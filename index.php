@@ -159,6 +159,14 @@ $router->post('notifications/store', [NotificationController::class, 'store']);
 $router->get('logs', [LogController::class, 'index']);
 $router->post('logs/clear', [LogController::class, 'clear']);
 
+// Cron Job Execution Endpoints
+$router->get('sync', function() {
+    require_once __DIR__ . '/cron/sync.php';
+});
+$router->get('cron/sync', function() {
+    require_once __DIR__ . '/cron/sync.php';
+});
+
 $router->get('updater', [UpdateController::class, 'index']);
 $router->get('updater/check', [UpdateController::class, 'checkNow']);
 $router->post('updater/apply', [UpdateController::class, 'apply']);
