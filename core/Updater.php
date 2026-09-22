@@ -25,7 +25,7 @@ class Updater {
         $cached = Setting::get('update_check_cache');
         $cacheTime = (int)Setting::get('update_check_time', '0');
 
-        if (!$forceRefresh && !empty($cached) && (time() - $cacheTime < 1800)) {
+        if (!$forceRefresh && !empty($cached) && (time() - $cacheTime < 900)) {
             $data = json_decode($cached, true);
             if (is_array($data)) return $data;
         }
@@ -66,12 +66,13 @@ class Updater {
 
         if ($commitRes && isset($commitRes['sha'])) {
             $shortSha = substr($commitRes['sha'], 0, 7);
-            $lastKnownSha = Setting::get('last_installed_commit_sha', '');
-            $hasUpdate = !empty($lastKnownSha) && ($lastKnownSha !== $shortSha);
+            $lastInstalledSha = Setting::get('last_installed_commit_sha', '');
+
+            $hasUpdate = empty($lastInstalledSha) || ($lastInstalledSha !== $shortSha);
 
             $result = [
                 'has_update' => $hasUpdate,
-                'current_version' => self::CURRENT_VERSION,
+                'current_version' => !empty($lastInstalledSha) ? "commit-{$lastInstalledSha}" : self::CURRENT_VERSION,
                 'latest_version' => "commit-{$shortSha}",
                 'release_title' => "آخرین تغییرات شاخه {$branch}",
                 'changelog' => $commitRes['commit']['message'] ?? 'آخرین تغییرات مستقیم مخزن گیت‌هاب',
@@ -86,7 +87,6 @@ class Updater {
             return $result;
         }
 
-        // No internet or invalid repo
         return [
             'has_update' => false,
             'current_version' => self::CURRENT_VERSION,
@@ -108,7 +108,9 @@ class Updater {
         $downloadUrl = $check['download_url'] ?? '';
 
         if (empty($downloadUrl)) {
-            return ['success' => false, 'error' => 'آدرس دانلود فایل به‌روزرسانی یافت نشد.'];
+            $branch = self::getBranch();
+            $repo = self::getRepo();
+            $downloadUrl = "https://github.com/{$repo}/archive/refs/heads/{$branch}.zip";
         }
 
         $tmpDir = sys_get_temp_dir() . '/connectix_update_' . time();
@@ -124,14 +126,13 @@ class Updater {
         curl_setopt($ch, CURLOPT_URL, $downloadUrl);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 90);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
         
         $headers = ['User-Agent: Connectix-Panel-Updater'];
         if (!empty($token)) {
             $headers[] = "Authorization: token {$token}";
-            $headers[] = "Accept: application/vnd.github.v3.raw";
         }
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
@@ -139,22 +140,19 @@ class Updater {
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
-        if (!$zipData || $httpCode >= 400) {
+        if (!$zipData || $httpCode >= 400 || strlen($zipData) < 1000) {
+            self::deleteDirectory($tmpDir);
             return ['success' => false, 'error' => "خطا در دانلود فایل پکیج از گیت‌هاب (کد HTTP: {$httpCode})"];
         }
 
         file_put_contents($zipFile, $zipData);
 
-        // Extract ZIP
-        $zip = new ZipArchive();
-        if ($zip->open($zipFile) !== true) {
-            @unlink($zipFile);
-            return ['success' => false, 'error' => 'فایل فشرده دانلود شده نامعتبر یا خراب است.'];
-        }
-
+        // Extract ZIP using resilient multi-engine extraction (ZipArchive -> unzip CLI -> Pure PHP)
         $extractPath = $tmpDir . '/extracted';
-        $zip->extractTo($extractPath);
-        $zip->close();
+        if (!self::extractZip($zipFile, $extractPath)) {
+            self::deleteDirectory($tmpDir);
+            return ['success' => false, 'error' => 'فایل فشرده دانلود شده قابل استخراج نیست.'];
+        }
 
         // Find root directory inside extracted zip (GitHub zips enclose files in a root directory)
         $subDirs = glob($extractPath . '/*', GLOB_ONLYDIR);
@@ -172,18 +170,102 @@ class Updater {
         // Cleanup
         self::deleteDirectory($tmpDir);
 
-        // Clear update cache
+        // Update installed commit SHA/version in database
+        $installedSha = str_replace('commit-', '', $check['latest_version'] ?? '');
+        Setting::set('last_installed_commit_sha', $installedSha);
+        Setting::set('last_installed_version', $check['latest_version'] ?? self::CURRENT_VERSION);
         Setting::set('update_check_cache', '');
         Setting::set('update_check_time', '0');
-        Setting::set('last_installed_version', $check['latest_version']);
 
         Helpers::logActivity('system_update', "به‌روزرسانی موفق پنل به نگارش {$check['latest_version']}", 'system');
 
         return [
             'success' => true,
-            'version' => $check['latest_version'],
-            'message' => "پنل با موفقیت به نگارش {$check['latest_version']} به‌روزرسانی شد!"
+            'version' => $check['latest_version'] ?? self::CURRENT_VERSION,
+            'message' => "پنل با موفقیت به نگارش " . ($check['latest_version'] ?? self::CURRENT_VERSION) . " به‌روزرسانی شد!"
         ];
+    }
+
+    /**
+     * Resilient ZIP extractor supporting ZipArchive, unzip CLI, and pure PHP fallback
+     */
+    public static function extractZip(string $zipFile, string $extractPath): bool {
+        if (!is_dir($extractPath)) {
+            @mkdir($extractPath, 0777, true);
+        }
+
+        // Method 1: PHP native ZipArchive if extension loaded
+        if (class_exists('ZipArchive')) {
+            $zip = new ZipArchive();
+            if ($zip->open($zipFile) === true) {
+                $zip->extractTo($extractPath);
+                $zip->close();
+                $files = glob($extractPath . '/*');
+                if (!empty($files)) return true;
+            }
+        }
+
+        // Method 2: System unzip command
+        if (function_exists('shell_exec')) {
+            $cmd = 'unzip -q -o ' . escapeshellarg($zipFile) . ' -d ' . escapeshellarg($extractPath) . ' 2>&1';
+            @shell_exec($cmd);
+            $files = glob($extractPath . '/*');
+            if (!empty($files)) return true;
+        }
+
+        // Method 3: Pure PHP unpacker using built-in gzinflate
+        return self::purePhpUnzip($zipFile, $extractPath);
+    }
+
+    /**
+     * Pure PHP ZIP file unpacker (Zero-dependency fallback)
+     */
+    public static function purePhpUnzip(string $zipFile, string $extractPath): bool {
+        $data = @file_get_contents($zipFile);
+        if (!$data) return false;
+
+        $offset = 0;
+        $fileCount = 0;
+        $len = strlen($data);
+
+        while ($offset < $len) {
+            if (substr($data, $offset, 4) !== "PK\x03\x04") {
+                break;
+            }
+
+            $compMethod = unpack('v', substr($data, $offset + 8, 2))[1] ?? 0;
+            $compSize = unpack('V', substr($data, $offset + 18, 4))[1] ?? 0;
+            $uncompSize = unpack('V', substr($data, $offset + 22, 4))[1] ?? 0;
+            $nameLen = unpack('v', substr($data, $offset + 26, 2))[1] ?? 0;
+            $extraLen = unpack('v', substr($data, $offset + 28, 2))[1] ?? 0;
+
+            $fileName = substr($data, $offset + 30, $nameLen);
+            $offset += 30 + $nameLen + $extraLen;
+
+            $fileData = substr($data, $offset, $compSize);
+            $offset += $compSize;
+
+            if ($compMethod === 8) {
+                $uncompressed = @gzinflate($fileData);
+            } elseif ($compMethod === 0) {
+                $uncompressed = $fileData;
+            } else {
+                continue;
+            }
+
+            if (str_ends_with($fileName, '/')) {
+                @mkdir($extractPath . '/' . $fileName, 0777, true);
+            } else {
+                $targetFile = $extractPath . '/' . $fileName;
+                @mkdir(dirname($targetFile), 0777, true);
+                if ($uncompressed !== false) {
+                    file_put_contents($targetFile, $uncompressed);
+                    $fileCount++;
+                }
+            }
+        }
+
+        return $fileCount > 0;
     }
 
     private static function copyDirectory(string $src, string $dst, array $skipped): void {
@@ -195,9 +277,7 @@ class Updater {
             $srcFile = $src . '/' . $file;
             $dstFile = $dst . '/' . $file;
 
-            // Check if file or folder is protected
             if (in_array($file, $skipped)) {
-                // Do not overwrite sensitive configuration or databases
                 continue;
             }
 
@@ -222,7 +302,15 @@ class Updater {
     private static function runPostUpdateMigrations(): void {
         try {
             $pdo = Database::getConnection();
-            // Ensure activity_logs table exists
+
+            $migFile = __DIR__ . '/../migrations/002_multi_reseller.sql';
+            if (file_exists($migFile)) {
+                $sql = file_get_contents($migFile);
+                if (!empty($sql)) {
+                    $pdo->exec($sql);
+                }
+            }
+
             $pdo->exec("CREATE TABLE IF NOT EXISTS activity_logs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NULL,
@@ -233,11 +321,6 @@ class Updater {
                 ip_address VARCHAR(45) NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )");
-
-            // Ensure telegram_chat_id exists in clients
-            try {
-                $pdo->exec("ALTER TABLE clients ADD COLUMN telegram_chat_id VARCHAR(64) NULL");
-            } catch (Throwable $e) {}
         } catch (Throwable $e) {}
     }
 
@@ -245,7 +328,7 @@ class Updater {
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 12);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
 
