@@ -1,0 +1,24 @@
+# Connectix Panel - Apache / cPanel URL Rewriting
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # تنظیم مسیر پوشه نصب (چون در پوشه contax نصب شده است):
+    RewriteBase /contax/
+
+    # Prevent direct access to sensitive directories
+    RewriteRule ^(core|drivers|data|cron)/.*$ - [F,L]
+
+    # Serve existing files and directories directly
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+
+    # Redirect all other requests to index.php
+    RewriteRule ^(.*)$ index.php [QSA,L]
+</IfModule>
+
+# Security Headers
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-XSS-Protection "1; mode=block"
+</IfModule>

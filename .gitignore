@@ -1,0 +1,10 @@
+# Database & Runtime Data
+/data/*.sqlite
+/data/*.sqlite-journal
+/data/*.log
+/data/backups/
+/data/tmp/
+
+# OS Files
+.DS_Store
+Thumbs.db

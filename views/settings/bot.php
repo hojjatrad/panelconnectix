@@ -1,0 +1,352 @@
+<?php
+$pageTitle = 'مدیریت و فعال‌سازی ربات تلگرام';
+require __DIR__ . '/../layout/header.php';
+
+$botActive = ($settings['telegram_bot_active'] ?? '1') === '1';
+$botToken = $settings['telegram_bot_token'] ?? '';
+$botUsername = $settings['telegram_bot_username'] ?? '';
+$adminId = $settings['telegram_admin_id'] ?? '';
+
+$cardNumber = $settings['card_number'] ?? '';
+$cardHolder = $settings['card_holder'] ?? '';
+$cardBank = $settings['card_bank_name'] ?? '';
+$supportTg = $settings['support_telegram'] ?? '';
+
+$paymentGw = $settings['payment_gateway'] ?? 'card';
+$zarinMerchant = $settings['zarinpal_merchant'] ?? '';
+$nextpayKey = $settings['nextpay_apikey'] ?? '';
+$nowpaymentsKey = $settings['nowpayments_apikey'] ?? '';
+
+$webhookUrl = Helpers::fullUrl('webhook.php');
+$isWebhookSet = !empty($webhookInfo['result']['url'] ?? '');
+?>
+
+<div class="space-y-6">
+
+    <!-- Top Status Bar & Quick Actions -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl">
+        <div class="flex items-center gap-4">
+            <div class="w-14 h-14 rounded-2xl bg-cyan-600/20 text-cyan-400 flex items-center justify-center text-3xl shadow-lg shadow-cyan-600/10">
+                <i class="fa-brands fa-telegram"></i>
+            </div>
+            <div>
+                <div class="flex items-center gap-2">
+                    <h1 class="text-lg font-bold text-white">ربات تلگرام و فروشگاه خودکار</h1>
+                    <?php if ($botActive && !empty($botToken)): ?>
+                        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">روشن و فعال</span>
+                    <?php else: ?>
+                        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">نیاز به توکن یا غیرفعال</span>
+                    <?php endif; ?>
+                </div>
+                <p class="text-xs text-slate-400 mt-1">خرید آنی اشتراک، تمدید دوره، استعلام حجم، دریافت نرم‌افزارها و واریز کارت‌به‌کارت</p>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex items-center gap-2 flex-wrap">
+            <form method="POST" action="<?= Helpers::url('settings/bot/set-webhook') ?>">
+                <?= Helpers::csrfField() ?>
+                <button type="submit" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition shadow-md flex items-center gap-2">
+                    <i class="fa-solid fa-bolt"></i>
+                    <span>ثبت خودکار وبهوک</span>
+                </button>
+            </form>
+
+            <form method="POST" action="<?= Helpers::url('settings/bot/test-message') ?>">
+                <?= Helpers::csrfField() ?>
+                <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-md flex items-center gap-2">
+                    <i class="fa-solid fa-paper-plane"></i>
+                    <span>تست ارسال به مدیر</span>
+                </button>
+            </form>
+
+            <form method="POST" action="<?= Helpers::url('settings/bot/delete-webhook') ?>" onsubmit="return confirm('آیا از حذف وبهوک تلگرام اطمینان دارید؟');">
+                <?= Helpers::csrfField() ?>
+                <button type="submit" class="px-3 py-2 bg-slate-800 hover:bg-rose-900/50 hover:text-rose-300 text-slate-300 rounded-xl text-xs font-medium transition border border-slate-700" title="حذف وبهوک">
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Webhook Info Box -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-slate-900/80 border border-slate-800 p-4 rounded-xl flex items-center gap-3">
+            <div class="w-10 h-10 rounded-lg <?= $isWebhookSet ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400' ?> flex items-center justify-center text-lg shrink-0">
+                <i class="fa-solid <?= $isWebhookSet ? 'fa-link' : 'fa-link-slash' ?>"></i>
+            </div>
+            <div class="overflow-hidden">
+                <div class="text-[11px] text-slate-400">وضعیت اتصال وبهوک تلگرام</div>
+                <div class="text-xs font-bold text-white truncate" title="<?= htmlspecialchars($webhookInfo['result']['url'] ?? 'ثبت نشده') ?>">
+                    <?= $isWebhookSet ? 'متصل به سرور' : 'تنظیم نشده (دکمه ثبت را بزنید)' ?>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-slate-900/80 border border-slate-800 p-4 rounded-xl flex items-center gap-3">
+            <div class="w-10 h-10 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-lg shrink-0">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+            </div>
+            <div>
+                <div class="text-[11px] text-slate-400">آپدیت‌های در صف تلگرام</div>
+                <div class="text-xs font-bold text-white">
+                    <?= intval($webhookInfo['result']['pending_update_count'] ?? 0) ?> پیام در انتظار
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-slate-900/80 border border-slate-800 p-4 rounded-xl flex items-center gap-3">
+            <div class="w-10 h-10 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center text-lg shrink-0">
+                <i class="fa-solid fa-receipt"></i>
+            </div>
+            <div>
+                <div class="text-[11px] text-slate-400">سفارشات نیازمند بررسی</div>
+                <div class="text-xs font-bold text-purple-300">
+                    <?php 
+                    $pendingCount = count(array_filter($orders, fn($o) => $o['payment_status'] === 'pending_approval'));
+                    echo $pendingCount . ' سفارش در انتظار تایید';
+                    ?>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Grid: Settings Form & Orders List -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Form Settings (5 Columns) -->
+        <div class="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+            <h2 class="text-sm font-bold text-white mb-4 flex items-center gap-2 pb-3 border-b border-slate-800">
+                <i class="fa-solid fa-sliders text-purple-400"></i>
+                <span>پیکربندی ربات و روش‌های پرداخت</span>
+            </h2>
+
+            <form method="POST" action="<?= Helpers::url('settings/bot') ?>" class="space-y-4">
+                <?= Helpers::csrfField() ?>
+
+                <!-- Bot Status Toggle -->
+                <div class="flex items-center justify-between p-3 bg-slate-950/60 rounded-xl border border-slate-800/80">
+                    <div>
+                        <div class="text-xs font-bold text-white">فعال بودن ربات تلگرام</div>
+                        <div class="text-[11px] text-slate-400">پاسخگویی به خریداران در تلگرام</div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" name="telegram_bot_active" value="1" class="sr-only peer" <?= $botActive ? 'checked' : '' ?>>
+                        <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                    </label>
+                </div>
+
+                <!-- Bot Token -->
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1.5">توکن ربات تلگرام (Bot Token)</label>
+                    <input type="text" name="telegram_bot_token" value="<?= htmlspecialchars($botToken) ?>" placeholder="مثال: 7123456789:AAHk..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-purple-500 font-mono text-left" dir="ltr">
+                    <p class="text-[10px] text-slate-500 mt-1">از طریق @BotFather در تلگرام دریافت می‌شود.</p>
+                </div>
+
+                <!-- Bot Username -->
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1.5">یوزرنیم ربات تلگرام</label>
+                    <div class="relative">
+                        <input type="text" name="telegram_bot_username" value="<?= htmlspecialchars($botUsername) ?>" placeholder="MyVpnBot" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-purple-500 font-mono text-left pl-8" dir="ltr">
+                        <span class="absolute left-3 top-2.5 text-xs text-slate-500">@</span>
+                    </div>
+                </div>
+
+                <!-- Bot Buttons Tip -->
+                <div class="p-3 bg-cyan-950/30 border border-cyan-800/40 rounded-xl text-[11px] text-cyan-300 flex items-start gap-2.5">
+                    <i class="fa-solid fa-circle-info text-cyan-400 mt-0.5 shrink-0"></i>
+                    <div>
+                        <div class="font-bold mb-0.5">نحوه نمایش دکمه‌های ربات:</div>
+                        <p class="text-[10px] text-cyan-200/80 leading-relaxed">
+                            دکمه‌های ربات به دو صورت همزمان (دکمه‌های شیشه‌ای زیر هر پیام + کیبورد ثابت پایین چت) فعال شده‌اند. پس از زدن دکمه <b>«تست ارسال به مدیر»</b> یا ارسال <b>/start</b> در تلگرام، کلیه دکمه‌ها با قابلیت خرید، تمدید و استعلام ظاهر خواهند شد.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Admin Telegram Chat ID -->
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1.5">شناسه عددی تلگرام مدیر (Admin Chat ID)</label>
+                    <input type="text" name="telegram_admin_id" value="<?= htmlspecialchars($adminId) ?>" placeholder="مثال: 123456789" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-purple-500 font-mono text-left" dir="ltr">
+                    <p class="text-[10px] text-slate-500 mt-1">ارسال فیش‌های واریزی و دکمه‌های تایید خرید به این شناسه ارسال می‌شود (از ربات @userinfobot دریافت کنید).</p>
+                </div>
+
+                <!-- Bot Welcome Text -->
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1.5">متن پیام شروع ربات (Welcome Message)</label>
+                    <textarea name="bot_welcome_text" rows="2" placeholder="به ربات رسمی خوش آمدید..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-purple-500"><?= htmlspecialchars($settings['bot_welcome_text'] ?? '') ?></textarea>
+                    <p class="text-[10px] text-slate-500 mt-0.5">در صورت خالی بودن، متن پیش‌فرض سیستم نمایش داده می‌شود.</p>
+                </div>
+
+                <!-- Card to Card Section -->
+                <div class="pt-3 border-t border-slate-800/80 space-y-3">
+                    <div class="text-xs font-bold text-purple-300 flex items-center gap-1.5">
+                        <i class="fa-solid fa-credit-card"></i>
+                        <span>اطلاعات کارت جهت واریز مشتری</span>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-400 mb-1">شماره کارت ۱۶ رقمی</label>
+                        <input type="text" name="card_number" value="<?= htmlspecialchars($cardNumber) ?>" placeholder="۶۰۳۷-xxxx-xxxx-xxxx" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-purple-500 font-mono text-center tracking-widest" dir="ltr">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[11px] font-medium text-slate-400 mb-1">نام دارنده حساب</label>
+                            <input type="text" name="card_holder" value="<?= htmlspecialchars($cardHolder) ?>" placeholder="نام صاحب کارت" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-medium text-slate-400 mb-1">نام بانک</label>
+                            <input type="text" name="card_bank_name" value="<?= htmlspecialchars($cardBank) ?>" placeholder="مثلاً بانک ملی" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-400 mb-1">شماره شبا یا توضیحات پرداخت (اختیاری)</label>
+                        <input type="text" name="card_sheba" value="<?= htmlspecialchars($settings['card_sheba'] ?? '') ?>" placeholder="IR... یا انتقال با فیش" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-purple-500 font-mono text-left" dir="ltr">
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-400 mb-1">آیدی پشتیبانی تلگرام</label>
+                        <input type="text" name="support_telegram" value="<?= htmlspecialchars($supportTg) ?>" placeholder="@Support_ID" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-purple-500 font-mono text-left" dir="ltr">
+                    </div>
+                </div>
+
+                <!-- Online Payment Gateway Section -->
+                <div class="pt-3 border-t border-slate-800/80 space-y-3">
+                    <div class="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
+                        <i class="fa-solid fa-globe"></i>
+                        <span>درگاه پرداخت آنلاین (اختیاری)</span>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-400 mb-1">روش پرداخت</label>
+                        <select name="payment_gateway" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-purple-500">
+                            <option value="card" <?= $paymentGw === 'card' ? 'selected' : '' ?>>فقط کارت به کارت (تایید با ارسال فیش)</option>
+                            <option value="zarinpal" <?= $paymentGw === 'zarinpal' ? 'selected' : '' ?>>زرین‌پال (ZarinPal)</option>
+                            <option value="nextpay" <?= $paymentGw === 'nextpay' ? 'selected' : '' ?>>نکست‌پی (NextPay)</option>
+                            <option value="nowpayments" <?= $paymentGw === 'nowpayments' ? 'selected' : '' ?>>تتر و کریپتو (NowPayments)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-400 mb-1">مرچنت‌کد زرین‌پال (Merchant ID)</label>
+                        <input type="text" name="zarinpal_merchant" value="<?= htmlspecialchars($zarinMerchant) ?>" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500 font-mono text-left" dir="ltr">
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-400 mb-1">کلید API نکست‌پی یا نوپیمنتس</label>
+                        <input type="text" name="nextpay_apikey" value="<?= htmlspecialchars($nextpayKey) ?>" placeholder="API Key" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500 font-mono text-left" dir="ltr">
+                    </div>
+                </div>
+
+                <div class="pt-3">
+                    <button type="submit" class="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs shadow-lg shadow-purple-600/30 transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-floppy-disk"></i>
+                        <span>ذخیره کلیه تنظیمات</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Orders Table (7 Columns) -->
+        <div class="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+                <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-cart-shopping text-cyan-400"></i>
+                    <span>سفارش‌های دریافتی از ربات تلگرام</span>
+                </h2>
+                <span class="text-xs text-slate-400"><?= count($orders) ?> سفارش اخیر</span>
+            </div>
+
+            <?php if (empty($orders)): ?>
+                <div class="p-12 text-center text-slate-500 space-y-2 my-auto">
+                    <i class="fa-solid fa-inbox text-3xl opacity-40"></i>
+                    <p class="text-xs">هنوز سفارشی از ربات تلگرام ثبت نشده است.</p>
+                </div>
+            <?php else: ?>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-right text-xs">
+                        <thead>
+                            <tr class="text-slate-400 border-b border-slate-800">
+                                <th class="pb-3 pr-2">کد سفارش</th>
+                                <th class="pb-3">کاربر تلگرام</th>
+                                <th class="pb-3">پلن</th>
+                                <th class="pb-3">مبلغ</th>
+                                <th class="pb-3">وضعیت</th>
+                                <th class="pb-3 text-center">اقدام</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-800/60">
+                            <?php foreach ($orders as $o): ?>
+                                <tr class="hover:bg-slate-800/30 transition">
+                                    <td class="py-3 pr-2 font-mono text-purple-300 font-bold"><?= htmlspecialchars($o['order_code']) ?></td>
+                                    <td class="py-3">
+                                        <div class="font-bold text-white"><?= htmlspecialchars($o['user_tg_name'] ?: 'کاربر') ?></div>
+                                        <div class="text-[10px] text-slate-400 font-mono">
+                                            <?= !empty($o['user_tg_username']) ? '@' . htmlspecialchars($o['user_tg_username']) : 'ID: ' . $o['user_tg_id'] ?>
+                                        </div>
+                                    </td>
+                                    <td class="py-3 text-slate-300"><?= htmlspecialchars($o['plan_title'] ?? 'پلن حذف شده') ?></td>
+                                    <td class="py-3 font-mono font-bold text-slate-200"><?= number_format($o['amount']) ?> ت</td>
+                                    <td class="py-3">
+                                        <?php if ($o['payment_status'] === 'paid'): ?>
+                                            <span class="px-2 py-0.5 rounded-full text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">تایید و فعال شده</span>
+                                        <?php elseif ($o['payment_status'] === 'pending_approval'): ?>
+                                            <span class="px-2 py-0.5 rounded-full text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 font-bold animate-pulse">فیش واریز شد (نیاز به تایید)</span>
+                                        <?php elseif ($o['payment_status'] === 'rejected'): ?>
+                                            <span class="px-2 py-0.5 rounded-full text-[10px] bg-rose-500/10 text-rose-400 border border-rose-500/20">رد شده</span>
+                                        <?php else: ?>
+                                            <span class="px-2 py-0.5 rounded-full text-[10px] bg-slate-800 text-slate-400">در انتظار واریز</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td class="py-3 text-center">
+                                        <?php if ($o['payment_status'] === 'pending_approval'): ?>
+                                            <div class="flex items-center justify-center gap-1.5">
+                                                <form method="POST" action="<?= Helpers::url('settings/bot/approve') ?>">
+                                                    <?= Helpers::csrfField() ?>
+                                                    <input type="hidden" name="order_id" value="<?= $o['id'] ?>">
+                                                    <button type="submit" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold transition shadow" title="تایید و ساخت خودکار اکانت">
+                                                        <i class="fa-solid fa-check"></i> تایید
+                                                    </button>
+                                                </form>
+
+                                                <form method="POST" action="<?= Helpers::url('settings/bot/reject') ?>">
+                                                    <?= Helpers::csrfField() ?>
+                                                    <input type="hidden" name="order_id" value="<?= $o['id'] ?>">
+                                                    <button type="submit" class="px-2 py-1 bg-rose-900/50 hover:bg-rose-800 text-rose-300 rounded-lg text-[10px] font-bold transition border border-rose-800/50" title="رد سفارش">
+                                                        <i class="fa-solid fa-xmark"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        <?php elseif ($o['payment_status'] === 'paid' && !empty($o['client_username'])): ?>
+                                            <span class="text-[10px] text-emerald-400 font-mono">کاربر: <?= htmlspecialchars($o['client_username']) ?></span>
+                                        <?php else: ?>
+                                            <span class="text-slate-600 text-[11px]">-</span>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php endif; ?>
+
+            <!-- Cron Automation Hint -->
+            <div class="mt-auto pt-4 border-t border-slate-800/80">
+                <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-[11px] text-slate-400 space-y-1">
+                    <div class="font-bold text-slate-300 flex items-center gap-1.5">
+                        <i class="fa-solid fa-clock text-purple-400"></i>
+                        <span>دستور Cron Job سی‌پنل جهت استعلام حجم و انقضا:</span>
+                    </div>
+                    <code class="block font-mono text-[10px] text-purple-300 select-all bg-slate-900 p-1.5 rounded border border-slate-800 text-left" dir="ltr">
+                        */10 * * * * curl -s "<?= Helpers::fullUrl('cron/sync.php?key=' . APP_SECRET) ?>" >/dev/null 2>&1
+                    </code>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+<?php require __DIR__ . '/../layout/footer.php'; ?>
