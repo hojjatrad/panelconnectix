@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS `users` (
     `zarinpal_merchant` VARCHAR(64) NULL,
     `support_username` VARCHAR(128) NULL,
     `welcome_message` TEXT NULL,
+    `telegram_channel` VARCHAR(128) NULL,
     `custom_domain` VARCHAR(128) NULL,
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -61,6 +62,9 @@ CREATE TABLE IF NOT EXISTS `plans` (
     `base_price` BIGINT NOT NULL,
     `reseller_price` BIGINT NOT NULL,
     `server_group` VARCHAR(64) NOT NULL DEFAULT 'default',
+    `category` VARCHAR(64) NOT NULL DEFAULT '۱ ماهه',
+    `show_in_bot` TINYINT(1) DEFAULT 1,
+    `ip_limit` INT DEFAULT 2,
     `is_free` TINYINT(1) DEFAULT 0,
     `is_active` TINYINT(1) DEFAULT 1,
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -79,9 +83,13 @@ CREATE TABLE IF NOT EXISTS `clients` (
     `traffic_limit_bytes` BIGINT NOT NULL,
     `traffic_used_bytes` BIGINT DEFAULT 0,
     `expire_at` DATETIME NULL,
+    `ip_limit` INT DEFAULT 2,
     `status` ENUM('active', 'expired', 'disabled', 'never_connected') NOT NULL DEFAULT 'active',
     `last_connected_at` DATETIME NULL,
     `telegram_chat_id` VARCHAR(64) NULL,
+    `alert_80_sent` TINYINT(1) DEFAULT 0,
+    `alert_95_sent` TINYINT(1) DEFAULT 0,
+    `alert_expire_sent` TINYINT(1) DEFAULT 0,
     `custom_note` TEXT NULL,
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
     INDEX `idx_reseller` (`reseller_id`),
@@ -166,6 +174,8 @@ CREATE TABLE IF NOT EXISTS `bot_orders` (
     `server_id` INT NULL,
     `target_username` VARCHAR(64) NULL,
     `amount` BIGINT DEFAULT 0,
+    `coupon_code` VARCHAR(64) NULL,
+    `discount_amount` BIGINT DEFAULT 0,
     `payment_method` VARCHAR(32) DEFAULT 'card',
     `payment_status` VARCHAR(32) DEFAULT 'pending_receipt',
     `receipt_photo_id` VARCHAR(255) NULL,
@@ -221,7 +231,74 @@ CREATE TABLE IF NOT EXISTS `activity_logs` (
     INDEX `idx_log_created` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 13. Application Download Guides & Video Tutorials
+CREATE TABLE IF NOT EXISTS `app_guides` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `platform` VARCHAR(32) NOT NULL,
+    `app_name` VARCHAR(128) NOT NULL,
+    `download_url` VARCHAR(255) NOT NULL,
+    `guide_url` VARCHAR(255) NULL,
+    `description` TEXT NULL,
+    `sort_order` INT DEFAULT 0,
+    `is_active` TINYINT(1) DEFAULT 1,
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 14. Discount Coupons
+CREATE TABLE IF NOT EXISTS `coupons` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `code` VARCHAR(64) NOT NULL UNIQUE,
+    `discount_percent` INT NOT NULL DEFAULT 10,
+    `max_uses` INT DEFAULT 0,
+    `used_count` INT DEFAULT 0,
+    `expires_at` DATE NULL,
+    `is_active` TINYINT(1) DEFAULT 1,
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 15. In-Panel Tickets & Support Messages
+CREATE TABLE IF NOT EXISTS `tickets` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `user_id` INT NOT NULL,
+    `subject` VARCHAR(255) NOT NULL,
+    `department` VARCHAR(64) DEFAULT 'support',
+    `priority` ENUM('low', 'medium', 'high', 'urgent') DEFAULT 'medium',
+    `status` ENUM('open', 'answered', 'waiting_reseller', 'closed') DEFAULT 'open',
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX `idx_ticket_user` (`user_id`),
+    INDEX `idx_ticket_status` (`status`),
+    CONSTRAINT `fk_ticket_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `ticket_messages` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `ticket_id` INT NOT NULL,
+    `sender_id` INT NOT NULL,
+    `message` TEXT NOT NULL,
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX `idx_tm_ticket` (`ticket_id`),
+    CONSTRAINT `fk_tm_ticket` FOREIGN KEY (`ticket_id`) REFERENCES `tickets` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 SET FOREIGN_KEY_CHECKS = 1;
+
+-- Seed Default App Guides
+INSERT INTO `app_guides` (`platform`, `app_name`, `download_url`, `guide_url`, `description`, `sort_order`, `is_active`) VALUES
+('android', 'V2rayNG', 'https://play.google.com/store/apps/details?id=com.v2ray.ang', 'https://youtube.com', 'محبوب‌ترین و پایدارترین کلاینت اندروید برای VLESS و Reality', 1, 1),
+('android', 'Hiddify Next', 'https://github.com/hiddify/hiddify-app/releases', 'https://youtube.com', 'کلاینت چندمنظوره با اتصال هوشمند و تغییر خودکار کانفیگ', 2, 1),
+('ios', 'Streisand', 'https://apps.apple.com/app/streisand/id6450534064', 'https://youtube.com', 'نرم‌افزار رایگان و فوق‌العاده سریع با پشتیبانی کامل از Reality', 1, 1),
+('ios', 'V2Box', 'https://apps.apple.com/app/v2box-v2ray-client/id6446814042', 'https://youtube.com', 'کلاینت قدرتمند iOS سازگار با تمام نسخه‌های آیفون و آیپد', 2, 1),
+('windows', 'Hiddify Windows', 'https://github.com/hiddify/hiddify-app/releases', 'https://youtube.com', 'نسخه کامپیوتر هیدیفای با سیستم پروکسی سیستم خودکار (TUN)', 1, 1),
+('windows', 'v2rayN', 'https://github.com/2dust/v2rayN/releases', 'https://youtube.com', 'کلاینت سبک، کلاسیک و فوق‌پایدار ویندوز', 2, 1),
+('macos', 'Hiddify macOS', 'https://github.com/hiddify/hiddify-app/releases', 'https://youtube.com', 'کلاینت رسمی هیدیفای برای مک‌بوک‌های پردازنده M1/M2/M3 و Intel', 1, 1)
+ON DUPLICATE KEY UPDATE `id`=`id`;
+
+-- Seed Sample Coupon
+INSERT INTO `coupons` (`code`, `discount_percent`, `max_uses`, `used_count`, `expires_at`, `is_active`) VALUES
+('WELCOME10', 10, 100, 0, '2027-12-31', 1),
+('VIP20', 20, 50, 0, '2027-12-31', 1)
+ON DUPLICATE KEY UPDATE `code`=`code`;
 
 -- Seed Default Admin: admin / admin123
 INSERT INTO `users` (`id`, `username`, `password_hash`, `role`, `full_name`, `email`, `wallet_balance`, `api_token`) 

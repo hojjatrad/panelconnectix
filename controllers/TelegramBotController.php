@@ -45,7 +45,8 @@ class TelegramBotController {
             'brand_name' => $brand,
             'card' => $card,
             'admin_chat_id' => $adminChatId,
-            'support_username' => !empty($reseller['support_username']) ? $reseller['support_username'] : Setting::get('telegram_support', '')
+            'support_username' => !empty($reseller['support_username']) ? $reseller['support_username'] : Setting::get('telegram_support', ''),
+            'channel' => !empty($reseller['telegram_channel']) ? $reseller['telegram_channel'] : Setting::get('bot_force_join_channel', '')
         ];
 
         return self::$currentContext;
@@ -59,15 +60,57 @@ class TelegramBotController {
         return self::resolveContext($pdo);
     }
 
+    /**
+     * Check if user has joined the mandatory channel (Force Join)
+     */
+    public static function checkForceJoin(PDO $pdo, string $chatId, string $fromId, ?string $botToken = null): bool {
+        $ctx = self::getContext($pdo);
+        $channel = trim(!empty($ctx['channel']) ? $ctx['channel'] : Setting::get('bot_force_join_channel', ''));
+        if (empty($channel)) {
+            return true;
+        }
+
+        $botToken = $botToken ?: $ctx['bot_token'];
+        $res = TelegramBot::getChatMember($channel, (int)$fromId, $botToken);
+        if ($res && isset($res['status'])) {
+            $status = $res['status'];
+            if (in_array($status, ['creator', 'administrator', 'member', 'restricted'])) {
+                return true;
+            }
+        }
+
+        $channelClean = ltrim($channel, '@');
+        $channelUrl = str_starts_with($channel, '-') ? '#' : "https://t.me/{$channelClean}";
+
+        $joinMsg = "⚠️ <b>عضویت در کانال الزامی است</b>\n\n"
+                 . "کاربر گرامی، جهت استفاده از کلیه خدمات ربات، عضویت در کانال رسمی اطلاع‌رسانی الزامی است:\n\n"
+                 . "📢 <b>کانال رسمی:</b> {$channel}\n\n"
+                 . "لطفاً ابتدا در کانال عضو شده و سپس دکمه «تایید عضویت ✅» را لمس فرمایید.";
+
+        $keyboard = [
+            'inline_keyboard' => [
+                [
+                    ['text' => '📢 عضویت در کانال رسمی', 'url' => $channelUrl]
+                ],
+                [
+                    ['text' => '✅ تایید عضویت', 'callback_data' => 'check_join']
+                ]
+            ]
+        ];
+
+        TelegramBot::sendMessage($joinMsg, $chatId, $keyboard, $botToken);
+        return false;
+    }
+
     public static function getPlansForReseller(PDO $pdo, int $resellerId, bool $includeFree = false): array {
         $sql = "SELECT p.*, 
                        COALESCE(rp.custom_title, p.title) as display_title,
-                       COALESCE(rp.custom_category, 'پیش‌فرض') as display_category,
+                       COALESCE(rp.custom_category, p.category, '۱ ماهه') as display_category,
                        COALESCE(rp.retail_price, p.base_price) as display_price,
                        COALESCE(rp.is_active, 1) as display_active
                 FROM plans p
                 LEFT JOIN reseller_plans rp ON p.id = rp.plan_id AND rp.reseller_id = ?
-                WHERE p.is_active = 1 AND COALESCE(rp.is_active, 1) = 1";
+                WHERE p.is_active = 1 AND COALESCE(rp.is_active, 1) = 1 AND COALESCE(p.show_in_bot, 1) = 1";
         if (!$includeFree) {
             $sql .= " AND p.is_free = 0";
         }
@@ -119,7 +162,7 @@ class TelegramBotController {
     }
 
     /**
-     * Main Menu Inline Keyboard with smart account binding detection
+     * Main Menu Inline Keyboard with clean 2-column layout & custom labels
      */
     public static function getMainMenuInlineKeyboard(?PDO $pdo = null, ?string $fromId = null): array {
         $boundCount = 0;
@@ -129,64 +172,81 @@ class TelegramBotController {
             $boundCount = (int)$stmt->fetchColumn();
         }
 
+        $buyText = Setting::get('btn_buy_text', '🛒 خرید اشتراک');
+        $renewText = Setting::get('btn_renew_text', '🔄 تمدید اشتراک');
+        $myAccText = Setting::get('btn_my_accounts_text', '👤 حساب‌های من');
+        $trialText = Setting::get('btn_trial_text', '🎁 تست رایگان');
+        $refText = Setting::get('btn_referral_text', '🤝 کسب درآمد');
+        $appsText = Setting::get('btn_apps_text', '📱 دانلود و آموزش');
+        $supportText = Setting::get('btn_support_text', '☎️ پشتیبانی');
+        $resellerText = Setting::get('btn_reseller_text', '💼 اخذ نمایندگی');
+
         $buttons = [];
 
         if ($boundCount > 0) {
             $buttons[] = [
-                ['text' => "👤 حساب‌های متصل من ({$boundCount} اکانت)", 'callback_data' => 'menu_my_accounts'],
+                ['text' => "{$myAccText} ({$boundCount})", 'callback_data' => 'menu_my_accounts'],
                 ['text' => '➕ اتصال حساب دیگر', 'callback_data' => 'menu_bind']
             ];
         } else {
             $buttons[] = [
-                ['text' => '🔗 ورود و اتصال حساب کاربری', 'callback_data' => 'menu_bind'],
-                ['text' => '🔍 استعلام با مشخصات (مهمان)', 'callback_data' => 'menu_guest_status']
+                ['text' => '🔗 ورود و اتصال حساب', 'callback_data' => 'menu_bind'],
+                ['text' => '🔍 استعلام وضعیت', 'callback_data' => 'menu_guest_status']
             ];
         }
 
         $buttons[] = [
-            ['text' => '🛒 خرید اشتراک جدید', 'callback_data' => 'menu_buy'],
-            ['text' => '🔄 تمدید اشتراک', 'callback_data' => 'menu_renew']
+            ['text' => $buyText, 'callback_data' => 'menu_buy'],
+            ['text' => $renewText, 'callback_data' => 'menu_renew']
         ];
 
         $buttons[] = [
-            ['text' => '🎁 دریافت تست رایگان', 'callback_data' => 'menu_trial'],
-            ['text' => '🤝 زیرمجموعه‌گیری و پاداش', 'callback_data' => 'menu_referral']
+            ['text' => $trialText, 'callback_data' => 'menu_trial'],
+            ['text' => $refText, 'callback_data' => 'menu_referral']
         ];
 
         $buttons[] = [
-            ['text' => '📱 دانلود نرم‌افزارها', 'callback_data' => 'menu_apps'],
-            ['text' => '☎️ پشتیبانی تلگرام', 'callback_data' => 'menu_support']
+            ['text' => $appsText, 'callback_data' => 'menu_apps'],
+            ['text' => $supportText, 'callback_data' => 'menu_support']
         ];
 
         $buttons[] = [
-            ['text' => '💼 درخواست پنل نمایندگی فروش', 'callback_data' => 'menu_reseller_apply']
+            ['text' => $resellerText, 'callback_data' => 'menu_reseller_apply']
         ];
 
         return ['inline_keyboard' => $buttons];
     }
 
     /**
-     * Main Menu Reply Keyboard (Fixed at bottom chat input)
+     * Main Menu Reply Keyboard (Fixed at bottom chat input - Clean 2-column layout)
      */
     public static function getMainMenuReplyKeyboard(): array {
+        $buyText = Setting::get('btn_buy_text', '🛒 خرید اشتراک');
+        $renewText = Setting::get('btn_renew_text', '🔄 تمدید اشتراک');
+        $myAccText = Setting::get('btn_my_accounts_text', '👤 حساب‌های من');
+        $trialText = Setting::get('btn_trial_text', '🎁 تست رایگان');
+        $refText = Setting::get('btn_referral_text', '🤝 کسب درآمد');
+        $appsText = Setting::get('btn_apps_text', '📱 دانلود و آموزش');
+        $supportText = Setting::get('btn_support_text', '☎️ پشتیبانی');
+        $resellerText = Setting::get('btn_reseller_text', '💼 اخذ نمایندگی');
+
         return [
             'keyboard' => [
                 [
-                    ['text' => '🛒 خرید اشتراک جدید'],
-                    ['text' => '🔄 تمدید اشتراک']
+                    ['text' => $buyText],
+                    ['text' => $renewText]
                 ],
                 [
-                    ['text' => '🎁 دریافت تست رایگان'],
-                    ['text' => '🤝 زیرمجموعه‌گیری و درآمد']
+                    ['text' => $myAccText],
+                    ['text' => $trialText]
                 ],
                 [
-                    ['text' => '👤 حساب‌های من'],
-                    ['text' => '🔗 ورود و اتصال حساب']
+                    ['text' => $refText],
+                    ['text' => $appsText]
                 ],
                 [
-                    ['text' => '📱 دانلود نرم‌افزارها'],
-                    ['text' => '💼 درخواست نمایندگی'],
-                    ['text' => '☎️ پشتیبانی تلگرام']
+                    ['text' => $supportText],
+                    ['text' => $resellerText]
                 ]
             ],
             'resize_keyboard' => true,
@@ -237,6 +297,33 @@ class TelegramBotController {
         $chatId = (string)($cb['message']['chat']['id'] ?? $fromId);
 
         TelegramBot::answerCallbackQuery($cbId);
+
+        // Force Join Check handler
+        if ($data === 'check_join') {
+            $channel = trim(Setting::get('bot_force_join_channel', ''));
+            $res = TelegramBot::getChatMember($channel, (int)$fromId);
+            $isMember = false;
+            if ($res && isset($res['status'])) {
+                $status = $res['status'];
+                if (in_array($status, ['creator', 'administrator', 'member', 'restricted'])) {
+                    $isMember = true;
+                }
+            }
+
+            if ($isMember) {
+                TelegramBot::answerCallbackQuery($cbId, '✅ عضویت شما در کانال تایید شد. خوش آمدید!', false);
+                self::sendMainMenu($pdo, $chatId, $fromId, $cb['from']['first_name'] ?? '', $messageId);
+            } else {
+                TelegramBot::answerCallbackQuery($cbId, '❌ شما هنوز در کانال عضو نشده‌اید! لطفاً ابتدا عضو شوید.', true);
+            }
+            return;
+        }
+
+        // Before executing other actions, verify channel membership if enabled
+        if (!self::checkForceJoin($pdo, $chatId, $fromId)) {
+            TelegramBot::answerCallbackQuery($cbId, '⚠️ عضویت در کانال جهت استفاده از ربات الزامی است.', true);
+            return;
+        }
 
         // Return to main menu
         if ($data === 'menu_main') {
@@ -423,6 +510,45 @@ class TelegramBotController {
             return;
         }
 
+        // Category Selection for Plans
+        if (str_starts_with($data, 'cat_buy_')) {
+            $catHash = str_replace('cat_buy_', '', $data);
+            self::showPlansMenu($pdo, $chatId, $messageId, $catHash);
+            return;
+        }
+
+        // Platform Selection for Apps Download
+        if (str_starts_with($data, 'apps_plat_')) {
+            $plat = str_replace('apps_plat_', '', $data);
+            self::showAppsDownload($pdo, $chatId, $messageId, $plat);
+            return;
+        }
+
+        // Apply Coupon Code
+        if (str_starts_with($data, 'apply_coupon_')) {
+            $orderId = (int)str_replace('apply_coupon_', '', $data);
+            self::setSession($pdo, $fromId, 'awaiting_coupon', ['order_id' => $orderId]);
+            $msg = "🎟 <b>اعمال کد تخفیف</b>\n\nلطفاً کد تخفیف خود را به صورت متنی در چت ارسال فرمایید:";
+            $kb = [
+                'inline_keyboard' => [
+                    [['text' => '🔙 انصراف و بازگشت به فاکتور', 'callback_data' => 'view_order_' . $orderId]]
+                ]
+            ];
+            if ($messageId) {
+                TelegramBot::editMessageText($msg, $chatId, $messageId, $kb);
+            } else {
+                TelegramBot::sendMessage($msg, $chatId, $kb);
+            }
+            return;
+        }
+
+        // View Order Invoice
+        if (str_starts_with($data, 'view_order_')) {
+            $orderId = (int)str_replace('view_order_', '', $data);
+            self::renderOrderInvoice($pdo, $orderId, $chatId, $messageId);
+            return;
+        }
+
         // Menu triggers
         if ($data === 'menu_buy') {
             self::showPlansMenu($pdo, $chatId, $messageId);
@@ -433,7 +559,7 @@ class TelegramBotController {
             return;
         }
         if ($data === 'menu_apps') {
-            self::showAppsDownload($chatId, $messageId);
+            self::showAppsDownload($pdo, $chatId, $messageId, null);
             return;
         }
         if ($data === 'menu_support') {
@@ -466,6 +592,13 @@ class TelegramBotController {
             return;
         }
 
+        // TON Payment Trigger
+        if (str_starts_with($data, 'pay_ton_')) {
+            $orderId = (int)str_replace('pay_ton_', '', $data);
+            self::showTonPayment($pdo, $chatId, $fromId, $orderId, $messageId);
+            return;
+        }
+
         // Admin Actions: Inline Crypto Payment Approval
         if (str_starts_with($data, 'admin_crypto_approve_')) {
             $cryptoId = (int)str_replace('admin_crypto_approve_', '', $data);
@@ -492,6 +625,67 @@ class TelegramBotController {
             $appId = (int)str_replace('reject_reseller_', '', $data);
             self::rejectResellerApplication($pdo, $appId, $chatId, $messageId);
             return;
+        }
+    }
+
+    /**
+     * Render Order Invoice with Clean 2-Column Action Buttons
+     */
+    private static function renderOrderInvoice(PDO $pdo, int $orderId, string $chatId, ?int $messageId = null, ?string $botToken = null): void {
+        $stmt = $pdo->prepare("SELECT o.*, p.title, p.traffic_gb, p.duration_days, 
+                                      COALESCE(rp.custom_title, p.title) as display_title
+                               FROM bot_orders o
+                               LEFT JOIN plans p ON o.plan_id = p.id
+                               LEFT JOIN reseller_plans rp ON p.id = rp.plan_id AND rp.reseller_id = o.reseller_id
+                               WHERE o.id = ?");
+        $stmt->execute([$orderId]);
+        $order = $stmt->fetch();
+        if (!$order) return;
+
+        $ctx = self::getContext($pdo);
+        $botToken = $botToken ?: $ctx['bot_token'];
+
+        $priceFa = number_format($order['amount']) . ' تومان';
+        $titlePrefix = ($order['order_type'] === 'renew') ? 'پیش‌فاکتور تمدید اشتراک' : 'پیش‌فاکتور خرید اشتراک جدید';
+
+        $msg = "🛒 <b>{$titlePrefix}</b>\n\n"
+             . "📦 <b>پلن انتخابی:</b> {$order['display_title']}\n"
+             . "💾 <b>حجم ترافیک:</b> {$order['traffic_gb']} گیگابایت\n"
+             . "⏳ <b>مدت اعتبار:</b> {$order['duration_days']} روز\n";
+
+        if (!empty($order['coupon_code'])) {
+            $msg .= "🎟 <b>کد تخفیف:</b> <code>{$order['coupon_code']}</code>\n"
+                  . "🔻 <b>میزان تخفیف:</b> " . number_format($order['discount_amount'] ?? 0) . " تومان\n";
+        }
+
+        $msg .= "💰 <b>مبلغ نهایی قابل پرداخت:</b> <b>{$priceFa}</b>\n"
+             . "🔢 <b>کد رهگیری:</b> <code>{$order['order_code']}</code>\n\n"
+             . "روش پرداخت یا ثبت کد تخفیف را انتخاب نمایید:";
+
+        $buttons = [
+            [
+                ['text' => '💳 کارت به کارت', 'callback_data' => 'pay_card_' . $orderId],
+                ['text' => '🪙 پرداخت تتر (USDT)', 'callback_data' => 'pay_crypto_' . $orderId]
+            ],
+            [
+                ['text' => '💎 پرداخت با تون (TON)', 'callback_data' => 'pay_ton_' . $orderId]
+            ]
+        ];
+
+        if (empty($order['coupon_code'])) {
+            $buttons[1][] = ['text' => '🎟 کد تخفیف', 'callback_data' => 'apply_coupon_' . $orderId];
+        }
+
+        $buttons[] = [
+            ['text' => '❌ انصراف از سفارش', 'callback_data' => 'cancel_order_' . $orderId]
+        ];
+
+        $keyboard = ['inline_keyboard' => $buttons];
+
+        if ($messageId) {
+            TelegramBot::editMessageText($msg, $chatId, $messageId, $keyboard, $botToken);
+        } else {
+            TelegramBot::sendMessage($msg, $chatId, $keyboard, $botToken);
         }
     }
 
@@ -531,36 +725,7 @@ class TelegramBotController {
         $stmtOrder->execute([$orderCode, $resellerId, $botToken, $fromId, $userTgName, $userTgUsername, $orderType, $planId, $clientId, $finalPrice]);
         $orderId = (int)$pdo->lastInsertId();
 
-        $priceFa = number_format($finalPrice) . ' تومان';
-        $titlePrefix = ($orderType === 'renew') ? 'پیش‌فاکتور تمدید اشتراک' : 'پیش‌فاکتور خرید اشتراک جدید';
-
-        $msg = "🛒 <b>{$titlePrefix}</b>\n\n"
-             . "📦 <b>پلن انتخابی:</b> {$plan['display_title']}\n"
-             . "💾 <b>حجم:</b> {$plan['traffic_gb']} گیگابایت\n"
-             . "⏳ <b>مدت زمان:</b> {$plan['duration_days']} روز\n"
-             . "💰 <b>مبلغ قابل پرداخت:</b> <b>{$priceFa}</b>\n"
-             . "🔢 <b>کد رهگیری سفارش:</b> <code>{$orderCode}</code>\n\n"
-             . "لطفاً روش پرداخت را انتخاب فرمایید:";
-
-        $keyboard = [
-            'inline_keyboard' => [
-                [
-                    ['text' => '💳 کارت به کارت (واریز بانکی و ارسال فیش)', 'callback_data' => 'pay_card_' . $orderId]
-                ],
-                [
-                    ['text' => '🪙 پرداخت ارزی تتر (USDT - TRC20)', 'callback_data' => 'pay_crypto_' . $orderId]
-                ],
-                [
-                    ['text' => '❌ انصراف از سفارش', 'callback_data' => 'cancel_order_' . $orderId]
-                ]
-            ]
-        ];
-
-        if ($messageId) {
-            TelegramBot::editMessageText($msg, $chatId, $messageId, $keyboard, $botToken);
-        } else {
-            TelegramBot::sendMessage($msg, $chatId, $keyboard, $botToken);
-        }
+        self::renderOrderInvoice($pdo, $orderId, $chatId, $messageId, $botToken);
     }
 
     /**
@@ -590,6 +755,11 @@ class TelegramBotController {
             }
         }
 
+        // Force Join Channel Verification (Before interactive actions)
+        if (!self::checkForceJoin($pdo, $chatId, $fromId)) {
+            return;
+        }
+
         // Command /start or /menu
         if (str_starts_with($text, '/start') || str_starts_with($text, '/menu') || $text === 'شروع' || $text === 'منو' || $text === 'دکمه ها' || $text === 'دکمه‌ها') {
             self::clearSession($pdo, $fromId);
@@ -597,8 +767,17 @@ class TelegramBotController {
             return;
         }
 
+        $buyText = Setting::get('btn_buy_text', '🛒 خرید اشتراک');
+        $renewText = Setting::get('btn_renew_text', '🔄 تمدید اشتراک');
+        $myAccText = Setting::get('btn_my_accounts_text', '👤 حساب‌های من');
+        $trialText = Setting::get('btn_trial_text', '🎁 تست رایگان');
+        $refText = Setting::get('btn_referral_text', '🤝 کسب درآمد');
+        $appsText = Setting::get('btn_apps_text', '📱 دانلود و آموزش');
+        $supportText = Setting::get('btn_support_text', '☎️ پشتیبانی');
+        $resellerText = Setting::get('btn_reseller_text', '💼 اخذ نمایندگی');
+
         // Quick bottom keyboard shortcuts
-        if ($text === '👤 حساب‌های من') {
+        if ($text === $myAccText || $text === '👤 حساب‌های من') {
             self::showMyAccounts($pdo, $chatId, $fromId);
             return;
         }
@@ -609,38 +788,105 @@ class TelegramBotController {
             ]);
             return;
         }
-        if ($text === '🛒 خرید اشتراک جدید') {
+        if ($text === $buyText || $text === '🛒 خرید اشتراک جدید' || $text === '🛒 خرید اشتراک') {
             self::showPlansMenu($pdo, $chatId);
             return;
         }
-        if ($text === '🔄 تمدید اشتراک') {
+        if ($text === $renewText || $text === '🔄 تمدید اشتراک') {
             self::showRenewChoice($pdo, $chatId, $fromId);
             return;
         }
-        if ($text === '🎁 دریافت تست رایگان' || $text === '/test' || $text === 'تست رایگان') {
+        if ($text === $trialText || $text === '🎁 دریافت تست رایگان' || $text === '/test' || $text === 'تست رایگان') {
             self::handleFreeTrialRequest($pdo, $chatId, $fromId);
             return;
         }
-        if ($text === '🤝 زیرمجموعه‌گیری و درآمد' || $text === '🤝 زیرمجموعه‌گیری و درآمدزایی' || $text === '/referral' || $text === 'زیرمجموعه‌گیری') {
+        if ($text === $refText || $text === '🤝 زیرمجموعه‌گیری و درآمد' || $text === '🤝 زیرمجموعه‌گیری و درآمدزایی' || $text === '/referral' || $text === 'زیرمجموعه‌گیری') {
             self::showReferralInfo($pdo, $chatId, $fromId);
             return;
         }
-        if ($text === '📱 دانلود نرم‌افزارها') {
-            self::showAppsDownload($chatId);
+        if ($text === $appsText || $text === '📱 دانلود نرم‌افزارها') {
+            self::showAppsDownload($pdo, $chatId);
             return;
         }
-        if ($text === '☎️ پشتیبانی تلگرام') {
+        if ($text === $supportText || $text === '☎️ پشتیبانی تلگرام') {
             self::showSupportInfo($chatId);
             return;
         }
-        if ($text === '🤝 درخواست نمایندگی' || $text === '🤝 درخواست پنل نمایندگی' || $text === '/reseller') {
+        if ($text === $resellerText || $text === '🤝 درخواست نمایندگی' || $text === '🤝 درخواست پنل نمایندگی' || $text === '/reseller' || $text === '💼 اخذ نمایندگی') {
             self::startResellerApplication($pdo, $chatId, $fromId);
+            return;
+        }
+
+        // Coupon Code Input Step
+        if ($session && $session['step'] === 'awaiting_coupon' && !empty($text)) {
+            $orderId = (int)($session['data']['order_id'] ?? 0);
+            $couponCode = strtoupper(trim($text));
+
+            $stmt = $pdo->prepare("SELECT * FROM coupons WHERE UPPER(code) = ? LIMIT 1");
+            $stmt->execute([$couponCode]);
+            $coupon = $stmt->fetch();
+
+            $now = date('Y-m-d');
+            $isValid = false;
+            $errorReason = 'کد تخفیف معتبر نمی‌باشد.';
+
+            if ($coupon) {
+                if ((int)$coupon['is_active'] !== 1) {
+                    $errorReason = 'این کد تخفیف در حال حاضر غیرفعال است.';
+                } elseif (!empty($coupon['expires_at']) && $coupon['expires_at'] < $now) {
+                    $errorReason = 'مهلت استفاده از این کد تخفیف به پایان رسیده است.';
+                } elseif ((int)$coupon['max_uses'] > 0 && (int)$coupon['used_count'] >= (int)$coupon['max_uses']) {
+                    $errorReason = 'ظرفیت استفاده از این کد تخفیف تکمیل شده است.';
+                } else {
+                    $isValid = true;
+                }
+            }
+
+            if (!$isValid) {
+                $kb = ['inline_keyboard' => [
+                    [['text' => '🔙 بازگشت به فاکتور سفارش', 'callback_data' => 'view_order_' . $orderId]]
+                ]];
+                TelegramBot::sendMessage("❌ <b>خطا در اعمال تخفیف:</b>\n{$errorReason}\nلطفاً کد دیگری وارد کنید یا به فاکتور بازگردید.", $chatId, $kb);
+                return;
+            }
+
+            // Apply discount
+            $stmtOrder = $pdo->prepare("SELECT * FROM bot_orders WHERE id = ?");
+            $stmtOrder->execute([$orderId]);
+            $order = $stmtOrder->fetch();
+
+            if (!$order) {
+                self::clearSession($pdo, $fromId);
+                self::sendMainMenu($pdo, $chatId, $fromId, '', null);
+                return;
+            }
+
+            $discountPercent = (int)$coupon['discount_percent'];
+            $discountAmount = (int)round(($order['amount'] * $discountPercent) / 100);
+            $newAmount = max(1000, $order['amount'] - $discountAmount);
+
+            $pdo->prepare("UPDATE bot_orders SET coupon_code = ?, discount_amount = ?, amount = ? WHERE id = ?")
+                ->execute([$coupon['code'], $discountAmount, $newAmount, $orderId]);
+
+            $pdo->prepare("UPDATE coupons SET used_count = used_count + 1 WHERE id = ?")
+                ->execute([$coupon['id']]);
+
+            self::clearSession($pdo, $fromId);
+
+            TelegramBot::sendMessage("🎉 <b>کد تخفیف {$coupon['code']} ({$discountPercent}٪) با موفقیت اعمال گردید!</b>", $chatId);
+            self::renderOrderInvoice($pdo, $orderId, $chatId);
             return;
         }
 
         // Crypto TXID Submission Step
         if ($session && $session['step'] === 'awaiting_crypto_txid') {
             self::handleCryptoTxidSubmission($pdo, $chatId, $fromId, $text, $session['data'] ?? []);
+            return;
+        }
+
+        // TON TXID Submission Step
+        if ($session && $session['step'] === 'awaiting_ton_txid') {
+            self::handleTonTxidSubmission($pdo, $chatId, $fromId, $text, $session['data'] ?? []);
             return;
         }
 
@@ -672,22 +918,35 @@ class TelegramBotController {
 
                     TelegramBot::sendMessage("✅ <b>رسید پرداخت شما با موفقیت دریافت شد.</b>\nکد سفارش: <code>{$order['order_code']}</code>\nسفارش شما بررسی و مشخصات تحویل داده خواهد شد.", $chatId, self::getMainMenuInlineKeyboard($pdo, $fromId), $botToken);
 
-                    if (!empty($adminId)) {
-                        $adminCaption = "🔔 <b>رسید واریزی جدید (ربات {$ctx['brand_name']})</b>\n\n"
-                                      . "👤 کاربر: @" . ($order['user_tg_username'] ?: 'ندارد') . " (ID: <code>{$fromId}</code>)\n"
-                                      . "📦 پلن: <b>{$order['plan_title']}</b>\n"
-                                      . "💰 مبلغ: <b>" . number_format($order['amount']) . " تومان</b>\n"
-                                      . "🔖 کد سفارش: <code>{$order['order_code']}</code>";
+                    $adminCaption = "🔔 <b>رسید واریزی جدید (ربات {$ctx['brand_name']})</b>\n\n"
+                                  . "👤 کاربر: @" . ($order['user_tg_username'] ?: 'ندارد') . " (ID: <code>{$fromId}</code>)\n"
+                                  . "📦 پلن: <b>{$order['plan_title']}</b>\n"
+                                  . "💰 مبلغ: <b>" . number_format($order['amount']) . " تومان</b>\n";
+                    if (!empty($order['coupon_code'])) {
+                        $adminCaption .= "🎟 تخفیف: <code>{$order['coupon_code']}</code> (-" . number_format($order['discount_amount'] ?? 0) . " ت)\n";
+                    }
+                    $adminCaption .= "🔖 کد سفارش: <code>{$order['order_code']}</code>";
 
-                        $adminKeyboard = [
-                            'inline_keyboard' => [
-                                [
-                                    ['text' => '✅ تایید و تحویل خودکار', 'callback_data' => 'admin_approve_' . $orderId],
-                                    ['text' => '❌ رد سفارش', 'callback_data' => 'admin_reject_' . $orderId]
-                                ]
+                    $adminKeyboard = [
+                        'inline_keyboard' => [
+                            [
+                                ['text' => '✅ تایید و تحویل خودکار', 'callback_data' => 'admin_approve_' . $orderId],
+                                ['text' => '❌ رد سفارش', 'callback_data' => 'admin_reject_' . $orderId]
                             ]
-                        ];
+                        ]
+                    ];
+
+                    if (!empty($adminId)) {
                         TelegramBot::sendPhoto($fileId, $adminCaption, $adminId, $adminKeyboard, $botToken);
+                    }
+
+                    // Forward to Sales Topic Thread
+                    $logChat = trim(Setting::get('bot_log_channel', ''));
+                    $topicSales = (int)Setting::get('bot_topic_sales', 0);
+                    if (!empty($logChat)) {
+                        TelegramBot::sendPhoto($fileId, $adminCaption, $logChat, $adminKeyboard, $botToken, $topicSales ?: null);
+                    } else {
+                        TelegramBot::sendCategorizedReport('sales', $adminCaption, $adminKeyboard, $botToken);
                     }
                     return;
                 }
@@ -712,18 +971,24 @@ class TelegramBotController {
 
                 TelegramBot::sendMessage("✅ <b>اطلاعات پرداخت ثبت شد.</b>\nکد سفارش: <code>{$order['order_code']}</code>\nپس از تایید مدیر، اشتراک فعال خواهد شد.", $chatId, self::getMainMenuInlineKeyboard($pdo, $fromId), $botToken);
 
-                if (!empty($adminId)) {
-                    $adminNotice = "🔔 <b>ثبت فیش متنی (ربات {$ctx['brand_name']})</b>\n👤 کاربر: @" . ($order['user_tg_username'] ?: 'ندارد') . "\n💰 مبلغ: <b>" . number_format($order['amount']) . " تومان</b>\n📝 متن: <code>{$text}</code>\n🔖 کد: <code>{$order['order_code']}</code>";
-                    $adminKeyboard = [
-                        'inline_keyboard' => [
-                            [
-                                ['text' => '✅ تایید و تحویل خودکار', 'callback_data' => 'admin_approve_' . $orderId],
-                                ['text' => '❌ رد سفارش', 'callback_data' => 'admin_reject_' . $orderId]
-                            ]
+                $adminNotice = "🔔 <b>ثبت فیش متنی (ربات {$ctx['brand_name']})</b>\n👤 کاربر: @" . ($order['user_tg_username'] ?: 'ندارد') . " (ID: <code>{$fromId}</code>)\n💰 مبلغ: <b>" . number_format($order['amount']) . " تومان</b>\n";
+                if (!empty($order['coupon_code'])) {
+                    $adminNotice .= "🎟 تخفیف: <code>{$order['coupon_code']}</code> (-" . number_format($order['discount_amount'] ?? 0) . " ت)\n";
+                }
+                $adminNotice .= "📝 متن: <code>{$text}</code>\n🔖 کد: <code>{$order['order_code']}</code>";
+
+                $adminKeyboard = [
+                    'inline_keyboard' => [
+                        [
+                            ['text' => '✅ تایید و تحویل خودکار', 'callback_data' => 'admin_approve_' . $orderId],
+                            ['text' => '❌ رد سفارش', 'callback_data' => 'admin_reject_' . $orderId]
                         ]
-                    ];
+                    ]
+                ];
+                if (!empty($adminId)) {
                     TelegramBot::sendMessage($adminNotice, $adminId, $adminKeyboard, $botToken);
                 }
+                TelegramBot::sendCategorizedReport('sales', $adminNotice, $adminKeyboard, $botToken);
                 return;
             }
         }
@@ -1161,16 +1426,16 @@ class TelegramBotController {
     }
 
     /**
-     * Show Plans Menu for Purchase
+     * Show Plans Menu for Purchase with Category Drill-down & Clean 2-Column Buttons
      */
-    private static function showPlansMenu(PDO $pdo, string $chatId, ?int $messageId = null): void {
+    private static function showPlansMenu(PDO $pdo, string $chatId, ?int $messageId = null, ?string $selectedCategory = null): void {
         $ctx = self::getContext($pdo);
         $resellerId = $ctx['reseller_id'];
         $botToken = $ctx['bot_token'];
 
-        $plans = self::getPlansForReseller($pdo, $resellerId);
+        $allPlans = self::getPlansForReseller($pdo, $resellerId);
 
-        if (empty($plans)) {
+        if (empty($allPlans)) {
             $emptyText = "در حال حاضر پلنی برای فروش در این ربات فعال نیست.";
             $kb = ['inline_keyboard' => [[['text' => '🔙 بازگشت به منوی اصلی', 'callback_data' => 'menu_main']]]];
             if ($messageId) {
@@ -1181,21 +1446,86 @@ class TelegramBotController {
             return;
         }
 
-        $msg = "🛒 <b>لیست تعرفه‌ها و پلن‌های قابل خرید ({$ctx['brand_name']})</b>\n\nلطفاً پلن مورد نظر خود را لمس نمایید:";
-        $buttons = [];
-        $lastCategory = null;
+        // Get unique categories
+        $categories = array_values(array_unique(array_map(fn($p) => $p['display_category'] ?: '۱ ماهه', $allPlans)));
 
-        foreach ($plans as $p) {
-            $cat = $p['display_category'] ?: 'پیش‌فرض';
-            if ($cat !== $lastCategory && $cat !== 'پیش‌فرض') {
-                $buttons[] = [['text' => "━━━ {$cat} ━━━", 'callback_data' => 'noop']];
-                $lastCategory = $cat;
+        // If no category selected and more than 1 category exists, show Categories Menu first
+        if ($selectedCategory === null && count($categories) > 1) {
+            $msg = "🛒 <b>دسته‌بندی بسته‌های اشتراک ({$ctx['brand_name']})</b>\n\n"
+                 . "لطفاً دوره یا نوع پلن مورد نظر خود را انتخاب فرمایید:";
+
+            $catButtons = [];
+            $row = [];
+            foreach ($categories as $cat) {
+                $icon = match($cat) {
+                    '۱ ماهه' => '📅',
+                    '۲ ماهه' => '📅',
+                    '۳ ماهه' => '📅',
+                    '۶ ماهه' => '📅',
+                    'اقتصادی' => '⚡️',
+                    'VIP تجاری' => '🚀',
+                    default => '📦'
+                };
+                $row[] = [
+                    'text' => "{$icon} {$cat}",
+                    'callback_data' => 'cat_buy_' . md5($cat)
+                ];
+                if (count($row) === 2) {
+                    $catButtons[] = $row;
+                    $row = [];
+                }
             }
-            $priceFa = number_format($p['display_price']) . ' تومان';
-            $btnText = "📦 {$p['display_title']} ({$p['traffic_gb']}GB / {$p['duration_days']} روز) - {$priceFa}";
-            $buttons[] = [['text' => $btnText, 'callback_data' => 'select_plan_' . $p['id']]];
+            if (!empty($row)) {
+                $catButtons[] = $row;
+            }
+            $catButtons[] = [['text' => '🔙 بازگشت به منوی اصلی', 'callback_data' => 'menu_main']];
+
+            $kb = ['inline_keyboard' => $catButtons];
+            if ($messageId) {
+                TelegramBot::editMessageText($msg, $chatId, $messageId, $kb, $botToken);
+            } else {
+                TelegramBot::sendMessage($msg, $chatId, $kb, $botToken);
+            }
+            return;
         }
-        $buttons[] = [['text' => '🔙 بازگشت به منوی اصلی', 'callback_data' => 'menu_main']];
+
+        // Filter plans by selected category if provided
+        $filteredPlans = $allPlans;
+        $titleCat = 'کلیه بسته‌ها';
+        if ($selectedCategory !== null) {
+            foreach ($categories as $c) {
+                if (md5($c) === $selectedCategory || $c === $selectedCategory) {
+                    $titleCat = $c;
+                    $filteredPlans = array_values(array_filter($allPlans, fn($p) => ($p['display_category'] ?: '۱ ماهه') === $c));
+                    break;
+                }
+            }
+        }
+
+        $msg = "🛒 <b>بسته‌های اشتراک — دسته: {$titleCat}</b>\n\n"
+             . "لطفاً پلن مورد نظر خود را لمس نمایید:";
+
+        $buttons = [];
+        $row = [];
+        foreach ($filteredPlans as $p) {
+            $priceFa = number_format($p['display_price']) . ' ت';
+            $ipText = !empty($p['ip_limit']) ? " ({$p['ip_limit']}ک)" : "";
+            $btnText = "📦 {$p['traffic_gb']}G{$ipText} ({$p['duration_days']}ر) - {$priceFa}";
+            $row[] = ['text' => $btnText, 'callback_data' => 'select_plan_' . $p['id']];
+            if (count($row) === 2) {
+                $buttons[] = $row;
+                $row = [];
+            }
+        }
+        if (!empty($row)) {
+            $buttons[] = $row;
+        }
+
+        if (count($categories) > 1) {
+            $buttons[] = [['text' => '🔙 بازگشت به دسته‌بندی‌ها', 'callback_data' => 'menu_buy']];
+        } else {
+            $buttons[] = [['text' => '🔙 بازگشت به منوی اصلی', 'callback_data' => 'menu_main']];
+        }
 
         $kb = ['inline_keyboard' => $buttons];
         if ($messageId) {
@@ -1206,33 +1536,82 @@ class TelegramBotController {
     }
 
     /**
-     * Show Apps Download
+     * Show Apps Download & Video Guides by Platform
      */
-    private static function showAppsDownload(string $chatId, ?int $messageId = null): void {
-        $msg = "📱 <b>دانلود نرم‌افزارهای اتصال برای انواع سیستم‌عامل‌ها</b>\n\n"
-             . "جهت استفاده از اشتراک، یکی از اپلیکیشن‌های زیر را مطابق دستگاه خود دانلود نمایید:\n\n"
-             . "🤖 <b>اندروید:</b>\n"
-             . "• <a href='https://play.google.com/store/apps/details?id=com.v2ray.ang'>دانلود V2rayNG از گوگل‌پلی</a>\n"
-             . "• <a href='https://github.com/hiddify/hiddify-app/releases'>دانلود هیدیفای (Hiddify)</a>\n\n"
-             . "🍏 <b>آیفون و آیپد (iOS):</b>\n"
-             . "• <a href='https://apps.apple.com/app/streisand/id6450534064'>دانلود Streisand از اپ‌استور</a>\n"
-             . "• <a href='https://apps.apple.com/app/v2box-v2ray-client/id6446814042'>دانلود V2Box از اپ‌استور</a>\n\n"
-             . "💻 <b>ویندوز و مکینتاش:</b>\n"
-             . "• <a href='https://github.com/hiddify/hiddify-app/releases'>دانلود نرم‌افزار Hiddify Next</a>\n"
-             . "• <a href='https://github.com/2dust/v2rayN/releases'>دانلود v2rayN ویندوز</a>";
+    private static function showAppsDownload(PDO $pdo, string $chatId, ?int $messageId = null, ?string $selectedPlatform = null): void {
+        $ctx = self::getContext($pdo);
+        $botToken = $ctx['bot_token'];
 
-        $keyboard = [
-            'inline_keyboard' => [
-                [['text' => '🔙 بازگشت به منوی اصلی', 'callback_data' => 'menu_main']]
-            ]
+        $platforms = [
+            'android' => ['title' => '🤖 اندروید (Android)', 'header' => '🤖 نرم‌افزارهای اندروید'],
+            'ios' => ['title' => '🍏 آیفون و آیپد (iOS)', 'header' => '🍏 نرم‌افزارهای آیفون و آیپد'],
+            'windows' => ['title' => '💻 ویندوز (Windows)', 'header' => '💻 نرم‌افزارهای ویندوز'],
+            'macos' => ['title' => '🍎 مک‌بوک (macOS)', 'header' => '🍎 نرم‌افزارهای مک‌بوک']
         ];
 
-        $edited = false;
-        if ($messageId) {
-            $edited = TelegramBot::editMessageText($msg, $chatId, $messageId, $keyboard);
+        if ($selectedPlatform === null) {
+            $msg = "📱 <b>مرکز دانلود نرم‌افزارها و راهنمای اتصال ({$ctx['brand_name']})</b>\n\n"
+                 . "جهت مشاهده اپلیکیشن‌های سازگار و آموزش ویدیویی، سیستم‌عامل خود را انتخاب فرمایید:";
+
+            $kb = [
+                'inline_keyboard' => [
+                    [
+                        ['text' => '🤖 اندروید (Android)', 'callback_data' => 'apps_plat_android'],
+                        ['text' => '🍏 آیفون / آیپد (iOS)', 'callback_data' => 'apps_plat_ios']
+                    ],
+                    [
+                        ['text' => '💻 ویندوز (Windows)', 'callback_data' => 'apps_plat_windows'],
+                        ['text' => '🍎 مک‌بوک (macOS)', 'callback_data' => 'apps_plat_macos']
+                    ],
+                    [
+                        ['text' => '🔙 بازگشت به منوی اصلی', 'callback_data' => 'menu_main']
+                    ]
+                ]
+            ];
+
+            if ($messageId) {
+                TelegramBot::editMessageText($msg, $chatId, $messageId, $kb, $botToken);
+            } else {
+                TelegramBot::sendMessage($msg, $chatId, $kb, $botToken);
+            }
+            return;
         }
-        if (!$edited) {
-            TelegramBot::sendMessage($msg, $chatId, $keyboard);
+
+        // Fetch apps from app_guides table
+        $stmt = $pdo->prepare("SELECT * FROM app_guides WHERE platform = ? AND is_active = 1 ORDER BY sort_order ASC, id ASC");
+        $stmt->execute([$selectedPlatform]);
+        $apps = $stmt->fetchAll();
+
+        $platTitle = $platforms[$selectedPlatform]['header'] ?? 'نرم‌افزارها';
+        $msg = "📱 <b>{$platTitle}</b>\n\n"
+             . "یکی از نرم‌افزارهای زیر را نصب نموده و لینک ساب‌لینک خود را در آن وارد کنید:\n\n";
+
+        $buttons = [];
+        if (empty($apps)) {
+            $msg .= "<i>در حال حاضر نرم‌افزاری برای این بخش ثبت نشده است.</i>\n";
+        } else {
+            foreach ($apps as $idx => $app) {
+                $msg .= ($idx + 1) . ". <b>" . htmlspecialchars($app['app_name']) . "</b>\n";
+                if (!empty($app['description'])) {
+                    $msg .= "<i>" . htmlspecialchars($app['description']) . "</i>\n";
+                }
+                $msg .= "\n";
+
+                $row = [['text' => "📥 دانلود {$app['app_name']}", 'url' => $app['download_url']]];
+                if (!empty($app['guide_url'])) {
+                    $row[] = ['text' => "🎥 آموزش", 'url' => $app['guide_url']];
+                }
+                $buttons[] = $row;
+            }
+        }
+
+        $buttons[] = [['text' => '🔙 بازگشت به سیستم‌عامل‌ها', 'callback_data' => 'menu_apps']];
+
+        $kb = ['inline_keyboard' => $buttons];
+        if ($messageId) {
+            TelegramBot::editMessageText($msg, $chatId, $messageId, $kb, $botToken);
+        } else {
+            TelegramBot::sendMessage($msg, $chatId, $kb, $botToken);
         }
     }
 
@@ -1514,6 +1893,27 @@ class TelegramBotController {
         Setting::set('telegram_admin_id', trim($_POST['telegram_admin_id'] ?? ''));
         Setting::set('telegram_bot_active', isset($_POST['telegram_bot_active']) ? '1' : '0');
 
+        // Feature: Force Join Channel
+        Setting::set('bot_force_join_channel', trim($_POST['bot_force_join_channel'] ?? ''));
+
+        // Feature: Forum Supergroup & Topic Thread IDs
+        Setting::set('bot_log_channel', trim($_POST['bot_log_channel'] ?? ''));
+        Setting::set('bot_topic_sales', trim($_POST['bot_topic_sales'] ?? ''));
+        Setting::set('bot_topic_backup', trim($_POST['bot_topic_backup'] ?? ''));
+        Setting::set('bot_topic_servers', trim($_POST['bot_topic_servers'] ?? ''));
+        Setting::set('bot_topic_users', trim($_POST['bot_topic_users'] ?? ''));
+        Setting::set('bot_topic_crypto', trim($_POST['bot_topic_crypto'] ?? ''));
+
+        // Feature: Custom Button Labels
+        Setting::set('btn_buy_text', trim($_POST['btn_buy_text'] ?? '🛒 خرید اشتراک'));
+        Setting::set('btn_renew_text', trim($_POST['btn_renew_text'] ?? '🔄 تمدید اشتراک'));
+        Setting::set('btn_my_accounts_text', trim($_POST['btn_my_accounts_text'] ?? '👤 حساب‌های من'));
+        Setting::set('btn_trial_text', trim($_POST['btn_trial_text'] ?? '🎁 تست رایگان'));
+        Setting::set('btn_referral_text', trim($_POST['btn_referral_text'] ?? '🤝 کسب درآمد'));
+        Setting::set('btn_apps_text', trim($_POST['btn_apps_text'] ?? '📱 دانلود و آموزش'));
+        Setting::set('btn_support_text', trim($_POST['btn_support_text'] ?? '☎️ پشتیبانی'));
+        Setting::set('btn_reseller_text', trim($_POST['btn_reseller_text'] ?? '💼 اخذ نمایندگی'));
+
         Setting::set('card_number', trim($_POST['card_number'] ?? ''));
         Setting::set('card_holder', trim($_POST['card_holder'] ?? ''));
         Setting::set('card_bank_name', trim($_POST['card_bank_name'] ?? ''));
@@ -1535,12 +1935,91 @@ class TelegramBotController {
         Setting::set('referral_enabled', isset($_POST['referral_enabled']) ? '1' : '0');
         Setting::set('referral_commission_percent', (string)(int)($_POST['referral_commission_percent'] ?? 10));
 
-        // Feature 6: Cryptocurrency / USDT TRC20 Settings
+        // Feature 6: Cryptocurrency / USDT TRC20 & TON Settings
         Setting::set('crypto_usdt_trc20_address', trim($_POST['crypto_usdt_trc20_address'] ?? ''));
         Setting::set('crypto_usdt_rate', (string)(int)($_POST['crypto_usdt_rate'] ?? 98000));
+        Setting::set('crypto_ton_wallet_address', trim($_POST['crypto_ton_wallet_address'] ?? ''));
+        Setting::set('crypto_ton_rate', (string)(int)($_POST['crypto_ton_rate'] ?? 380000));
 
-        Helpers::flash('success', 'تنظیمات ربات تلگرام، تست رایگان، زیرمجموعه‌گیری و درگاه‌های پرداخت با موفقیت ذخیره شد.');
+        Helpers::flash('success', 'تنظیمات ربات تلگرام، جوین اجباری، موضوعات انجمن و دکمه‌ها با موفقیت ذخیره شد.');
         Helpers::redirect('settings/bot');
+    }
+
+    /**
+     * Auto Create Forum Topics in Supergroup
+     */
+    public function autoCreateTopicsAction(): void {
+        header('Content-Type: application/json');
+        Auth::requireLogin();
+
+        $logChat = trim(Setting::get('bot_log_channel', Setting::get('telegram_admin_id', '')));
+        if (empty($logChat)) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'شناسه سوپرگروه لاگ سیستم (مثلاً -1001234567890) در فیلد بالا تنظیم نشده است.'
+            ]);
+            return;
+        }
+
+        $topicsToCreate = [
+            'sales' => ['name' => '🛒 گزارش خریدها و فاکتورها', 'color' => 7322096],
+            'backup' => ['name' => '💾 نسخه پشتیبان دیتابیس (Backup)', 'color' => 16766590],
+            'servers' => ['name' => '⚡️ سلامت سرورها و فیل‌اور', 'color' => 16747520],
+            'users' => ['name' => '👥 کاربران و درخواست نمایندگی', 'color' => 5793266],
+            'crypto' => ['name' => '🪙 پرداخت‌های ارزی تتر (USDT)', 'color' => 9367492],
+        ];
+
+        $results = [];
+        $createdCount = 0;
+
+        foreach ($topicsToCreate as $key => $conf) {
+            $existingId = Setting::get("bot_topic_{$key}", '');
+            if (!empty($existingId)) {
+                $results[$key] = [
+                    'name' => $conf['name'],
+                    'thread_id' => (int)$existingId,
+                    'status' => 'already_exists'
+                ];
+                continue;
+            }
+
+            $res = TelegramBot::createForumTopic($logChat, $conf['name'], $conf['color']);
+            if ($res && isset($res['message_thread_id'])) {
+                $threadId = (int)$res['message_thread_id'];
+                Setting::set("bot_topic_{$key}", (string)$threadId);
+                $results[$key] = [
+                    'name' => $conf['name'],
+                    'thread_id' => $threadId,
+                    'status' => 'created'
+                ];
+                $createdCount++;
+
+                TelegramBot::sendMessage(
+                    "📌 <b>موضوع ایجاد شد: {$conf['name']}</b>\nاین تاپیک اختصاصی جهت دریافت اعلانات خودکار سامانه کانکتیکس فعال گردید.",
+                    $logChat,
+                    null,
+                    null,
+                    $threadId
+                );
+            } else {
+                $results[$key] = [
+                    'name' => $conf['name'],
+                    'status' => 'failed',
+                    'error' => 'سوپرگروه قابلیت Topics را فعال نکرده یا ربات دسترسی Manage Topics ندارد.'
+                ];
+            }
+        }
+
+        $hasFail = false;
+        foreach ($results as $r) {
+            if (($r['status'] ?? '') === 'failed') $hasFail = true;
+        }
+
+        echo json_encode([
+            'success' => !$hasFail || $createdCount > 0,
+            'message' => $hasFail ? 'برخی تاپیک‌ها ساخته نشدند (بررسی کنید ربات ادمین سوپرگروه با دسترسی Manage Topics باشد).' : 'تمام موضوعات با موفقیت در سوپرگروه ایجاد و تنظیم شدند.',
+            'results' => $results
+        ]);
     }
 
     public function setWebhookAction(): void {
@@ -1762,6 +2241,7 @@ class TelegramBotController {
                     ]
                 ];
                 TelegramBot::sendMessage($adminMsg, $adminChatId, $adminKb, $botToken);
+                TelegramBot::sendCategorizedReport('users', $adminMsg, $adminKb, $botToken);
             }
         }
     }
@@ -2165,6 +2645,123 @@ class TelegramBotController {
                 ]
             ];
             TelegramBot::sendMessage($adminCaption, (string)$adminId, $adminKb, $botToken);
+            TelegramBot::sendCategorizedReport('crypto', $adminCaption, $adminKb, $botToken);
+        }
+    }
+
+    /**
+     * Crypto TON Network Payment Step
+     */
+    public static function showTonPayment(PDO $pdo, string $chatId, string $fromId, int $orderId, ?int $messageId = null): void {
+        $stmt = $pdo->prepare("SELECT * FROM bot_orders WHERE id = ?");
+        $stmt->execute([$orderId]);
+        $order = $stmt->fetch();
+
+        if (!$order) {
+            TelegramBot::sendMessage("❌ سفارش یافت نشد.", $chatId);
+            return;
+        }
+
+        $ctx = self::getContext($pdo);
+        $botToken = $ctx['bot_token'];
+
+        $tonRate = (int)Setting::get('crypto_ton_rate', 380000);
+        if ($tonRate <= 0) $tonRate = 380000;
+        $tonAmount = round($order['amount'] / $tonRate, 3);
+        $nanotons = (int)round($tonAmount * 1000000000);
+
+        $tonWallet = Setting::get('crypto_ton_wallet_address', 'EQD4FPq-PRDieyQKkKZjmNu49pKypDryHyRMvzkBhzsJw6-h');
+        $memo = $order['order_code'];
+
+        self::setSession($pdo, $fromId, 'awaiting_ton_txid', [
+            'order_id' => $orderId,
+            'ton' => $tonAmount,
+            'wallet' => $tonWallet,
+            'memo' => $memo
+        ]);
+
+        $directTonLink = "ton://transfer/{$tonWallet}?amount={$nanotons}&text=" . urlencode($memo);
+
+        $msg = "💎 <b>پرداخت ارزی با ارز دیجیتال تون (TON - ولت تلگرام)</b>\n\n"
+             . "💰 <b>مبلغ فاکتور:</b> " . number_format($order['amount']) . " تومان\n"
+             . "💎 <b>معادل دقیق TON:</b> <b>{$tonAmount} TON</b>\n"
+             . "🌐 <b>شبکه:</b> <code>The Open Network (TON)</code>\n\n"
+             . "📥 <b>آدرس کیف پول (Wallet):</b>\n"
+             . "<code>{$tonWallet}</code>\n\n"
+             . "📝 <b>کد شناسه پرداخت (Comment / Memo الزامی):</b>\n"
+             . "<code>{$memo}</code>\n\n"
+             . "⚠️ <b>دستورالعمل:</b>\n"
+             . "۱. می‌توانید مستقیماً از دکمه «انتقال سریع با ولت تلگرام» استفاده کنید یا مبلغ را به آدرس فوق واریز نمایید.\n"
+             . "۲. حتماً عبارت Comment/Memo را برابر <code>{$memo}</code> قرار دهید.\n"
+             . "۳. پس از پرداخت، هش تراکنش یا عکس رسید را ارسال فرمایید.";
+
+        $keyboard = [
+            'inline_keyboard' => [
+                [['text' => '🚀 انتقال سریع با ولت تلگرام (Tonkeeper / Wallet)', 'url' => $directTonLink]],
+                [['text' => '🔙 بازگشت به منوی اصلی', 'callback_data' => 'menu_main']]
+            ]
+        ];
+
+        if ($messageId) {
+            TelegramBot::editMessageText($msg, $chatId, $messageId, $keyboard, $botToken);
+        } else {
+            TelegramBot::sendMessage($msg, $chatId, $keyboard, $botToken);
+        }
+    }
+
+    public static function handleTonTxidSubmission(PDO $pdo, string $chatId, string $fromId, string $txid, array $sessionData): void {
+        $orderId = (int)($sessionData['order_id'] ?? 0);
+        $tonAmount = $sessionData['ton'] ?? '0.00';
+        $wallet = $sessionData['wallet'] ?? '';
+
+        $stmt = $pdo->prepare("SELECT o.*, p.title as plan_title FROM bot_orders o LEFT JOIN plans p ON o.plan_id = p.id WHERE o.id = ?");
+        $stmt->execute([$orderId]);
+        $order = $stmt->fetch();
+
+        if (!$order) {
+            self::clearSession($pdo, $fromId);
+            TelegramBot::sendMessage("❌ سفارش یافت نشد.", $chatId);
+            return;
+        }
+
+        $resellerId = (int)($order['reseller_id'] ?? 1);
+        $pdo->prepare("INSERT INTO crypto_payments (user_id, reseller_id, order_id, currency, network, expected_amount_usdt, toman_amount, wallet_address, tx_hash, status) 
+                       VALUES (?, ?, ?, 'TON', 'TON', ?, ?, ?, ?, 'pending')")
+            ->execute([$resellerId, $resellerId, $orderId, $tonAmount, $order['amount'], $wallet, $txid]);
+        $cryptoId = (int)$pdo->lastInsertId();
+
+        $pdo->prepare("UPDATE bot_orders SET payment_status = 'pending_approval' WHERE id = ?")->execute([$orderId]);
+        self::clearSession($pdo, $fromId);
+
+        $ctx = self::getContext($pdo);
+        $botToken = $ctx['bot_token'];
+        $adminId = $ctx['admin_chat_id'];
+
+        $confirmUser = "✅ <b>اطلاعات پرداخت ارز TON با موفقیت ثبت شد!</b>\n\n"
+                     . "🔖 <b>کد سفارش:</b> <code>{$order['order_code']}</code>\n"
+                     . "💎 <b>مبلغ:</b> <b>{$tonAmount} TON</b>\n"
+                     . "🔗 <b>کد هش / تراکنش:</b>\n<code>{$txid}</code>\n\n"
+                     . "<i>سفارش شما در حال تایید است و اشتراک فوراً تحویل خواهد شد.</i>";
+        TelegramBot::sendMessage($confirmUser, $chatId, self::getMainMenuInlineKeyboard($pdo, $fromId), $botToken);
+
+        if (!empty($adminId)) {
+            $adminCaption = "💎 <b>تراکنش جدید تون (TON) در انتظار تایید</b>\n\n"
+                          . "👤 کاربر: @" . ($order['user_tg_username'] ?: 'ندارد') . " (ID: <code>{$fromId}</code>)\n"
+                          . "📦 پلن: <b>{$order['plan_title']}</b>\n"
+                          . "💎 مبلغ: <b>{$tonAmount} TON</b> (" . number_format($order['amount']) . " تومان)\n"
+                          . "🔗 هش تراکنش (TXID):\n<code>{$txid}</code>\n\n"
+                          . "🔍 بررسی در اکسپلورر تون‌اسکن:\nhttps://tonscan.org/tx/{$txid}";
+
+            $adminKb = [
+                'inline_keyboard' => [
+                    [
+                        ['text' => '✅ تایید و فعال‌سازی سفارش', 'callback_data' => 'admin_crypto_approve_' . $cryptoId],
+                        ['text' => '❌ رد تراکنش', 'callback_data' => 'admin_crypto_reject_' . $cryptoId]
+                    ]
+                ]
+            ];
+            TelegramBot::sendMessage($adminCaption, (string)$adminId, $adminKb, $botToken);
+            TelegramBot::sendCategorizedReport('crypto', $adminCaption, $adminKb, $botToken);
         }
     }
 

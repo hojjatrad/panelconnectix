@@ -59,7 +59,7 @@ class TelegramBot {
         return $decoded;
     }
 
-    public static function sendMessage(string $text, ?string $chatId = null, $replyMarkup = null, ?string $customToken = null): bool {
+    public static function sendMessage(string $text, ?string $chatId = null, $replyMarkup = null, ?string $customToken = null, ?int $messageThreadId = null): bool {
         $targetChat = $chatId ?: self::getAdminChatId();
         if (empty($targetChat)) {
             return false;
@@ -72,6 +72,10 @@ class TelegramBot {
             'disable_web_page_preview' => true
         ];
 
+        if ($messageThreadId !== null && $messageThreadId > 0) {
+            $params['message_thread_id'] = $messageThreadId;
+        }
+
         if ($replyMarkup !== null) {
             $params['reply_markup'] = $replyMarkup;
         }
@@ -80,7 +84,7 @@ class TelegramBot {
         return isset($res['ok']) && $res['ok'] === true;
     }
 
-    public static function sendPhoto(string $photo, string $caption = '', ?string $chatId = null, $replyMarkup = null, ?string $customToken = null): bool {
+    public static function sendPhoto(string $photo, string $caption = '', ?string $chatId = null, $replyMarkup = null, ?string $customToken = null, ?int $messageThreadId = null): bool {
         $targetChat = $chatId ?: self::getAdminChatId();
         if (empty($targetChat)) {
             return false;
@@ -93,6 +97,10 @@ class TelegramBot {
             'parse_mode' => 'HTML'
         ];
 
+        if ($messageThreadId !== null && $messageThreadId > 0) {
+            $params['message_thread_id'] = $messageThreadId;
+        }
+
         if ($replyMarkup !== null) {
             $params['reply_markup'] = $replyMarkup;
         }
@@ -101,7 +109,7 @@ class TelegramBot {
         return isset($res['ok']) && $res['ok'] === true;
     }
 
-    public static function sendDocument(string $filePath, string $caption = '', ?string $chatId = null, ?string $customToken = null): bool {
+    public static function sendDocument(string $filePath, string $caption = '', ?string $chatId = null, ?string $customToken = null, ?int $messageThreadId = null): bool {
         $targetChat = $chatId ?: self::getAdminChatId();
         $token = !empty($customToken) ? trim($customToken) : self::getToken();
         if (empty($targetChat) || empty($token) || !file_exists($filePath)) {
@@ -118,6 +126,10 @@ class TelegramBot {
             'document' => $cfile
         ];
 
+        if ($messageThreadId !== null && $messageThreadId > 0) {
+            $postData['message_thread_id'] = $messageThreadId;
+        }
+
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
@@ -132,6 +144,82 @@ class TelegramBot {
         if (!$response) return false;
         $decoded = json_decode($response, true);
         return isset($decoded['ok']) && $decoded['ok'] === true;
+    }
+
+    /**
+     * Create a forum topic in a supergroup
+     */
+    public static function createForumTopic(string $chatId, string $name, int $iconColor = 0x6FB9F0, ?string $customToken = null): ?int {
+        $params = [
+            'chat_id' => $chatId,
+            'name' => $name,
+            'icon_color' => $iconColor
+        ];
+        $res = self::request('createForumTopic', $params, $customToken);
+        if (isset($res['ok']) && $res['ok'] === true && isset($res['result']['message_thread_id'])) {
+            return (int)$res['result']['message_thread_id'];
+        }
+        return null;
+    }
+
+    /**
+     * Check if user is member of mandatory channel/group (Force Join)
+     */
+    public static function getChatMember(string $chatId, string $userId, ?string $customToken = null): ?array {
+        $params = [
+            'chat_id' => $chatId,
+            'user_id' => (int)$userId
+        ];
+        $res = self::request('getChatMember', $params, $customToken);
+        if (isset($res['ok']) && $res['ok'] === true && isset($res['result']['status'])) {
+            return $res['result'];
+        }
+        return null;
+    }
+
+    /**
+     * Send report routed to dedicated topic in log channel
+     */
+    public static function sendCategorizedReport(string $category, string $text, $replyMarkup = null, ?string $customToken = null): bool {
+        $logChannel = Setting::get('telegram_log_channel_id');
+        $targetChat = !empty($logChannel) ? $logChannel : self::getAdminChatId();
+        
+        $threadId = null;
+        if (!empty($logChannel)) {
+            $topicKey = match($category) {
+                'sales' => 'topic_sales_id',
+                'backup' => 'topic_backup_id',
+                'servers' => 'topic_servers_id',
+                'users', 'reseller' => 'topic_users_id',
+                'crypto' => 'topic_crypto_id',
+                default => 'topic_general_id'
+            };
+            $savedId = (int)Setting::get($topicKey, '0');
+            if ($savedId > 0) {
+                $threadId = $savedId;
+            }
+        }
+
+        return self::sendMessage($text, $targetChat, $replyMarkup, $customToken, $threadId);
+    }
+
+    /**
+     * Send backup file routed to backup topic in log channel
+     */
+    public static function sendCategorizedDocument(string $category, string $filePath, string $caption = '', ?string $customToken = null): bool {
+        $logChannel = Setting::get('telegram_log_channel_id');
+        $targetChat = !empty($logChannel) ? $logChannel : self::getAdminChatId();
+
+        $threadId = null;
+        if (!empty($logChannel)) {
+            $topicKey = ($category === 'backup') ? 'topic_backup_id' : 'topic_general_id';
+            $savedId = (int)Setting::get($topicKey, '0');
+            if ($savedId > 0) {
+                $threadId = $savedId;
+            }
+        }
+
+        return self::sendDocument($filePath, $caption, $targetChat, $customToken, $threadId);
     }
 
     public static function editMessageText(string $text, string $chatId, int $messageId, $replyMarkup = null, ?string $customToken = null): bool {

@@ -70,6 +70,7 @@ require __DIR__ . '/../layout/header.php';
                 <label class="block text-xs font-semibold text-slate-300 mb-2">انتخاب سرور مقصد (پروتکل و کلاستر) *</label>
                 <select name="server_id" id="serverSelect" required
                         class="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:ring-1 focus:ring-purple-500">
+                    <option value="auto" selected>⚡️ انتخاب خودکار هوشمند (پایدارترین و کم‌ترافیک‌ترین سرور)</option>
                     <?php foreach ($servers as $s): ?>
                         <option value="<?= $s['id'] ?>" data-group="<?= $s['server_group'] ?>">
                             <?= htmlspecialchars($s['name']) ?> (هسته: <?= strtoupper($s['driver']) ?> - دسته: <?= $s['server_group'] ?>)
@@ -78,11 +79,19 @@ require __DIR__ . '/../layout/header.php';
                 </select>
             </div>
 
-            <!-- Custom Note -->
-            <div>
-                <label class="block text-xs font-semibold text-slate-300 mb-2">یادداشت برای این مشتری (اختیاری)</label>
-                <input type="text" name="custom_note" placeholder="مثلاً: آقای رضایی - تمدید سالانه"
-                       class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white text-xs placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-purple-500">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-2">سقف اتصال همزمان (تعداد کاربر/IP)</label>
+                    <input type="number" name="ip_limit" id="clientIpLimit" value="2" min="0" placeholder="0 = نامحدود"
+                           class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white font-mono text-xs focus:outline-none focus:ring-1 focus:ring-purple-500">
+                    <span class="text-[10px] text-slate-500 mt-1 block">تعداد دستگاه‌های مجاز برای اتصال همزمان به کانفیگ</span>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-2">یادداشت برای این مشتری (اختیاری)</label>
+                    <input type="text" name="custom_note" placeholder="مثلاً: آقای رضایی - تمدید سالانه"
+                           class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white text-xs placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-purple-500">
+                </div>
             </div>
 
             <!-- Live Cost Summary Box -->

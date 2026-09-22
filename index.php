@@ -48,6 +48,7 @@ require_once __DIR__ . '/controllers/ProfileController.php';
 require_once __DIR__ . '/controllers/ResellerPortalController.php';
 require_once __DIR__ . '/controllers/LogController.php';
 require_once __DIR__ . '/controllers/UpdateController.php';
+require_once __DIR__ . '/controllers/TicketController.php';
 require_once __DIR__ . '/core/Updater.php';
 
 $router = new Router();
@@ -76,6 +77,7 @@ $router->get('clients/configs', [ClientController::class, 'getConfigs']);
 $router->post('clients/test-account', [ClientController::class, 'createTestAccount']);
 $router->post('clients/bulk', [ClientController::class, 'bulkAction']);
 $router->post('clients/store', [ClientController::class, 'store']);
+$router->post('clients/update', [ClientController::class, 'update']);
 $router->post('clients/renew', [ClientController::class, 'renew']);
 $router->post('clients/reserve', [ClientController::class, 'reservePlan']);
 $router->post('clients/delete', [ClientController::class, 'delete']);
@@ -83,12 +85,16 @@ $router->post('clients/delete', [ClientController::class, 'delete']);
 // Plans Management
 $router->get('plans', [PlanController::class, 'index']);
 $router->post('plans/store', [PlanController::class, 'store']);
+$router->post('plans/update', [PlanController::class, 'update']);
 $router->post('plans/toggle', [PlanController::class, 'toggle']);
+$router->post('plans/toggle-bot', [PlanController::class, 'toggleBot']);
+$router->post('plans/delete', [PlanController::class, 'delete']);
 
 // Server Nodes Management (Admin only)
 $router->get('servers', [ServerController::class, 'index']);
 $router->post('servers/store', [ServerController::class, 'store']);
 $router->post('servers/update', [ServerController::class, 'update']);
+$router->post('servers/migrate', [ServerController::class, 'migrateClients']);
 $router->post('servers/delete', [ServerController::class, 'delete']);
 $router->get('servers/test', [ServerController::class, 'testConnection']);
 $router->get('servers/ping', [ServerController::class, 'ping']);
@@ -143,6 +149,7 @@ $router->get('settings/bot-users', [TelegramBotController::class, 'botUsers']);
 $router->post('settings/bot-users/send-msg', [TelegramBotController::class, 'sendUserMessage']);
 $router->post('settings/bot-broadcast', [TelegramBotController::class, 'broadcast']);
 $router->post('settings/bot', [TelegramBotController::class, 'updateSettings']);
+$router->post('settings/bot/auto-create-topics', [TelegramBotController::class, 'autoCreateTopicsAction']);
 $router->post('settings/bot/set-webhook', [TelegramBotController::class, 'setWebhookAction']);
 $router->post('settings/bot/test-message', [TelegramBotController::class, 'testMessageAction']);
 $router->post('settings/bot/delete-webhook', [TelegramBotController::class, 'deleteWebhookAction']);
@@ -150,6 +157,27 @@ $router->post('settings/bot/approve', [TelegramBotController::class, 'approveWeb
 $router->post('settings/bot/reject', [TelegramBotController::class, 'rejectWeb']);
 $router->get('telegram/webhook', [TelegramBotController::class, 'handleWebhook']);
 $router->post('telegram/webhook', [TelegramBotController::class, 'handleWebhook']);
+
+// App Guides & Download Tutorials
+$router->get('settings/app-guides', [AppGuideController::class, 'index']);
+$router->post('settings/app-guides/store', [AppGuideController::class, 'store']);
+$router->post('settings/app-guides/update', [AppGuideController::class, 'update']);
+$router->post('settings/app-guides/toggle', [AppGuideController::class, 'toggle']);
+$router->post('settings/app-guides/delete', [AppGuideController::class, 'delete']);
+
+// Discount Coupons
+$router->get('settings/coupons', [CouponController::class, 'index']);
+$router->post('settings/coupons/store', [CouponController::class, 'store']);
+$router->post('settings/coupons/toggle', [CouponController::class, 'toggle']);
+$router->post('settings/coupons/delete', [CouponController::class, 'delete']);
+
+// In-Panel Tickets & Support
+$router->get('tickets', [TicketController::class, 'index']);
+$router->get('tickets/create', [TicketController::class, 'create']);
+$router->post('tickets/store', [TicketController::class, 'store']);
+$router->get('tickets/show', [TicketController::class, 'show']);
+$router->post('tickets/reply', [TicketController::class, 'reply']);
+$router->post('tickets/close', [TicketController::class, 'close']);
 
 // Online Payments
 $router->get('payment/pay', [PaymentController::class, 'payBotOrder']);

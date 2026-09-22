@@ -180,6 +180,10 @@ require __DIR__ . '/../layout/header.php';
                                 <td class="p-3.5">
                                     <div class="font-medium text-slate-200"><?= htmlspecialchars($c['plan_title'] ?? 'پلن عادی') ?></div>
                                     <div class="text-[11px] text-slate-400 mt-0.5"><?= htmlspecialchars($c['server_name'] ?? 'سرور ابری') ?></div>
+                                    <span class="inline-flex items-center gap-1 mt-1 text-[10px] text-purple-300 font-mono bg-purple-950/40 px-1.5 py-0.5 rounded border border-purple-800/30">
+                                        <i class="fa-solid fa-users text-[9px]"></i>
+                                        <span><?= ($c['ip_limit'] ?? 2) > 0 ? ($c['ip_limit'] ?? 2) . ' دستگاه' : 'نامحدود' ?></span>
+                                    </span>
                                 </td>
 
                                 <td class="p-3.5 min-w-[140px]">
@@ -236,6 +240,12 @@ require __DIR__ . '/../layout/header.php';
                                         <button type="button" onclick="copyToClipboard('<?= $subUrl ?>', this)" 
                                                 class="p-2 bg-slate-800 hover:bg-slate-700 text-cyan-300 hover:text-white rounded-lg transition-colors border border-slate-700" title="کپی سریع لینک سابسکریپشن">
                                             <i class="fa-solid fa-copy"></i>
+                                        </button>
+
+                                        <!-- Edit Service Modal Button -->
+                                        <button type="button" onclick='openEditClientModal(<?= json_encode($c) ?>)' 
+                                                class="p-2 bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-white rounded-lg transition-colors border border-slate-700" title="ویرایش مشخصات سرویس">
+                                            <i class="fa-solid fa-pen-to-square"></i>
                                         </button>
 
                                         <!-- Renew Modal Button -->
@@ -629,7 +639,149 @@ ${c.sub_url}`;
         modal.classList.remove('flex');
         modal.classList.add('hidden');
     }
+
+    function openEditClientModal(c) {
+        document.getElementById('editClientId').value = c.id;
+        document.getElementById('editUsername').value = c.username || '';
+        document.getElementById('editPassword').value = c.password || '';
+        document.getElementById('editServerId').value = c.server_id || '';
+        document.getElementById('editPlanId').value = c.plan_id || '';
+        document.getElementById('editStatus').value = c.status || 'active';
+        
+        const limitGb = (c.traffic_limit_bytes / (1024 * 1024 * 1024)).toFixed(2);
+        const usedGb = (c.traffic_used_bytes / (1024 * 1024 * 1024)).toFixed(2);
+        document.getElementById('editTrafficLimitGb').value = parseFloat(limitGb);
+        document.getElementById('editTrafficUsedGb').value = parseFloat(usedGb);
+        
+        document.getElementById('editExpireAt').value = c.expire_at || '';
+        document.getElementById('editTelegramChatId').value = c.telegram_chat_id || '';
+        document.getElementById('editIpLimit').value = c.ip_limit ?? 2;
+        document.getElementById('editCustomNote').value = c.custom_note || '';
+
+        const modal = document.getElementById('editClientModal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+
+    function closeEditClientModal() {
+        const modal = document.getElementById('editClientModal');
+        modal.classList.remove('flex');
+        modal.classList.add('hidden');
+    }
+
+    function resetClientUsedTraffic() {
+        document.getElementById('editTrafficUsedGb').value = 0;
+    }
 </script>
+
+<!-- Modal: Edit Client / Service -->
+<div id="editClientModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full p-6 shadow-2xl relative max-h-[92vh] overflow-y-auto">
+        <button type="button" onclick="closeEditClientModal()" class="absolute top-4 left-4 text-slate-400 hover:text-white transition-colors">
+            <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+
+        <h3 class="text-base font-bold text-white mb-4 flex items-center gap-2 pb-3 border-b border-slate-800">
+            <i class="fa-solid fa-pen-to-square text-amber-400"></i>
+            <span>ویرایش مشخصات اشتراک و سرویس</span>
+        </h3>
+
+        <form action="<?= Helpers::url('clients/update') ?>" method="POST" class="space-y-4 text-xs">
+            <?= Helpers::csrfField() ?>
+            <input type="hidden" name="client_id" id="editClientId" value="">
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-slate-300 mb-1 font-semibold">نام کاربری (Username) *</label>
+                    <input type="text" name="username" id="editUsername" required dir="ltr" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-xs focus:border-amber-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-slate-300 mb-1 font-semibold">کلمه عبور (Password)</label>
+                    <input type="text" name="password" id="editPassword" dir="ltr" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-xs focus:border-amber-500 focus:outline-none">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                    <label class="block text-slate-300 mb-1 font-semibold">وضعیت سرویس</label>
+                    <select name="status" id="editStatus" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white text-xs focus:border-amber-500 focus:outline-none">
+                        <option value="active">فعال (Active)</option>
+                        <option value="disabled">غیرفعال (Disabled)</option>
+                        <option value="limited">پایان حجم (Limited)</option>
+                        <option value="expired">منقضی شده (Expired)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-slate-300 mb-1 font-semibold">سرور / نود اختصاصی</label>
+                    <select name="server_id" id="editServerId" required class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white text-xs focus:border-amber-500 focus:outline-none">
+                        <?php foreach ($servers as $s): ?>
+                            <option value="<?= $s['id'] ?>"><?= htmlspecialchars($s['name']) ?> (<?= htmlspecialchars($s['driver']) ?>)</option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-slate-300 mb-1 font-semibold">پلن متصل</label>
+                    <select name="plan_id" id="editPlanId" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white text-xs focus:border-amber-500 focus:outline-none">
+                        <option value="">بدون پلن اختصاصی</option>
+                        <?php foreach ($plans as $p): ?>
+                            <option value="<?= $p['id'] ?>"><?= htmlspecialchars($p['title']) ?> (<?= $p['traffic_gb'] ?>GB)</option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 p-3.5 bg-slate-950/60 rounded-xl border border-slate-800">
+                <div>
+                    <label class="block text-slate-300 mb-1 font-semibold">سقف کل حجم (گیگابایت - GB)</label>
+                    <input type="number" step="0.1" name="traffic_limit_gb" id="editTrafficLimitGb" required min="0" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-center text-xs focus:border-amber-500 focus:outline-none">
+                </div>
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="text-slate-300 font-semibold">حجم مصرف‌شده (GB)</label>
+                        <button type="button" onclick="resetClientUsedTraffic()" class="text-[10px] text-amber-400 hover:text-amber-300 transition flex items-center gap-1">
+                            <i class="fa-solid fa-rotate-left"></i>
+                            <span>صفر کردن مصرف</span>
+                        </button>
+                    </div>
+                    <input type="number" step="0.1" name="traffic_used_gb" id="editTrafficUsedGb" min="0" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-center text-xs focus:border-amber-500 focus:outline-none">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-slate-300 mb-1 font-semibold">تاریخ و زمان انقضا</label>
+                    <input type="text" name="expire_at" id="editExpireAt" placeholder="2026-12-31 23:59:59" dir="ltr" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-xs focus:border-amber-500 focus:outline-none">
+                    <span class="text-[10px] text-slate-500 mt-0.5 block">فرمت استاندارد: YYYY-MM-DD HH:MM:SS</span>
+                </div>
+                <div>
+                    <label class="block text-slate-300 mb-1 font-semibold">شناسه چت تلگرام کاربر (جهت نوتیفیکیشن)</label>
+                    <input type="text" name="telegram_chat_id" id="editTelegramChatId" dir="ltr" placeholder="123456789" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-xs focus:border-amber-500 focus:outline-none">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-slate-300 mb-1 font-semibold">سقف اتصال همزمان (کاربر/دستگاه)</label>
+                    <input type="number" name="ip_limit" id="editIpLimit" min="0" placeholder="0 = نامحدود" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-center text-xs focus:border-amber-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-slate-300 mb-1 font-semibold">یادداشت داخلی ادمین / نماینده</label>
+                    <input type="text" name="custom_note" id="editCustomNote" placeholder="توضیحات اختیاری..." class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white text-xs focus:border-amber-500 focus:outline-none">
+                </div>
+            </div>
+
+            <div class="pt-2 flex items-center justify-end gap-2 border-t border-slate-800">
+                <button type="button" onclick="closeEditClientModal()" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition">
+                    انصراف
+                </button>
+                <button type="submit" class="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs transition shadow-md flex items-center gap-2">
+                    <i class="fa-solid fa-floppy-disk"></i>
+                    <span>ذخیره تغییرات سرویس</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 
 <?php
 require __DIR__ . '/../layout/footer.php';

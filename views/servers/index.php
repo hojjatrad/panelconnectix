@@ -17,6 +17,11 @@ require __DIR__ . '/../layout/header.php';
             <span>پایش سلامت نودها و سوئیچ هوشمند (Failover)</span>
         </a>
 
+        <button onclick="openMigrateModal()" class="px-4 py-2 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 text-xs font-bold rounded-xl transition-all shadow-sm flex items-center gap-2">
+            <i class="fa-solid fa-people-carry-box"></i>
+            <span>مهاجرت دسته‌جمعی</span>
+        </button>
+
         <form method="POST" action="<?= Helpers::url('servers/sync') ?>" class="m-0">
             <?= Helpers::csrfField() ?>
             <button type="submit" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl transition-all shadow-md flex items-center gap-2">
@@ -364,11 +369,69 @@ require __DIR__ . '/../layout/header.php';
             });
     }
 
+    function openMigrateModal() {
+        document.getElementById('migrateModal').classList.remove('hidden');
+        document.getElementById('migrateModal').classList.add('flex');
+    }
+    function closeMigrateModal() {
+        document.getElementById('migrateModal').classList.remove('flex');
+        document.getElementById('migrateModal').classList.add('hidden');
+    }
+
     // Auto-ping servers on page load
     document.addEventListener('DOMContentLoaded', () => {
         pingAllServers();
     });
 </script>
+
+<!-- Modal: Bulk Server Migration -->
+<div id="migrateModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative">
+        <button onclick="closeMigrateModal()" class="absolute top-4 left-4 text-slate-400 hover:text-white transition-colors">
+            <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+
+        <h3 class="text-base font-bold text-white mb-2 flex items-center gap-2">
+            <i class="fa-solid fa-people-carry-box text-amber-400"></i>
+            <span>مهاجرت و انتقال دسته‌جمعی کلاینت‌ها</span>
+        </h3>
+        <p class="text-xs text-slate-400 mb-4">انتقال آنی تمامی کاربران فعال از یک سرور مسدود یا در حال تعمیر به یک سرور سالم و پایدار.</p>
+
+        <form action="<?= Helpers::url('servers/migrate') ?>" method="POST" class="space-y-4 text-xs" onsubmit="return confirm('آیا از انتقال کلیه کاربران سرور مبدا به سرور مقصد اطمینان دارید؟');">
+            <?= Helpers::csrfField() ?>
+
+            <div>
+                <label class="block text-slate-300 mb-1 font-semibold">سرور مبدا (سرور فعلی کاربران) *</label>
+                <select name="from_server_id" required class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white">
+                    <option value="">-- انتخاب سرور مبدا --</option>
+                    <?php foreach ($servers as $s): ?>
+                        <option value="<?= $s['id'] ?>"><?= htmlspecialchars($s['name']) ?> (<?= $s['client_count'] ?> کلاینت)</option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-slate-300 mb-1 font-semibold">سرور مقصد (نود جایگزین) *</label>
+                <select name="to_server_id" required class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white">
+                    <option value="">-- انتخاب سرور مقصد --</option>
+                    <?php foreach ($servers as $s): ?>
+                        <option value="<?= $s['id'] ?>"><?= htmlspecialchars($s['name']) ?> (ظرفیت: <?= $s['max_clients'] ?>)</option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="p-3 bg-amber-950/30 border border-amber-800/40 rounded-xl text-[11px] text-amber-300/90 leading-relaxed">
+                <i class="fa-solid fa-circle-exclamation text-amber-400 ml-1"></i>
+                کلیه کانفیگ‌های کاربران بر روی سرور مقصد بازسازی شده و ساب‌لینک‌ها بدون نیاز به تغییر لینک در سمت مشتری، بلافاصله روی سرور جدید کار خواهند کرد.
+            </div>
+
+            <button type="submit" class="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs transition-all shadow-md mt-2 flex items-center justify-center gap-2">
+                <i class="fa-solid fa-arrow-right-arrow-left"></i>
+                <span>شروع انتقال خودکار کاربران</span>
+            </button>
+        </form>
+    </div>
+</div>
 
 <?php
 require __DIR__ . '/../layout/footer.php';

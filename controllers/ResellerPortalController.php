@@ -49,6 +49,7 @@ class ResellerPortalController {
         $botToken = trim($_POST['telegram_bot_token'] ?? '');
         $botUsername = ltrim(trim($_POST['telegram_bot_username'] ?? ''), '@');
         $adminChatId = trim($_POST['telegram_admin_chat_id'] ?? '');
+        $channel = trim($_POST['telegram_channel'] ?? '');
 
         $pdo = Database::getConnection();
 
@@ -75,8 +76,8 @@ class ResellerPortalController {
             Helpers::flash('info', 'اطلاعات ربات به‌روزرسانی شد.');
         }
 
-        $stmt = $pdo->prepare("UPDATE users SET telegram_bot_token = ?, telegram_bot_username = ?, telegram_admin_chat_id = ? WHERE id = ?");
-        $stmt->execute([$botToken, $botUsername, $adminChatId, $userId]);
+        $stmt = $pdo->prepare("UPDATE users SET telegram_bot_token = ?, telegram_bot_username = ?, telegram_admin_chat_id = ?, telegram_channel = ? WHERE id = ?");
+        $stmt->execute([$botToken, $botUsername, $adminChatId, $channel, $userId]);
 
         Helpers::redirect('reseller/bot');
     }

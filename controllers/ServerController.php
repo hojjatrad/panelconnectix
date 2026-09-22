@@ -296,4 +296,62 @@ class ServerController {
         Helpers::flash('success', 'پایش سلامت ' . count($results) . ' سرور با موفقیت انجام شد و وضعیت‌ها به‌روزرسانی گردید.');
         Helpers::redirect('servers');
     }
+
+    /**
+     * Bulk Migrate all clients from one server node to another (Failover & Maintenance)
+     */
+    public function migrateClients(): void {
+        Auth::requireAdmin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
+            Helpers::redirect('servers');
+        }
+
+        $fromServerId = (int)($_POST['from_server_id'] ?? 0);
+        $toServerId = (int)($_POST['to_server_id'] ?? 0);
+
+        if ($fromServerId <= 0 || $toServerId <= 0 || $fromServerId === $toServerId) {
+            Helpers::flash('error', 'لطفاً سرور مبدا و مقصد را به درستی و متفاوت از هم انتخاب نمایید.');
+            Helpers::redirect('servers');
+        }
+
+        $pdo = Database::getConnection();
+        $fromServer = $pdo->query("SELECT * FROM server_nodes WHERE id = {$fromServerId}")->fetch();
+        $toServer = $pdo->query("SELECT * FROM server_nodes WHERE id = {$toServerId}")->fetch();
+
+        if (!$fromServer || !$toServer) {
+            Helpers::flash('error', 'سرور مبدا یا مقصد یافت نشد.');
+            Helpers::redirect('servers');
+        }
+
+        $clients = $pdo->query("SELECT * FROM clients WHERE server_id = {$fromServerId}")->fetchAll();
+        if (empty($clients)) {
+            Helpers::flash('info', 'هیچ کلاینتی بر روی سرور مبدا برای انتقال وجود ندارد.');
+            Helpers::redirect('servers');
+        }
+
+        $toDriver = DriverFactory::create($toServer);
+        $migratedCount = 0;
+        $failedCount = 0;
+
+        foreach ($clients as $c) {
+            try {
+                $toDriver->createUser([
+                    'username' => $c['username'],
+                    'uuid' => $c['uuid'],
+                    'traffic_limit_bytes' => $c['traffic_limit_bytes'],
+                    'expire_timestamp' => !empty($c['expire_at']) ? strtotime($c['expire_at']) : 0,
+                    'proxies' => ['vless', 'vmess', 'trojan']
+                ]);
+
+                $pdo->prepare("UPDATE clients SET server_id = ? WHERE id = ?")->execute([$toServerId, $c['id']]);
+                $migratedCount++;
+            } catch (Throwable $e) {
+                $failedCount++;
+            }
+        }
+
+        Helpers::flash('success', "عملیات مهاجرت دسته‌جمعی به پایان رسید: {$migratedCount} کلاینت با موفقیت از '{$fromServer['name']}' به '{$toServer['name']}' منتقل شدند." . ($failedCount > 0 ? " ({$failedCount} خطا)" : ""));
+        Helpers::redirect('servers');
+    }
 }

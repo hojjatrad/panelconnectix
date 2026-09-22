@@ -24,6 +24,9 @@ class PlanController {
         $basePrice = (int)($_POST['base_price'] ?? 0);
         $resellerPrice = (int)($_POST['reseller_price'] ?? 0);
         $serverGroup = trim($_POST['server_group'] ?? 'default');
+        $category = trim($_POST['category'] ?? '۱ ماهه');
+        $ipLimit = max(0, (int)($_POST['ip_limit'] ?? 2));
+        $showInBot = isset($_POST['show_in_bot']) ? 1 : 0;
         $isFree = isset($_POST['is_free']) ? 1 : 0;
 
         if (empty($title) || $traffic <= 0 || $days <= 0) {
@@ -32,10 +35,42 @@ class PlanController {
         }
 
         $pdo = Database::getConnection();
-        $stmt = $pdo->prepare("INSERT INTO plans (title, traffic_gb, duration_days, base_price, reseller_price, server_group, is_free) VALUES (?, ?, ?, ?, ?, ?, ?)");
-        $stmt->execute([$title, $traffic, $days, $basePrice, $resellerPrice, $serverGroup, $isFree]);
+        $stmt = $pdo->prepare("INSERT INTO plans (title, traffic_gb, duration_days, base_price, reseller_price, server_group, category, ip_limit, show_in_bot, is_free) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$title, $traffic, $days, $basePrice, $resellerPrice, $serverGroup, $category, $ipLimit, $showInBot, $isFree]);
 
         Helpers::flash('success', 'پلن جدید با موفقیت ایجاد شد.');
+        Helpers::redirect('plans');
+    }
+
+    public function update(): void {
+        Auth::requireAdmin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
+            Helpers::redirect('plans');
+        }
+
+        $id = (int)($_POST['id'] ?? 0);
+        $title = trim($_POST['title'] ?? '');
+        $traffic = (int)($_POST['traffic_gb'] ?? 0);
+        $days = (int)($_POST['duration_days'] ?? 0);
+        $basePrice = (int)($_POST['base_price'] ?? 0);
+        $resellerPrice = (int)($_POST['reseller_price'] ?? 0);
+        $serverGroup = trim($_POST['server_group'] ?? 'default');
+        $category = trim($_POST['category'] ?? '۱ ماهه');
+        $ipLimit = max(0, (int)($_POST['ip_limit'] ?? 2));
+        $showInBot = isset($_POST['show_in_bot']) ? 1 : 0;
+        $isFree = isset($_POST['is_free']) ? 1 : 0;
+
+        if ($id <= 0 || empty($title) || $traffic <= 0 || $days <= 0) {
+            Helpers::flash('error', 'اطلاعات وارد شده برای ویرایش پلن نامعتبر است.');
+            Helpers::redirect('plans');
+        }
+
+        $pdo = Database::getConnection();
+        $stmt = $pdo->prepare("UPDATE plans SET title = ?, traffic_gb = ?, duration_days = ?, base_price = ?, reseller_price = ?, server_group = ?, category = ?, ip_limit = ?, show_in_bot = ?, is_free = ? WHERE id = ?");
+        $stmt->execute([$title, $traffic, $days, $basePrice, $resellerPrice, $serverGroup, $category, $ipLimit, $showInBot, $isFree, $id]);
+
+        Helpers::flash('success', "پلن '{$title}' با موفقیت به‌روزرسانی شد.");
         Helpers::redirect('plans');
     }
 
@@ -49,7 +84,41 @@ class PlanController {
         $id = (int)($_POST['id'] ?? 0);
         $pdo = Database::getConnection();
         $pdo->query("UPDATE plans SET is_active = (1 - is_active) WHERE id = $id");
-        Helpers::flash('info', 'وضعیت پلن تغییر یافت.');
+        Helpers::flash('info', 'وضعیت فعال/غیرفعال پلن تغییر یافت.');
+        Helpers::redirect('plans');
+    }
+
+    public function toggleBot(): void {
+        Auth::requireAdmin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن نامعتبر است.');
+            Helpers::redirect('plans');
+        }
+
+        $id = (int)($_POST['id'] ?? 0);
+        $pdo = Database::getConnection();
+        $pdo->query("UPDATE plans SET show_in_bot = (1 - COALESCE(show_in_bot, 1)) WHERE id = $id");
+        Helpers::flash('info', 'وضعیت نمایش پلن در ربات تلگرام تغییر یافت.');
+        Helpers::redirect('plans');
+    }
+
+    public function delete(): void {
+        Auth::requireAdmin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن نامعتبر است.');
+            Helpers::redirect('plans');
+        }
+
+        $id = (int)($_POST['id'] ?? 0);
+        $pdo = Database::getConnection();
+        $clientCount = (int)$pdo->query("SELECT COUNT(*) FROM clients WHERE plan_id = $id")->fetchColumn();
+        if ($clientCount > 0) {
+            Helpers::flash('error', "این پلن دارای {$clientCount} مشترک فعال است و قابل حذف نیست. می‌توانید وضعیت آن را غیرفعال کنید.");
+            Helpers::redirect('plans');
+        }
+
+        $pdo->prepare("DELETE FROM plans WHERE id = ?")->execute([$id]);
+        Helpers::flash('success', 'پلن مورد نظر با موفقیت حذف شد.');
         Helpers::redirect('plans');
     }
 }

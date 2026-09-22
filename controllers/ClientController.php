@@ -118,10 +118,9 @@ class ClientController {
         $username = strtolower(trim($_POST['username'] ?? ''));
         $password = trim($_POST['password'] ?? '');
         $planId = (int)($_POST['plan_id'] ?? 0);
-        $serverId = (int)($_POST['server_id'] ?? 0);
         $customNote = trim($_POST['custom_note'] ?? '');
 
-        if (empty($username) || empty($planId) || empty($serverId)) {
+        if (empty($username) || empty($planId)) {
             Helpers::flash('error', 'تمامی فیلدهای ستاره‌دار الزامی هستند.');
             Helpers::redirect('clients/create');
         }
@@ -134,17 +133,43 @@ class ClientController {
             Helpers::redirect('clients/create');
         }
 
-        // Fetch Plan & Server
+        // Fetch Plan
         $stmtPlan = $pdo->prepare("SELECT * FROM plans WHERE id = ? AND is_active = 1");
         $stmtPlan->execute([$planId]);
         $plan = $stmtPlan->fetch();
 
-        $stmtServer = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ? AND is_active = 1");
-        $stmtServer->execute([$serverId]);
-        $server = $stmtServer->fetch();
+        if (!$plan) {
+            Helpers::flash('error', 'پلن انتخاب‌شده معتبر نیست.');
+            Helpers::redirect('clients/create');
+        }
 
-        if (!$plan || !$server) {
-            Helpers::flash('error', 'پلن یا سرور انتخاب‌شده معتبر نیست.');
+        // Server Selection: Direct or Auto Load Balancing
+        $autoSelect = (($_POST['server_id'] ?? '') === 'auto' || empty($_POST['server_id']));
+        if ($autoSelect) {
+            $group = $plan['server_group'] ?? 'default';
+            $stmtAuto = $pdo->prepare("SELECT s.*, (SELECT COUNT(*) FROM clients WHERE server_id = s.id) as client_count 
+                                       FROM server_nodes s 
+                                       WHERE s.is_active = 1 AND (s.server_group = ? OR ? = 'default') 
+                                       ORDER BY client_count ASC, COALESCE(s.latency_ms, 999) ASC LIMIT 1");
+            $stmtAuto->execute([$group, $group]);
+            $server = $stmtAuto->fetch();
+            if (!$server) {
+                $server = $pdo->query("SELECT * FROM server_nodes WHERE is_active = 1 ORDER BY id ASC LIMIT 1")->fetch();
+            }
+            if ($server) {
+                $serverId = (int)$server['id'];
+            } else {
+                $serverId = 0;
+            }
+        } else {
+            $serverId = (int)($_POST['server_id'] ?? 0);
+            $stmtServer = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ? AND is_active = 1");
+            $stmtServer->execute([$serverId]);
+            $server = $stmtServer->fetch();
+        }
+
+        if (!$server) {
+            Helpers::flash('error', 'هیچ سرور فعالی برای ایجاد اشتراک یافت نشد.');
             Helpers::redirect('clients/create');
         }
 
@@ -168,6 +193,7 @@ class ClientController {
         $trafficBytes = $plan['traffic_gb'] * 1024 * 1024 * 1024;
         $expireAt = date('Y-m-d H:i:s', strtotime("+{$plan['duration_days']} days"));
         $expireTimestamp = strtotime($expireAt);
+        $ipLimit = isset($_POST['ip_limit']) ? max(0, (int)$_POST['ip_limit']) : (int)($plan['ip_limit'] ?? 2);
 
         // 1. Provision on Remote Server Node via Driver
         $driver = DriverFactory::create($server);
@@ -205,9 +231,9 @@ class ClientController {
             }
 
             // Insert Client
-            $stmtInsert = $pdo->prepare("INSERT INTO clients (reseller_id, server_id, plan_id, username, password, uuid, sub_token, traffic_limit_bytes, traffic_used_bytes, expire_at, status, custom_note) 
-                                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'active', ?)");
-            $stmtInsert->execute([$userId, $serverId, $planId, $username, $password, $uuid, $subToken, $trafficBytes, $expireAt, $customNote]);
+            $stmtInsert = $pdo->prepare("INSERT INTO clients (reseller_id, server_id, plan_id, username, password, uuid, sub_token, traffic_limit_bytes, traffic_used_bytes, expire_at, ip_limit, status, custom_note) 
+                                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, 'active', ?)");
+            $stmtInsert->execute([$userId, $serverId, $planId, $username, $password, $uuid, $subToken, $trafficBytes, $expireAt, $ipLimit, $customNote]);
             $newClientId = $pdo->lastInsertId();
 
             $pdo->commit();
@@ -232,6 +258,128 @@ class ClientController {
             Helpers::flash('error', 'خطا در ثبت تراکنش دیتابیس: ' . $e->getMessage());
             Helpers::redirect('clients/create');
         }
+    }
+
+    /**
+     * Update existing client service details (Modal Edit)
+     */
+    public function update(): void {
+        Auth::requireLogin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
+            Helpers::redirect('clients');
+        }
+
+        $id = (int)($_POST['client_id'] ?? 0);
+        $pdo = Database::getConnection();
+
+        $stmt = $pdo->prepare("SELECT c.*, s.name as server_name, s.driver, s.api_url, s.api_username, s.api_password, s.api_token 
+                               FROM clients c 
+                               LEFT JOIN server_nodes s ON c.server_id = s.id 
+                               WHERE c.id = ?");
+        $stmt->execute([$id]);
+        $client = $stmt->fetch();
+
+        if (!$client) {
+            Helpers::flash('error', 'کلاینت یافت نشد.');
+            Helpers::redirect('clients');
+        }
+
+        // Reseller access control
+        if (Auth::isReseller() && (int)$client['reseller_id'] !== Auth::id()) {
+            Helpers::flash('error', 'دسترسی غیرمجاز.');
+            Helpers::redirect('clients');
+        }
+
+        $username = trim($_POST['username'] ?? $client['username']);
+        $password = trim($_POST['password'] ?? $client['password']);
+        $serverId = (int)($_POST['server_id'] ?? $client['server_id']);
+        $planId = !empty($_POST['plan_id']) ? (int)$_POST['plan_id'] : null;
+        $status = in_array($_POST['status'] ?? '', ['active', 'disabled', 'expired', 'limited']) ? $_POST['status'] : $client['status'];
+        
+        $trafficLimitGb = isset($_POST['traffic_limit_gb']) ? (float)$_POST['traffic_limit_gb'] : ($client['traffic_limit_bytes'] / (1024*1024*1024));
+        $trafficUsedGb = isset($_POST['traffic_used_gb']) ? (float)$_POST['traffic_used_gb'] : ($client['traffic_used_bytes'] / (1024*1024*1024));
+        $trafficLimitBytes = (int)round($trafficLimitGb * 1024 * 1024 * 1024);
+        $trafficUsedBytes = (int)round($trafficUsedGb * 1024 * 1024 * 1024);
+
+        $expireAt = !empty($_POST['expire_at']) ? trim($_POST['expire_at']) : null;
+        $telegramChatId = !empty($_POST['telegram_chat_id']) ? trim($_POST['telegram_chat_id']) : null;
+        $customNote = trim($_POST['custom_note'] ?? ($client['custom_note'] ?? ''));
+        $ipLimit = max(0, (int)($_POST['ip_limit'] ?? ($client['ip_limit'] ?? 2)));
+
+        // If server changed, handle node migration
+        $oldServerId = (int)$client['server_id'];
+        if ($oldServerId !== $serverId) {
+            try {
+                // Delete from old node
+                $oldServer = $pdo->query("SELECT * FROM server_nodes WHERE id = {$oldServerId}")->fetch();
+                if ($oldServer) {
+                    $oldDriver = DriverFactory::create($oldServer);
+                    $oldDriver->deleteUser($client['username']);
+                }
+
+                // Provision on new node
+                $newServer = $pdo->query("SELECT * FROM server_nodes WHERE id = {$serverId}")->fetch();
+                if ($newServer) {
+                    $newDriver = DriverFactory::create($newServer);
+                    $expireSec = $expireAt ? (strtotime($expireAt) - time()) : 0;
+                    $newDriver->createUser([
+                        'username' => $username,
+                        'uuid' => $client['uuid'],
+                        'traffic_limit_bytes' => $trafficLimitBytes,
+                        'expire_timestamp' => $expireAt ? strtotime($expireAt) : 0,
+                        'proxies' => ['vless', 'vmess', 'trojan']
+                    ]);
+                }
+            } catch (Throwable $e) {}
+        } else {
+            // Sync status with current remote node if changed
+            if ($client['status'] !== $status) {
+                try {
+                    $driver = DriverFactory::create($client);
+                    $driver->toggleUserStatus($client['username'], ($status === 'active'));
+                } catch (Throwable $e) {}
+            }
+        }
+
+        // Reset alert flags if traffic was reset or limit was increased
+        $resetAlertsSql = "";
+        if ($trafficUsedBytes < $client['traffic_used_bytes'] || $trafficLimitBytes > $client['traffic_limit_bytes']) {
+            $resetAlertsSql = ", alert_80_sent = 0, alert_95_sent = 0";
+        }
+
+        $stmtUp = $pdo->prepare("UPDATE clients SET 
+            username = ?, 
+            password = ?, 
+            server_id = ?, 
+            plan_id = ?, 
+            status = ?, 
+            traffic_limit_bytes = ?, 
+            traffic_used_bytes = ?, 
+            expire_at = ?, 
+            ip_limit = ?,
+            telegram_chat_id = ?,
+            custom_note = ?
+            {$resetAlertsSql},
+            updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?");
+        $stmtUp->execute([
+            $username,
+            $password,
+            $serverId,
+            $planId,
+            $status,
+            $trafficLimitBytes,
+            $trafficUsedBytes,
+            $expireAt,
+            $ipLimit,
+            $telegramChatId,
+            $customNote,
+            $id
+        ]);
+
+        Helpers::flash('success', "مشخصات سرویس کاربر '{$username}' با موفقیت به‌روزرسانی شد.");
+        Helpers::redirect('clients');
     }
 
     public function renew(): void {

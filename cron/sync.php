@@ -28,6 +28,15 @@ $pdo = Database::getConnection();
 try {
     $healthResults = ServerController::performHealthCheck();
     $onlineServers = count(array_filter($healthResults, fn($s) => $s['status'] === 'online'));
+    $offlineServers = array_filter($healthResults, fn($s) => $s['status'] !== 'online');
+    if (!empty($offlineServers)) {
+        $msg = "⚡️ <b>هشدار نودهای سرور کانکتیکس</b>\n\n";
+        foreach ($offlineServers as $off) {
+            $msg .= "❌ نود: <b>" . htmlspecialchars($off['name'] ?? 'سرور') . "</b> (" . htmlspecialchars($off['ip'] ?? '') . ")\nعلت: " . htmlspecialchars($off['error'] ?? 'عدم پاسخگویی پینگ') . "\n\n";
+        }
+        $msg .= "⏱ زمان بررسی: " . date('Y-m-d H:i:s');
+        TelegramBot::sendCategorizedReport('servers', $msg);
+    }
     echo "[Server Health] Checked " . count($healthResults) . " nodes | Online: {$onlineServers}" . $eol;
 } catch (Throwable $e) {
     echo "[Server Health Error] " . $e->getMessage() . $eol;
@@ -215,8 +224,8 @@ if (time() - $lastBackup >= 86400) {
         }
         fclose($handle);
 
-        $caption = "📦 <b>پشتیبان‌گیری خودکار ۲۴ ساعته سیستم</b>\n📅 تاریخ: " . date('Y-m-d H:i:s') . "\n🛡 ارسال خودکار دیتابیس توسط کرون جاب";
-        TelegramBot::sendDocument($tempPath, $caption);
+        $caption = "💾 <b>نسخه پشتیبان خودکار دیتابیس</b>\n📅 تاریخ: " . date('Y-m-d H:i:s') . "\n🛡 سیستم مانیتورینگ خودکار کانکتیکس";
+        TelegramBot::sendCategorizedDocument('backup', $tempPath, $caption);
         @unlink($tempPath);
 
         Setting::set('last_cron_backup_time', (string)time());

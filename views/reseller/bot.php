@@ -57,6 +57,14 @@ require __DIR__ . '/../layout/header.php';
                     </div>
                 </div>
 
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1.5">کانال تلگرام جهت عضویت اجباری (Force Join):</label>
+                    <input type="text" name="telegram_channel" value="<?= htmlspecialchars($reseller['telegram_channel'] ?? '') ?>" 
+                           dir="ltr" placeholder="@MyBrandChannel یا -100..."
+                           class="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white font-mono text-xs focus:border-cyan-500 focus:outline-none">
+                    <span class="text-[10px] text-slate-500 mt-1 block">در صورت تکمیل، مشتریان قبل از خرید در ربات شما موظف به عضویت در کانال شما خواهند بود. ربات باید ادمین کانال باشد.</span>
+                </div>
+
                 <!-- Webhook URL Display -->
                 <div class="p-3.5 bg-slate-950/60 rounded-xl border border-slate-800 space-y-1.5">
                     <span class="text-[11px] font-bold text-slate-400 block">آدرس وب‌هوک خودکار اختصاصی شما:</span>

@@ -89,10 +89,16 @@ $passwordVal = !empty($client['password']) ? $client['password'] : '123456';
                 </div>
             </div>
 
-            <!-- Expiration Date -->
-            <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
-                <span class="text-slate-400">اعتبار زمانی:</span>
-                <span class="font-bold text-amber-300"><?= Helpers::daysRemaining($client['expire_at']) ?></span>
+            <!-- Expiration Date & IP Limit -->
+            <div class="pt-3 border-t border-slate-800/80 space-y-2 text-xs">
+                <div class="flex items-center justify-between">
+                    <span class="text-slate-400">اعتبار زمانی:</span>
+                    <span class="font-bold text-amber-300"><?= Helpers::daysRemaining($client['expire_at']) ?></span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-slate-400">سقف اتصال همزمان:</span>
+                    <span class="font-bold text-purple-300 font-mono"><?= ($client['ip_limit'] ?? 2) > 0 ? ($client['ip_limit'] ?? 2) . ' دستگاه' : 'نامحدود' ?></span>
+                </div>
             </div>
 
             <!-- Reserved Plan Banner (if queued) -->
@@ -172,6 +178,43 @@ $passwordVal = !empty($client['password']) ? $client['password'] : '123456';
                     <i class="fa-solid fa-box"></i>
                     <span>ورود به Sing-box</span>
                 </a>
+            </div>
+        </div>
+
+        <!-- Multi-Inbound Fallback Individual Configs Box -->
+        <div class="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 space-y-3">
+            <button type="button" onclick="document.getElementById('fallbackConfigsBox').classList.toggle('hidden')" class="w-full flex items-center justify-between text-xs font-bold text-slate-300 hover:text-white transition">
+                <span class="flex items-center gap-2">
+                    <i class="fa-solid fa-network-wired text-purple-400"></i>
+                    <span>کانفیگ‌های مجزا و مسیرهای پشتیبان (Multi-Inbound)</span>
+                </span>
+                <i class="fa-solid fa-chevron-down text-[10px] text-slate-500"></i>
+            </button>
+
+            <div id="fallbackConfigsBox" class="hidden space-y-2.5 pt-2 border-t border-slate-800/80">
+                <p class="text-[11px] text-slate-400 leading-relaxed">
+                    در صورتی که نرم‌افزار شما از ساب‌لینک خودکار پشتیبانی نمی‌کند، می‌توانید هر یک از مسیرهای زیر را به تفکیک کپی و وارد کنید:
+                </p>
+                <?php 
+                $protoLabels = [
+                    'vless_reality' => ['title' => '⚡️ VLESS Reality (مستقیم پرسرعت)', 'color' => 'text-purple-400'],
+                    'vless_ws' => ['title' => '🛡 VLESS CDN (ضد فیلتر شبکه ملی)', 'color' => 'text-cyan-400'],
+                    'trojan' => ['title' => '🔒 Trojan TLS (پایدار برای iOS و مک)', 'color' => 'text-emerald-400'],
+                    'vmess' => ['title' => '🚀 VMess WS (سازگار با کلیه اوپراتورها)', 'color' => 'text-amber-400'],
+                ];
+                foreach ($configs as $k => $cfg): 
+                    $info = $protoLabels[$k] ?? ['title' => strtoupper($k), 'color' => 'text-white'];
+                ?>
+                    <div class="bg-slate-900/90 border border-slate-800 p-2.5 rounded-xl space-y-1">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[11px] font-bold <?= $info['color'] ?>"><?= $info['title'] ?></span>
+                            <button onclick="copyRaw('<?= htmlspecialchars($cfg) ?>', this)" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-purple-600 text-[10px] text-slate-300 hover:text-white transition">
+                                <i class="fa-regular fa-copy ml-1"></i> کپی
+                            </button>
+                        </div>
+                        <input type="text" readonly value="<?= htmlspecialchars($cfg) ?>" class="w-full bg-slate-950 border border-slate-800/80 rounded-lg p-1.5 font-mono text-[10px] text-slate-400 select-all" dir="ltr">
+                    </div>
+                <?php endforeach; ?>
             </div>
         </div>
 

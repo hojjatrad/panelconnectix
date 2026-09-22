@@ -12,6 +12,16 @@ $themeClasses = [
     'black'  => ['primary' => 'bg-zinc-800', 'hover' => 'hover:bg-zinc-700', 'text' => 'text-zinc-300', 'border' => 'border-zinc-600'],
 ];
 $t = $themeClasses[$theme] ?? $themeClasses['violet'];
+
+$headerOpenTickets = 0;
+try {
+    $pdoHeader = Database::getConnection();
+    if (Auth::isAdmin()) {
+        $headerOpenTickets = (int)$pdoHeader->query("SELECT COUNT(*) FROM tickets WHERE status IN ('open', 'waiting_reseller')")->fetchColumn();
+    } elseif (Auth::isReseller()) {
+        $headerOpenTickets = (int)$pdoHeader->query("SELECT COUNT(*) FROM tickets WHERE user_id = " . Auth::id() . " AND status = 'answered'")->fetchColumn();
+    }
+} catch (Throwable $e) {}
 ?>
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
@@ -136,13 +146,35 @@ $t = $themeClasses[$theme] ?? $themeClasses['violet'];
                 <span>کاربران ربات (Audience)</span>
             </a>
 
+            <a href="<?= Helpers::url('settings/app-guides') ?>" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors hover:bg-slate-800 hover:text-white <?= str_contains($_SERVER['REQUEST_URI'] ?? '', 'app-guides') ? 'bg-slate-800/90 text-white font-semibold shadow-sm' : 'text-slate-400' ?>">
+                <i class="fa-solid fa-mobile-screen-button text-center w-5 text-emerald-400"></i>
+                <span>نرم‌افزارها و آموزش‌ها</span>
+            </a>
+
+            <a href="<?= Helpers::url('settings/coupons') ?>" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors hover:bg-slate-800 hover:text-white <?= str_contains($_SERVER['REQUEST_URI'] ?? '', 'coupons') ? 'bg-slate-800/90 text-white font-semibold shadow-sm' : 'text-slate-400' ?>">
+                <i class="fa-solid fa-ticket text-center w-5 text-amber-400"></i>
+                <span>کدهای تخفیف ربات</span>
+            </a>
+
             <a href="<?= Helpers::url('updater') ?>" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors hover:bg-slate-800 hover:text-white <?= str_contains($_SERVER['REQUEST_URI'] ?? '', 'updater') ? 'bg-slate-800/90 text-white font-semibold shadow-sm' : 'text-slate-400' ?>">
                 <i class="fa-brands fa-github w-5 text-center text-purple-400"></i>
                 <span>به‌روزرسانی پنل (گیت‌هاب)</span>
             </a>
             <?php endif; ?>
 
-            <div class="pt-3 pb-1 text-xs font-semibold text-slate-400 uppercase tracking-wider px-3.5">مالی و تنظیمات</div>
+            <div class="pt-3 pb-1 text-xs font-semibold text-slate-400 uppercase tracking-wider px-3.5">مالی و پشتیبانی</div>
+
+            <a href="<?= Helpers::url('tickets') ?>" class="flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors hover:bg-slate-800 hover:text-white <?= str_contains($_SERVER['REQUEST_URI'] ?? '', 'tickets') ? 'bg-slate-800/90 text-white font-semibold shadow-sm' : 'text-slate-400' ?>">
+                <span class="flex items-center gap-3">
+                    <i class="fa-solid fa-headset w-5 text-center text-rose-400"></i>
+                    <span>تیکت‌ها و پشتیبانی</span>
+                </span>
+                <?php if ($headerOpenTickets > 0): ?>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white font-mono">
+                        <?= $headerOpenTickets ?>
+                    </span>
+                <?php endif; ?>
+            </a>
 
             <a href="<?= Helpers::url('billing') ?>" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors hover:bg-slate-800 hover:text-white <?= str_contains($_SERVER['REQUEST_URI'] ?? '', 'billing') ? 'bg-slate-800/90 text-white font-semibold shadow-sm' : 'text-slate-400' ?>">
                 <i class="fa-solid fa-wallet w-5 text-center text-rose-400"></i>
