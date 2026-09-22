@@ -296,6 +296,40 @@ class Database {
                     INDEX `idx_ra_status` (`status`)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
 
+                // IP Limits for Plans & Clients in MySQL
+                $check = $pdo->query("SHOW COLUMNS FROM `plans` LIKE 'ip_limit'")->fetch();
+                if (!$check) {
+                    $pdo->exec("ALTER TABLE `plans` ADD COLUMN `ip_limit` INT DEFAULT 2");
+                }
+
+                $check = $pdo->query("SHOW COLUMNS FROM `clients` LIKE 'ip_limit'")->fetch();
+                if (!$check) {
+                    $pdo->exec("ALTER TABLE `clients` ADD COLUMN `ip_limit` INT DEFAULT 2");
+                }
+
+                // Support Tickets in MySQL
+                $pdo->exec("CREATE TABLE IF NOT EXISTS `tickets` (
+                    `id` INT AUTO_INCREMENT PRIMARY KEY,
+                    `user_id` INT NOT NULL,
+                    `subject` VARCHAR(255) NOT NULL,
+                    `department` VARCHAR(64) DEFAULT 'support',
+                    `priority` VARCHAR(32) DEFAULT 'medium',
+                    `status` VARCHAR(32) DEFAULT 'open',
+                    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX `idx_t_user` (`user_id`),
+                    INDEX `idx_t_status` (`status`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
+
+                $pdo->exec("CREATE TABLE IF NOT EXISTS `ticket_messages` (
+                    `id` INT AUTO_INCREMENT PRIMARY KEY,
+                    `ticket_id` INT NOT NULL,
+                    `sender_id` INT NOT NULL,
+                    `message` TEXT NOT NULL,
+                    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    INDEX `idx_tm_ticket` (`ticket_id`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
+
             } else {
                 // SQLite
                 $cols = [
