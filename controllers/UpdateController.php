@@ -110,11 +110,36 @@ class UpdateController {
 
     public function webhook(): void {
         header('Content-Type: application/json; charset=utf-8');
-        $secret = $_GET['secret'] ?? '';
+        $rawPayload = file_get_contents('php://input');
+        $querySecret = $_GET['secret'] ?? '';
         $expected = Setting::get('github_webhook_secret', APP_SECRET);
-        if (empty($secret) || $secret !== $expected) {
+
+        $isAuthorized = false;
+
+        // Check 1: Query param ?secret=
+        if (!empty($querySecret) && hash_equals($expected, $querySecret)) {
+            $isAuthorized = true;
+        }
+
+        // Check 2: GitHub Native Header X-Hub-Signature-256
+        $hubSignature = $_SERVER['HTTP_X_HUB_SIGNATURE_256'] ?? '';
+        if (!$isAuthorized && !empty($hubSignature) && str_starts_with($hubSignature, 'sha256=')) {
+            $expectedSig = 'sha256=' . hash_hmac('sha256', $rawPayload, $expected);
+            if (hash_equals($expectedSig, $hubSignature)) {
+                $isAuthorized = true;
+            }
+        }
+
+        if (!$isAuthorized) {
             http_response_code(403);
-            echo json_encode(['error' => 'Unauthorized webhook secret']);
+            echo json_encode(['error' => 'Unauthorized webhook request']);
+            exit;
+        }
+
+        // Only process push events if event header is present
+        $githubEvent = $_SERVER['HTTP_X_GITHUB_EVENT'] ?? 'push';
+        if ($githubEvent === 'ping') {
+            echo json_encode(['status' => 'pong', 'message' => 'GitHub Webhook connected successfully!']);
             exit;
         }
 
