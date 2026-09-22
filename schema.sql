@@ -201,6 +201,7 @@ ON DUPLICATE KEY UPDATE `id`=`id`;
 INSERT INTO `settings` (`key`, `val`) VALUES
 ('github_repo', 'hojjatrad/panelconnectix'),
 ('github_branch', 'main'),
+('github_webhook_secret', 'gh_hook_sec_vpbotn_2026'),
 ('brand_name', 'Connectix VPN'),
 ('current_version', '1.0.0')
 ON DUPLICATE KEY UPDATE `val`=VALUES(`val`);
