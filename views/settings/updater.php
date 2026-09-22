@@ -66,14 +66,24 @@ require __DIR__ . '/../layout/header.php';
                     </form>
                 </div>
             <?php else: ?>
-                <div class="bg-slate-950/60 border border-slate-800/80 rounded-2xl p-5 flex items-center gap-3.5">
-                    <div class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-xl shrink-0">
-                        <i class="fa-solid fa-shield-check"></i>
+                <div class="bg-slate-950/60 border border-slate-800/80 rounded-2xl p-5 space-y-3">
+                    <div class="flex items-center gap-3.5">
+                        <div class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-xl shrink-0">
+                            <i class="fa-solid fa-shield-check"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-xs text-white">سامانه شما در حال حاضر کاملاً متصل و فعال است</h4>
+                            <p class="text-[11px] text-slate-400 mt-0.5">آخرین استعلام از مخزن <code class="text-purple-300"><?= htmlspecialchars($repo) ?></code> در تاریخ <?= $updateInfo['checked_at'] ?? 'هم‌اکنون' ?> انجام گردید.</p>
+                        </div>
                     </div>
-                    <div>
-                        <h4 class="font-bold text-xs text-white">سامانه شما در حال حاضر کاملاً به‌روز است</h4>
-                        <p class="text-[11px] text-slate-400 mt-0.5">آخرین استعلام از مخزن <code class="text-purple-300"><?= htmlspecialchars($repo) ?></code> در تاریخ <?= $updateInfo['checked_at'] ?? 'هم‌اکنون' ?> انجام گردید.</p>
-                    </div>
+
+                    <form action="<?= Helpers::url('updater/apply') ?>" method="POST" onsubmit="return confirm('آیا از استقرار و دانلود مجدد آخرین نسخه از گیت‌هاب اطمینان دارید؟');" class="pt-2">
+                        <?= Helpers::csrfField() ?>
+                        <button type="submit" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-purple-300 hover:text-white font-bold rounded-xl text-xs transition border border-slate-700 flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-arrows-rotate"></i>
+                            <span>دانلود و استقرار مجدد آخرین کدها از گیت‌هاب (Force Sync / Update)</span>
+                        </button>
+                    </form>
                 </div>
             <?php endif; ?>
 

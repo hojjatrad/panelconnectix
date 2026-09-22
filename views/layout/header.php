@@ -205,9 +205,16 @@ $t = $themeClasses[$theme] ?? $themeClasses['violet'];
         <?php 
         if (Auth::isAdmin() && class_exists('Updater')) {
             $cachedUpdate = Setting::get('update_check_cache');
-            if (!empty($cachedUpdate)) {
+            $cacheTime = (int)Setting::get('update_check_time', '0');
+
+            // If empty or older than 15 minutes, check in background
+            if (empty($cachedUpdate) || (time() - $cacheTime > 900)) {
+                $updateObj = Updater::checkForUpdates(false);
+            } else {
                 $updateObj = json_decode($cachedUpdate, true);
-                if (!empty($updateObj['has_update'])):
+            }
+
+            if (!empty($updateObj['has_update'])):
         ?>
             <div class="mx-6 mt-4 p-4 bg-gradient-to-r from-purple-900/80 via-indigo-900/80 to-slate-900/90 border border-purple-500/50 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
                 <div class="flex items-center gap-3.5">
@@ -215,20 +222,19 @@ $t = $themeClasses[$theme] ?? $themeClasses['violet'];
                         <i class="fa-solid fa-cloud-arrow-down animate-bounce"></i>
                     </div>
                     <div>
-                        <h4 class="text-xs font-bold text-white">🎉 نگارش جدید پنل در مخزن گیت‌هاب منتشر شد (نسخه <?= htmlspecialchars($updateObj['latest_version']) ?>)</h4>
-                        <p class="text-[11px] text-purple-200 mt-0.5">نگارش فعلی شما: v<?= Updater::CURRENT_VERSION ?> | امکان ارتقای آنی با ۱ کلیک بدون از دست رفتن داده‌ها</p>
+                        <h4 class="text-xs font-bold text-white">🎉 نگارش جدید پنل در مخزن گیت‌هاب در دسترس است (نسخه <?= htmlspecialchars($updateObj['latest_version']) ?>)</h4>
+                        <p class="text-[11px] text-purple-200 mt-0.5"><?= htmlspecialchars($updateObj['release_title'] ?? '') ?> | امکان ارتقای آنی با ۱ کلیک بدون از دست رفتن داده‌ها</p>
                     </div>
                 </div>
                 <div class="flex items-center gap-2 shrink-0">
                     <a href="<?= Helpers::url('updater') ?>" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center gap-1.5">
                         <i class="fa-solid fa-rocket"></i>
-                        <span>به‌روزرسانی به این نسخه</span>
+                        <span>مشاهده و اعمال به‌روزرسانی</span>
                     </a>
                 </div>
             </div>
         <?php 
-                endif;
-            }
+            endif;
         }
         ?>
 
