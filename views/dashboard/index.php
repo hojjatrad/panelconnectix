@@ -6,8 +6,11 @@ require __DIR__ . '/../layout/header.php';
 <div class="relative overflow-hidden bg-gradient-to-r from-purple-900/40 via-slate-900 to-slate-900 border border-purple-800/30 rounded-2xl p-6 shadow-xl">
     <div class="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
-            <span class="inline-block px-2.5 py-1 rounded-md text-xs font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30 mb-2">
-                نسخه ۲.۷.۳ سازگار با مرزبان، پاسارگاد و ۳x-ui
+            <?php 
+            $panelVer = class_exists('Updater') ? Updater::getCurrentVersion() : '2.4.4'; 
+            ?>
+            <span class="inline-block px-2.5 py-1 rounded-md text-xs font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30 mb-2 font-mono">
+                نگارش پنل: v<?= htmlspecialchars($panelVer) ?> | سازگار با مرزبان، پاسارگاد و ۳x-ui
             </span>
             <h2 class="text-xl md:text-2xl font-black text-white">سلام، <?= htmlspecialchars($user['full_name'] ?? $user['username']) ?> خوش آمدید!</h2>
             <p class="text-xs md:text-sm text-slate-400 mt-1"><?= htmlspecialchars($user['welcome_message'] ?? 'مدیریت و مانیتورینگ متمرکز سرورها و مشتریان') ?></p>

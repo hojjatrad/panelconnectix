@@ -55,7 +55,7 @@ class MockDriver implements PanelDriverInterface {
     public function getNodeStats(): array {
         return [
             'status' => 'online',
-            'version' => 'Mock Core 2.7.3 (Simulated)',
+            'version' => 'Mock Core Node (Online)',
             'users' => rand(40, 180),
             'cpu' => rand(12, 38) . '%',
             'ram' => rand(1, 3) . '.' . rand(1, 9) . ' GB / 8 GB'
