@@ -70,6 +70,35 @@ $t = $themeClasses[$theme] ?? $themeClasses['violet'];
                 <span>پلن‌ها و تعرفه‌ها</span>
             </a>
 
+            <?php if (Auth::isReseller()): ?>
+            <div class="pt-3 pb-1 text-xs font-semibold text-slate-400 uppercase tracking-wider px-3.5">بخش اختصاصی نماینده</div>
+
+            <a href="<?= Helpers::url('reseller/orders') ?>" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors hover:bg-slate-800 hover:text-white <?= str_contains($_SERVER['REQUEST_URI'] ?? '', 'reseller/orders') ? 'bg-slate-800/90 text-white font-semibold shadow-sm' : 'text-slate-400' ?>">
+                <i class="fa-solid fa-cart-shopping w-5 text-center text-cyan-400"></i>
+                <span>سفارشات ربات من</span>
+            </a>
+
+            <a href="<?= Helpers::url('reseller/plans') ?>" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors hover:bg-slate-800 hover:text-white <?= str_contains($_SERVER['REQUEST_URI'] ?? '', 'reseller/plans') ? 'bg-slate-800/90 text-white font-semibold shadow-sm' : 'text-slate-400' ?>">
+                <i class="fa-solid fa-tags w-5 text-center text-indigo-400"></i>
+                <span>تعرفه‌ها و دسته‌بندی من</span>
+            </a>
+
+            <a href="<?= Helpers::url('reseller/bot') ?>" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors hover:bg-slate-800 hover:text-white <?= str_contains($_SERVER['REQUEST_URI'] ?? '', 'reseller/bot') ? 'bg-slate-800/90 text-white font-semibold shadow-sm' : 'text-slate-400' ?>">
+                <i class="fa-brands fa-telegram w-5 text-center text-sky-400"></i>
+                <span>ربات تلگرام اختصاصی من</span>
+            </a>
+
+            <a href="<?= Helpers::url('reseller/banking') ?>" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors hover:bg-slate-800 hover:text-white <?= str_contains($_SERVER['REQUEST_URI'] ?? '', 'reseller/banking') ? 'bg-slate-800/90 text-white font-semibold shadow-sm' : 'text-slate-400' ?>">
+                <i class="fa-solid fa-credit-card w-5 text-center text-emerald-400"></i>
+                <span>حساب بانکی و درگاه من</span>
+            </a>
+
+            <a href="<?= Helpers::url('reseller/branding') ?>" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors hover:bg-slate-800 hover:text-white <?= str_contains($_SERVER['REQUEST_URI'] ?? '', 'reseller/branding') ? 'bg-slate-800/90 text-white font-semibold shadow-sm' : 'text-slate-400' ?>">
+                <i class="fa-solid fa-palette w-5 text-center text-fuchsia-400"></i>
+                <span>برندینگ و وایت‌لیبل من</span>
+            </a>
+            <?php endif; ?>
+
             <?php if (Auth::isAdmin()): ?>
             <div class="pt-3 pb-1 text-xs font-semibold text-slate-400 uppercase tracking-wider px-3.5">بخش مدیریت کل</div>
 

@@ -10,7 +10,7 @@ class ResellerController {
 
         $stmt = $pdo->query("SELECT u.*, 
                                     COUNT(c.id) as client_count,
-                                    COALESCE(b.brand_name, 'Connectix Default') as brand_name
+                                    COALESCE(u.brand_name, b.brand_name, 'Connectix Default') as brand_name
                              FROM users u
                              LEFT JOIN clients c ON c.reseller_id = u.id
                              LEFT JOIN branding_metadata b ON b.user_id = u.id

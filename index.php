@@ -45,6 +45,7 @@ require_once __DIR__ . '/controllers/TelegramBotController.php';
 require_once __DIR__ . '/controllers/PaymentController.php';
 require_once __DIR__ . '/controllers/ApiController.php';
 require_once __DIR__ . '/controllers/ProfileController.php';
+require_once __DIR__ . '/controllers/ResellerPortalController.php';
 require_once __DIR__ . '/controllers/LogController.php';
 require_once __DIR__ . '/controllers/UpdateController.php';
 require_once __DIR__ . '/core/Updater.php';
@@ -98,6 +99,19 @@ $router->post('servers/sync', [ServerController::class, 'syncNow']);
 $router->get('resellers', [ResellerController::class, 'index']);
 $router->post('resellers/store', [ResellerController::class, 'store']);
 $router->post('resellers/adjust', [ResellerController::class, 'adjustBalance']);
+
+// Reseller Dedicated Portal
+$router->get('reseller/bot', [ResellerPortalController::class, 'bot']);
+$router->post('reseller/bot', [ResellerPortalController::class, 'saveBot']);
+$router->get('reseller/banking', [ResellerPortalController::class, 'banking']);
+$router->post('reseller/banking', [ResellerPortalController::class, 'saveBanking']);
+$router->get('reseller/branding', [ResellerPortalController::class, 'branding']);
+$router->post('reseller/branding', [ResellerPortalController::class, 'saveBranding']);
+$router->get('reseller/plans', [ResellerPortalController::class, 'plans']);
+$router->post('reseller/plans', [ResellerPortalController::class, 'savePlans']);
+$router->get('reseller/orders', [ResellerPortalController::class, 'orders']);
+$router->post('reseller/orders/approve', [ResellerPortalController::class, 'approveOrder']);
+$router->post('reseller/orders/reject', [ResellerPortalController::class, 'rejectOrder']);
 
 // Billing & Prepaid Wallet
 $router->get('billing', [BillingController::class, 'index']);

@@ -19,6 +19,19 @@ CREATE TABLE IF NOT EXISTS `users` (
     `allowed_groups` VARCHAR(255) DEFAULT 'all' COMMENT 'all or comma separated',
     `api_token` VARCHAR(128) UNIQUE NULL,
     `status` ENUM('active', 'suspended') NOT NULL DEFAULT 'active',
+    `telegram_bot_token` VARCHAR(255) NULL,
+    `telegram_bot_username` VARCHAR(128) NULL,
+    `telegram_admin_chat_id` VARCHAR(64) NULL,
+    `brand_name` VARCHAR(128) NULL,
+    `logo_url` VARCHAR(255) NULL,
+    `theme_color` VARCHAR(32) DEFAULT 'violet',
+    `card_number` VARCHAR(32) NULL,
+    `card_holder` VARCHAR(128) NULL,
+    `card_shaba` VARCHAR(34) NULL,
+    `zarinpal_merchant` VARCHAR(64) NULL,
+    `support_username` VARCHAR(128) NULL,
+    `welcome_message` TEXT NULL,
+    `custom_domain` VARCHAR(128) NULL,
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -143,6 +156,8 @@ CREATE TABLE IF NOT EXISTS `system_settings` (
 CREATE TABLE IF NOT EXISTS `bot_orders` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `order_code` VARCHAR(32) UNIQUE,
+    `reseller_id` INT NULL DEFAULT 1,
+    `bot_token` VARCHAR(255) NULL,
     `user_tg_id` VARCHAR(64) NOT NULL,
     `user_tg_name` VARCHAR(128) NULL,
     `user_tg_username` VARCHAR(128) NULL,
@@ -159,15 +174,36 @@ CREATE TABLE IF NOT EXISTS `bot_orders` (
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX `idx_order_tg` (`user_tg_id`),
+    INDEX `idx_order_reseller` (`reseller_id`),
     INDEX `idx_order_status` (`payment_status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 11. Bot User Sessions
 CREATE TABLE IF NOT EXISTS `bot_sessions` (
-    `tg_id` VARCHAR(64) PRIMARY KEY,
+    `tg_id` VARCHAR(64) NOT NULL,
+    `reseller_id` INT NOT NULL DEFAULT 1,
     `step` VARCHAR(64) NULL,
     `data` TEXT NULL,
-    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`tg_id`, `reseller_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 12. Reseller Custom Plans & Custom Pricing
+CREATE TABLE IF NOT EXISTS `reseller_plans` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `reseller_id` INT NOT NULL,
+    `plan_id` INT NOT NULL,
+    `custom_title` VARCHAR(128) NULL,
+    `custom_category` VARCHAR(64) DEFAULT 'پیش‌فرض',
+    `retail_price` BIGINT NOT NULL,
+    `is_active` TINYINT(1) DEFAULT 1,
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY `uk_reseller_plan` (`reseller_id`, `plan_id`),
+    INDEX `idx_rp_reseller` (`reseller_id`),
+    INDEX `idx_rp_plan` (`plan_id`),
+    CONSTRAINT `fk_rp_user` FOREIGN KEY (`reseller_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_rp_plan` FOREIGN KEY (`plan_id`) REFERENCES `plans` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 12. Activity & Audit Logs

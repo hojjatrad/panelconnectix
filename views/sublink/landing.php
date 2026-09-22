@@ -5,7 +5,7 @@ $pct = $totalBytes > 0 ? round(($usedBytes / $totalBytes) * 100, 1) : 0;
 $remBytes = max(0, $totalBytes - $usedBytes);
 $brandName = htmlspecialchars($client['brand_name'] ?? 'Connectix VPN');
 $subUrl = Helpers::fullUrl('sub/' . $client['sub_token']);
-$botUsername = Setting::get('telegram_bot_username', '');
+$botUsername = !empty($client['reseller_bot_username']) ? $client['reseller_bot_username'] : Setting::get('telegram_bot_username', '');
 $passwordVal = !empty($client['password']) ? $client['password'] : '123456';
 ?>
 <!DOCTYPE html>

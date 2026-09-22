@@ -10,9 +10,17 @@ class SublinkController {
         // 1. Fetch Client, Server, and Reseller Branding
         $stmt = $pdo->prepare("SELECT c.*, 
                                       s.name as server_name, s.sub_domain, s.driver as server_driver,
-                                      b.brand_name, b.theme_color, b.logo_url, b.telegram_support, b.whatsapp_support, b.welcome_message, b.renewal_url,
+                                      COALESCE(u.brand_name, b.brand_name, 'Connectix VPN') as brand_name, 
+                                      COALESCE(u.theme_color, b.theme_color, 'violet') as theme_color, 
+                                      COALESCE(u.logo_url, b.logo_url) as logo_url, 
+                                      COALESCE(u.support_username, b.telegram_support) as telegram_support, 
+                                      b.whatsapp_support, 
+                                      COALESCE(u.welcome_message, b.welcome_message) as welcome_message, 
+                                      b.renewal_url,
+                                      COALESCE(u.telegram_bot_username, '') as reseller_bot_username,
                                       rp.id as reserved_id, rp.plan_id as reserved_plan_id, rp.traffic_gb as reserved_gb, rp.duration_days as reserved_days
                                FROM clients c 
+                               LEFT JOIN users u ON u.id = c.reseller_id
                                LEFT JOIN server_nodes s ON c.server_id = s.id 
                                LEFT JOIN branding_metadata b ON b.user_id = c.reseller_id 
                                LEFT JOIN reserved_plans rp ON rp.client_id = c.id AND rp.status = 'queued'

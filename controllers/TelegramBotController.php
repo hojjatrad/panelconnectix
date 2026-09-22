@@ -8,10 +8,79 @@ require_once __DIR__ . '/../core/Provisioner.php';
 require_once __DIR__ . '/SublinkController.php';
 
 class TelegramBotController {
+    public static ?array $currentContext = null;
+
+    public static function resolveContext(PDO $pdo, ?string $token = null, ?int $resellerId = null): array {
+        $token = $token ?: ($_GET['bot_token'] ?? $_GET['token'] ?? null);
+        $resellerId = $resellerId ?: (isset($_GET['reseller_id']) ? (int)$_GET['reseller_id'] : null);
+
+        $reseller = null;
+        if (!empty($token)) {
+            $stmt = $pdo->prepare("SELECT * FROM users WHERE telegram_bot_token = ? LIMIT 1");
+            $stmt->execute([$token]);
+            $reseller = $stmt->fetch();
+        } elseif (!empty($resellerId)) {
+            $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ? LIMIT 1");
+            $stmt->execute([$resellerId]);
+            $reseller = $stmt->fetch();
+        }
+
+        if (!$reseller) {
+            $reseller = $pdo->query("SELECT * FROM users WHERE role = 'admin' ORDER BY id ASC LIMIT 1")->fetch();
+            $token = $token ?: TelegramBot::getToken();
+        }
+
+        $brand = !empty($reseller['brand_name']) ? $reseller['brand_name'] : Setting::get('brand_name', 'کانکتیکس');
+        $card = [
+            'number' => !empty($reseller['card_number']) ? $reseller['card_number'] : Setting::get('bank_card', Setting::get('card_number', '۶۰۳۷-۹۹۷۵-xxxx-xxxx')),
+            'holder' => !empty($reseller['card_holder']) ? $reseller['card_holder'] : Setting::get('bank_card_owner', Setting::get('card_holder', 'مدیریت')),
+            'shaba' => !empty($reseller['card_shaba']) ? $reseller['card_shaba'] : Setting::get('card_sheba', ''),
+        ];
+        $adminChatId = !empty($reseller['telegram_admin_chat_id']) ? $reseller['telegram_admin_chat_id'] : TelegramBot::getAdminChatId();
+
+        self::$currentContext = [
+            'reseller_id' => (int)($reseller['id'] ?? 1),
+            'reseller' => $reseller,
+            'bot_token' => $token,
+            'brand_name' => $brand,
+            'card' => $card,
+            'admin_chat_id' => $adminChatId,
+            'support_username' => !empty($reseller['support_username']) ? $reseller['support_username'] : Setting::get('telegram_support', '')
+        ];
+
+        return self::$currentContext;
+    }
+
+    public static function getContext(?PDO $pdo = null): array {
+        if (self::$currentContext !== null) {
+            return self::$currentContext;
+        }
+        $pdo = $pdo ?: Database::getConnection();
+        return self::resolveContext($pdo);
+    }
+
+    public static function getPlansForReseller(PDO $pdo, int $resellerId, bool $includeFree = false): array {
+        $sql = "SELECT p.*, 
+                       COALESCE(rp.custom_title, p.title) as display_title,
+                       COALESCE(rp.custom_category, 'پیش‌فرض') as display_category,
+                       COALESCE(rp.retail_price, p.base_price) as display_price,
+                       COALESCE(rp.is_active, 1) as display_active
+                FROM plans p
+                LEFT JOIN reseller_plans rp ON p.id = rp.plan_id AND rp.reseller_id = ?
+                WHERE p.is_active = 1 AND COALESCE(rp.is_active, 1) = 1";
+        if (!$includeFree) {
+            $sql .= " AND p.is_free = 0";
+        }
+        $sql .= " ORDER BY display_category ASC, display_price ASC";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([$resellerId]);
+        return $stmt->fetchAll();
+    }
+
     /**
      * Webhook entry point called by Telegram server
      */
-    public static function handleWebhook(): void {
+    public static function handleWebhook(?string $incomingToken = null, ?int $incomingResellerId = null): void {
         try {
             $raw = file_get_contents('php://input');
             if (empty($raw)) {
@@ -26,6 +95,7 @@ class TelegramBotController {
             }
 
             $pdo = Database::getConnection();
+            self::resolveContext($pdo, $incomingToken, $incomingResellerId);
 
             // 1. Handle Callback Queries (Inline button clicks)
             if (isset($update['callback_query'])) {
@@ -231,18 +301,18 @@ class TelegramBotController {
                 return;
             }
 
-            $cardNumber = Setting::get('bank_card', Setting::get('card_number', '۶۰۳۷-۹۹۷۵-xxxx-xxxx'));
-            $cardHolder = Setting::get('bank_card_owner', Setting::get('card_holder', 'مدیریت کانکتیکس'));
-            $bankName = Setting::get('card_bank_name', 'ملی');
-            $cardSheba = Setting::get('card_sheba', '');
+            $ctx = self::getContext($pdo);
+            $botToken = $ctx['bot_token'];
+            $cardNumber = $ctx['card']['number'];
+            $cardHolder = $ctx['card']['holder'];
+            $cardSheba = $ctx['card']['shaba'];
             $amountFa = number_format($order['amount']) . ' تومان';
 
             self::setSession($pdo, $fromId, 'awaiting_receipt', ['order_id' => $orderId]);
 
-            $msg = "💳 <b>اطلاعات حساب جهت واریز کارت به کارت</b>\n\n"
+            $msg = "💳 <b>اطلاعات حساب جهت واریز کارت به کارت ({$ctx['brand_name']})</b>\n\n"
                  . "🔢 <b>شماره کارت:</b>\n<code>{$cardNumber}</code>\n\n"
-                 . "👤 <b>به نام:</b> {$cardHolder}\n"
-                 . "🏦 <b>بانک:</b> {$bankName}\n";
+                 . "👤 <b>به نام:</b> {$cardHolder}\n";
 
             if (!empty($cardSheba)) {
                 $msg .= "📌 <b>شماره شبا:</b>\n<code>{$cardSheba}</code>\n\n";
@@ -262,9 +332,9 @@ class TelegramBotController {
             ];
 
             if ($messageId) {
-                TelegramBot::editMessageText($msg, $chatId, $messageId, $keyboard);
+                TelegramBot::editMessageText($msg, $chatId, $messageId, $keyboard, $botToken);
             } else {
-                TelegramBot::sendMessage($msg, $chatId, $keyboard);
+                TelegramBot::sendMessage($msg, $chatId, $keyboard, $botToken);
             }
             return;
         }
@@ -333,30 +403,40 @@ class TelegramBotController {
         $fromId = (string)($cb['from']['id'] ?? '');
         $chatId = (string)($cb['message']['chat']['id'] ?? $fromId);
 
-        $stmt = $pdo->prepare("SELECT * FROM plans WHERE id = ? AND is_active = 1");
-        $stmt->execute([$planId]);
+        $ctx = self::getContext($pdo);
+        $resellerId = $ctx['reseller_id'];
+        $botToken = $ctx['bot_token'];
+
+        $stmt = $pdo->prepare("SELECT p.*, 
+                                      COALESCE(rp.custom_title, p.title) as display_title,
+                                      COALESCE(rp.retail_price, p.base_price) as display_price
+                               FROM plans p 
+                               LEFT JOIN reseller_plans rp ON p.id = rp.plan_id AND rp.reseller_id = ?
+                               WHERE p.id = ? AND p.is_active = 1");
+        $stmt->execute([$resellerId, $planId]);
         $plan = $stmt->fetch();
 
         if (!$plan) {
-            TelegramBot::sendMessage("⚠️ پلن انتخابی معتبر نیست.", $chatId);
+            TelegramBot::sendMessage("⚠️ پلن انتخابی معتبر نیست.", $chatId, null, $botToken);
             return;
         }
 
         $orderCode = ($orderType === 'renew' ? 'RNW-' : 'ORD-') . strtoupper(substr(bin2hex(random_bytes(3)), 0, 6));
         $userTgName = trim(($cb['from']['first_name'] ?? '') . ' ' . ($cb['from']['last_name'] ?? ''));
         $userTgUsername = $cb['from']['username'] ?? '';
+        $finalPrice = (int)$plan['display_price'];
 
         $stmtOrder = $pdo->prepare("INSERT INTO bot_orders 
-            (order_code, user_tg_id, user_tg_name, user_tg_username, order_type, plan_id, client_id, amount, payment_method, payment_status) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'card', 'pending_receipt')");
-        $stmtOrder->execute([$orderCode, $fromId, $userTgName, $userTgUsername, $orderType, $planId, $clientId, $plan['base_price']]);
+            (order_code, reseller_id, bot_token, user_tg_id, user_tg_name, user_tg_username, order_type, plan_id, client_id, amount, payment_method, payment_status) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'card', 'pending_receipt')");
+        $stmtOrder->execute([$orderCode, $resellerId, $botToken, $fromId, $userTgName, $userTgUsername, $orderType, $planId, $clientId, $finalPrice]);
         $orderId = (int)$pdo->lastInsertId();
 
-        $priceFa = number_format($plan['base_price']) . ' تومان';
+        $priceFa = number_format($finalPrice) . ' تومان';
         $titlePrefix = ($orderType === 'renew') ? 'پیش‌فاکتور تمدید اشتراک' : 'پیش‌فاکتور خرید اشتراک جدید';
 
         $msg = "🛒 <b>{$titlePrefix}</b>\n\n"
-             . "📦 <b>پلن انتخابی:</b> {$plan['title']}\n"
+             . "📦 <b>پلن انتخابی:</b> {$plan['display_title']}\n"
              . "💾 <b>حجم:</b> {$plan['traffic_gb']} گیگابایت\n"
              . "⏳ <b>مدت زمان:</b> {$plan['duration_days']} روز\n"
              . "💰 <b>مبلغ قابل پرداخت:</b> <b>{$priceFa}</b>\n"
@@ -375,9 +455,9 @@ class TelegramBotController {
         ];
 
         if ($messageId) {
-            TelegramBot::editMessageText($msg, $chatId, $messageId, $keyboard);
+            TelegramBot::editMessageText($msg, $chatId, $messageId, $keyboard, $botToken);
         } else {
-            TelegramBot::sendMessage($msg, $chatId, $keyboard);
+            TelegramBot::sendMessage($msg, $chatId, $keyboard, $botToken);
         }
     }
 
@@ -449,11 +529,14 @@ class TelegramBotController {
                         ->execute([$fileId, $orderId]);
                     self::clearSession($pdo, $fromId);
 
-                    TelegramBot::sendMessage("✅ <b>رسید پرداخت شما با موفقیت دریافت شد.</b>\nکد سفارش: <code>{$order['order_code']}</code>\nسفارش شما بررسی و مشخصات تحویل داده خواهد شد.", $chatId, self::getMainMenuInlineKeyboard($pdo, $fromId));
+                    $ctx = self::getContext($pdo);
+                    $adminId = $ctx['admin_chat_id'];
+                    $botToken = $ctx['bot_token'];
 
-                    $adminId = TelegramBot::getAdminChatId();
+                    TelegramBot::sendMessage("✅ <b>رسید پرداخت شما با موفقیت دریافت شد.</b>\nکد سفارش: <code>{$order['order_code']}</code>\nسفارش شما بررسی و مشخصات تحویل داده خواهد شد.", $chatId, self::getMainMenuInlineKeyboard($pdo, $fromId), $botToken);
+
                     if (!empty($adminId)) {
-                        $adminCaption = "🔔 <b>رسید واریزی جدید</b>\n\n"
+                        $adminCaption = "🔔 <b>رسید واریزی جدید (ربات {$ctx['brand_name']})</b>\n\n"
                                       . "👤 کاربر: @" . ($order['user_tg_username'] ?: 'ندارد') . " (ID: <code>{$fromId}</code>)\n"
                                       . "📦 پلن: <b>{$order['plan_title']}</b>\n"
                                       . "💰 مبلغ: <b>" . number_format($order['amount']) . " تومان</b>\n"
@@ -467,7 +550,7 @@ class TelegramBotController {
                                 ]
                             ]
                         ];
-                        TelegramBot::sendPhoto($fileId, $adminCaption, $adminId, $adminKeyboard);
+                        TelegramBot::sendPhoto($fileId, $adminCaption, $adminId, $adminKeyboard, $botToken);
                     }
                     return;
                 }
@@ -486,11 +569,14 @@ class TelegramBotController {
                     ->execute([$text, $orderId]);
                 self::clearSession($pdo, $fromId);
 
-                TelegramBot::sendMessage("✅ <b>اطلاعات پرداخت ثبت شد.</b>\nکد سفارش: <code>{$order['order_code']}</code>\nپس از تایید مدیر، اشتراک فعال خواهد شد.", $chatId, self::getMainMenuInlineKeyboard($pdo, $fromId));
+                $ctx = self::getContext($pdo);
+                $adminId = $ctx['admin_chat_id'];
+                $botToken = $ctx['bot_token'];
 
-                $adminId = TelegramBot::getAdminChatId();
+                TelegramBot::sendMessage("✅ <b>اطلاعات پرداخت ثبت شد.</b>\nکد سفارش: <code>{$order['order_code']}</code>\nپس از تایید مدیر، اشتراک فعال خواهد شد.", $chatId, self::getMainMenuInlineKeyboard($pdo, $fromId), $botToken);
+
                 if (!empty($adminId)) {
-                    $adminNotice = "🔔 <b>ثبت فیش متنی</b>\n👤 کاربر: @" . ($order['user_tg_username'] ?: 'ندارد') . "\n💰 مبلغ: <b>" . number_format($order['amount']) . " تومان</b>\n📝 متن: <code>{$text}</code>\n🔖 کد: <code>{$order['order_code']}</code>";
+                    $adminNotice = "🔔 <b>ثبت فیش متنی (ربات {$ctx['brand_name']})</b>\n👤 کاربر: @" . ($order['user_tg_username'] ?: 'ندارد') . "\n💰 مبلغ: <b>" . number_format($order['amount']) . " تومان</b>\n📝 متن: <code>{$text}</code>\n🔖 کد: <code>{$order['order_code']}</code>";
                     $adminKeyboard = [
                         'inline_keyboard' => [
                             [
@@ -499,7 +585,7 @@ class TelegramBotController {
                             ]
                         ]
                     ];
-                    TelegramBot::sendMessage($adminNotice, $adminId, $adminKeyboard);
+                    TelegramBot::sendMessage($adminNotice, $adminId, $adminKeyboard, $botToken);
                 }
                 return;
             }
@@ -890,22 +976,26 @@ class TelegramBotController {
             return;
         }
 
-        $plans = $pdo->query("SELECT * FROM plans WHERE is_active = 1 AND is_free = 0 ORDER BY base_price ASC")->fetchAll();
+        $ctx = self::getContext($pdo);
+        $resellerId = $ctx['reseller_id'];
+        $botToken = $ctx['bot_token'];
+
+        $plans = self::getPlansForReseller($pdo, $resellerId);
         $msg = "🔄 <b>تمدید اشتراک برای کاربر:</b> <code>{$client['username']}</code>\n\nلطفاً پلن مورد نظر برای تمدید را انتخاب نمایید:";
 
         $buttons = [];
         foreach ($plans as $p) {
-            $priceFa = number_format($p['base_price']) . ' ت';
-            $btnText = "{$p['title']} ({$p['traffic_gb']}GB - {$p['duration_days']} روز) | {$priceFa}";
+            $priceFa = number_format($p['display_price']) . ' ت';
+            $btnText = "{$p['display_title']} ({$p['traffic_gb']}GB - {$p['duration_days']} روز) | {$priceFa}";
             $buttons[] = [['text' => $btnText, 'callback_data' => 'select_renew_plan_' . $client['id'] . '_' . $p['id']]];
         }
         $buttons[] = [['text' => '🔙 بازگشت', 'callback_data' => 'view_acc_' . $clientId]];
 
         $kb = ['inline_keyboard' => $buttons];
         if ($messageId) {
-            TelegramBot::editMessageText($msg, $chatId, $messageId, $kb);
+            TelegramBot::editMessageText($msg, $chatId, $messageId, $kb, $botToken);
         } else {
-            TelegramBot::sendMessage($msg, $chatId, $kb);
+            TelegramBot::sendMessage($msg, $chatId, $kb, $botToken);
         }
     }
 
@@ -913,21 +1003,23 @@ class TelegramBotController {
      * Send Persian Main Menu
      */
     public static function sendMainMenu(PDO $pdo, string $chatId, ?string $fromId = null, string $name = '', ?int $messageId = null): void {
-        $brand = Setting::get('brand_name', 'کانکتیکس');
+        $ctx = self::getContext($pdo);
+        $brand = $ctx['brand_name'];
+        $botToken = $ctx['bot_token'];
         $greeting = !empty($name) ? "سلام {$name} عزیز! " : "سلام! ";
-        $welcomeCustom = Setting::get('bot_welcome_text');
-        $welcomeText = !empty($welcomeCustom) ? $welcomeCustom : Setting::get('welcome_message', "به ربات رسمی {$brand} خوش آمدید.\nجهت خرید اشتراک، تمدید، استعلام حجم یا ورود به حساب از دکمه‌های شیشه‌ای زیر استفاده نمایید:");
+        $welcomeCustom = $ctx['reseller']['welcome_message'] ?? null;
+        $welcomeText = !empty($welcomeCustom) ? $welcomeCustom : "به ربات رسمی {$brand} خوش آمدید.\nجهت خرید اشتراک، تمدید، استعلام حجم یا ورود به حساب از دکمه‌های شیشه‌ای زیر استفاده نمایید:";
 
         $msg = "⚡️ <b>{$greeting}</b>\n\n{$welcomeText}";
         $inlineKb = self::getMainMenuInlineKeyboard($pdo, $fromId ?: $chatId);
 
         $edited = false;
         if ($messageId) {
-            $edited = TelegramBot::editMessageText($msg, $chatId, $messageId, $inlineKb);
+            $edited = TelegramBot::editMessageText($msg, $chatId, $messageId, $inlineKb, $botToken);
         }
         if (!$edited) {
-            TelegramBot::sendMessage($msg, $chatId, $inlineKb);
-            TelegramBot::sendMessage("👇 همچنین کیبورد دسترسی سریع در پایین فعال است:", $chatId, self::getMainMenuReplyKeyboard());
+            TelegramBot::sendMessage($msg, $chatId, $inlineKb, $botToken);
+            TelegramBot::sendMessage("👇 همچنین کیبورد دسترسی سریع در پایین فعال است:", $chatId, self::getMainMenuReplyKeyboard(), $botToken);
         }
     }
 
@@ -935,39 +1027,44 @@ class TelegramBotController {
      * Show Plans Menu for Purchase
      */
     private static function showPlansMenu(PDO $pdo, string $chatId, ?int $messageId = null): void {
-        $plans = $pdo->query("SELECT * FROM plans WHERE is_active = 1 AND is_free = 0 ORDER BY base_price ASC")->fetchAll();
-        if (empty($plans)) {
-            $plans = $pdo->query("SELECT * FROM plans WHERE is_active = 1 ORDER BY base_price ASC")->fetchAll();
-        }
+        $ctx = self::getContext($pdo);
+        $resellerId = $ctx['reseller_id'];
+        $botToken = $ctx['bot_token'];
+
+        $plans = self::getPlansForReseller($pdo, $resellerId);
 
         if (empty($plans)) {
-            $emptyText = "در حال حاضر پلنی برای فروش موجود نیست.";
+            $emptyText = "در حال حاضر پلنی برای فروش در این ربات فعال نیست.";
             $kb = ['inline_keyboard' => [[['text' => '🔙 بازگشت به منوی اصلی', 'callback_data' => 'menu_main']]]];
             if ($messageId) {
-                TelegramBot::editMessageText($emptyText, $chatId, $messageId, $kb);
+                TelegramBot::editMessageText($emptyText, $chatId, $messageId, $kb, $botToken);
             } else {
-                TelegramBot::sendMessage($emptyText, $chatId, $kb);
+                TelegramBot::sendMessage($emptyText, $chatId, $kb, $botToken);
             }
             return;
         }
 
-        $msg = "🛒 <b>لیست تعرفه‌ها و پلن‌های قابل خرید</b>\n\nلطفاً پلن مورد نظر خود را لمس نمایید:";
+        $msg = "🛒 <b>لیست تعرفه‌ها و پلن‌های قابل خرید ({$ctx['brand_name']})</b>\n\nلطفاً پلن مورد نظر خود را لمس نمایید:";
         $buttons = [];
+        $lastCategory = null;
+
         foreach ($plans as $p) {
-            $priceFa = number_format($p['base_price']) . ' تومان';
-            $btnText = "📦 {$p['title']} ({$p['traffic_gb']}GB / {$p['duration_days']} روز) - {$priceFa}";
+            $cat = $p['display_category'] ?: 'پیش‌فرض';
+            if ($cat !== $lastCategory && $cat !== 'پیش‌فرض') {
+                $buttons[] = [['text' => "━━━ {$cat} ━━━", 'callback_data' => 'noop']];
+                $lastCategory = $cat;
+            }
+            $priceFa = number_format($p['display_price']) . ' تومان';
+            $btnText = "📦 {$p['display_title']} ({$p['traffic_gb']}GB / {$p['duration_days']} روز) - {$priceFa}";
             $buttons[] = [['text' => $btnText, 'callback_data' => 'select_plan_' . $p['id']]];
         }
         $buttons[] = [['text' => '🔙 بازگشت به منوی اصلی', 'callback_data' => 'menu_main']];
 
-        $keyboard = ['inline_keyboard' => $buttons];
-
-        $edited = false;
+        $kb = ['inline_keyboard' => $buttons];
         if ($messageId) {
-            $edited = TelegramBot::editMessageText($msg, $chatId, $messageId, $keyboard);
-        }
-        if (!$edited) {
-            TelegramBot::sendMessage($msg, $chatId, $keyboard);
+            TelegramBot::editMessageText($msg, $chatId, $messageId, $kb, $botToken);
+        } else {
+            TelegramBot::sendMessage($msg, $chatId, $kb, $botToken);
         }
     }
 
@@ -1029,10 +1126,10 @@ class TelegramBotController {
     }
 
     /**
-     * Approve order and provision account
+     * Approve order and provision account (Multi-tenant Wallet & Delivery Aware)
      */
     public static function approveOrderAction(PDO $pdo, int $orderId, ?string $adminId = null): array {
-        $stmt = $pdo->prepare("SELECT o.*, p.traffic_gb, p.duration_days, p.server_group 
+        $stmt = $pdo->prepare("SELECT o.*, p.title as plan_title, p.traffic_gb, p.duration_days, p.base_price, p.server_group 
                                FROM bot_orders o 
                                LEFT JOIN plans p ON o.plan_id = p.id 
                                WHERE o.id = ?");
@@ -1047,8 +1144,47 @@ class TelegramBotController {
             return ['success' => true, 'username' => 'قبلاً فعال شده', 'password' => '---', 'sub_url' => ''];
         }
 
+        $resellerId = (int)($order['reseller_id'] ?? 1);
+        $botToken = !empty($order['bot_token']) ? $order['bot_token'] : null;
+
+        // Wholesale Wallet Deduction for Resellers
+        if ($resellerId > 1) {
+            $stmtReseller = $pdo->prepare("SELECT * FROM users WHERE id = ?");
+            $stmtReseller->execute([$resellerId]);
+            $reseller = $stmtReseller->fetch();
+
+            if ($reseller) {
+                $discount = (int)$reseller['discount_percent'];
+                $wholesaleCost = (int)round($order['base_price'] * (1 - ($discount / 100)));
+
+                if ($reseller['wallet_balance'] < $wholesaleCost) {
+                    $errNotice = "⚠️ <b>خطا در تایید سفارش #{$order['order_code']}</b>\n\nموجودی کیف پول شما کافی نیست!\nموجودی: " . number_format($reseller['wallet_balance']) . " تومان\nهزینه عمده پلن: " . number_format($wholesaleCost) . " تومان\nلطفاً ابتدا کیف پول خود را شارژ فرمایید.";
+                    if (!empty($reseller['telegram_admin_chat_id'])) {
+                        TelegramBot::sendMessage($errNotice, (string)$reseller['telegram_admin_chat_id'], null, $botToken);
+                    }
+                    return ['success' => false, 'error' => 'موجودی کیف پول نماینده نزد مدیریت کافی نیست (نیاز به: ' . number_format($wholesaleCost) . ' تومان)'];
+                }
+
+                // Deduct wholesale cost
+                $newBal = $reseller['wallet_balance'] - $wholesaleCost;
+                $pdo->prepare("UPDATE users SET wallet_balance = ? WHERE id = ?")->execute([$newBal, $resellerId]);
+                $pdo->prepare("INSERT INTO transactions (user_id, amount, balance_after, type, description, reference_id, status) VALUES (?, ?, ?, 'plan_purchase', ?, ?, 'completed')")
+                    ->execute([$resellerId, -$wholesaleCost, $newBal, "خرید خودکار از ربات برای سفارش #{$order['order_code']}", $order['order_code']]);
+
+                // Notify reseller of profit & remaining balance
+                $profit = max(0, $order['amount'] - $wholesaleCost);
+                $resellerReceipt = "💳 <b>گزارش کسر هزینه عمده و سود سفارش #{$order['order_code']}</b>\n\n"
+                                 . "💰 دریافتی از مشتری: " . number_format($order['amount']) . " تومان\n"
+                                 . "📉 کسر از کیف پول شما: " . number_format($wholesaleCost) . " تومان\n"
+                                 . "💵 سود خالص شما: <b>+" . number_format($profit) . " تومان</b>\n"
+                                 . "💼 باقیمانده کیف پول: " . number_format($newBal) . " تومان";
+                if (!empty($reseller['telegram_admin_chat_id'])) {
+                    TelegramBot::sendMessage($resellerReceipt, (string)$reseller['telegram_admin_chat_id'], null, $botToken);
+                }
+            }
+        }
+
         // Renewal order fulfillment
-        // Delivery for renewal order
         if ($order['order_type'] === 'renew' && !empty($order['client_id'])) {
             $renewResult = Provisioner::renewClient((int)$order['client_id'], (int)$order['plan_id']);
             if (!$renewResult['success']) {
@@ -1078,7 +1214,7 @@ class TelegramBotController {
                     [['text' => '📊 مشاهده وضعیت اشتراک', 'callback_data' => 'view_acc_' . $client['id']]],
                     [['text' => '🔙 منوی اصلی', 'callback_data' => 'menu_main']]
                 ]
-            ]);
+            ], $botToken);
 
             return [
                 'success' => true,
@@ -1089,13 +1225,13 @@ class TelegramBotController {
         }
 
         // New Purchase Order fulfillment via Provisioner
-        $customNote = "خریداری شده توسط تلگرام ID: " . $order['user_tg_id'];
+        $customNote = "خریداری شده توسط ربات تلگرام ID: " . $order['user_tg_id'];
         $prov = Provisioner::createClient(
             (int)$order['plan_id'], 
             $order['server_id'] ? (int)$order['server_id'] : null, 
             null, 
             null, 
-            1, 
+            $resellerId, 
             $customNote,
             (string)$order['user_tg_id']
         );
@@ -1129,7 +1265,7 @@ class TelegramBotController {
             ]
         ];
 
-        TelegramBot::sendPhoto($qrUrl, $customerMsg, $order['user_tg_id'], $customerKeyboard);
+        TelegramBot::sendPhoto($qrUrl, $customerMsg, $order['user_tg_id'], $customerKeyboard, $botToken);
 
         return [
             'success' => true,
@@ -1152,7 +1288,7 @@ class TelegramBotController {
             $rejectMsg = "❌ <b>سفارش شماره {$order['order_code']} توسط مدیریت رد شد.</b>\nدر صورت کسر وجه یا نیاز به بررسی، لطفاً با پشتیبانی در ارتباط باشید.";
             TelegramBot::sendMessage($rejectMsg, $order['user_tg_id'], [
                 'inline_keyboard' => [[['text' => '☎️ پشتیبانی تلگرام', 'callback_data' => 'menu_support']]]
-            ]);
+            ], $order['bot_token'] ?? null);
         }
     }
 

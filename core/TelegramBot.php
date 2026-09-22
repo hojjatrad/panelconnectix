@@ -24,8 +24,8 @@ class TelegramBot {
         return ($active === '1' || $active === 'true' || $active === 'on');
     }
 
-    public static function request(string $method, array $params = []): ?array {
-        $token = self::getToken();
+    public static function request(string $method, array $params = [], ?string $customToken = null): ?array {
+        $token = !empty($customToken) ? trim($customToken) : self::getToken();
         if (empty($token)) {
             return null;
         }
@@ -59,7 +59,7 @@ class TelegramBot {
         return $decoded;
     }
 
-    public static function sendMessage(string $text, ?string $chatId = null, $replyMarkup = null): bool {
+    public static function sendMessage(string $text, ?string $chatId = null, $replyMarkup = null, ?string $customToken = null): bool {
         $targetChat = $chatId ?: self::getAdminChatId();
         if (empty($targetChat)) {
             return false;
@@ -76,11 +76,11 @@ class TelegramBot {
             $params['reply_markup'] = $replyMarkup;
         }
 
-        $res = self::request('sendMessage', $params);
+        $res = self::request('sendMessage', $params, $customToken);
         return isset($res['ok']) && $res['ok'] === true;
     }
 
-    public static function sendPhoto(string $photo, string $caption = '', ?string $chatId = null, $replyMarkup = null): bool {
+    public static function sendPhoto(string $photo, string $caption = '', ?string $chatId = null, $replyMarkup = null, ?string $customToken = null): bool {
         $targetChat = $chatId ?: self::getAdminChatId();
         if (empty($targetChat)) {
             return false;
@@ -97,13 +97,13 @@ class TelegramBot {
             $params['reply_markup'] = $replyMarkup;
         }
 
-        $res = self::request('sendPhoto', $params);
+        $res = self::request('sendPhoto', $params, $customToken);
         return isset($res['ok']) && $res['ok'] === true;
     }
 
-    public static function sendDocument(string $filePath, string $caption = '', ?string $chatId = null): bool {
+    public static function sendDocument(string $filePath, string $caption = '', ?string $chatId = null, ?string $customToken = null): bool {
         $targetChat = $chatId ?: self::getAdminChatId();
-        $token = self::getToken();
+        $token = !empty($customToken) ? trim($customToken) : self::getToken();
         if (empty($targetChat) || empty($token) || !file_exists($filePath)) {
             return false;
         }
@@ -134,7 +134,7 @@ class TelegramBot {
         return isset($decoded['ok']) && $decoded['ok'] === true;
     }
 
-    public static function editMessageText(string $text, string $chatId, int $messageId, $replyMarkup = null): bool {
+    public static function editMessageText(string $text, string $chatId, int $messageId, $replyMarkup = null, ?string $customToken = null): bool {
         $params = [
             'chat_id' => $chatId,
             'message_id' => $messageId,
@@ -147,11 +147,11 @@ class TelegramBot {
             $params['reply_markup'] = $replyMarkup;
         }
 
-        $res = self::request('editMessageText', $params);
+        $res = self::request('editMessageText', $params, $customToken);
         return isset($res['ok']) && $res['ok'] === true;
     }
 
-    public static function answerCallbackQuery(string $callbackQueryId, ?string $text = null, bool $showAlert = false): bool {
+    public static function answerCallbackQuery(string $callbackQueryId, ?string $text = null, bool $showAlert = false, ?string $customToken = null): bool {
         $params = [
             'callback_query_id' => $callbackQueryId,
             'show_alert' => $showAlert
@@ -159,29 +159,29 @@ class TelegramBot {
         if ($text !== null) {
             $params['text'] = $text;
         }
-        $res = self::request('answerCallbackQuery', $params);
+        $res = self::request('answerCallbackQuery', $params, $customToken);
         return isset($res['ok']) && $res['ok'] === true;
     }
 
-    public static function setWebhook(string $webhookUrl): array {
-        $token = self::getToken();
+    public static function setWebhook(string $webhookUrl, ?string $customToken = null): array {
+        $token = !empty($customToken) ? trim($customToken) : self::getToken();
         if (empty($token)) {
             return ['ok' => false, 'description' => 'توکن ربات تلگرام تنظیم نشده است.'];
         }
         $res = self::request('setWebhook', [
             'url' => $webhookUrl,
             'drop_pending_updates' => false
-        ]);
+        ], $token);
         return $res ?: ['ok' => false, 'description' => 'پاسخی از تلگرام دریافت نشد.'];
     }
 
-    public static function getWebhookInfo(): array {
-        $res = self::request('getWebhookInfo');
+    public static function getWebhookInfo(?string $customToken = null): array {
+        $res = self::request('getWebhookInfo', [], $customToken);
         return $res ?: ['ok' => false, 'description' => 'خطا در ارتباط با تلگرام'];
     }
 
-    public static function deleteWebhook(): array {
-        $res = self::request('deleteWebhook', ['drop_pending_updates' => false]);
+    public static function deleteWebhook(?string $customToken = null): array {
+        $res = self::request('deleteWebhook', ['drop_pending_updates' => false], $customToken);
         return $res ?: ['ok' => false, 'description' => 'خطا در حذف وبهوک'];
     }
 }

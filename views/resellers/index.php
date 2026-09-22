@@ -39,7 +39,16 @@ require __DIR__ . '/../layout/header.php';
                             <span class="font-bold text-white font-mono"><?= htmlspecialchars($r['username']) ?></span>
                             <span class="text-[10px] text-slate-400 block mt-0.5"><?= htmlspecialchars($r['full_name'] ?? 'بی‌نام') ?></span>
                         </td>
-                        <td class="p-3.5 font-medium text-slate-200"><?= htmlspecialchars($r['brand_name']) ?></td>
+                        <td class="p-3.5">
+                            <span class="font-medium text-slate-200 block"><?= htmlspecialchars($r['brand_name']) ?></span>
+                            <?php if (!empty($r['telegram_bot_username'])): ?>
+                                <span class="text-[10px] text-cyan-400 font-mono flex items-center gap-1 mt-0.5">
+                                    <i class="fa-brands fa-telegram"></i> @<?= htmlspecialchars($r['telegram_bot_username']) ?>
+                                </span>
+                            <?php else: ?>
+                                <span class="text-[10px] text-slate-500">ربات متصل نیست</span>
+                            <?php endif; ?>
+                        </td>
                         <td class="p-3.5 font-bold text-emerald-400 font-mono"><?= Helpers::formatMoney($r['wallet_balance']) ?></td>
                         <td class="p-3.5 font-bold text-purple-400"><?= $r['discount_percent'] ?>%</td>
                         <td class="p-3.5 text-slate-300"><?= number_format($r['client_count']) ?> کلاینت</td>
