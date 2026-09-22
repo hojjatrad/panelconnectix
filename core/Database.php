@@ -41,12 +41,27 @@ class Database {
         return self::$instance;
     }
 
+        public static function safeAddColumn(PDO $pdo, string $table, string $column, string $definition): void {
+        try {
+            $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+            if ($driver === 'mysql') {
+                $stmt = $pdo->query("SHOW COLUMNS FROM `{$table}` LIKE '{$column}'");
+                if ($stmt && !$stmt->fetch()) {
+                    $pdo->exec("ALTER TABLE `{$table}` ADD COLUMN `{$column}` {$definition}");
+                }
+            } else {
+                $pdo->exec("ALTER TABLE `{$table}` ADD COLUMN `{$column}` {$definition}");
+            }
+        } catch (Throwable $e) {}
+    }
+
     public static function ensureExtendedTablesExist(PDO $pdo): void {
         try {
             $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
             $isSqlite = ($driver === 'sqlite');
             $autoInc = $isSqlite ? 'INTEGER PRIMARY KEY AUTOINCREMENT' : 'INT AUTO_INCREMENT PRIMARY KEY';
 
+            // 1. Auxiliary Tables
             $pdo->exec("CREATE TABLE IF NOT EXISTS system_settings (
                 setting_key VARCHAR(64) PRIMARY KEY,
                 setting_value TEXT NULL
@@ -65,6 +80,8 @@ class Database {
                 server_id INT NULL,
                 target_username VARCHAR(64) NULL,
                 amount BIGINT DEFAULT 0,
+                coupon_code VARCHAR(64) NULL,
+                discount_amount BIGINT DEFAULT 0,
                 payment_method VARCHAR(32) DEFAULT 'card',
                 payment_status VARCHAR(32) DEFAULT 'pending_receipt',
                 receipt_photo_id VARCHAR(255) NULL,
@@ -75,433 +92,217 @@ class Database {
             )");
 
             $pdo->exec("CREATE TABLE IF NOT EXISTS bot_sessions (
-                tg_id VARCHAR(64) PRIMARY KEY,
+                tg_id VARCHAR(64) NOT NULL,
+                reseller_id INT NOT NULL DEFAULT 1,
                 step VARCHAR(64) NULL,
                 data TEXT NULL,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (tg_id, reseller_id)
+            )");
+
+            $pdo->exec("CREATE TABLE IF NOT EXISTS bot_users (
+                id $autoInc,
+                reseller_id INT NULL DEFAULT 1,
+                tg_id VARCHAR(64) UNIQUE NOT NULL,
+                first_name VARCHAR(128) NULL,
+                last_name VARCHAR(128) NULL,
+                username VARCHAR(128) NULL,
+                phone VARCHAR(32) NULL,
+                referred_by VARCHAR(64) NULL,
+                referral_balance BIGINT DEFAULT 0,
+                referral_count INT DEFAULT 0,
+                is_blocked TINYINT(1) DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                last_active_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )");
+
+            $pdo->exec("CREATE TABLE IF NOT EXISTS trial_logs (
+                id $autoInc,
+                user_id INT NULL,
+                reseller_id INT NULL DEFAULT 1,
+                telegram_id VARCHAR(64) NULL,
+                ip_address VARCHAR(64) NULL,
+                client_id INT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )");
+
+            $pdo->exec("CREATE TABLE IF NOT EXISTS crypto_payments (
+                id $autoInc,
+                user_id INT NULL,
+                reseller_id INT NULL DEFAULT 1,
+                order_id INT NULL,
+                currency VARCHAR(16) DEFAULT 'USDT',
+                network VARCHAR(16) DEFAULT 'TRC20',
+                expected_amount_usdt DECIMAL(10,2) DEFAULT 0.00,
+                toman_amount BIGINT DEFAULT 0,
+                wallet_address VARCHAR(128) NOT NULL,
+                tx_hash VARCHAR(128) NULL,
+                status VARCHAR(32) DEFAULT 'pending',
+                admin_notes TEXT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )");
 
-            // Auto-migrate Users table columns for Multi-Tenant Reseller Platform
-            if ($driver === 'mysql') {
-                $cols = [
-                    'telegram_bot_token' => 'VARCHAR(255) NULL',
-                    'telegram_bot_username' => 'VARCHAR(128) NULL',
-                    'telegram_admin_chat_id' => 'VARCHAR(64) NULL',
-                    'brand_name' => 'VARCHAR(128) NULL',
-                    'logo_url' => 'VARCHAR(255) NULL',
-                    'theme_color' => "VARCHAR(32) DEFAULT 'violet'",
-                    'card_number' => 'VARCHAR(32) NULL',
-                    'card_holder' => 'VARCHAR(128) NULL',
-                    'card_shaba' => 'VARCHAR(34) NULL',
-                    'zarinpal_merchant' => 'VARCHAR(64) NULL',
-                    'support_username' => 'VARCHAR(128) NULL',
-                    'welcome_message' => 'TEXT NULL',
-                    'custom_domain' => 'VARCHAR(128) NULL',
-                    'credit_limit' => 'BIGINT DEFAULT 0'
-                ];
+            $pdo->exec("CREATE TABLE IF NOT EXISTS app_guides (
+                id $autoInc,
+                platform VARCHAR(32) NOT NULL,
+                app_name VARCHAR(128) NOT NULL,
+                download_url VARCHAR(255) NOT NULL,
+                guide_url VARCHAR(255) NULL,
+                description TEXT NULL,
+                sort_order INT DEFAULT 0,
+                is_active TINYINT(1) DEFAULT 1,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )");
 
-                foreach ($cols as $col => $def) {
-                    $check = $pdo->query("SHOW COLUMNS FROM `users` LIKE '{$col}'")->fetch();
-                    if (!$check) {
-                        $pdo->exec("ALTER TABLE `users` ADD COLUMN `{$col}` {$def}");
-                    }
-                }
+            $pdo->exec("CREATE TABLE IF NOT EXISTS coupons (
+                id $autoInc,
+                code VARCHAR(64) UNIQUE NOT NULL,
+                discount_percent INT DEFAULT 10,
+                max_uses INT DEFAULT 100,
+                used_count INT DEFAULT 0,
+                expire_at DATETIME NULL,
+                is_active TINYINT(1) DEFAULT 1,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )");
 
-                $orderCols = [
-                    'reseller_id' => 'INT NULL DEFAULT 1',
-                    'bot_token' => 'VARCHAR(255) NULL'
-                ];
-                foreach ($orderCols as $col => $def) {
-                    $check = $pdo->query("SHOW COLUMNS FROM `bot_orders` LIKE '{$col}'")->fetch();
-                    if (!$check) {
-                        $pdo->exec("ALTER TABLE `bot_orders` ADD COLUMN `{$col}` {$def}");
-                    }
-                }
+            $pdo->exec("CREATE TABLE IF NOT EXISTS reseller_plans (
+                id $autoInc,
+                reseller_id INT NOT NULL,
+                plan_id INT NOT NULL,
+                custom_title VARCHAR(128) NULL,
+                custom_category VARCHAR(64) DEFAULT 'پیش‌فرض',
+                retail_price BIGINT NOT NULL,
+                is_active TINYINT(1) DEFAULT 1,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )");
 
-                // Feature columns for MySQL
-                $userExtraCols = [
-                    'auto_tier_enabled' => 'TINYINT(1) DEFAULT 1',
-                    'tier_level' => "VARCHAR(32) DEFAULT 'bronze'"
-                ];
-                foreach ($userExtraCols as $col => $def) {
-                    $check = $pdo->query("SHOW COLUMNS FROM `users` LIKE '{$col}'")->fetch();
-                    if (!$check) {
-                        $pdo->exec("ALTER TABLE `users` ADD COLUMN `{$col}` {$def}");
-                    }
-                }
+            $pdo->exec("CREATE TABLE IF NOT EXISTS reseller_applications (
+                id $autoInc,
+                user_tg_id VARCHAR(64) NOT NULL,
+                user_tg_name VARCHAR(128) NULL,
+                user_tg_username VARCHAR(128) NULL,
+                brand_name VARCHAR(128) NOT NULL,
+                contact_info VARCHAR(128) NOT NULL,
+                preferred_username VARCHAR(64) NOT NULL,
+                estimated_sales VARCHAR(64) NULL,
+                experience_notes TEXT NULL,
+                status VARCHAR(32) DEFAULT 'pending',
+                approved_user_id INT NULL,
+                admin_notes TEXT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )");
 
-                $botUserExtraCols = [
-                    'referred_by' => 'VARCHAR(64) NULL',
-                    'referral_balance' => 'BIGINT DEFAULT 0',
-                    'referral_count' => 'INT DEFAULT 0'
-                ];
-                foreach ($botUserExtraCols as $col => $def) {
-                    $check = $pdo->query("SHOW COLUMNS FROM `bot_users` LIKE '{$col}'")->fetch();
-                    if (!$check) {
-                        $pdo->exec("ALTER TABLE `bot_users` ADD COLUMN `{$col}` {$def}");
-                    }
-                }
+            $pdo->exec("CREATE TABLE IF NOT EXISTS tickets (
+                id $autoInc,
+                user_id INT NOT NULL,
+                subject VARCHAR(255) NOT NULL,
+                department VARCHAR(64) DEFAULT 'support',
+                priority VARCHAR(32) DEFAULT 'medium',
+                status VARCHAR(32) DEFAULT 'open',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )");
 
-                $clientExtraCols = [
-                    'alert_80_sent' => 'TINYINT(1) DEFAULT 0',
-                    'alert_exp_sent' => 'TINYINT(1) DEFAULT 0',
-                    'alert_final_sent' => 'TINYINT(1) DEFAULT 0',
-                    'telegram_chat_id' => 'VARCHAR(64) NULL'
-                ];
-                foreach ($clientExtraCols as $col => $def) {
-                    $check = $pdo->query("SHOW COLUMNS FROM `clients` LIKE '{$col}'")->fetch();
-                    if (!$check) {
-                        $pdo->exec("ALTER TABLE `clients` ADD COLUMN `{$col}` {$def}");
-                    }
-                }
+            $pdo->exec("CREATE TABLE IF NOT EXISTS ticket_messages (
+                id $autoInc,
+                ticket_id INT NOT NULL,
+                sender_id INT NOT NULL,
+                message TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )");
 
-                $serverExtraCols = [
-                    'health_status' => "VARCHAR(32) DEFAULT 'online'",
-                    'latency_ms' => 'INT DEFAULT 0',
-                    'last_checked_at' => 'DATETIME NULL',
-                    'error_message' => 'TEXT NULL'
-                ];
-                foreach ($serverExtraCols as $col => $def) {
-                    $check = $pdo->query("SHOW COLUMNS FROM `server_nodes` LIKE '{$col}'")->fetch();
-                    if (!$check) {
-                        $pdo->exec("ALTER TABLE `server_nodes` ADD COLUMN `{$col}` {$def}");
-                    }
-                }
+            $pdo->exec("CREATE TABLE IF NOT EXISTS activity_logs (
+                id $autoInc,
+                user_id INT NULL,
+                action VARCHAR(64) NOT NULL,
+                entity_type VARCHAR(64) NULL,
+                entity_id VARCHAR(64) NULL,
+                description TEXT NOT NULL,
+                ip_address VARCHAR(45) NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )");
 
-                $pdo->exec("CREATE TABLE IF NOT EXISTS `trial_logs` (
-                    `id` INT AUTO_INCREMENT PRIMARY KEY,
-                    `user_id` INT NULL,
-                    `reseller_id` INT NULL DEFAULT 1,
-                    `telegram_id` VARCHAR(64) NULL,
-                    `ip_address` VARCHAR(64) NULL,
-                    `client_id` INT NULL,
-                    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    INDEX `idx_tl_tg` (`telegram_id`),
-                    INDEX `idx_tl_date` (`created_at`)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
+            // 2. Safe Column Additions for Core Tables
+            $userCols = [
+                'telegram_bot_token' => 'VARCHAR(255) NULL',
+                'telegram_bot_username' => 'VARCHAR(128) NULL',
+                'telegram_admin_chat_id' => 'VARCHAR(64) NULL',
+                'brand_name' => 'VARCHAR(128) NULL',
+                'logo_url' => 'VARCHAR(255) NULL',
+                'theme_color' => "VARCHAR(32) DEFAULT 'violet'",
+                'card_number' => 'VARCHAR(32) NULL',
+                'card_holder' => 'VARCHAR(128) NULL',
+                'card_shaba' => 'VARCHAR(34) NULL',
+                'zarinpal_merchant' => 'VARCHAR(64) NULL',
+                'support_username' => 'VARCHAR(128) NULL',
+                'welcome_message' => 'TEXT NULL',
+                'custom_domain' => 'VARCHAR(128) NULL',
+                'telegram_channel' => 'VARCHAR(128) NULL',
+                'credit_limit' => 'BIGINT DEFAULT 0',
+                'auto_tier_enabled' => 'TINYINT(1) DEFAULT 1',
+                'tier_level' => "VARCHAR(32) DEFAULT 'bronze'"
+            ];
+            foreach ($userCols as $c => $d) {
+                self::safeAddColumn($pdo, 'users', $c, $d);
+            }
 
-                $pdo->exec("CREATE TABLE IF NOT EXISTS `crypto_payments` (
-                    `id` INT AUTO_INCREMENT PRIMARY KEY,
-                    `user_id` INT NULL,
-                    `reseller_id` INT NULL DEFAULT 1,
-                    `order_id` INT NULL,
-                    `currency` VARCHAR(16) DEFAULT 'USDT',
-                    `network` VARCHAR(16) DEFAULT 'TRC20',
-                    `expected_amount_usdt` DECIMAL(10,2) DEFAULT 0.00,
-                    `toman_amount` BIGINT DEFAULT 0,
-                    `wallet_address` VARCHAR(128) NOT NULL,
-                    `tx_hash` VARCHAR(128) NULL,
-                    `status` VARCHAR(32) DEFAULT 'pending',
-                    `admin_notes` TEXT NULL,
-                    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                    INDEX `idx_cp_status` (`status`),
-                    INDEX `idx_cp_tx` (`tx_hash`)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
+            $orderCols = [
+                'reseller_id' => 'INT NULL DEFAULT 1',
+                'bot_token' => 'VARCHAR(255) NULL',
+                'coupon_code' => 'VARCHAR(64) NULL',
+                'discount_amount' => 'BIGINT DEFAULT 0'
+            ];
+            foreach ($orderCols as $c => $d) {
+                self::safeAddColumn($pdo, 'bot_orders', $c, $d);
+            }
 
-                // Plan & Order columns for Telegram Enhancements
-                $planCols = [
-                    'show_in_bot' => 'TINYINT(1) DEFAULT 1',
-                    'category' => "VARCHAR(64) DEFAULT '۱ ماهه'"
-                ];
-                foreach ($planCols as $col => $def) {
-                    $check = $pdo->query("SHOW COLUMNS FROM `plans` LIKE '{$col}'")->fetch();
-                    if (!$check) {
-                        $pdo->exec("ALTER TABLE `plans` ADD COLUMN `{$col}` {$def}");
-                    }
-                }
+            $botUserCols = [
+                'referred_by' => 'VARCHAR(64) NULL',
+                'referral_balance' => 'BIGINT DEFAULT 0',
+                'referral_count' => 'INT DEFAULT 0'
+            ];
+            foreach ($botUserCols as $c => $d) {
+                self::safeAddColumn($pdo, 'bot_users', $c, $d);
+            }
 
-                $orderExtraCols = [
-                    'coupon_code' => 'VARCHAR(32) NULL',
-                    'discount_amount' => 'BIGINT DEFAULT 0'
-                ];
-                foreach ($orderExtraCols as $col => $def) {
-                    $check = $pdo->query("SHOW COLUMNS FROM `bot_orders` LIKE '{$col}'")->fetch();
-                    if (!$check) {
-                        $pdo->exec("ALTER TABLE `bot_orders` ADD COLUMN `{$col}` {$def}");
-                    }
-                }
+            $clientCols = [
+                'alert_80_sent' => 'TINYINT(1) DEFAULT 0',
+                'alert_95_sent' => 'TINYINT(1) DEFAULT 0',
+                'alert_exp_sent' => 'TINYINT(1) DEFAULT 0',
+                'alert_final_sent' => 'TINYINT(1) DEFAULT 0',
+                'telegram_chat_id' => 'VARCHAR(64) NULL',
+                'ip_limit' => 'INT DEFAULT 2',
+                'custom_note' => 'TEXT NULL'
+            ];
+            foreach ($clientCols as $c => $d) {
+                self::safeAddColumn($pdo, 'clients', $c, $d);
+            }
 
-                $pdo->exec("CREATE TABLE IF NOT EXISTS `app_guides` (
-                    `id` INT AUTO_INCREMENT PRIMARY KEY,
-                    `platform` VARCHAR(32) NOT NULL,
-                    `app_name` VARCHAR(128) NOT NULL,
-                    `download_url` VARCHAR(255) NOT NULL,
-                    `guide_url` VARCHAR(255) NULL,
-                    `description` TEXT NULL,
-                    `sort_order` INT DEFAULT 0,
-                    `is_active` TINYINT(1) DEFAULT 1,
-                    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    INDEX `idx_ag_platform` (`platform`)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
+            $serverCols = [
+                'health_status' => "VARCHAR(32) DEFAULT 'online'",
+                'latency_ms' => 'INT DEFAULT 0',
+                'last_checked_at' => 'DATETIME NULL',
+                'error_message' => 'TEXT NULL'
+            ];
+            foreach ($serverCols as $c => $d) {
+                self::safeAddColumn($pdo, 'server_nodes', $c, $d);
+            }
 
-                $pdo->exec("CREATE TABLE IF NOT EXISTS `coupons` (
-                    `id` INT AUTO_INCREMENT PRIMARY KEY,
-                    `code` VARCHAR(32) UNIQUE NOT NULL,
-                    `discount_percent` INT DEFAULT 10,
-                    `max_uses` INT DEFAULT 100,
-                    `used_count` INT DEFAULT 0,
-                    `expire_at` DATETIME NULL,
-                    `is_active` TINYINT(1) DEFAULT 1,
-                    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    INDEX `idx_cpn_code` (`code`)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
+            $planCols = [
+                'show_in_bot' => 'TINYINT(1) DEFAULT 1',
+                'category' => "VARCHAR(64) DEFAULT '۱ ماهه'",
+                'ip_limit' => 'INT DEFAULT 2',
+                'server_id' => 'INT NULL DEFAULT NULL'
+            ];
+            foreach ($planCols as $c => $d) {
+                self::safeAddColumn($pdo, 'plans', $c, $d);
+            }
 
-                $pdo->exec("CREATE TABLE IF NOT EXISTS `reseller_plans` (
-                    `id` INT AUTO_INCREMENT PRIMARY KEY,
-                    `reseller_id` INT NOT NULL,
-                    `plan_id` INT NOT NULL,
-                    `custom_title` VARCHAR(128) NULL,
-                    `custom_category` VARCHAR(64) DEFAULT 'پیش‌فرض',
-                    `retail_price` BIGINT NOT NULL,
-                    `is_active` TINYINT(1) DEFAULT 1,
-                    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                    UNIQUE KEY `uk_reseller_plan` (`reseller_id`, `plan_id`),
-                    INDEX `idx_rp_reseller` (`reseller_id`),
-                    INDEX `idx_rp_plan` (`plan_id`)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
-
-                $pdo->exec("CREATE TABLE IF NOT EXISTS `bot_users` (
-                    `id` INT AUTO_INCREMENT PRIMARY KEY,
-                    `reseller_id` INT NULL DEFAULT 1,
-                    `tg_id` VARCHAR(64) UNIQUE NOT NULL,
-                    `first_name` VARCHAR(128) NULL,
-                    `last_name` VARCHAR(128) NULL,
-                    `username` VARCHAR(128) NULL,
-                    `phone` VARCHAR(32) NULL,
-                    `is_blocked` TINYINT(1) DEFAULT 0,
-                    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    `last_active_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    INDEX `idx_bu_reseller` (`reseller_id`),
-                    INDEX `idx_bu_tg` (`tg_id`)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
-
-                $pdo->exec("CREATE TABLE IF NOT EXISTS `reseller_applications` (
-                    `id` INT AUTO_INCREMENT PRIMARY KEY,
-                    `user_tg_id` VARCHAR(64) NOT NULL,
-                    `user_tg_name` VARCHAR(128) NULL,
-                    `user_tg_username` VARCHAR(128) NULL,
-                    `brand_name` VARCHAR(128) NOT NULL,
-                    `contact_info` VARCHAR(128) NOT NULL,
-                    `preferred_username` VARCHAR(64) NOT NULL,
-                    `estimated_sales` VARCHAR(64) NULL,
-                    `experience_notes` TEXT NULL,
-                    `status` VARCHAR(32) DEFAULT 'pending',
-                    `approved_user_id` INT NULL,
-                    `admin_notes` TEXT NULL,
-                    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                    INDEX `idx_ra_tg` (`user_tg_id`),
-                    INDEX `idx_ra_status` (`status`)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
-
-                // IP Limits for Plans & Clients in MySQL
-                $check = $pdo->query("SHOW COLUMNS FROM `plans` LIKE 'ip_limit'")->fetch();
-                if (!$check) {
-                    $pdo->exec("ALTER TABLE `plans` ADD COLUMN `ip_limit` INT DEFAULT 2");
-                }
-
-                $check = $pdo->query("SHOW COLUMNS FROM `plans` LIKE 'server_id'")->fetch();
-                if (!$check) {
-                    $pdo->exec("ALTER TABLE `plans` ADD COLUMN `server_id` INT NULL DEFAULT NULL");
-                }
-
-                $check = $pdo->query("SHOW COLUMNS FROM `clients` LIKE 'ip_limit'")->fetch();
-                if (!$check) {
-                    $pdo->exec("ALTER TABLE `clients` ADD COLUMN `ip_limit` INT DEFAULT 2");
-                }
-
-                // Support Tickets in MySQL
-                $pdo->exec("CREATE TABLE IF NOT EXISTS `tickets` (
-                    `id` INT AUTO_INCREMENT PRIMARY KEY,
-                    `user_id` INT NOT NULL,
-                    `subject` VARCHAR(255) NOT NULL,
-                    `department` VARCHAR(64) DEFAULT 'support',
-                    `priority` VARCHAR(32) DEFAULT 'medium',
-                    `status` VARCHAR(32) DEFAULT 'open',
-                    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                    INDEX `idx_t_user` (`user_id`),
-                    INDEX `idx_t_status` (`status`)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
-
-                $pdo->exec("CREATE TABLE IF NOT EXISTS `ticket_messages` (
-                    `id` INT AUTO_INCREMENT PRIMARY KEY,
-                    `ticket_id` INT NOT NULL,
-                    `sender_id` INT NOT NULL,
-                    `message` TEXT NOT NULL,
-                    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    INDEX `idx_tm_ticket` (`ticket_id`)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
-
-                // Seed Default Apps for MySQL if empty
-                $appCount = (int)$pdo->query("SELECT COUNT(*) FROM `app_guides`")->fetchColumn();
-                if ($appCount === 0) {
-                    $defaultApps = [
-                        ['android', 'v2rayNG (پیشنهادی اندروید)', 'https://github.com/2dust/v2rayNG/releases', 'https://t.me/connectix/79', 'پایدارترین کلاینت اندروید با قابلیت اتصال خودکار و پشتیبانی از همه پروتکل‌ها', 1],
-                        ['android', 'NapsternetV (کلاینت دوم اندروید)', 'https://play.google.com/store/apps/details?id=com.napsternetlabs.napsternetv', '', 'نرم‌افزار کمکی برای اینترنت‌های با اختلال بالا', 2],
-                        ['ios', 'Streisand (پیشنهادی آیفون و آیپد)', 'https://apps.apple.com/app/streisand/id6450534064', '', 'رایگان، بسیار سریع و سازگار با اینترنت‌های همراه اول و ایرانسل', 1],
-                        ['ios', 'V2Box (کلاینت جایگزین iOS)', 'https://apps.apple.com/app/v2box-v2ray-client/id6446814042', '', 'پشتیبانی کامل از ساب‌لینک هوشمند و پینگ تست آنی', 2],
-                        ['windows', 'NekoRay (پیشنهادی ویندوز)', 'https://github.com/MatsuriDayo/nekoray/releases', '', 'دارای حالت System Proxy و VPN Mode برای کل ترافیک ویندوز', 1],
-                        ['windows', 'v2rayN (کلاینت کلاسیک ویندوز)', 'https://github.com/2dust/v2rayN/releases', '', 'پشتیبانی از Reality و Xray Core', 2],
-                        ['macos', 'FoXray (مک‌بوک)', 'https://apps.apple.com/app/foxray/id6448898396', '', 'کلاینت رسمی و بسیار سبک سیستم‌عامل macOS', 1]
-                    ];
-                    $stmtApp = $pdo->prepare("INSERT INTO `app_guides` (`platform`, `app_name`, `download_url`, `guide_url`, `description`, `sort_order`) VALUES (?, ?, ?, ?, ?, ?)");
-                    foreach ($defaultApps as $da) {
-                        $stmtApp->execute($da);
-                    }
-                }
-
-                // Seed Default Coupons for MySQL if empty
-                $couponCount = (int)$pdo->query("SELECT COUNT(*) FROM `coupons`")->fetchColumn();
-                if ($couponCount === 0) {
-                    $pdo->exec("INSERT INTO `coupons` (`code`, `discount_percent`, `max_uses`, `used_count`, `is_active`) VALUES ('WELCOME10', 10, 100, 0, 1)");
-                    $pdo->exec("INSERT INTO `coupons` (`code`, `discount_percent`, `max_uses`, `used_count`, `is_active`) VALUES ('VIP20', 20, 50, 0, 1)");
-                }
-
-            } else {
-                // SQLite
-                $cols = [
-                    'telegram_bot_token' => 'VARCHAR(255) NULL',
-                    'telegram_bot_username' => 'VARCHAR(128) NULL',
-                    'telegram_admin_chat_id' => 'VARCHAR(64) NULL',
-                    'brand_name' => 'VARCHAR(128) NULL',
-                    'logo_url' => 'VARCHAR(255) NULL',
-                    'theme_color' => "VARCHAR(32) DEFAULT 'violet'",
-                    'card_number' => 'VARCHAR(32) NULL',
-                    'card_holder' => 'VARCHAR(128) NULL',
-                    'card_shaba' => 'VARCHAR(34) NULL',
-                    'zarinpal_merchant' => 'VARCHAR(64) NULL',
-                    'support_username' => 'VARCHAR(128) NULL',
-                    'welcome_message' => 'TEXT NULL',
-                    'custom_domain' => 'VARCHAR(128) NULL',
-                    'telegram_channel' => 'VARCHAR(128) NULL',
-                    'credit_limit' => 'BIGINT DEFAULT 0',
-                    'auto_tier_enabled' => 'TINYINT(1) DEFAULT 1',
-                    'tier_level' => "VARCHAR(32) DEFAULT 'bronze'"
-                ];
-                foreach ($cols as $col => $def) {
-                    try {
-                        $pdo->exec("ALTER TABLE users ADD COLUMN {$col} {$def}");
-                    } catch (Throwable $e) {}
-                }
-
-                $sqliteBotUserCols = [
-                    'referred_by' => 'VARCHAR(64) NULL',
-                    'referral_balance' => 'BIGINT DEFAULT 0',
-                    'referral_count' => 'INT DEFAULT 0'
-                ];
-                foreach ($sqliteBotUserCols as $col => $def) {
-                    try {
-                        $pdo->exec("ALTER TABLE bot_users ADD COLUMN {$col} {$def}");
-                    } catch (Throwable $e) {}
-                }
-
-                $sqliteClientCols = [
-                    'alert_80_sent' => 'TINYINT(1) DEFAULT 0',
-                    'alert_exp_sent' => 'TINYINT(1) DEFAULT 0',
-                    'alert_final_sent' => 'TINYINT(1) DEFAULT 0',
-                    'telegram_chat_id' => 'VARCHAR(64) NULL'
-                ];
-                foreach ($sqliteClientCols as $col => $def) {
-                    try {
-                        $pdo->exec("ALTER TABLE clients ADD COLUMN {$col} {$def}");
-                    } catch (Throwable $e) {}
-                }
-
-                $sqliteServerCols = [
-                    'health_status' => "VARCHAR(32) DEFAULT 'online'",
-                    'latency_ms' => 'INT DEFAULT 0',
-                    'last_checked_at' => 'DATETIME NULL',
-                    'error_message' => 'TEXT NULL'
-                ];
-                foreach ($sqliteServerCols as $col => $def) {
-                    try {
-                        $pdo->exec("ALTER TABLE server_nodes ADD COLUMN {$col} {$def}");
-                    } catch (Throwable $e) {}
-                }
-
-                try {
-                    $pdo->exec("ALTER TABLE clients ADD COLUMN alert_80_sent TINYINT(1) DEFAULT 0");
-                } catch (Throwable $e) {}
-                try {
-                    $pdo->exec("ALTER TABLE clients ADD COLUMN alert_95_sent TINYINT(1) DEFAULT 0");
-                } catch (Throwable $e) {}
-                try {
-                    $pdo->exec("ALTER TABLE clients ADD COLUMN alert_expire_sent TINYINT(1) DEFAULT 0");
-                } catch (Throwable $e) {}
-
-                try {
-                    $pdo->exec("ALTER TABLE users ADD COLUMN telegram_channel VARCHAR(128) NULL");
-                } catch (Throwable $e) {}
-
-                try {
-                    $pdo->exec("ALTER TABLE plans ADD COLUMN show_in_bot TINYINT(1) DEFAULT 1");
-                } catch (Throwable $e) {}
-                try {
-                    $pdo->exec("ALTER TABLE plans ADD COLUMN category VARCHAR(64) DEFAULT '۱ ماهه'");
-                } catch (Throwable $e) {}
-                try {
-                    $pdo->exec("ALTER TABLE plans ADD COLUMN ip_limit INT DEFAULT 2");
-                } catch (Throwable $e) {}
-                try {
-                    $pdo->exec("ALTER TABLE plans ADD COLUMN server_id INT NULL DEFAULT NULL");
-                } catch (Throwable $e) {}
-                try {
-                    $pdo->exec("ALTER TABLE clients ADD COLUMN ip_limit INT DEFAULT 2");
-                } catch (Throwable $e) {}
-
-                try {
-                    $pdo->exec("ALTER TABLE bot_orders ADD COLUMN coupon_code VARCHAR(32) NULL");
-                } catch (Throwable $e) {}
-                try {
-                    $pdo->exec("ALTER TABLE bot_orders ADD COLUMN discount_amount BIGINT DEFAULT 0");
-                } catch (Throwable $e) {}
-
-                $pdo->exec("CREATE TABLE IF NOT EXISTS `tickets` (
-                    `id` INTEGER PRIMARY KEY AUTOINCREMENT,
-                    `user_id` INT NOT NULL,
-                    `subject` VARCHAR(255) NOT NULL,
-                    `department` VARCHAR(64) DEFAULT 'support',
-                    `priority` VARCHAR(32) DEFAULT 'medium',
-                    `status` VARCHAR(32) DEFAULT 'open',
-                    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP
-                );");
-
-                $pdo->exec("CREATE TABLE IF NOT EXISTS `ticket_messages` (
-                    `id` INTEGER PRIMARY KEY AUTOINCREMENT,
-                    `ticket_id` INT NOT NULL,
-                    `sender_id` INT NOT NULL,
-                    `message` TEXT NOT NULL,
-                    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
-                );");
-
-                $pdo->exec("CREATE TABLE IF NOT EXISTS `app_guides` (
-                    `id` INTEGER PRIMARY KEY AUTOINCREMENT,
-                    `platform` VARCHAR(32) NOT NULL,
-                    `app_name` VARCHAR(128) NOT NULL,
-                    `download_url` VARCHAR(255) NOT NULL,
-                    `guide_url` VARCHAR(255) NULL,
-                    `description` TEXT NULL,
-                    `sort_order` INT DEFAULT 0,
-                    `is_active` TINYINT(1) DEFAULT 1,
-                    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
-                );");
-
-                $pdo->exec("CREATE TABLE IF NOT EXISTS `coupons` (
-                    `id` INTEGER PRIMARY KEY AUTOINCREMENT,
-                    `code` VARCHAR(32) UNIQUE NOT NULL,
-                    `discount_percent` INT DEFAULT 10,
-                    `max_uses` INT DEFAULT 100,
-                    `used_count` INT DEFAULT 0,
-                    `expire_at` DATETIME NULL,
-                    `is_active` TINYINT(1) DEFAULT 1,
-                    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
-                );");
-
-                // Seed Default Apps if empty
+            // 3. Seed Default App Guides if empty
+            try {
                 $appCount = (int)$pdo->query("SELECT COUNT(*) FROM app_guides")->fetchColumn();
                 if ($appCount === 0) {
                     $defaultApps = [
@@ -518,85 +319,19 @@ class Database {
                         $stmtApp->execute($da);
                     }
                 }
+            } catch (Throwable $e) {}
 
-                // Seed Default Coupons if empty
+            // 4. Seed Default Coupons if empty
+            try {
                 $couponCount = (int)$pdo->query("SELECT COUNT(*) FROM coupons")->fetchColumn();
                 if ($couponCount === 0) {
                     $pdo->exec("INSERT INTO coupons (code, discount_percent, max_uses, used_count, is_active) VALUES ('WELCOME10', 10, 100, 0, 1)");
                     $pdo->exec("INSERT INTO coupons (code, discount_percent, max_uses, used_count, is_active) VALUES ('VIP20', 20, 50, 0, 1)");
                 }
+            } catch (Throwable $e) {}
 
-                $pdo->exec("CREATE TABLE IF NOT EXISTS `trial_logs` (
-                    `id` INTEGER PRIMARY KEY AUTOINCREMENT,
-                    `user_id` INT NULL,
-                    `reseller_id` INT NULL DEFAULT 1,
-                    `telegram_id` VARCHAR(64) NULL,
-                    `ip_address` VARCHAR(64) NULL,
-                    `client_id` INT NULL,
-                    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
-                );");
-
-                $pdo->exec("CREATE TABLE IF NOT EXISTS `crypto_payments` (
-                    `id` INTEGER PRIMARY KEY AUTOINCREMENT,
-                    `user_id` INT NULL,
-                    `reseller_id` INT NULL DEFAULT 1,
-                    `order_id` INT NULL,
-                    `currency` VARCHAR(16) DEFAULT 'USDT',
-                    `network` VARCHAR(16) DEFAULT 'TRC20',
-                    `expected_amount_usdt` DECIMAL(10,2) DEFAULT 0.00,
-                    `toman_amount` BIGINT DEFAULT 0,
-                    `wallet_address` VARCHAR(128) NOT NULL,
-                    `tx_hash` VARCHAR(128) NULL,
-                    `status` VARCHAR(32) DEFAULT 'pending',
-                    `admin_notes` TEXT NULL,
-                    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP
-                );");
-
-                $pdo->exec("CREATE TABLE IF NOT EXISTS `reseller_plans` (
-                    `id` INTEGER PRIMARY KEY AUTOINCREMENT,
-                    `reseller_id` INT NOT NULL,
-                    `plan_id` INT NOT NULL,
-                    `custom_title` VARCHAR(128) NULL,
-                    `custom_category` VARCHAR(64) DEFAULT 'پیش‌فرض',
-                    `retail_price` BIGINT NOT NULL,
-                    `is_active` TINYINT(1) DEFAULT 1,
-                    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP
-                );");
-
-                $pdo->exec("CREATE TABLE IF NOT EXISTS `bot_users` (
-                    `id` INTEGER PRIMARY KEY AUTOINCREMENT,
-                    `reseller_id` INT NULL DEFAULT 1,
-                    `tg_id` VARCHAR(64) UNIQUE NOT NULL,
-                    `first_name` VARCHAR(128) NULL,
-                    `last_name` VARCHAR(128) NULL,
-                    `username` VARCHAR(128) NULL,
-                    `phone` VARCHAR(32) NULL,
-                    `is_blocked` TINYINT(1) DEFAULT 0,
-                    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    `last_active_at` DATETIME DEFAULT CURRENT_TIMESTAMP
-                );");
-
-                $pdo->exec("CREATE TABLE IF NOT EXISTS `reseller_applications` (
-                    `id` INTEGER PRIMARY KEY AUTOINCREMENT,
-                    `user_tg_id` VARCHAR(64) NOT NULL,
-                    `user_tg_name` VARCHAR(128) NULL,
-                    `user_tg_username` VARCHAR(128) NULL,
-                    `brand_name` VARCHAR(128) NOT NULL,
-                    `contact_info` VARCHAR(128) NOT NULL,
-                    `preferred_username` VARCHAR(64) NOT NULL,
-                    `estimated_sales` VARCHAR(64) NULL,
-                    `experience_notes` TEXT NULL,
-                    `status` VARCHAR(32) DEFAULT 'pending',
-                    `approved_user_id` INT NULL,
-                    `admin_notes` TEXT NULL,
-                    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP
-                );");
-            }
         } catch (Throwable $e) {
-            // Ignore if already created
+            // Safe failover
         }
     }
 

@@ -2,9 +2,6 @@
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
-    # تنظیم مسیر پوشه نصب (چون در پوشه contax نصب شده است):
-    RewriteBase /contax/
-
     # Prevent direct access to sensitive directories
     RewriteRule ^(core|drivers|data|cron)/.*$ - [F,L]
 

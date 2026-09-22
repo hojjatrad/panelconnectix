@@ -50,7 +50,7 @@ class SublinkController {
                     status = 'active' 
                     WHERE id = ?")->execute([$addBytes, $newExpire, $client['id']]);
 
-                $pdo->prepare("UPDATE reserved_plans SET status = 'applied', applied_at = datetime('now') WHERE id = ?")
+                $pdo->prepare("UPDATE reserved_plans SET status = 'applied', applied_at = CURRENT_TIMESTAMP WHERE id = ?")
                     ->execute([$client['reserved_id']]);
 
                 $pdo->commit();
@@ -66,7 +66,7 @@ class SublinkController {
         }
 
         // 3. Update last connected timestamp
-        $pdo->prepare("UPDATE clients SET last_connected_at = datetime('now') WHERE id = ?")->execute([$client['id']]);
+        $pdo->prepare("UPDATE clients SET last_connected_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$client['id']]);
 
         // 4. Generate Connection Configs
         $configs = $this->buildConfigs($client);

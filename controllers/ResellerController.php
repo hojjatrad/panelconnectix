@@ -96,8 +96,10 @@ class ResellerController {
 
         // Copy default reseller plans
         $plans = $pdo->query("SELECT * FROM plans WHERE is_active = 1")->fetchAll();
+        $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+        $ignoreSql = ($driver === 'mysql') ? 'INSERT IGNORE' : 'INSERT OR IGNORE';
         foreach ($plans as $p) {
-            $pdo->prepare("INSERT OR IGNORE INTO reseller_plans (reseller_id, plan_id, custom_title, custom_category, retail_price) VALUES (?, ?, ?, 'پیش‌فرض', ?)")
+            $pdo->prepare("{$ignoreSql} INTO reseller_plans (reseller_id, plan_id, custom_title, custom_category, retail_price) VALUES (?, ?, ?, 'پیش‌فرض', ?)")
                 ->execute([$newId, $p['id'], $p['title'], $p['base_price']]);
         }
 
@@ -276,8 +278,10 @@ class ResellerController {
             ->execute([$newUserId, $brandName]);
 
         $plans = $pdo->query("SELECT * FROM plans WHERE is_active = 1")->fetchAll();
+        $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+        $ignoreSql = ($driver === 'mysql') ? 'INSERT IGNORE' : 'INSERT OR IGNORE';
         foreach ($plans as $p) {
-            $pdo->prepare("INSERT OR IGNORE INTO reseller_plans (reseller_id, plan_id, custom_title, custom_category, retail_price) VALUES (?, ?, ?, 'پیش‌فرض', ?)")
+            $pdo->prepare("{$ignoreSql} INTO reseller_plans (reseller_id, plan_id, custom_title, custom_category, retail_price) VALUES (?, ?, ?, 'پیش‌فرض', ?)")
                 ->execute([$newUserId, $p['id'], $p['title'], $p['base_price']]);
         }
 

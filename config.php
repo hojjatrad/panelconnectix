@@ -25,5 +25,13 @@ define('TELEGRAM_BOT_TOKEN', '123456:FAKE');
 define('TELEGRAM_ADMIN_CHAT_ID', '987654321');
 
 date_default_timezone_set('Asia/Tehran');
-ini_set('display_errors', 0);
-error_reporting(0);
+if (!defined('APP_DEBUG')) {
+    define('APP_DEBUG', true);
+}
+if (APP_DEBUG) {
+    ini_set('display_errors', 1);
+    error_reporting(E_ALL & ~E_NOTICE & ~E_DEPRECATED);
+} else {
+    ini_set('display_errors', 0);
+    error_reporting(0);
+}

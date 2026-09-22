@@ -74,12 +74,12 @@ class TicketController {
         $pdo->beginTransaction();
         try {
             $stmt = $pdo->prepare("INSERT INTO tickets (user_id, subject, department, priority, status, created_at, updated_at) 
-                                   VALUES (?, ?, ?, ?, 'open', datetime('now'), datetime('now'))");
+                                   VALUES (?, ?, ?, ?, 'open', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
             $stmt->execute([$userId, $subject, $department, $priority]);
             $ticketId = (int)$pdo->lastInsertId();
 
             $stmtMsg = $pdo->prepare("INSERT INTO ticket_messages (ticket_id, sender_id, message, created_at) 
-                                      VALUES (?, ?, ?, datetime('now'))");
+                                      VALUES (?, ?, ?, CURRENT_TIMESTAMP)");
             $stmtMsg->execute([$ticketId, $userId, $message]);
             $pdo->commit();
 
@@ -176,10 +176,10 @@ class TicketController {
         $pdo->beginTransaction();
         try {
             $stmtMsg = $pdo->prepare("INSERT INTO ticket_messages (ticket_id, sender_id, message, created_at) 
-                                      VALUES (?, ?, ?, datetime('now'))");
+                                      VALUES (?, ?, ?, CURRENT_TIMESTAMP)");
             $stmtMsg->execute([$id, $userId, $message]);
 
-            $stmtUp = $pdo->prepare("UPDATE tickets SET status = ?, updated_at = datetime('now') WHERE id = ?");
+            $stmtUp = $pdo->prepare("UPDATE tickets SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
             $stmtUp->execute([$newStatus, $id]);
             $pdo->commit();
 
@@ -210,7 +210,7 @@ class TicketController {
             Helpers::redirect('tickets');
         }
 
-        $pdo->prepare("UPDATE tickets SET status = 'closed', updated_at = datetime('now') WHERE id = ?")->execute([$id]);
+        $pdo->prepare("UPDATE tickets SET status = 'closed', updated_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$id]);
         Helpers::flash('info', "تیکت شماره #{$id} بسته شد.");
         Helpers::redirect('tickets/show?id=' . $id);
     }

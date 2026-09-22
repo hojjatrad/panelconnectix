@@ -20,7 +20,12 @@ class DashboardController {
         $activeClients = (int)$pdo->query("SELECT COUNT(*) FROM clients WHERE status = 'active' AND $clientWhere")->fetchColumn();
         $expiredClients = (int)$pdo->query("SELECT COUNT(*) FROM clients WHERE status = 'expired' AND $clientWhere")->fetchColumn();
         $neverConnected = (int)$pdo->query("SELECT COUNT(*) FROM clients WHERE status = 'never_connected' AND $clientWhere")->fetchColumn();
-        $onlineClients = (int)$pdo->query("SELECT COUNT(*) FROM clients WHERE last_connected_at >= datetime('now', '-10 minutes') AND $clientWhere")->fetchColumn();
+        
+        $tenMinutesAgo = date('Y-m-d H:i:s', strtotime('-10 minutes'));
+        $stmtOnline = $pdo->prepare("SELECT COUNT(*) FROM clients WHERE last_connected_at >= ? AND $clientWhere");
+        $stmtOnline->execute([$tenMinutesAgo]);
+        $onlineClients = (int)$stmtOnline->fetchColumn();
+        
         $idleClients = max(0, $totalClients - ($onlineClients + $neverConnected + $expiredClients));
 
         // 2. Plans & Revenue Statistics

@@ -1,6 +1,6 @@
 -- =====================================================================
 -- Connectix-Style Multi-Panel VPN Reseller System
--- MySQL Schema for cPanel (phpMyAdmin)
+-- Complete MySQL Schema for cPanel (phpMyAdmin & Web Installer)
 -- Charset: utf8mb4_unicode_ci
 -- =====================================================================
 
@@ -33,6 +33,9 @@ CREATE TABLE IF NOT EXISTS `users` (
     `welcome_message` TEXT NULL,
     `telegram_channel` VARCHAR(128) NULL,
     `custom_domain` VARCHAR(128) NULL,
+    `credit_limit` BIGINT DEFAULT 0,
+    `auto_tier_enabled` TINYINT(1) DEFAULT 1,
+    `tier_level` VARCHAR(32) DEFAULT 'bronze',
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -50,6 +53,10 @@ CREATE TABLE IF NOT EXISTS `server_nodes` (
     `inbound_tag` VARCHAR(64) NULL,
     `max_clients` INT DEFAULT 500,
     `is_active` TINYINT(1) DEFAULT 1,
+    `health_status` VARCHAR(32) DEFAULT 'online',
+    `latency_ms` INT DEFAULT 0,
+    `last_checked_at` DATETIME NULL,
+    `error_message` TEXT NULL,
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -69,7 +76,8 @@ CREATE TABLE IF NOT EXISTS `plans` (
     `is_free` TINYINT(1) DEFAULT 0,
     `is_active` TINYINT(1) DEFAULT 1,
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
-    INDEX `idx_plans_server` (`server_id`)
+    INDEX `idx_plans_server` (`server_id`),
+    INDEX `idx_plans_group` (`server_group`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 4. Clients Table
@@ -91,7 +99,8 @@ CREATE TABLE IF NOT EXISTS `clients` (
     `telegram_chat_id` VARCHAR(64) NULL,
     `alert_80_sent` TINYINT(1) DEFAULT 0,
     `alert_95_sent` TINYINT(1) DEFAULT 0,
-    `alert_expire_sent` TINYINT(1) DEFAULT 0,
+    `alert_exp_sent` TINYINT(1) DEFAULT 0,
+    `alert_final_sent` TINYINT(1) DEFAULT 0,
     `custom_note` TEXT NULL,
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
     INDEX `idx_reseller` (`reseller_id`),
@@ -218,7 +227,7 @@ CREATE TABLE IF NOT EXISTS `reseller_plans` (
     CONSTRAINT `fk_rp_plan` FOREIGN KEY (`plan_id`) REFERENCES `plans` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 12. Activity & Audit Logs
+-- 13. Activity & Audit Logs
 CREATE TABLE IF NOT EXISTS `activity_logs` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `user_id` INT NULL,
@@ -233,7 +242,7 @@ CREATE TABLE IF NOT EXISTS `activity_logs` (
     INDEX `idx_log_created` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 13. Application Download Guides & Video Tutorials
+-- 14. Application Download Guides & Video Tutorials
 CREATE TABLE IF NOT EXISTS `app_guides` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `platform` VARCHAR(32) NOT NULL,
@@ -243,29 +252,31 @@ CREATE TABLE IF NOT EXISTS `app_guides` (
     `description` TEXT NULL,
     `sort_order` INT DEFAULT 0,
     `is_active` TINYINT(1) DEFAULT 1,
-    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX `idx_ag_platform` (`platform`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 14. Discount Coupons
+-- 15. Discount Coupons
 CREATE TABLE IF NOT EXISTS `coupons` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `code` VARCHAR(64) NOT NULL UNIQUE,
     `discount_percent` INT NOT NULL DEFAULT 10,
-    `max_uses` INT DEFAULT 0,
+    `max_uses` INT DEFAULT 100,
     `used_count` INT DEFAULT 0,
-    `expires_at` DATE NULL,
+    `expire_at` DATETIME NULL,
     `is_active` TINYINT(1) DEFAULT 1,
-    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX `idx_cpn_code` (`code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 15. In-Panel Tickets & Support Messages
+-- 16. In-Panel Tickets & Support Messages
 CREATE TABLE IF NOT EXISTS `tickets` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `user_id` INT NOT NULL,
     `subject` VARCHAR(255) NOT NULL,
     `department` VARCHAR(64) DEFAULT 'support',
-    `priority` ENUM('low', 'medium', 'high', 'urgent') DEFAULT 'medium',
-    `status` ENUM('open', 'answered', 'waiting_reseller', 'closed') DEFAULT 'open',
+    `priority` VARCHAR(32) DEFAULT 'medium',
+    `status` VARCHAR(32) DEFAULT 'open',
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX `idx_ticket_user` (`user_id`),
@@ -283,40 +294,136 @@ CREATE TABLE IF NOT EXISTS `ticket_messages` (
     CONSTRAINT `fk_tm_ticket` FOREIGN KEY (`ticket_id`) REFERENCES `tickets` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 17. Free Trial Logs Table
+CREATE TABLE IF NOT EXISTS `trial_logs` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `user_id` INT NULL,
+    `reseller_id` INT NULL DEFAULT 1,
+    `telegram_id` VARCHAR(64) NULL,
+    `ip_address` VARCHAR(64) NULL,
+    `client_id` INT NULL,
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX `idx_tl_tg` (`telegram_id`),
+    INDEX `idx_tl_date` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 18. Crypto Payments Table (TON / USDT)
+CREATE TABLE IF NOT EXISTS `crypto_payments` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `user_id` INT NULL,
+    `reseller_id` INT NULL DEFAULT 1,
+    `order_id` INT NULL,
+    `currency` VARCHAR(16) DEFAULT 'USDT',
+    `network` VARCHAR(16) DEFAULT 'TRC20',
+    `expected_amount_usdt` DECIMAL(10,2) DEFAULT 0.00,
+    `toman_amount` BIGINT DEFAULT 0,
+    `wallet_address` VARCHAR(128) NOT NULL,
+    `tx_hash` VARCHAR(128) NULL,
+    `status` VARCHAR(32) DEFAULT 'pending',
+    `admin_notes` TEXT NULL,
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX `idx_cp_status` (`status`),
+    INDEX `idx_cp_tx` (`tx_hash`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 19. Bot Users Directory
+CREATE TABLE IF NOT EXISTS `bot_users` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `reseller_id` INT NULL DEFAULT 1,
+    `tg_id` VARCHAR(64) UNIQUE NOT NULL,
+    `first_name` VARCHAR(128) NULL,
+    `last_name` VARCHAR(128) NULL,
+    `username` VARCHAR(128) NULL,
+    `phone` VARCHAR(32) NULL,
+    `referred_by` VARCHAR(64) NULL,
+    `referral_balance` BIGINT DEFAULT 0,
+    `referral_count` INT DEFAULT 0,
+    `is_blocked` TINYINT(1) DEFAULT 0,
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    `last_active_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX `idx_bu_reseller` (`reseller_id`),
+    INDEX `idx_bu_tg` (`tg_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 20. Reseller Applications Table
+CREATE TABLE IF NOT EXISTS `reseller_applications` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `user_tg_id` VARCHAR(64) NOT NULL,
+    `user_tg_name` VARCHAR(128) NULL,
+    `user_tg_username` VARCHAR(128) NULL,
+    `brand_name` VARCHAR(128) NOT NULL,
+    `contact_info` VARCHAR(128) NOT NULL,
+    `preferred_username` VARCHAR(64) NOT NULL,
+    `estimated_sales` VARCHAR(64) NULL,
+    `experience_notes` TEXT NULL,
+    `status` VARCHAR(32) DEFAULT 'pending',
+    `approved_user_id` INT NULL,
+    `admin_notes` TEXT NULL,
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX `idx_ra_tg` (`user_tg_id`),
+    INDEX `idx_ra_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 SET FOREIGN_KEY_CHECKS = 1;
+
+-- Seed Default Server Nodes
+INSERT INTO `server_nodes` (`id`, `name`, `driver`, `api_url`, `server_group`, `sub_domain`, `is_active`) VALUES 
+(1, 'سرور فنلاند کلاود (Marzban Core)', 'mock', 'https://fi.marzban.example.com:8000', 'default', 'fi.connectix.space', 1),
+(2, 'سرور آلمان VIP (Pasargad Core)', 'mock', 'https://de.pasargad.example.com', 'vip', 'de-vip.connectix.space', 1),
+(3, 'سرور ملی ایران اکسس (3x-ui Core)', 'mock', 'https://ir.node.example.com:2053', 'iran_access', 'ir.connectix.space', 1),
+(4, 'سرور هلند اقتصادی (Economic Node)', 'mock', 'https://nl.node.example.com', 'economic', 'nl.connectix.space', 1)
+ON DUPLICATE KEY UPDATE `name`=VALUES(`name`);
+
+-- Seed Default Plans
+INSERT INTO `plans` (`id`, `title`, `traffic_gb`, `duration_days`, `base_price`, `reseller_price`, `server_group`, `is_free`, `is_active`) VALUES 
+(1, 'پلن تست رایگان ۱ روزه (1GB)', 1, 1, 0, 0, 'default', 1, 1),
+(2, 'یک‌ماهه ۳۰ گیگابایت (اقتصادی)', 30, 30, 95000, 75000, 'economic', 0, 1),
+(3, 'یک‌ماهه ۵۰ گیگابایت (استاندارد)', 50, 30, 145000, 115000, 'default', 0, 1),
+(4, 'دو‌ماهه ۱۰۰ گیگابایت (VIP تجاری)', 100, 60, 270000, 210000, 'vip', 0, 1),
+(5, 'سه‌ماهه ۱۵۰ گیگابایت (ویژه)', 150, 90, 380000, 295000, 'default', 0, 1),
+(6, 'یک‌ماهه نامحدود ایران اکسس', 200, 30, 190000, 150000, 'iran_access', 0, 1)
+ON DUPLICATE KEY UPDATE `title`=VALUES(`title`);
 
 -- Seed Default App Guides
 INSERT INTO `app_guides` (`platform`, `app_name`, `download_url`, `guide_url`, `description`, `sort_order`, `is_active`) VALUES
-('android', 'V2rayNG', 'https://play.google.com/store/apps/details?id=com.v2ray.ang', 'https://youtube.com', 'محبوب‌ترین و پایدارترین کلاینت اندروید برای VLESS و Reality', 1, 1),
-('android', 'Hiddify Next', 'https://github.com/hiddify/hiddify-app/releases', 'https://youtube.com', 'کلاینت چندمنظوره با اتصال هوشمند و تغییر خودکار کانفیگ', 2, 1),
-('ios', 'Streisand', 'https://apps.apple.com/app/streisand/id6450534064', 'https://youtube.com', 'نرم‌افزار رایگان و فوق‌العاده سریع با پشتیبانی کامل از Reality', 1, 1),
-('ios', 'V2Box', 'https://apps.apple.com/app/v2box-v2ray-client/id6446814042', 'https://youtube.com', 'کلاینت قدرتمند iOS سازگار با تمام نسخه‌های آیفون و آیپد', 2, 1),
-('windows', 'Hiddify Windows', 'https://github.com/hiddify/hiddify-app/releases', 'https://youtube.com', 'نسخه کامپیوتر هیدیفای با سیستم پروکسی سیستم خودکار (TUN)', 1, 1),
-('windows', 'v2rayN', 'https://github.com/2dust/v2rayN/releases', 'https://youtube.com', 'کلاینت سبک، کلاسیک و فوق‌پایدار ویندوز', 2, 1),
-('macos', 'Hiddify macOS', 'https://github.com/hiddify/hiddify-app/releases', 'https://youtube.com', 'کلاینت رسمی هیدیفای برای مک‌بوک‌های پردازنده M1/M2/M3 و Intel', 1, 1)
+('android', 'v2rayNG (پیشنهادی اندروید)', 'https://github.com/2dust/v2rayNG/releases', 'https://t.me/connectix/79', 'پایدارترین کلاینت اندروید با قابلیت اتصال خودکار و پشتیبانی از همه پروتکل‌ها', 1, 1),
+('android', 'NapsternetV (کلاینت دوم اندروید)', 'https://play.google.com/store/apps/details?id=com.napsternetlabs.napsternetv', '', 'نرم‌افزار کمکی برای اینترنت‌های با اختلال بالا', 2, 1),
+('ios', 'Streisand (پیشنهادی آیفون و آیپد)', 'https://apps.apple.com/app/streisand/id6450534064', '', 'رایگان، بسیار سریع و سازگار با اینترنت‌های همراه اول و ایرانسل', 1, 1),
+('ios', 'V2Box (کلاینت جایگزین iOS)', 'https://apps.apple.com/app/v2box-v2ray-client/id6446814042', '', 'پشتیبانی کامل از ساب‌لینک هوشمند و پینگ تست آنی', 2, 1),
+('windows', 'NekoRay (پیشنهادی ویندوز)', 'https://github.com/MatsuriDayo/nekoray/releases', '', 'دارای حالت System Proxy و VPN Mode برای کل ترافیک ویندوز', 1, 1),
+('windows', 'v2rayN (کلاینت کلاسیک ویندوز)', 'https://github.com/2dust/v2rayN/releases', '', 'پشتیبانی از Reality و Xray Core', 2, 1),
+('macos', 'FoXray (مک‌بوک)', 'https://apps.apple.com/app/foxray/id6448898396', '', 'کلاینت رسمی و بسیار سبک سیستم‌عامل macOS', 1, 1)
 ON DUPLICATE KEY UPDATE `id`=`id`;
 
--- Seed Sample Coupon
-INSERT INTO `coupons` (`code`, `discount_percent`, `max_uses`, `used_count`, `expires_at`, `is_active`) VALUES
-('WELCOME10', 10, 100, 0, '2027-12-31', 1),
-('VIP20', 20, 50, 0, '2027-12-31', 1)
+-- Seed Sample Coupons
+INSERT INTO `coupons` (`code`, `discount_percent`, `max_uses`, `used_count`, `is_active`) VALUES
+('WELCOME10', 10, 100, 0, 1),
+('VIP20', 20, 50, 0, 1)
 ON DUPLICATE KEY UPDATE `code`=`code`;
 
 -- Seed Default Admin: admin / admin123
 INSERT INTO `users` (`id`, `username`, `password_hash`, `role`, `full_name`, `email`, `wallet_balance`, `api_token`) 
-VALUES (1, 'admin', '$2y$10$wT8mQ3x2mK5uN6L7p8O9.eiLz7QeKj8EwL1uV7R4K6P9l2U3t4v5W', 'admin', 'مدیر کل سیستم', 'admin@connectix.local', 0, 'admin_secret_token_123')
-ON DUPLICATE KEY UPDATE `id`=`id`;
+VALUES (1, 'admin', '$2y$10$7Z2v7v5uV2o6L5w2R3e1OeK3V5j7m6l5P2q8r7T4u1i9O2p3A4b5C', 'admin', 'مدیر ارشد سامانه', 'admin@connectix.local', 0, 'admin_secret_token_123')
+ON DUPLICATE KEY UPDATE `username`=VALUES(`username`);
 
--- Seed Default Reseller: reseller / 123456
+-- Seed Default Reseller: novinvpn / 123456
 INSERT INTO `users` (`id`, `username`, `password_hash`, `role`, `full_name`, `email`, `wallet_balance`, `discount_percent`, `api_token`) 
 VALUES (2, 'novinvpn', '$2y$10$7Z2v7v5uV2o6L5w2R3e1OeK3V5j7m6l5P2q8r7T4u1i9O2p3A4b5C', 'reseller', 'نوین وی‌پی‌ان (نماینده نمونه)', 'novin@example.com', 500000, 15, 'reseller_novin_token_456')
-ON DUPLICATE KEY UPDATE `id`=`id`;
+ON DUPLICATE KEY UPDATE `username`=VALUES(`username`);
 
--- Seed Default Settings
-INSERT INTO `settings` (`key`, `val`) VALUES
+-- Seed Default Branding
+INSERT INTO `branding_metadata` (`user_id`, `brand_name`, `theme_color`, `telegram_support`, `whatsapp_support`, `welcome_message`) VALUES
+(1, 'Connectix Panel', 'violet', '@Connectix_Admin', '+989000000000', 'پنل مدیریت اختصاصی کانکتیکس'),
+(2, 'نوین وی‌پی‌ان', 'violet', '@NovinVPN_Support', '+989123456789', 'به نوین وی‌پی‌ان خوش آمدید. با بالاترین کیفیت و سرعت متصل شوید.')
+ON DUPLICATE KEY UPDATE `brand_name`=VALUES(`brand_name`);
+
+-- Seed Default System Settings
+INSERT INTO `system_settings` (`setting_key`, `setting_value`) VALUES
 ('github_repo', 'hojjatrad/panelconnectix'),
 ('github_branch', 'main'),
 ('github_webhook_secret', 'gh_hook_sec_vpbotn_2026'),
 ('brand_name', 'Connectix VPN'),
-('current_version', '1.0.0')
-ON DUPLICATE KEY UPDATE `val`=VALUES(`val`);
+('current_version', '2.6.1')
+ON DUPLICATE KEY UPDATE `setting_value`=VALUES(`setting_value`);

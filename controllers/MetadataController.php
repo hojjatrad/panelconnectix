@@ -57,7 +57,7 @@ class MetadataController {
             whatsapp_support = ?, 
             welcome_message = ?, 
             renewal_url = ?,
-            updated_at = datetime('now')
+            updated_at = CURRENT_TIMESTAMP
             WHERE user_id = ?");
         $stmt->execute([$brandName, $themeColor, $logoUrl, $telegram, $whatsapp, $welcome, $renewalUrl, $userId]);
 

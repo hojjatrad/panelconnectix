@@ -28,6 +28,9 @@ require_once __DIR__ . '/core/Helpers.php';
 require_once __DIR__ . '/core/Setting.php';
 require_once __DIR__ . '/core/TelegramBot.php';
 require_once __DIR__ . '/core/Auth.php';
+require_once __DIR__ . '/core/Provisioner.php';
+require_once __DIR__ . '/core/Payment.php';
+require_once __DIR__ . '/core/Updater.php';
 require_once __DIR__ . '/core/Router.php';
 
 // Controllers
@@ -218,5 +221,25 @@ $router->get('api/v1/plans', [ApiController::class, 'getPlans']);
 $router->post('api/v1/client/create', [ApiController::class, 'createClient']);
 $router->get('api/v1/client/info', [ApiController::class, 'getClientInfo']);
 
-// Dispatch Request
-$router->dispatch();
+// Dispatch Request with graceful error protection
+try {
+    $router->dispatch();
+} catch (Throwable $e) {
+    http_response_code(500);
+    $errorMsg = $e->getMessage();
+    $errorFile = basename($e->getFile());
+    $errorLine = $e->getLine();
+    error_log("Connectix Critical Error: {$errorMsg} in {$errorFile}:{$errorLine}");
+    
+    // Check if it's an API request or sublink
+    $path = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
+    if (str_contains($path, '/api/') || (isset($_GET['route']) && str_starts_with($_GET['route'], 'api/'))) {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['status' => 'error', 'message' => 'Internal Server Error: ' . $errorMsg], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    
+    // Elegant user-friendly error screen
+    echo "<!DOCTYPE html><html lang='fa' dir='rtl'><head><meta charset='UTF-8'><title>خطای سیستم | Connectix Panel</title><script src='https://cdn.tailwindcss.com'></script><style>@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700&display=swap'); *{font-family:'Vazirmatn',sans-serif;}</style></head><body class='bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center p-4'><div class='bg-slate-900 border border-rose-900/50 p-8 rounded-3xl max-w-lg w-full text-center shadow-2xl space-y-4'><div class='w-16 h-16 rounded-2xl bg-rose-500/20 text-rose-400 mx-auto flex items-center justify-center text-3xl font-black'>⚠️</div><h2 class='text-xl font-black text-white'>خطای اجرای سامانه (Error 500)</h2><div class='bg-slate-950/80 p-4 rounded-xl border border-rose-900/30 text-right space-y-1.5'><p class='text-xs text-rose-300 font-mono break-all font-semibold'>" . htmlspecialchars($errorMsg) . "</p><p class='text-[11px] text-slate-500 font-mono'>در فایل: " . htmlspecialchars($errorFile) . " (خط " . $errorLine . ")</p></div><div class='pt-2 flex flex-col gap-2'><a href='" . Helpers::url('dashboard') . "' class='w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs transition-all shadow-md'>تلاش مجدد و بازگشت به داشبورد</a><a href='install.php?reinstall=1' class='w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition-all border border-slate-700'>ورود به نصب‌کننده خودکار دیتابیس</a></div></div></body></html>";
+    exit;
+}

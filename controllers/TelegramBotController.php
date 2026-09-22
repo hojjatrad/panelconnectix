@@ -2286,8 +2286,10 @@ class TelegramBotController {
             ->execute([$newUserId, $brandName]);
 
         $plans = $pdo->query("SELECT * FROM plans WHERE is_active = 1")->fetchAll();
+        $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+        $ignoreSql = ($driver === 'mysql') ? 'INSERT IGNORE' : 'INSERT OR IGNORE';
         foreach ($plans as $p) {
-            $pdo->prepare("INSERT OR IGNORE INTO reseller_plans (reseller_id, plan_id, custom_title, custom_category, retail_price) VALUES (?, ?, ?, 'پیش‌فرض', ?)")
+            $pdo->prepare("{$ignoreSql} INTO reseller_plans (reseller_id, plan_id, custom_title, custom_category, retail_price) VALUES (?, ?, ?, 'پیش‌فرض', ?)")
                 ->execute([$newUserId, $p['id'], $p['title'], $p['base_price']]);
         }
 
@@ -2380,11 +2382,10 @@ class TelegramBotController {
         $users = $stmtUsers->fetchAll();
 
         $totalCount = (int)$pdo->query("SELECT COUNT(*) FROM bot_users")->fetchColumn();
-        $isMysql = ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql');
-        $activeSql = $isMysql 
-            ? "SELECT COUNT(*) FROM bot_users WHERE last_active_at >= NOW() - INTERVAL 1 DAY"
-            : "SELECT COUNT(*) FROM bot_users WHERE last_active_at >= datetime('now', '-1 day')";
-        $active24hCount = (int)$pdo->query($activeSql)->fetchColumn();
+        $oneDayAgo = date('Y-m-d H:i:s', strtotime('-1 day'));
+        $stmtActive = $pdo->prepare("SELECT COUNT(*) FROM bot_users WHERE last_active_at >= ?");
+        $stmtActive->execute([$oneDayAgo]);
+        $active24hCount = (int)$stmtActive->fetchColumn();
         $hasUsernameCount = (int)$pdo->query("SELECT COUNT(*) FROM bot_users WHERE username IS NOT NULL AND username != ''")->fetchColumn();
         $totalOrdersCount = (int)$pdo->query("SELECT COUNT(*) FROM bot_orders")->fetchColumn();
 

@@ -93,7 +93,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $allPassed) {
             $schemaFile = __DIR__ . '/schema.sql';
             if (file_exists($schemaFile) && $dbDriver === 'mysql') {
                 $sqlContent = file_get_contents($schemaFile);
-                $pdo->exec($sqlContent);
+                $sqlLines = explode("\n", $sqlContent);
+                $cleanSql = '';
+                foreach ($sqlLines as $line) {
+                    $trimmed = trim($line);
+                    if (str_starts_with($trimmed, '--') || str_starts_with($trimmed, '#') || str_starts_with($trimmed, '/*')) {
+                        continue;
+                    }
+                    $cleanSql .= $line . "\n";
+                }
+                $statements = array_filter(array_map('trim', explode(';', $cleanSql)));
+                foreach ($statements as $stmtSql) {
+                    if (!empty($stmtSql)) {
+                        try {
+                            $pdo->exec($stmtSql);
+                        } catch (Throwable $stmtEx) {
+                            // Non-fatal if table or index already exists
+                        }
+                    }
+                }
             } else {
                 require_once __DIR__ . '/core/Database.php';
                 Database::initializeSqliteSchema($pdo);
@@ -153,8 +171,16 @@ define('TELEGRAM_BOT_TOKEN', " . var_export($botToken, true) . ");
 define('TELEGRAM_ADMIN_CHAT_ID', " . var_export($adminChatId, true) . ");
 
 date_default_timezone_set('Asia/Tehran');
-ini_set('display_errors', 0);
-error_reporting(0);
+if (!defined('APP_DEBUG')) {
+    define('APP_DEBUG', true);
+}
+if (APP_DEBUG) {
+    ini_set('display_errors', 1);
+    error_reporting(E_ALL & ~E_NOTICE & ~E_DEPRECATED);
+} else {
+    ini_set('display_errors', 0);
+    error_reporting(0);
+}
 ";
             file_put_contents($configFile, $configContent);
 
