@@ -58,7 +58,7 @@ require __DIR__ . '/../layout/header.php';
                             $effectivePrice = $effectivePrice - ($effectivePrice * ($effectiveDiscount / 100));
                         }
                     ?>
-                        <option value="<?= $p['id'] ?>" data-price="<?= $effectivePrice ?>" data-group="<?= $p['server_group'] ?>" data-free="<?= $p['is_free'] ?>">
+                        <option value="<?= $p['id'] ?>" data-price="<?= $effectivePrice ?>" data-group="<?= $p['server_group'] ?>" data-server-id="<?= $p['server_id'] ?? '' ?>" data-ip-limit="<?= $p['ip_limit'] ?? 2 ?>" data-free="<?= $p['is_free'] ?>">
                             <?= htmlspecialchars($p['title']) ?> (<?= $p['traffic_gb'] ?> گیگابایت / <?= $p['duration_days'] ?> روزه) - <?= $p['is_free'] ? 'رایگان (تست)' : Helpers::formatMoney($effectivePrice) ?>
                         </option>
                     <?php endforeach; ?>
@@ -131,6 +131,15 @@ require __DIR__ . '/../layout/header.php';
 
         const price = parseInt(selected.getAttribute('data-price') || 0);
         const isFree = selected.getAttribute('data-free') === '1';
+        const boundServerId = selected.getAttribute('data-server-id');
+        const planIpLimit = selected.getAttribute('data-ip-limit');
+
+        if (boundServerId && document.getElementById('serverSelect')) {
+            document.getElementById('serverSelect').value = boundServerId;
+        }
+        if (planIpLimit && document.getElementById('clientIpLimit')) {
+            document.getElementById('clientIpLimit').value = planIpLimit;
+        }
 
         if (isFree) {
             document.getElementById('planCostText').innerText = 'رایگان';

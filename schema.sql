@@ -62,12 +62,14 @@ CREATE TABLE IF NOT EXISTS `plans` (
     `base_price` BIGINT NOT NULL,
     `reseller_price` BIGINT NOT NULL,
     `server_group` VARCHAR(64) NOT NULL DEFAULT 'default',
+    `server_id` INT NULL DEFAULT NULL,
     `category` VARCHAR(64) NOT NULL DEFAULT '۱ ماهه',
     `show_in_bot` TINYINT(1) DEFAULT 1,
     `ip_limit` INT DEFAULT 2,
     `is_free` TINYINT(1) DEFAULT 0,
     `is_active` TINYINT(1) DEFAULT 1,
-    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX `idx_plans_server` (`server_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 4. Clients Table

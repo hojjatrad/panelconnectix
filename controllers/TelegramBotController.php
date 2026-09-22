@@ -718,11 +718,12 @@ class TelegramBotController {
         $userTgName = trim(($cb['from']['first_name'] ?? '') . ' ' . ($cb['from']['last_name'] ?? ''));
         $userTgUsername = $cb['from']['username'] ?? '';
         $finalPrice = (int)$plan['display_price'];
+        $planServerId = !empty($plan['server_id']) ? (int)$plan['server_id'] : null;
 
         $stmtOrder = $pdo->prepare("INSERT INTO bot_orders 
-            (order_code, reseller_id, bot_token, user_tg_id, user_tg_name, user_tg_username, order_type, plan_id, client_id, amount, payment_method, payment_status) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'card', 'pending_receipt')");
-        $stmtOrder->execute([$orderCode, $resellerId, $botToken, $fromId, $userTgName, $userTgUsername, $orderType, $planId, $clientId, $finalPrice]);
+            (order_code, reseller_id, bot_token, user_tg_id, user_tg_name, user_tg_username, order_type, plan_id, server_id, client_id, amount, payment_method, payment_status) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'card', 'pending_receipt')");
+        $stmtOrder->execute([$orderCode, $resellerId, $botToken, $fromId, $userTgName, $userTgUsername, $orderType, $planId, $planServerId, $clientId, $finalPrice]);
         $orderId = (int)$pdo->lastInsertId();
 
         self::renderOrderInvoice($pdo, $orderId, $chatId, $messageId, $botToken);

@@ -54,8 +54,8 @@ $pendingCount = $pendingAppsCount ?? 0;
                     $tier = Provisioner::getResellerTier($r['id']);
                 ?>
                     <tr class="hover:bg-slate-800/30 transition-colors">
-                        <td class="p-3.5">
-                            <div class="flex items-center gap-2 flex-wrap">
+                        <td class="p-3.5 whitespace-nowrap">
+                            <div class="flex items-center gap-2">
                                 <span class="font-bold text-white font-mono"><?= htmlspecialchars($r['username']) ?></span>
                                 <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold 
                                     <?= match($tier['tier']) {
@@ -70,7 +70,7 @@ $pendingCount = $pendingAppsCount ?? 0;
                             </div>
                             <span class="text-[10px] text-slate-400 block mt-0.5"><?= htmlspecialchars($r['full_name'] ?? 'بی‌نام') ?></span>
                         </td>
-                        <td class="p-3.5">
+                        <td class="p-3.5 whitespace-nowrap">
                             <span class="font-medium text-slate-200 block"><?= htmlspecialchars($r['brand_name']) ?></span>
                             <?php if (!empty($r['telegram_bot_username'])): ?>
                                 <a href="https://t.me/<?= htmlspecialchars($r['telegram_bot_username']) ?>" target="_blank" class="text-[10px] text-cyan-400 font-mono flex items-center gap-1 mt-0.5 hover:underline">
@@ -80,13 +80,13 @@ $pendingCount = $pendingAppsCount ?? 0;
                                 <span class="text-[10px] text-slate-500">ربات متصل نیست</span>
                             <?php endif; ?>
                         </td>
-                        <td class="p-3.5 font-bold <?= $isDebt ? 'text-rose-400' : 'text-emerald-400' ?> font-mono">
+                        <td class="p-3.5 font-bold <?= $isDebt ? 'text-rose-400' : 'text-emerald-400' ?> font-mono whitespace-nowrap">
                             <?= Helpers::formatMoney($balance) ?>
                         </td>
-                        <td class="p-3.5 font-mono text-purple-300">
+                        <td class="p-3.5 font-mono text-purple-300 whitespace-nowrap">
                             <?= $limit > 0 ? Helpers::formatMoney($limit) : '<span class="text-slate-500">فقط نقدی</span>' ?>
                         </td>
-                        <td class="p-3.5">
+                        <td class="p-3.5 whitespace-nowrap">
                             <?php if ($isDebt): ?>
                                 <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">
                                     بدهکار (<?= Helpers::formatMoney(abs($balance)) ?>)
@@ -97,36 +97,36 @@ $pendingCount = $pendingAppsCount ?? 0;
                                 </span>
                             <?php endif; ?>
                         </td>
-                        <td class="p-3.5">
+                        <td class="p-3.5 whitespace-nowrap">
                             <button onclick="openDiscountModal(<?= $r['id'] ?>, '<?= htmlspecialchars($r['username']) ?>', <?= (int)$tier['discount'] ?>)" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30 transition text-xs group" title="کلیک برای ویرایش درصد تخفیف (موثر: <?= $tier['discount'] ?>٪)">
                                 <span><?= $tier['discount'] ?>%</span>
                                 <i class="fa-solid fa-pen text-[9px] text-purple-400 group-hover:scale-125 transition-transform"></i>
                             </button>
                         </td>
-                        <td class="p-3.5">
+                        <td class="p-3.5 whitespace-nowrap">
                             <a href="<?= Helpers::url('resellers/clients?id=' . $r['id']) ?>" class="text-cyan-400 hover:underline font-medium flex items-center gap-1">
                                 <span><?= number_format($r['client_count']) ?> کلاینت</span>
                                 <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
                             </a>
                         </td>
-                        <td class="p-3.5">
+                        <td class="p-3.5 whitespace-nowrap">
                             <span class="px-2 py-0.5 rounded text-[10px] font-semibold <?= $r['status'] === 'active' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400' ?>">
                                 <?= $r['status'] === 'active' ? 'فعال' : 'مسدود' ?>
                             </span>
                         </td>
-                        <td class="p-3.5 text-center">
-                            <div class="flex items-center justify-center gap-1.5 flex-wrap">
-                                <button onclick="openAdjustModal(<?= $r['id'] ?>, '<?= htmlspecialchars($r['username']) ?>')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-emerald-300 rounded-lg text-xs font-medium border border-slate-700 transition" title="شارژ یا کسر موجودی">
-                                    <i class="fa-solid fa-wallet"></i> شارژ
+                        <td class="p-3.5 text-center whitespace-nowrap">
+                            <div class="flex items-center justify-center gap-1.5">
+                                <button onclick="openAdjustModal(<?= $r['id'] ?>, '<?= htmlspecialchars($r['username']) ?>')" class="w-8 h-8 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition flex items-center justify-center text-xs" title="شارژ یا کسر موجودی کیف پول">
+                                    <i class="fa-solid fa-wallet"></i>
                                 </button>
-                                <button onclick="openDiscountModal(<?= $r['id'] ?>, '<?= htmlspecialchars($r['username']) ?>', <?= (int)$r['discount_percent'] ?>)" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-amber-300 rounded-lg text-xs font-medium border border-slate-700 transition" title="ویرایش درصد تخفیف">
-                                    <i class="fa-solid fa-percent"></i> تخفیف
+                                <button onclick="openCreditLimitModal(<?= $r['id'] ?>, '<?= htmlspecialchars($r['username']) ?>', <?= $limit ?>)" class="w-8 h-8 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 transition flex items-center justify-center text-xs" title="تنظیم سقف بدهی و اعتبار مجاز">
+                                    <i class="fa-solid fa-scale-balanced"></i>
                                 </button>
-                                <button onclick="openCreditLimitModal(<?= $r['id'] ?>, '<?= htmlspecialchars($r['username']) ?>', <?= $limit ?>)" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-purple-300 rounded-lg text-xs font-medium border border-slate-700 transition" title="سقف بدهی و اعتبار">
-                                    <i class="fa-solid fa-scale-balanced"></i> سقف اعتبار
-                                </button>
-                                <button onclick="copyResellerDetails('<?= htmlspecialchars($r['username']) ?>', '<?= htmlspecialchars($r['brand_name']) ?>')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded-lg text-xs font-medium border border-slate-700 transition" title="کپی پیام آماده حاوی آدرس پنل و مشخصات برای ارسال به نماینده">
-                                    <i class="fa-solid fa-share-nodes"></i> کپی مشخصات
+                                <a href="<?= Helpers::url('resellers/clients?id=' . $r['id']) ?>" class="w-8 h-8 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 transition flex items-center justify-center text-xs" title="مشاهده و نظارت بر کاربران این نماینده">
+                                    <i class="fa-solid fa-users"></i>
+                                </a>
+                                <button onclick="copyResellerDetails('<?= htmlspecialchars($r['username']) ?>', '<?= htmlspecialchars($r['brand_name']) ?>')" class="w-8 h-8 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 transition flex items-center justify-center text-xs" title="کپی پیام آماده حاوی آدرس پنل و مشخصات برای ارسال به نماینده">
+                                    <i class="fa-solid fa-share-nodes"></i>
                                 </button>
                             </div>
                         </td>

@@ -302,6 +302,11 @@ class Database {
                     $pdo->exec("ALTER TABLE `plans` ADD COLUMN `ip_limit` INT DEFAULT 2");
                 }
 
+                $check = $pdo->query("SHOW COLUMNS FROM `plans` LIKE 'server_id'")->fetch();
+                if (!$check) {
+                    $pdo->exec("ALTER TABLE `plans` ADD COLUMN `server_id` INT NULL DEFAULT NULL");
+                }
+
                 $check = $pdo->query("SHOW COLUMNS FROM `clients` LIKE 'ip_limit'")->fetch();
                 if (!$check) {
                     $pdo->exec("ALTER TABLE `clients` ADD COLUMN `ip_limit` INT DEFAULT 2");
@@ -439,6 +444,9 @@ class Database {
                 } catch (Throwable $e) {}
                 try {
                     $pdo->exec("ALTER TABLE plans ADD COLUMN ip_limit INT DEFAULT 2");
+                } catch (Throwable $e) {}
+                try {
+                    $pdo->exec("ALTER TABLE plans ADD COLUMN server_id INT NULL DEFAULT NULL");
                 } catch (Throwable $e) {}
                 try {
                     $pdo->exec("ALTER TABLE clients ADD COLUMN ip_limit INT DEFAULT 2");

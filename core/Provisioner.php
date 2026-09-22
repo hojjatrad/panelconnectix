@@ -27,11 +27,20 @@ class Provisioner {
             return ['success' => false, 'error' => 'پلن انتخاب‌شده یافت نشد یا غیرفعال است.'];
         }
 
-        // Fetch Server
+        // Fetch Server (Specific passed ID -> Plan-bound Server -> Cluster Best Server)
         if ($serverId !== null && $serverId > 0) {
             $stmtServer = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ? AND is_active = 1");
             $stmtServer->execute([$serverId]);
             $server = $stmtServer->fetch();
+        } elseif (!empty($plan['server_id'])) {
+            // Plan is directly bound to a specific server node!
+            $stmtServer = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ? AND is_active = 1");
+            $stmtServer->execute([(int)$plan['server_id']]);
+            $server = $stmtServer->fetch();
+            if (!$server) {
+                // Failover fallback to cluster group if bound node is inactive
+                $server = self::findBestServer($plan['server_group'] ?? 'default', $pdo);
+            }
         } else {
             $server = self::findBestServer($plan['server_group'] ?? 'default', $pdo);
         }
@@ -113,6 +122,7 @@ class Provisioner {
                 'sub_url' => $subUrl,
                 'expire_at' => $expireAt,
                 'traffic_gb' => $plan['traffic_gb'],
+                'server_id' => (int)$server['id'],
                 'server_name' => $server['name']
             ];
         } catch (Throwable $e) {

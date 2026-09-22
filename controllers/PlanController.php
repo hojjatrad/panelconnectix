@@ -7,7 +7,13 @@ class PlanController {
     public function index(): void {
         Auth::requireLogin();
         $pdo = Database::getConnection();
-        $plans = $pdo->query("SELECT * FROM plans ORDER BY is_free DESC, base_price ASC")->fetchAll();
+        Database::ensureExtendedTablesExist($pdo);
+
+        $plans = $pdo->query("SELECT p.*, s.name as server_name, s.driver as server_driver, s.sub_domain as server_subdomain 
+                              FROM plans p 
+                              LEFT JOIN server_nodes s ON p.server_id = s.id 
+                              ORDER BY p.is_free DESC, p.base_price ASC")->fetchAll();
+        $servers = $pdo->query("SELECT * FROM server_nodes WHERE is_active = 1 ORDER BY name ASC")->fetchAll();
         require __DIR__ . '/../views/plans/index.php';
     }
 
@@ -24,6 +30,7 @@ class PlanController {
         $basePrice = (int)($_POST['base_price'] ?? 0);
         $resellerPrice = (int)($_POST['reseller_price'] ?? 0);
         $serverGroup = trim($_POST['server_group'] ?? 'default');
+        $serverId = !empty($_POST['server_id']) ? (int)$_POST['server_id'] : null;
         $category = trim($_POST['category'] ?? '۱ ماهه');
         $ipLimit = max(0, (int)($_POST['ip_limit'] ?? 2));
         $showInBot = isset($_POST['show_in_bot']) ? 1 : 0;
@@ -35,8 +42,8 @@ class PlanController {
         }
 
         $pdo = Database::getConnection();
-        $stmt = $pdo->prepare("INSERT INTO plans (title, traffic_gb, duration_days, base_price, reseller_price, server_group, category, ip_limit, show_in_bot, is_free) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->execute([$title, $traffic, $days, $basePrice, $resellerPrice, $serverGroup, $category, $ipLimit, $showInBot, $isFree]);
+        $stmt = $pdo->prepare("INSERT INTO plans (title, traffic_gb, duration_days, base_price, reseller_price, server_group, server_id, category, ip_limit, show_in_bot, is_free) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$title, $traffic, $days, $basePrice, $resellerPrice, $serverGroup, $serverId, $category, $ipLimit, $showInBot, $isFree]);
 
         Helpers::flash('success', 'پلن جدید با موفقیت ایجاد شد.');
         Helpers::redirect('plans');
@@ -56,6 +63,7 @@ class PlanController {
         $basePrice = (int)($_POST['base_price'] ?? 0);
         $resellerPrice = (int)($_POST['reseller_price'] ?? 0);
         $serverGroup = trim($_POST['server_group'] ?? 'default');
+        $serverId = !empty($_POST['server_id']) ? (int)$_POST['server_id'] : null;
         $category = trim($_POST['category'] ?? '۱ ماهه');
         $ipLimit = max(0, (int)($_POST['ip_limit'] ?? 2));
         $showInBot = isset($_POST['show_in_bot']) ? 1 : 0;
@@ -67,8 +75,8 @@ class PlanController {
         }
 
         $pdo = Database::getConnection();
-        $stmt = $pdo->prepare("UPDATE plans SET title = ?, traffic_gb = ?, duration_days = ?, base_price = ?, reseller_price = ?, server_group = ?, category = ?, ip_limit = ?, show_in_bot = ?, is_free = ? WHERE id = ?");
-        $stmt->execute([$title, $traffic, $days, $basePrice, $resellerPrice, $serverGroup, $category, $ipLimit, $showInBot, $isFree, $id]);
+        $stmt = $pdo->prepare("UPDATE plans SET title = ?, traffic_gb = ?, duration_days = ?, base_price = ?, reseller_price = ?, server_group = ?, server_id = ?, category = ?, ip_limit = ?, show_in_bot = ?, is_free = ? WHERE id = ?");
+        $stmt->execute([$title, $traffic, $days, $basePrice, $resellerPrice, $serverGroup, $serverId, $category, $ipLimit, $showInBot, $isFree, $id]);
 
         Helpers::flash('success', "پلن '{$title}' با موفقیت به‌روزرسانی شد.");
         Helpers::redirect('plans');

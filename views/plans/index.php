@@ -89,8 +89,18 @@ if (empty($categories)) $categories = ['۱ ماهه', '۲ ماهه', '۳ ماه�
                             <span class="font-bold text-purple-300 font-mono"><?= ($p['ip_limit'] ?? 2) > 0 ? ($p['ip_limit'] ?? 2) . ' دستگاه' : 'نامحدود' ?></span>
                         </div>
                         <div class="flex justify-between text-slate-400">
-                            <span>گروه کلاستر سرور:</span>
-                            <span class="font-bold text-cyan-400 uppercase font-mono text-[11px]"><?= $p['server_group'] ?></span>
+                            <span>نود اختصاصی / کلاستر:</span>
+                            <?php if (!empty($p['server_name'])): ?>
+                                <span class="font-bold text-purple-300 text-[11px] flex items-center gap-1 font-mono" title="<?= htmlspecialchars($p['server_subdomain'] ?? '') ?>">
+                                    <i class="fa-solid fa-server text-[9px] text-purple-400"></i>
+                                    <?= htmlspecialchars($p['server_name']) ?> (<?= strtoupper($p['server_driver'] ?? '') ?>)
+                                </span>
+                            <?php else: ?>
+                                <span class="text-cyan-400 text-[11px] flex items-center gap-1 font-mono">
+                                    <i class="fa-solid fa-network-wired text-[9px]"></i>
+                                    کلاستر هوشمند (<?= strtoupper($p['server_group']) ?>)
+                                </span>
+                            <?php endif; ?>
                         </div>
                     </div>
 
@@ -197,6 +207,19 @@ if (empty($categories)) $categories = ['۱ ماهه', '۲ ماهه', '۳ ماه�
                         <option value="vip">تجاری VIP (Business Class)</option>
                     </select>
                 </div>
+
+                <div class="col-span-2">
+                    <label class="block text-slate-300 mb-1 font-semibold">سرور / نود اختصاصی صدور کانفیگ</label>
+                    <select name="server_id" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white text-xs">
+                        <option value="">⚡️ انتخاب خودکار از کلاستر سرور (Auto Load Balance)</option>
+                        <?php if (!empty($servers)): ?>
+                            <?php foreach ($servers as $s): ?>
+                                <option value="<?= $s['id'] ?>">🖥 <?= htmlspecialchars($s['name']) ?> (هسته: <?= strtoupper($s['driver']) ?> - دسته: <?= $s['server_group'] ?>)</option>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </select>
+                    <span class="text-[10px] text-slate-500 mt-0.5 block">در صورت انتخاب نود، کانفیگ مشتریان این پلن ۱۰۰٪ روی همان سرور ایجاد خواهد شد.</span>
+                </div>
             </div>
 
             <div class="grid grid-cols-2 gap-3">
@@ -281,6 +304,19 @@ if (empty($categories)) $categories = ['۱ ماهه', '۲ ماهه', '۳ ماه�
                         <option value="vip">تجاری VIP (Business Class)</option>
                     </select>
                 </div>
+
+                <div class="col-span-2">
+                    <label class="block text-slate-300 mb-1 font-semibold">سرور / نود اختصاصی صدور کانفیگ</label>
+                    <select name="server_id" id="edit_server_id" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white text-xs">
+                        <option value="">⚡️ انتخاب خودکار از کلاستر سرور (Auto Load Balance)</option>
+                        <?php if (!empty($servers)): ?>
+                            <?php foreach ($servers as $s): ?>
+                                <option value="<?= $s['id'] ?>">🖥 <?= htmlspecialchars($s['name']) ?> (هسته: <?= strtoupper($s['driver']) ?> - دسته: <?= $s['server_group'] ?>)</option>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </select>
+                    <span class="text-[10px] text-slate-500 mt-0.5 block">در صورت انتخاب نود، کانفیگ مشتریان این پلن ۱۰۰٪ روی همان سرور ایجاد خواهد شد.</span>
+                </div>
             </div>
 
             <div class="grid grid-cols-2 gap-3">
@@ -346,6 +382,7 @@ if (empty($categories)) $categories = ['۱ ماهه', '۲ ماهه', '۳ ماه�
         document.getElementById('edit_title').value = p.title;
         document.getElementById('edit_category').value = p.category || '۱ ماهه';
         document.getElementById('edit_server_group').value = p.server_group || 'default';
+        document.getElementById('edit_server_id').value = p.server_id || '';
         document.getElementById('edit_traffic_gb').value = p.traffic_gb;
         document.getElementById('edit_duration_days').value = p.duration_days;
         document.getElementById('edit_ip_limit').value = p.ip_limit ?? 2;
