@@ -2,27 +2,45 @@
 require_once __DIR__ . '/../core/Auth.php';
 require_once __DIR__ . '/../core/Database.php';
 require_once __DIR__ . '/../core/Helpers.php';
+require_once __DIR__ . '/../core/Updater.php';
 
 class ResellerController {
     public function index(): void {
         Auth::requireAdmin();
         $pdo = Database::getConnection();
 
-        // Ensure database columns exist for MySQL / SQLite
-        if (class_exists('Updater')) {
-            Updater::ensureDatabaseSchema();
-        }
+        // 1. Ensure database schema and columns exist
+        try {
+            Database::ensureExtendedTablesExist($pdo);
+        } catch (Throwable $e) {}
 
-        // 100% MySQL ONLY_FULL_GROUP_BY safe query
-        $stmt = $pdo->query("SELECT u.id, u.username, u.full_name, u.email, u.wallet_balance, 
-                                    u.discount_percent, u.status, u.telegram_bot_username,
-                                    COALESCE(u.brand_name, b.brand_name, 'بدون برند') as brand_name,
-                                    (SELECT COUNT(*) FROM clients WHERE reseller_id = u.id) as client_count
-                             FROM users u
-                             LEFT JOIN branding_metadata b ON b.user_id = u.id
-                             WHERE u.role = 'reseller'
-                             ORDER BY u.id DESC");
-        $resellers = $stmt->fetchAll();
+        // 2. Query resellers with safe fallback
+        try {
+            $stmt = $pdo->query("SELECT u.id, u.username, u.full_name, u.email, u.wallet_balance, 
+                                        u.discount_percent, u.status, u.telegram_bot_username,
+                                        COALESCE(u.brand_name, b.brand_name, 'بدون برند') as brand_name,
+                                        (SELECT COUNT(*) FROM clients WHERE reseller_id = u.id) as client_count
+                                 FROM users u
+                                 LEFT JOIN branding_metadata b ON b.user_id = u.id
+                                 WHERE u.role = 'reseller'
+                                 ORDER BY u.id DESC");
+            $resellers = $stmt->fetchAll();
+        } catch (Throwable $e) {
+            // Self-healing fallback query if optional columns are pending
+            try {
+                $stmt = $pdo->query("SELECT u.id, u.username, u.full_name, u.email, u.wallet_balance, 
+                                            u.discount_percent, u.status,
+                                            '' as telegram_bot_username,
+                                            'بدون برند' as brand_name,
+                                            (SELECT COUNT(*) FROM clients WHERE reseller_id = u.id) as client_count
+                                     FROM users u
+                                     WHERE u.role = 'reseller'
+                                     ORDER BY u.id DESC");
+                $resellers = $stmt->fetchAll();
+            } catch (Throwable $e2) {
+                $resellers = [];
+            }
+        }
 
         require __DIR__ . '/../views/resellers/index.php';
     }

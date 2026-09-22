@@ -4,10 +4,17 @@ require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Setting.php';
 
 class Updater {
-    public const CURRENT_VERSION = '2.4.2';
+    public const CURRENT_VERSION = '2.4.4';
 
     public static function getCurrentVersion(): string {
         return Setting::get('current_version', self::CURRENT_VERSION);
+    }
+
+    public static function ensureDatabaseSchema(): void {
+        try {
+            $pdo = Database::getConnection();
+            Database::ensureExtendedTablesExist($pdo);
+        } catch (Throwable $e) {}
     }
 
     public static function getRepo(): string {
@@ -38,9 +45,14 @@ class Updater {
         $token = self::getToken();
         $currentVer = self::getCurrentVersion();
 
-        // 1. Try Releases API
-        $url = "https://api.github.com/repos/{$repo}/releases/latest";
-        $res = self::githubRequest($url, $token);
+        // 1. Try Releases list (fetches latest instantly without GitHub CDN /latest caching lag)
+        $url = "https://api.github.com/repos/{$repo}/releases";
+        $releases = self::githubRequest($url, $token);
+        $res = (is_array($releases) && !empty($releases[0]['tag_name'])) ? $releases[0] : null;
+
+        if (!$res) {
+            $res = self::githubRequest("https://api.github.com/repos/{$repo}/releases/latest", $token);
+        }
 
         if ($res && isset($res['tag_name'])) {
             $latestTag = ltrim($res['tag_name'], 'vV');

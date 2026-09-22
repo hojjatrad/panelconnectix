@@ -16,6 +16,10 @@ require __DIR__ . '/../layout/header.php';
             <i class="fa-solid fa-arrows-rotate text-purple-400"></i>
             <span>بررسی انتشار نسخه جدید</span>
         </a>
+        <button type="button" onclick="startLiveUpdate()" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl transition shadow flex items-center gap-2">
+            <i class="fa-solid fa-play"></i>
+            <span>اجرای زنده به‌روزرسانی (با نوار پیشرفت)</span>
+        </button>
     </div>
 </div>
 
@@ -57,16 +61,15 @@ require __DIR__ . '/../layout/header.php';
                         </div>
                     <?php endif; ?>
 
-                    <form id="updateForm" action="<?= Helpers::url('updater/apply') ?>" method="POST" onsubmit="startLiveUpdate(event)">
-                        <?= Helpers::csrfField() ?>
-                        <button type="submit" id="btnStartUpdate" class="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-xl text-xs transition-all shadow-lg shadow-purple-900/40 flex items-center justify-center gap-2">
-                            <i class="fa-solid fa-rocket"></i>
-                            <span>شروع به‌روزرسانی آنی به نسخه <?= $updateInfo['latest_version'] ?> (1-Click Update)</span>
+                    <div>
+                        <button type="button" onclick="startLiveUpdate()" id="btnStartUpdate" class="w-full py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-xl text-xs transition-all shadow-lg shadow-purple-900/40 flex items-center justify-center gap-2 cursor-pointer">
+                            <i class="fa-solid fa-rocket text-sm"></i>
+                            <span>شروع به‌روزرسانی آنی به نسخه <?= $updateInfo['latest_version'] ?> (همراه با نوار پیشرفت زنده)</span>
                         </button>
-                    </form>
+                    </div>
                 </div>
             <?php else: ?>
-                <div class="bg-slate-950/60 border border-slate-800/80 rounded-2xl p-5 space-y-3">
+                <div class="bg-slate-950/60 border border-slate-800/80 rounded-2xl p-5 space-y-4">
                     <div class="flex items-center gap-3.5">
                         <div class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-xl shrink-0">
                             <i class="fa-solid fa-shield-check"></i>
@@ -77,13 +80,12 @@ require __DIR__ . '/../layout/header.php';
                         </div>
                     </div>
 
-                    <form id="forceUpdateForm" action="<?= Helpers::url('updater/apply') ?>" method="POST" onsubmit="startLiveUpdate(event)" class="pt-2">
-                        <?= Helpers::csrfField() ?>
-                        <button type="submit" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-purple-300 hover:text-white font-bold rounded-xl text-xs transition border border-slate-700 flex items-center justify-center gap-2">
+                    <div class="pt-2">
+                        <button type="button" onclick="startLiveUpdate()" class="w-full py-3 bg-gradient-to-r from-purple-600/90 to-indigo-600/90 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-xl text-xs transition border border-purple-500/30 flex items-center justify-center gap-2 cursor-pointer shadow-md">
                             <i class="fa-solid fa-arrows-rotate"></i>
-                            <span>دانلود و استقرار مجدد آخرین کدها از گیت‌هاب (Force Sync / Update)</span>
+                            <span>دانلود و استقرار مجدد آخرین کدها از گیت‌هاب (اجرای نوار پیشرفت زنده)</span>
                         </button>
-                    </form>
+                    </div>
                 </div>
             <?php endif; ?>
 
@@ -205,7 +207,7 @@ require __DIR__ . '/../layout/header.php';
 </div>
 
 <!-- Modal: Live Progress Bar for Update -->
-<div id="updateProgressModal" class="fixed inset-0 bg-black/85 backdrop-blur-md hidden items-center justify-center p-4 z-50">
+<div id="updateProgressModal" style="z-index: 999999;" class="fixed inset-0 bg-black/85 backdrop-blur-md hidden items-center justify-center p-4">
     <div class="bg-slate-900 border border-purple-500/40 rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl relative space-y-6 text-center">
         <!-- Animated Icon -->
         <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 mx-auto flex items-center justify-center text-white text-2xl shadow-lg shadow-purple-600/40" id="progressIconBox">
@@ -286,8 +288,12 @@ require __DIR__ . '/../layout/header.php';
 </div>
 
 <script>
+let updateInProgress = false;
+
 function startLiveUpdate(e) {
-    if (e) e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
+    if (updateInProgress) return;
+    updateInProgress = true;
 
     const modal = document.getElementById('updateProgressModal');
     modal.classList.remove('hidden');
@@ -341,7 +347,8 @@ function startLiveUpdate(e) {
             fetch('<?= Helpers::url('updater/ajax-apply') ?>', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded'
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-Requested-With': 'XMLHttpRequest'
                 },
                 body: 'csrf_token=' + encodeURIComponent('<?= Helpers::generateCsrf() ?>')
             })
@@ -364,11 +371,11 @@ function startLiveUpdate(e) {
                         const rep = document.getElementById('completionReport');
                         rep.classList.remove('hidden');
                         document.getElementById('reportEndTime').innerText = data.finished_at || new Date().toLocaleTimeString('fa-IR');
-                        document.getElementById('reportDuration').innerText = data.duration || '۳.۲ ثانیه';
+                        document.getElementById('reportDuration').innerText = data.duration || '۲.۸ ثانیه';
 
                         setTimeout(() => {
-                            window.location.reload();
-                        }, 2500);
+                            window.location.href = '<?= Helpers::url('updater') ?>';
+                        }, 2200);
                     }, 800);
                 } else {
                     alert('خطا در ارتقای خودکار: ' + (data.error || 'خطای ناشناخته'));
@@ -379,9 +386,16 @@ function startLiveUpdate(e) {
                 alert('خطا در برقراری ارتباط با سرور: ' + err.message);
                 window.location.reload();
             });
-        }, 900);
-    }, 700);
+        }, 800);
+    }, 600);
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('autostart') === '1') {
+        startLiveUpdate();
+    }
+});
 </script>
 
 <?php

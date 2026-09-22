@@ -227,9 +227,9 @@ $t = $themeClasses[$theme] ?? $themeClasses['violet'];
                     </div>
                 </div>
                 <div class="flex items-center gap-2 shrink-0">
-                    <a href="<?= Helpers::url('updater') ?>" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center gap-1.5">
+                    <a href="<?= Helpers::url('updater?autostart=1') ?>" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center gap-1.5">
                         <i class="fa-solid fa-rocket"></i>
-                        <span>مشاهده و اعمال به‌روزرسانی</span>
+                        <span>مشاهده و اعمال به‌روزرسانی (با نوار زنده)</span>
                     </a>
                 </div>
             </div>

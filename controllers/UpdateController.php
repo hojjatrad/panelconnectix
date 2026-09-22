@@ -8,11 +8,12 @@ class UpdateController {
     public function index(): void {
         Auth::requireAdmin();
 
-        $updateInfo = Updater::checkForUpdates(false);
+        $force = isset($_GET['refresh']) && $_GET['refresh'] === '1';
+        $updateInfo = Updater::checkForUpdates($force);
         $repo = Updater::getRepo();
         $branch = Updater::getBranch();
         $token = Updater::getToken();
-        $currentVersion = Updater::CURRENT_VERSION;
+        $currentVersion = Updater::getCurrentVersion();
 
         require __DIR__ . '/../views/settings/updater.php';
     }
@@ -22,9 +23,9 @@ class UpdateController {
         $updateInfo = Updater::checkForUpdates(true);
 
         if ($updateInfo['has_update']) {
-            Helpers::flash('info', "نسخه جدید {$updateInfo['latest_version']} در گیت‌هاب در دسترس است!");
+            Helpers::flash('info', "نسخه جدید {$updateInfo['latest_version']} در گیت‌هاب در دسترس است! لطفاً جهت اعمال دکمه به‌روزرسانی را لمس کنید.");
         } else {
-            Helpers::flash('success', "پنل شما به‌روز است. نگارش فعال: " . Updater::CURRENT_VERSION);
+            Helpers::flash('success', "پنل شما به‌روز است. نگارش فعال: " . ($updateInfo['current_version'] ?? Updater::getCurrentVersion()));
         }
 
         Helpers::redirect('updater');
