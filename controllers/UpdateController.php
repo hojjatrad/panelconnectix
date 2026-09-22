@@ -57,6 +57,7 @@ class UpdateController {
         $repo = trim($_POST['github_repo'] ?? '');
         $branch = trim($_POST['github_branch'] ?? 'main');
         $token = trim($_POST['github_token'] ?? '');
+        $autoApply = !empty($_POST['auto_apply_github_updates']) ? '1' : '0';
 
         // Remove https://github.com/ if user pasted full URL
         $repo = preg_replace('#^https?://github\.com/#i', '', $repo);
@@ -65,6 +66,7 @@ class UpdateController {
         Setting::set('github_repo', $repo);
         Setting::set('github_branch', $branch);
         Setting::set('github_token', $token);
+        Setting::set('auto_apply_github_updates', $autoApply);
 
         // Invalidate check cache
         Setting::set('update_check_cache', '');
@@ -104,5 +106,26 @@ class UpdateController {
         Helpers::logActivity('git_push', "ارسال فایل‌های پنل به گیت‌هاب: {$remoteUrl}", 'system');
         Helpers::flash('info', "فرمان Git اجرا شد:\n" . substr($pushOutput, 0, 300));
         Helpers::redirect('updater');
+    }
+
+    public function webhook(): void {
+        header('Content-Type: application/json; charset=utf-8');
+        $secret = $_GET['secret'] ?? '';
+        $expected = Setting::get('github_webhook_secret', APP_SECRET);
+        if (empty($secret) || $secret !== $expected) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Unauthorized webhook secret']);
+            exit;
+        }
+
+        $res = Updater::applyUpdate();
+        if ($res['success']) {
+            try {
+                require_once __DIR__ . '/../core/TelegramBot.php';
+                TelegramBot::sendMessage("⚡️ <b>آپدیت آنی گیت‌هاب با وب‌هوک اعمال شد!</b>\n\nتغییرات جدید مستقیماً از مخزن گیت‌هاب دریافت و روی پنل هاست مستقر گردید.");
+            } catch (Throwable $e) {}
+        }
+        echo json_encode($res);
+        exit;
     }
 }

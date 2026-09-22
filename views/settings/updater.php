@@ -126,13 +126,34 @@ require __DIR__ . '/../layout/header.php';
     </div>
 
     <!-- Repository Configuration Card -->
-    <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-sm space-y-4 h-fit">
-        <div class="flex items-center gap-2 border-b border-slate-800 pb-3">
-            <i class="fa-solid fa-sliders text-purple-400"></i>
-            <h3 class="font-bold text-xs text-white">تنظیمات مخزن گیت‌هاب</h3>
+    <div class="space-y-4">
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-sm space-y-4">
+            <div class="flex items-center gap-2 border-b border-slate-800 pb-3">
+                <i class="fa-solid fa-bolt text-amber-400"></i>
+                <h3 class="font-bold text-xs text-white">وب‌هوک استقرار آنی (GitHub Webhook)</h3>
+            </div>
+            <p class="text-[11px] text-slate-400 leading-relaxed">
+                برای به‌روزرسانی آنی و بدون تأخیر پنل به‌محض زدن Push در گیت‌هاب، آدرس وب‌هوک زیر را در تنظیمات مخزن گیت‌هاب (Settings > Webhooks) قرار دهید:
+            </p>
+            <div class="flex items-center gap-2">
+                <input type="text" readonly value="<?= Helpers::fullUrl('updater/webhook?secret=' . APP_SECRET) ?>" 
+                       id="webhookUrlInput"
+                       class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-slate-300 font-mono text-[11px] select-all" dir="ltr">
+                <button onclick="copyToClipboard(document.getElementById('webhookUrlInput').value, this)" 
+                        class="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs transition shadow shrink-0">
+                    <i class="fa-solid fa-copy"></i>
+                </button>
+            </div>
+            <span class="text-[10px] text-slate-500 block">Content type را در گیت‌هاب روی <code>application/json</code> قرار دهید.</span>
         </div>
 
-        <form action="<?= Helpers::url('updater/settings') ?>" method="POST" class="space-y-3.5 text-xs">
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-sm space-y-4">
+            <div class="flex items-center gap-2 border-b border-slate-800 pb-3">
+                <i class="fa-solid fa-sliders text-purple-400"></i>
+                <h3 class="font-bold text-xs text-white">تنظیمات مخزن گیت‌هاب</h3>
+            </div>
+
+            <form action="<?= Helpers::url('updater/settings') ?>" method="POST" class="space-y-3.5 text-xs">
             <?= Helpers::csrfField() ?>
 
             <div>
@@ -156,6 +177,14 @@ require __DIR__ . '/../layout/header.php';
                        placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
                        class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
                 <span class="text-[10px] text-slate-500 mt-1 block">برای مخازن شخصی/خصوصی (Private) یا جلوگیری از محدودیت درخواست‌ها الزامی است.</span>
+            </div>
+
+            <div class="p-3 bg-slate-800/80 rounded-xl border border-slate-700 space-y-1">
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="auto_apply_github_updates" value="1" <?= Setting::get('auto_apply_github_updates') == '1' ? 'checked' : '' ?> class="rounded bg-slate-700 border-slate-600 text-purple-600 focus:ring-0">
+                    <span class="text-slate-200 font-medium">به‌روزرسانی کاملاً خودکار در پس‌زمینه (توسط کران‌جاب)</span>
+                </label>
+                <p class="text-[11px] text-slate-400 mr-5">در صورت انتشار نسخه جدید، کران‌جاب سیستم فایل‌ها را خودکار دانلود و جایگزین می‌کند و به ادمین تلگرام پیام می‌دهد.</p>
             </div>
 
             <button type="submit" class="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs transition shadow mt-2">

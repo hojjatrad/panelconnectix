@@ -184,3 +184,31 @@ if (time() - $lastBackup >= 86400) {
         echo "[" . date('Y-m-d H:i:s') . "] Backup error: " . $e->getMessage() . $eol;
     }
 }
+
+// GitHub Auto-Update & Notification Check (Every 6 Hours)
+$lastUpdateCheck = (int)Setting::get('last_cron_update_check', '0');
+if (time() - $lastUpdateCheck >= 21600) {
+    Setting::set('last_cron_update_check', (string)time());
+    echo "[" . date('Y-m-d H:i:s') . "] Checking GitHub for panel updates..." . $eol;
+    try {
+        require_once __DIR__ . '/../core/Updater.php';
+        $updateInfo = Updater::checkForUpdates(true);
+        if (!empty($updateInfo['has_update'])) {
+            $isAutoApply = (bool)Setting::get('auto_apply_github_updates', false);
+            if ($isAutoApply) {
+                $applyRes = Updater::applyUpdate();
+                if ($applyRes['success']) {
+                    TelegramBot::sendMessage("🚀 <b>به‌روزرسانی خودکار انجام شد!</b>\n\nسیستم به آخرین نسخه در گیت‌هاب (<code>{$updateInfo['latest_version']}</code>) به‌روزرسانی شد.\n\n📝 تغییرات: " . strip_tags($updateInfo['changelog'] ?? ''));
+                    echo "[" . date('Y-m-d H:i:s') . "] Auto-update applied successfully." . $eol;
+                }
+            } else {
+                // Notify admin via Telegram
+                TelegramBot::sendMessage("🔔 <b>نسخه جدیدی از پنل در گیت‌هاب منتشر شده است!</b>\n\n🏷 نسخه جدید: <code>{$updateInfo['latest_version']}</code>\n📝 تغییرات:\n" . strip_tags($updateInfo['changelog'] ?? '') . "\n\nبرای اعمال با ۱ کلیک به منوی تنظیمات > آپدیت مراجعه نمایید.");
+                echo "[" . date('Y-m-d H:i:s') . "] Update available notification sent to admin." . $eol;
+            }
+        }
+    } catch (Throwable $e) {
+        echo "[" . date('Y-m-d H:i:s') . "] Update check error: " . $e->getMessage() . $eol;
+    }
+}
+

@@ -142,6 +142,8 @@ $router->get('updater/check', [UpdateController::class, 'checkNow']);
 $router->post('updater/apply', [UpdateController::class, 'apply']);
 $router->post('updater/settings', [UpdateController::class, 'saveSettings']);
 $router->post('updater/git-push', [UpdateController::class, 'gitPushAction']);
+$router->post('updater/webhook', [UpdateController::class, 'webhook']);
+$router->get('updater/webhook', [UpdateController::class, 'webhook']);
 
 // Public Subscription & Dynamic QR Landing Endpoint
 $router->get('sub/{token}', [SublinkController::class, 'show']);
