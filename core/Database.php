@@ -43,7 +43,8 @@ class Database {
 
     public static function ensureExtendedTablesExist(PDO $pdo): void {
         try {
-            $isSqlite = (DB_DRIVER === 'sqlite');
+            $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+            $isSqlite = ($driver === 'sqlite');
             $autoInc = $isSqlite ? 'INTEGER PRIMARY KEY AUTOINCREMENT' : 'INT AUTO_INCREMENT PRIMARY KEY';
 
             $pdo->exec("CREATE TABLE IF NOT EXISTS system_settings (
@@ -54,6 +55,8 @@ class Database {
             $pdo->exec("CREATE TABLE IF NOT EXISTS bot_orders (
                 id $autoInc,
                 order_code VARCHAR(32) UNIQUE,
+                reseller_id INT NULL DEFAULT 1,
+                bot_token VARCHAR(255) NULL,
                 user_tg_id VARCHAR(64) NOT NULL,
                 user_tg_name VARCHAR(128) NULL,
                 user_tg_username VARCHAR(128) NULL,
@@ -77,6 +80,100 @@ class Database {
                 data TEXT NULL,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )");
+
+            // Auto-migrate Users table columns for Multi-Tenant Reseller Platform
+            if ($driver === 'mysql') {
+                $cols = [
+                    'telegram_bot_token' => 'VARCHAR(255) NULL',
+                    'telegram_bot_username' => 'VARCHAR(128) NULL',
+                    'telegram_admin_chat_id' => 'VARCHAR(64) NULL',
+                    'brand_name' => 'VARCHAR(128) NULL',
+                    'logo_url' => 'VARCHAR(255) NULL',
+                    'theme_color' => "VARCHAR(32) DEFAULT 'violet'",
+                    'card_number' => 'VARCHAR(32) NULL',
+                    'card_holder' => 'VARCHAR(128) NULL',
+                    'card_shaba' => 'VARCHAR(34) NULL',
+                    'zarinpal_merchant' => 'VARCHAR(64) NULL',
+                    'support_username' => 'VARCHAR(128) NULL',
+                    'welcome_message' => 'TEXT NULL',
+                    'custom_domain' => 'VARCHAR(128) NULL'
+                ];
+
+                foreach ($cols as $col => $def) {
+                    $check = $pdo->query("SHOW COLUMNS FROM `users` LIKE '{$col}'")->fetch();
+                    if (!$check) {
+                        $pdo->exec("ALTER TABLE `users` ADD COLUMN `{$col}` {$def}");
+                    }
+                }
+
+                $orderCols = [
+                    'reseller_id' => 'INT NULL DEFAULT 1',
+                    'bot_token' => 'VARCHAR(255) NULL'
+                ];
+                foreach ($orderCols as $col => $def) {
+                    $check = $pdo->query("SHOW COLUMNS FROM `bot_orders` LIKE '{$col}'")->fetch();
+                    if (!$check) {
+                        $pdo->exec("ALTER TABLE `bot_orders` ADD COLUMN `{$col}` {$def}");
+                    }
+                }
+
+                $pdo->exec("CREATE TABLE IF NOT EXISTS `reseller_plans` (
+                    `id` INT AUTO_INCREMENT PRIMARY KEY,
+                    `reseller_id` INT NOT NULL,
+                    `plan_id` INT NOT NULL,
+                    `custom_title` VARCHAR(128) NULL,
+                    `custom_category` VARCHAR(64) DEFAULT 'پیش‌فرض',
+                    `retail_price` BIGINT NOT NULL,
+                    `is_active` TINYINT(1) DEFAULT 1,
+                    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    UNIQUE KEY `uk_reseller_plan` (`reseller_id`, `plan_id`),
+                    INDEX `idx_rp_reseller` (`reseller_id`),
+                    INDEX `idx_rp_plan` (`plan_id`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
+
+            } else {
+                // SQLite
+                $cols = [
+                    'telegram_bot_token' => 'VARCHAR(255) NULL',
+                    'telegram_bot_username' => 'VARCHAR(128) NULL',
+                    'telegram_admin_chat_id' => 'VARCHAR(64) NULL',
+                    'brand_name' => 'VARCHAR(128) NULL',
+                    'logo_url' => 'VARCHAR(255) NULL',
+                    'theme_color' => "VARCHAR(32) DEFAULT 'violet'",
+                    'card_number' => 'VARCHAR(32) NULL',
+                    'card_holder' => 'VARCHAR(128) NULL',
+                    'card_shaba' => 'VARCHAR(34) NULL',
+                    'zarinpal_merchant' => 'VARCHAR(64) NULL',
+                    'support_username' => 'VARCHAR(128) NULL',
+                    'welcome_message' => 'TEXT NULL',
+                    'custom_domain' => 'VARCHAR(128) NULL'
+                ];
+                foreach ($cols as $col => $def) {
+                    try {
+                        $pdo->exec("ALTER TABLE users ADD COLUMN {$col} {$def}");
+                    } catch (Throwable $e) {}
+                }
+
+                try {
+                    $pdo->exec("ALTER TABLE bot_orders ADD COLUMN reseller_id INT NULL DEFAULT 1");
+                } catch (Throwable $e) {}
+                try {
+                    $pdo->exec("ALTER TABLE bot_orders ADD COLUMN bot_token VARCHAR(255) NULL");
+                } catch (Throwable $e) {}
+
+                $pdo->exec("CREATE TABLE IF NOT EXISTS `reseller_plans` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT,
+                    `reseller_id` INT NOT NULL,
+                    `plan_id` INT NOT NULL,
+                    `custom_title` VARCHAR(128) NULL,
+                    `custom_category` VARCHAR(64) DEFAULT 'پیش‌فرض',
+                    `retail_price` BIGINT NOT NULL,
+                    `is_active` TINYINT(1) DEFAULT 1,
+                    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP
+                );");
+            }
         } catch (Throwable $e) {
             // Ignore if already created
         }

@@ -4,7 +4,11 @@ require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Setting.php';
 
 class Updater {
-    public const CURRENT_VERSION = '2.3.0';
+    public const CURRENT_VERSION = '2.4.2';
+
+    public static function getCurrentVersion(): string {
+        return Setting::get('current_version', self::CURRENT_VERSION);
+    }
 
     public static function getRepo(): string {
         return Setting::get('github_repo', 'hojjatrad/panelconnectix');
@@ -32,6 +36,7 @@ class Updater {
 
         $repo = self::getRepo();
         $token = self::getToken();
+        $currentVer = self::getCurrentVersion();
 
         // 1. Try Releases API
         $url = "https://api.github.com/repos/{$repo}/releases/latest";
@@ -39,12 +44,12 @@ class Updater {
 
         if ($res && isset($res['tag_name'])) {
             $latestTag = ltrim($res['tag_name'], 'vV');
-            $hasUpdate = version_compare($latestTag, self::CURRENT_VERSION, '>');
+            $hasUpdate = version_compare($latestTag, $currentVer, '>');
             $downloadUrl = $res['zipball_url'] ?? "https://github.com/{$repo}/archive/refs/tags/{$res['tag_name']}.zip";
 
             $result = [
                 'has_update' => $hasUpdate,
-                'current_version' => self::CURRENT_VERSION,
+                'current_version' => $currentVer,
                 'latest_version' => $latestTag,
                 'release_title' => $res['name'] ?? "Release v{$latestTag}",
                 'changelog' => $res['body'] ?? 'به‌روزرسانی‌های امنیتی و بهبود عملکرد پنل',
@@ -72,7 +77,7 @@ class Updater {
 
             $result = [
                 'has_update' => $hasUpdate,
-                'current_version' => !empty($lastInstalledSha) ? "commit-{$lastInstalledSha}" : self::CURRENT_VERSION,
+                'current_version' => !empty($lastInstalledSha) ? "commit-{$lastInstalledSha}" : $currentVer,
                 'latest_version' => "commit-{$shortSha}",
                 'release_title' => "آخرین تغییرات شاخه {$branch}",
                 'changelog' => $commitRes['commit']['message'] ?? 'آخرین تغییرات مستقیم مخزن گیت‌هاب',
@@ -89,8 +94,8 @@ class Updater {
 
         return [
             'has_update' => false,
-            'current_version' => self::CURRENT_VERSION,
-            'latest_version' => self::CURRENT_VERSION,
+            'current_version' => $currentVer,
+            'latest_version' => $currentVer,
             'release_title' => 'اطلاعات در دسترس نیست',
             'changelog' => 'عدم دسترسی به گیت‌هاب یا مخزن خصوصی بدون توکن.',
             'download_url' => '',
@@ -170,19 +175,29 @@ class Updater {
         // Cleanup
         self::deleteDirectory($tmpDir);
 
-        // Update installed commit SHA/version in database
-        $installedSha = str_replace('commit-', '', $check['latest_version'] ?? '');
+        // Update installed version in database
+        $installedVer = $check['latest_version'] ?? self::CURRENT_VERSION;
+        $installedSha = str_replace('commit-', '', $installedVer);
+        Setting::set('current_version', $installedVer);
         Setting::set('last_installed_commit_sha', $installedSha);
-        Setting::set('last_installed_version', $check['latest_version'] ?? self::CURRENT_VERSION);
+        Setting::set('last_installed_version', $installedVer);
         Setting::set('update_check_cache', '');
         Setting::set('update_check_time', '0');
 
-        Helpers::logActivity('system_update', "به‌روزرسانی موفق پنل به نگارش {$check['latest_version']}", 'system');
+        // Invalidate OPcache and clear stat cache so changes take effect in RAM immediately
+        if (function_exists('opcache_reset')) {
+            @opcache_reset();
+        }
+        if (function_exists('clearstatcache')) {
+            @clearstatcache(true);
+        }
+
+        Helpers::logActivity('system_update', "به‌روزرسانی موفق پنل به نگارش {$installedVer}", 'system');
 
         return [
             'success' => true,
-            'version' => $check['latest_version'] ?? self::CURRENT_VERSION,
-            'message' => "پنل با موفقیت به نگارش " . ($check['latest_version'] ?? self::CURRENT_VERSION) . " به‌روزرسانی شد!"
+            'version' => $installedVer,
+            'message' => "پنل با موفقیت به نگارش {$installedVer} به‌روزرسانی شد!"
         ];
     }
 
@@ -269,7 +284,8 @@ class Updater {
     }
 
     private static function copyDirectory(string $src, string $dst, array $skipped): void {
-        $dir = opendir($src);
+        $dir = @opendir($src);
+        if (!$dir) return;
         @mkdir($dst, 0777, true);
         while (($file = readdir($dir)) !== false) {
             if ($file === '.' || $file === '..') continue;
@@ -284,7 +300,18 @@ class Updater {
             if (is_dir($srcFile)) {
                 self::copyDirectory($srcFile, $dstFile, $skipped);
             } else {
-                @copy($srcFile, $dstFile);
+                if (file_exists($dstFile)) {
+                    @chmod($dstFile, 0666);
+                    @unlink($dstFile);
+                }
+                $copied = @copy($srcFile, $dstFile);
+                if (!$copied) {
+                    $content = @file_get_contents($srcFile);
+                    if ($content !== false) {
+                        @file_put_contents($dstFile, $content);
+                    }
+                }
+                @chmod($dstFile, 0644);
             }
         }
         closedir($dir);
@@ -302,25 +329,7 @@ class Updater {
     private static function runPostUpdateMigrations(): void {
         try {
             $pdo = Database::getConnection();
-
-            $migFile = __DIR__ . '/../migrations/002_multi_reseller.sql';
-            if (file_exists($migFile)) {
-                $sql = file_get_contents($migFile);
-                if (!empty($sql)) {
-                    $pdo->exec($sql);
-                }
-            }
-
-            $pdo->exec("CREATE TABLE IF NOT EXISTS activity_logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NULL,
-                action VARCHAR(64) NOT NULL,
-                entity_type VARCHAR(64) NULL,
-                entity_id VARCHAR(64) NULL,
-                description TEXT NOT NULL,
-                ip_address VARCHAR(45) NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )");
+            Database::ensureExtendedTablesExist($pdo);
         } catch (Throwable $e) {}
     }
 
