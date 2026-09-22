@@ -43,6 +43,27 @@ require __DIR__ . '/../layout/header.php';
     </div>
 </div>
 
+<!-- Search Bar -->
+<div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 mb-4">
+    <form action="<?= Helpers::url('settings/bot-users') ?>" method="GET" class="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+        <div class="relative w-full sm:w-80">
+            <i class="fa-solid fa-magnifying-glass absolute right-3.5 top-3 text-slate-500"></i>
+            <input type="text" name="q" value="<?= htmlspecialchars($_GET['q'] ?? '') ?>" placeholder="جستجو بر اساس نام، یوزرنیم (@) یا شناسه عددی..." 
+                   class="w-full bg-slate-800 border border-slate-700 rounded-xl pr-9 pl-4 py-2 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-cyan-500">
+        </div>
+        <div class="flex items-center gap-2 w-full sm:w-auto">
+            <button type="submit" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-xl border border-slate-700 transition">
+                فیلتر
+            </button>
+            <?php if (!empty($_GET['q'])): ?>
+                <a href="<?= Helpers::url('settings/bot-users') ?>" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-rose-400 font-semibold rounded-xl border border-slate-700 transition">
+                    پاکسازی جستجو
+                </a>
+            <?php endif; ?>
+        </div>
+    </form>
+</div>
+
 <!-- Users Table -->
 <div class="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
     <?php if (empty($users)): ?>

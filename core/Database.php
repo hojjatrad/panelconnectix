@@ -330,6 +330,31 @@ class Database {
                     INDEX `idx_tm_ticket` (`ticket_id`)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
 
+                // Seed Default Apps for MySQL if empty
+                $appCount = (int)$pdo->query("SELECT COUNT(*) FROM `app_guides`")->fetchColumn();
+                if ($appCount === 0) {
+                    $defaultApps = [
+                        ['android', 'v2rayNG (پیشنهادی اندروید)', 'https://github.com/2dust/v2rayNG/releases', 'https://t.me/connectix/79', 'پایدارترین کلاینت اندروید با قابلیت اتصال خودکار و پشتیبانی از همه پروتکل‌ها', 1],
+                        ['android', 'NapsternetV (کلاینت دوم اندروید)', 'https://play.google.com/store/apps/details?id=com.napsternetlabs.napsternetv', '', 'نرم‌افزار کمکی برای اینترنت‌های با اختلال بالا', 2],
+                        ['ios', 'Streisand (پیشنهادی آیفون و آیپد)', 'https://apps.apple.com/app/streisand/id6450534064', '', 'رایگان، بسیار سریع و سازگار با اینترنت‌های همراه اول و ایرانسل', 1],
+                        ['ios', 'V2Box (کلاینت جایگزین iOS)', 'https://apps.apple.com/app/v2box-v2ray-client/id6446814042', '', 'پشتیبانی کامل از ساب‌لینک هوشمند و پینگ تست آنی', 2],
+                        ['windows', 'NekoRay (پیشنهادی ویندوز)', 'https://github.com/MatsuriDayo/nekoray/releases', '', 'دارای حالت System Proxy و VPN Mode برای کل ترافیک ویندوز', 1],
+                        ['windows', 'v2rayN (کلاینت کلاسیک ویندوز)', 'https://github.com/2dust/v2rayN/releases', '', 'پشتیبانی از Reality و Xray Core', 2],
+                        ['macos', 'FoXray (مک‌بوک)', 'https://apps.apple.com/app/foxray/id6448898396', '', 'کلاینت رسمی و بسیار سبک سیستم‌عامل macOS', 1]
+                    ];
+                    $stmtApp = $pdo->prepare("INSERT INTO `app_guides` (`platform`, `app_name`, `download_url`, `guide_url`, `description`, `sort_order`) VALUES (?, ?, ?, ?, ?, ?)");
+                    foreach ($defaultApps as $da) {
+                        $stmtApp->execute($da);
+                    }
+                }
+
+                // Seed Default Coupons for MySQL if empty
+                $couponCount = (int)$pdo->query("SELECT COUNT(*) FROM `coupons`")->fetchColumn();
+                if ($couponCount === 0) {
+                    $pdo->exec("INSERT INTO `coupons` (`code`, `discount_percent`, `max_uses`, `used_count`, `is_active`) VALUES ('WELCOME10', 10, 100, 0, 1)");
+                    $pdo->exec("INSERT INTO `coupons` (`code`, `discount_percent`, `max_uses`, `used_count`, `is_active`) VALUES ('VIP20', 20, 50, 0, 1)");
+                }
+
             } else {
                 // SQLite
                 $cols = [

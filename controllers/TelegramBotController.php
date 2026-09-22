@@ -2347,7 +2347,37 @@ class TelegramBotController {
         $pdo = Database::getConnection();
         Database::ensureExtendedTablesExist($pdo);
 
-        $users = $pdo->query("SELECT * FROM bot_users ORDER BY last_active_at DESC LIMIT 500")->fetchAll();
+        // Auto-sync any Telegram users who placed orders into bot_users table
+        try {
+            $isMysql = ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql');
+            if ($isMysql) {
+                $pdo->exec("INSERT INTO bot_users (reseller_id, tg_id, first_name, username, created_at, last_active_at)
+                            SELECT reseller_id, user_tg_id, MAX(user_tg_name), MAX(user_tg_username), MIN(created_at), MAX(created_at)
+                            FROM bot_orders
+                            WHERE user_tg_id IS NOT NULL AND user_tg_id != ''
+                            GROUP BY user_tg_id
+                            ON DUPLICATE KEY UPDATE last_active_at = VALUES(last_active_at)");
+            } else {
+                $pdo->exec("INSERT OR IGNORE INTO bot_users (reseller_id, tg_id, first_name, username, created_at, last_active_at)
+                            SELECT reseller_id, user_tg_id, MAX(user_tg_name), MAX(user_tg_username), MIN(created_at), MAX(created_at)
+                            FROM bot_orders
+                            WHERE user_tg_id IS NOT NULL AND user_tg_id != ''
+                            GROUP BY user_tg_id");
+            }
+        } catch (Throwable $e) {}
+
+        $search = trim($_GET['q'] ?? '');
+        $where = "1=1";
+        $params = [];
+        if (!empty($search)) {
+            $where .= " AND (tg_id LIKE ? OR first_name LIKE ? OR username LIKE ?)";
+            $params = ["%{$search}%", "%{$search}%", "%{$search}%"];
+        }
+
+        $stmtUsers = $pdo->prepare("SELECT * FROM bot_users WHERE {$where} ORDER BY last_active_at DESC LIMIT 500");
+        $stmtUsers->execute($params);
+        $users = $stmtUsers->fetchAll();
+
         $totalCount = (int)$pdo->query("SELECT COUNT(*) FROM bot_users")->fetchColumn();
         $isMysql = ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql');
         $activeSql = $isMysql 

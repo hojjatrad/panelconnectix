@@ -49,6 +49,8 @@ require_once __DIR__ . '/controllers/ResellerPortalController.php';
 require_once __DIR__ . '/controllers/LogController.php';
 require_once __DIR__ . '/controllers/UpdateController.php';
 require_once __DIR__ . '/controllers/TicketController.php';
+require_once __DIR__ . '/controllers/AppGuideController.php';
+require_once __DIR__ . '/controllers/CouponController.php';
 require_once __DIR__ . '/core/Updater.php';
 
 $router = new Router();
