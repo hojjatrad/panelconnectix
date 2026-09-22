@@ -160,6 +160,27 @@ class ResellerController {
         Helpers::redirect('resellers');
     }
 
+    public function updateDiscount(): void {
+        Auth::requireAdmin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
+            Helpers::redirect('resellers');
+        }
+
+        $userId = (int)($_POST['user_id'] ?? 0);
+        $discount = (int)($_POST['discount_percent'] ?? 0);
+        if ($discount < 0) $discount = 0;
+        if ($discount > 100) $discount = 100;
+
+        $pdo = Database::getConnection();
+        $stmt = $pdo->prepare("UPDATE users SET discount_percent = ? WHERE id = ? AND role = 'reseller'");
+        $stmt->execute([$discount, $userId]);
+
+        Helpers::logActivity('reseller_discount', "تغییر درصد تخفیف نماینده {$userId} به {$discount}٪", 'reseller', (string)$userId);
+        Helpers::flash('success', "درصد تخفیف نماینده با موفقیت به {$discount}٪ تغییر یافت.");
+        Helpers::redirect('resellers');
+    }
+
     public function clients(): void {
         Auth::requireAdmin();
         $pdo = Database::getConnection();

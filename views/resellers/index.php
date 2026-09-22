@@ -84,7 +84,12 @@ $pendingCount = $pendingAppsCount ?? 0;
                                 </span>
                             <?php endif; ?>
                         </td>
-                        <td class="p-3.5 font-bold text-purple-400"><?= $r['discount_percent'] ?>%</td>
+                        <td class="p-3.5">
+                            <button onclick="openDiscountModal(<?= $r['id'] ?>, '<?= htmlspecialchars($r['username']) ?>', <?= (int)$r['discount_percent'] ?>)" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30 transition text-xs group" title="کلیک برای ویرایش درصد تخفیف">
+                                <span><?= $r['discount_percent'] ?>%</span>
+                                <i class="fa-solid fa-pen text-[9px] text-purple-400 group-hover:scale-125 transition-transform"></i>
+                            </button>
+                        </td>
                         <td class="p-3.5">
                             <a href="<?= Helpers::url('resellers/clients?id=' . $r['id']) ?>" class="text-cyan-400 hover:underline font-medium flex items-center gap-1">
                                 <span><?= number_format($r['client_count']) ?> کلاینت</span>
@@ -100,6 +105,9 @@ $pendingCount = $pendingAppsCount ?? 0;
                             <div class="flex items-center justify-center gap-1.5 flex-wrap">
                                 <button onclick="openAdjustModal(<?= $r['id'] ?>, '<?= htmlspecialchars($r['username']) ?>')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-emerald-300 rounded-lg text-xs font-medium border border-slate-700 transition" title="شارژ یا کسر موجودی">
                                     <i class="fa-solid fa-wallet"></i> شارژ
+                                </button>
+                                <button onclick="openDiscountModal(<?= $r['id'] ?>, '<?= htmlspecialchars($r['username']) ?>', <?= (int)$r['discount_percent'] ?>)" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-amber-300 rounded-lg text-xs font-medium border border-slate-700 transition" title="ویرایش درصد تخفیف">
+                                    <i class="fa-solid fa-percent"></i> تخفیف
                                 </button>
                                 <button onclick="openCreditLimitModal(<?= $r['id'] ?>, '<?= htmlspecialchars($r['username']) ?>', <?= $limit ?>)" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-purple-300 rounded-lg text-xs font-medium border border-slate-700 transition" title="سقف بدهی و اعتبار">
                                     <i class="fa-solid fa-scale-balanced"></i> سقف اعتبار
@@ -173,6 +181,53 @@ $pendingCount = $pendingAppsCount ?? 0;
 
             <button type="submit" class="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl shadow-md">
                 ذخیره سقف اعتبار
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Edit Reseller Discount (%) -->
+<div id="discountModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+    <div class="bg-slate-900 border border-amber-500/40 rounded-2xl max-w-sm w-full p-6 shadow-2xl relative text-xs">
+        <button onclick="closeDiscountModal()" class="absolute top-4 left-4 text-slate-400 hover:text-white">
+            <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+
+        <h3 class="text-base font-bold text-white mb-2 flex items-center gap-1.5">
+            <i class="fa-solid fa-percent text-amber-400"></i>
+            <span>ویرایش درصد تخفیف نماینده</span>
+        </h3>
+        <p class="text-slate-400 mb-4">نماینده: <span id="discountUsername" class="font-bold text-amber-400 font-mono"></span></p>
+
+        <form action="<?= Helpers::url('resellers/update-discount') ?>" method="POST" class="space-y-4">
+            <?= Helpers::csrfField() ?>
+            <input type="hidden" name="user_id" id="discountUserId" value="">
+
+            <div>
+                <label class="block text-slate-300 mb-1 font-semibold">درصد تخفیف همکاری (۰ الی ۱۰۰٪):</label>
+                <div class="relative">
+                    <input type="number" name="discount_percent" id="discountPercentInput" min="0" max="100" required class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-center text-lg font-bold">
+                    <span class="absolute left-3 top-3 text-slate-400 font-bold">%</span>
+                </div>
+                <span class="text-[10px] text-slate-400 mt-1 block">این درصد به صورت خودکار هنگام صدور اشتراک توسط نماینده یا در خریدهای ربات تلگرام اختصاصی او از قیمت پایه کسر می‌گردد.</span>
+            </div>
+
+            <div>
+                <label class="block text-slate-400 mb-1.5 font-medium text-[11px]">انتخاب سریع تخفیف‌های متداول:</label>
+                <div class="grid grid-cols-4 gap-1.5">
+                    <button type="button" onclick="setQuickDiscount(0)" class="py-1 px-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-[10px] text-slate-300 border border-slate-700">۰٪ (عادی)</button>
+                    <button type="button" onclick="setQuickDiscount(10)" class="py-1 px-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-[10px] text-amber-300 border border-slate-700">۱۰٪</button>
+                    <button type="button" onclick="setQuickDiscount(15)" class="py-1 px-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-[10px] text-amber-300 border border-slate-700">۱۵٪</button>
+                    <button type="button" onclick="setQuickDiscount(20)" class="py-1 px-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-[10px] text-amber-300 border border-slate-700">۲۰٪</button>
+                    <button type="button" onclick="setQuickDiscount(25)" class="py-1 px-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-[10px] text-amber-300 border border-slate-700">۲۵٪</button>
+                    <button type="button" onclick="setQuickDiscount(30)" class="py-1 px-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-[10px] text-amber-300 border border-slate-700">۳۰٪</button>
+                    <button type="button" onclick="setQuickDiscount(40)" class="py-1 px-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-[10px] text-amber-300 border border-slate-700">۴۰٪</button>
+                    <button type="button" onclick="setQuickDiscount(50)" class="py-1 px-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-[10px] text-amber-300 border border-slate-700">۵۰٪</button>
+                </div>
+            </div>
+
+            <button type="submit" class="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl shadow-md">
+                ذخیره تغییرات درصد تخفیف
             </button>
         </form>
     </div>
@@ -252,6 +307,22 @@ function closeCreditLimitModal() {
     document.getElementById('creditLimitModal').classList.remove('flex');
     document.getElementById('creditLimitModal').classList.add('hidden');
 }
+
+function openDiscountModal(id, username, discount) {
+    document.getElementById('discountUserId').value = id;
+    document.getElementById('discountUsername').innerText = username;
+    document.getElementById('discountPercentInput').value = discount || 0;
+    document.getElementById('discountModal').classList.remove('hidden');
+    document.getElementById('discountModal').classList.add('flex');
+}
+function closeDiscountModal() {
+    document.getElementById('discountModal').classList.remove('flex');
+    document.getElementById('discountModal').classList.add('hidden');
+}
+function setQuickDiscount(percent) {
+    document.getElementById('discountPercentInput').value = percent;
+}
+
 function openNewResellerModal() {
     document.getElementById('newResellerModal').classList.remove('hidden');
     document.getElementById('newResellerModal').classList.add('flex');
