@@ -1,20 +1,32 @@
 <?php
 require __DIR__ . '/../layout/header.php';
+$pendingCount = $pendingAppsCount ?? 0;
 ?>
 
-<div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/80 border border-slate-800 p-5 rounded-2xl shadow-sm">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/80 border border-slate-800 p-5 rounded-2xl shadow-sm mb-6">
     <div>
         <h2 class="text-lg font-bold text-white flex items-center gap-2">
             <i class="fa-solid fa-handshake text-indigo-400"></i>
             <span>مدیریت شبکه نمایندگان فروش (Resellers)</span>
         </h2>
-        <p class="text-xs text-slate-400 mt-1">مدیریت اعتبار کیف پول، درصد تخفیف، تعداد مشتریان و مجوزهای دسترسی</p>
+        <p class="text-xs text-slate-400 mt-1">مدیریت اعتبار کیف پول، سقف بدهی، تخفیف همکاری، نظارت بر کلاینت‌ها و درخواست‌های نمایندگی</p>
     </div>
 
-    <button onclick="openNewResellerModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-md flex items-center gap-2">
-        <i class="fa-solid fa-user-plus"></i>
-        <span>ثبت نماینده جدید</span>
-    </button>
+    <div class="flex items-center gap-2">
+        <a href="<?= Helpers::url('resellers/applications') ?>" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center gap-2 relative">
+            <i class="fa-solid fa-user-clock text-amber-400"></i>
+            <span>درخواست‌های جدید نمایندگی</span>
+            <?php if ($pendingCount > 0): ?>
+                <span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-slate-950 font-mono animate-pulse">
+                    <?= $pendingCount ?>
+                </span>
+            <?php endif; ?>
+        </a>
+        <button onclick="openNewResellerModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-md flex items-center gap-2">
+            <i class="fa-solid fa-user-plus"></i>
+            <span>ثبت نماینده جدید</span>
+        </button>
+    </div>
 </div>
 
 <!-- Resellers Table -->
@@ -24,16 +36,22 @@ require __DIR__ . '/../layout/header.php';
             <thead class="bg-slate-800/60 text-slate-300 border-b border-slate-700/60">
                 <tr>
                     <th class="p-3.5 font-semibold">شناسه / نام کاربری</th>
-                    <th class="p-3.5 font-semibold">برند نماینده</th>
+                    <th class="p-3.5 font-semibold">برند و ربات نماینده</th>
                     <th class="p-3.5 font-semibold">موجودی کیف پول</th>
-                    <th class="p-3.5 font-semibold">درصد تخفیف</th>
-                    <th class="p-3.5 font-semibold">تعداد مشتریان</th>
+                    <th class="p-3.5 font-semibold">سقف بدهی مجاز</th>
+                    <th class="p-3.5 font-semibold">وضعیت تراز</th>
+                    <th class="p-3.5 font-semibold">تخفیف</th>
+                    <th class="p-3.5 font-semibold">مشتریان</th>
                     <th class="p-3.5 font-semibold">وضعیت</th>
                     <th class="p-3.5 font-semibold text-center">عملیات</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-800/70">
-                <?php foreach ($resellers as $r): ?>
+                <?php foreach ($resellers as $r): 
+                    $balance = (int)$r['wallet_balance'];
+                    $limit = (int)($r['credit_limit'] ?? 0);
+                    $isDebt = ($balance < 0);
+                ?>
                     <tr class="hover:bg-slate-800/30 transition-colors">
                         <td class="p-3.5">
                             <span class="font-bold text-white font-mono"><?= htmlspecialchars($r['username']) ?></span>
@@ -42,25 +60,54 @@ require __DIR__ . '/../layout/header.php';
                         <td class="p-3.5">
                             <span class="font-medium text-slate-200 block"><?= htmlspecialchars($r['brand_name']) ?></span>
                             <?php if (!empty($r['telegram_bot_username'])): ?>
-                                <span class="text-[10px] text-cyan-400 font-mono flex items-center gap-1 mt-0.5">
+                                <a href="https://t.me/<?= htmlspecialchars($r['telegram_bot_username']) ?>" target="_blank" class="text-[10px] text-cyan-400 font-mono flex items-center gap-1 mt-0.5 hover:underline">
                                     <i class="fa-brands fa-telegram"></i> @<?= htmlspecialchars($r['telegram_bot_username']) ?>
-                                </span>
+                                </a>
                             <?php else: ?>
                                 <span class="text-[10px] text-slate-500">ربات متصل نیست</span>
                             <?php endif; ?>
                         </td>
-                        <td class="p-3.5 font-bold text-emerald-400 font-mono"><?= Helpers::formatMoney($r['wallet_balance']) ?></td>
+                        <td class="p-3.5 font-bold <?= $isDebt ? 'text-rose-400' : 'text-emerald-400' ?> font-mono">
+                            <?= Helpers::formatMoney($balance) ?>
+                        </td>
+                        <td class="p-3.5 font-mono text-purple-300">
+                            <?= $limit > 0 ? Helpers::formatMoney($limit) : '<span class="text-slate-500">فقط نقدی</span>' ?>
+                        </td>
+                        <td class="p-3.5">
+                            <?php if ($isDebt): ?>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                                    بدهکار (<?= Helpers::formatMoney(abs($balance)) ?>)
+                                </span>
+                            <?php else: ?>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                    تراز مثبت ✓
+                                </span>
+                            <?php endif; ?>
+                        </td>
                         <td class="p-3.5 font-bold text-purple-400"><?= $r['discount_percent'] ?>%</td>
-                        <td class="p-3.5 text-slate-300"><?= number_format($r['client_count']) ?> کلاینت</td>
+                        <td class="p-3.5">
+                            <a href="<?= Helpers::url('resellers/clients?id=' . $r['id']) ?>" class="text-cyan-400 hover:underline font-medium flex items-center gap-1">
+                                <span><?= number_format($r['client_count']) ?> کلاینت</span>
+                                <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                            </a>
+                        </td>
                         <td class="p-3.5">
                             <span class="px-2 py-0.5 rounded text-[10px] font-semibold <?= $r['status'] === 'active' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400' ?>">
                                 <?= $r['status'] === 'active' ? 'فعال' : 'مسدود' ?>
                             </span>
                         </td>
                         <td class="p-3.5 text-center">
-                            <button onclick="openAdjustModal(<?= $r['id'] ?>, '<?= htmlspecialchars($r['username']) ?>')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-300 rounded-lg text-xs font-medium border border-slate-700 transition-colors">
-                                شارژ / کسر اعتبار
-                            </button>
+                            <div class="flex items-center justify-center gap-1.5 flex-wrap">
+                                <button onclick="openAdjustModal(<?= $r['id'] ?>, '<?= htmlspecialchars($r['username']) ?>')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-emerald-300 rounded-lg text-xs font-medium border border-slate-700 transition" title="شارژ یا کسر موجودی">
+                                    <i class="fa-solid fa-wallet"></i> شارژ
+                                </button>
+                                <button onclick="openCreditLimitModal(<?= $r['id'] ?>, '<?= htmlspecialchars($r['username']) ?>', <?= $limit ?>)" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-purple-300 rounded-lg text-xs font-medium border border-slate-700 transition" title="سقف بدهی و اعتبار">
+                                    <i class="fa-solid fa-scale-balanced"></i> سقف اعتبار
+                                </button>
+                                <button onclick="copyResellerDetails('<?= htmlspecialchars($r['username']) ?>', '<?= htmlspecialchars($r['brand_name']) ?>')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded-lg text-xs font-medium border border-slate-700 transition" title="کپی پیام آماده حاوی آدرس پنل و مشخصات برای ارسال به نماینده">
+                                    <i class="fa-solid fa-share-nodes"></i> کپی مشخصات
+                                </button>
+                            </div>
                         </td>
                     </tr>
                 <?php endforeach; ?>
@@ -96,6 +143,36 @@ require __DIR__ . '/../layout/header.php';
 
             <button type="submit" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md">
                 اعمال در کیف پول
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Set Credit Limit (سقف اعتبار بدهی) -->
+<div id="creditLimitModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+    <div class="bg-slate-900 border border-purple-500/40 rounded-2xl max-w-sm w-full p-6 shadow-2xl relative text-xs">
+        <button onclick="closeCreditLimitModal()" class="absolute top-4 left-4 text-slate-400 hover:text-white">
+            <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+
+        <h3 class="text-base font-bold text-white mb-2 flex items-center gap-1.5">
+            <i class="fa-solid fa-scale-balanced text-purple-400"></i>
+            <span>تنظیم سقف اعتبار بدهی (Debt Limit)</span>
+        </h3>
+        <p class="text-slate-400 mb-4">نماینده: <span id="creditLimitUsername" class="font-bold text-purple-400 font-mono"></span></p>
+
+        <form action="<?= Helpers::url('resellers/set-credit-limit') ?>" method="POST" class="space-y-4">
+            <?= Helpers::csrfField() ?>
+            <input type="hidden" name="user_id" id="creditLimitUserId" value="">
+
+            <div>
+                <label class="block text-slate-300 mb-1 font-semibold">حداکثر سقف بدهی مجاز (تومان):</label>
+                <input type="number" name="credit_limit" id="creditLimitInput" min="0" step="100000" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
+                <span class="text-[10px] text-slate-400 mt-1 block">مقدار ۰ یعنی فقط در صورت داشتن شارژ نقدی مجاز به ایجاد اکانت است. مقادیر بالاتر به نماینده اجازه می‌دهد تا آن سقف بدهکار شود.</span>
+            </div>
+
+            <button type="submit" class="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl shadow-md">
+                ذخیره سقف اعتبار
             </button>
         </form>
     </div>
@@ -142,7 +219,7 @@ require __DIR__ . '/../layout/header.php';
                 </div>
                 <div>
                     <label class="block text-slate-300 mb-1 font-semibold">درصد تخفیف همکاری (%)</label>
-                    <input type="number" name="discount_percent" value="10" min="0" max="100" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
+                    <input type="number" name="discount_percent" value="15" min="0" max="100" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
                 </div>
             </div>
 
@@ -154,24 +231,48 @@ require __DIR__ . '/../layout/header.php';
 </div>
 
 <script>
-    function openAdjustModal(id, username) {
-        document.getElementById('adjustUserId').value = id;
-        document.getElementById('adjustUsername').innerText = username;
-        document.getElementById('adjustModal').classList.remove('hidden');
-        document.getElementById('adjustModal').classList.add('flex');
-    }
-    function closeAdjustModal() {
-        document.getElementById('adjustModal').classList.remove('flex');
-        document.getElementById('adjustModal').classList.add('hidden');
-    }
-    function openNewResellerModal() {
-        document.getElementById('newResellerModal').classList.remove('hidden');
-        document.getElementById('newResellerModal').classList.add('flex');
-    }
-    function closeNewResellerModal() {
-        document.getElementById('newResellerModal').classList.remove('flex');
-        document.getElementById('newResellerModal').classList.add('hidden');
-    }
+function openAdjustModal(id, username) {
+    document.getElementById('adjustUserId').value = id;
+    document.getElementById('adjustUsername').innerText = username;
+    document.getElementById('adjustModal').classList.remove('hidden');
+    document.getElementById('adjustModal').classList.add('flex');
+}
+function closeAdjustModal() {
+    document.getElementById('adjustModal').classList.remove('flex');
+    document.getElementById('adjustModal').classList.add('hidden');
+}
+function openCreditLimitModal(id, username, limit) {
+    document.getElementById('creditLimitUserId').value = id;
+    document.getElementById('creditLimitUsername').innerText = username;
+    document.getElementById('creditLimitInput').value = limit || 0;
+    document.getElementById('creditLimitModal').classList.remove('hidden');
+    document.getElementById('creditLimitModal').classList.add('flex');
+}
+function closeCreditLimitModal() {
+    document.getElementById('creditLimitModal').classList.remove('flex');
+    document.getElementById('creditLimitModal').classList.add('hidden');
+}
+function openNewResellerModal() {
+    document.getElementById('newResellerModal').classList.remove('hidden');
+    document.getElementById('newResellerModal').classList.add('flex');
+}
+function closeNewResellerModal() {
+    document.getElementById('newResellerModal').classList.remove('flex');
+    document.getElementById('newResellerModal').classList.add('hidden');
+}
+
+function copyResellerDetails(username, brandName) {
+    const loginUrl = '<?= Helpers::fullUrl('login') ?>';
+    const text = `🌟 اطلاعات پنل نمایندگی شما (${brandName}):\n\n` +
+                 `🌐 آدرس ورود به پنل:\n${loginUrl}\n\n` +
+                 `👤 نام کاربری:\n${username}\n\n` +
+                 `💡 برای اتصال ربات تلگرام اختصاصی و اطلاعات حساب، پس از ورود به بخش «ربات تلگرام و فروش» مراجعه فرمایید.`;
+    navigator.clipboard.writeText(text).then(() => {
+        alert('✅ پیام آماده با مشخصات کامل پنل کپی شد! می‌توانید آن را مستقیماً در تلگرام یا واتساپ برای نماینده ارسال نمایید.');
+    }).catch(err => {
+        alert('خطا در کپی: ' + err);
+    });
+}
 </script>
 
 <?php

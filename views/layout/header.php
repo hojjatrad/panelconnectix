@@ -107,14 +107,33 @@ $t = $themeClasses[$theme] ?? $themeClasses['violet'];
                 <span>سرورها و نودها</span>
             </a>
 
-            <a href="<?= Helpers::url('resellers') ?>" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors hover:bg-slate-800 hover:text-white <?= str_contains($_SERVER['REQUEST_URI'] ?? '', 'resellers') ? 'bg-slate-800/90 text-white font-semibold shadow-sm' : 'text-slate-400' ?>">
-                <i class="fa-solid fa-handshake w-5 text-center text-indigo-400"></i>
-                <span>مدیریت نمایندگان</span>
+            <?php
+            $headerPendingApps = 0;
+            try {
+                $dbInst = Database::getConnection();
+                $headerPendingApps = (int)$dbInst->query("SELECT COUNT(*) FROM reseller_applications WHERE status = 'pending'")->fetchColumn();
+            } catch (Throwable $e) {}
+            ?>
+            <a href="<?= Helpers::url('resellers') ?>" class="flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors hover:bg-slate-800 hover:text-white <?= (str_contains($_SERVER['REQUEST_URI'] ?? '', 'resellers') && !str_contains($_SERVER['REQUEST_URI'] ?? '', 'reseller/')) ? 'bg-slate-800/90 text-white font-semibold shadow-sm' : 'text-slate-400' ?>">
+                <span class="flex items-center gap-3">
+                    <i class="fa-solid fa-handshake w-5 text-center text-indigo-400"></i>
+                    <span>مدیریت نمایندگان</span>
+                </span>
+                <?php if ($headerPendingApps > 0): ?>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-slate-950 font-mono">
+                        <?= $headerPendingApps ?>
+                    </span>
+                <?php endif; ?>
             </a>
 
-            <a href="<?= Helpers::url('settings/bot') ?>" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors hover:bg-slate-800 hover:text-white <?= str_contains($_SERVER['REQUEST_URI'] ?? '', 'settings/bot') ? 'bg-slate-800/90 text-white font-semibold shadow-sm' : 'text-slate-400' ?>">
+            <a href="<?= Helpers::url('settings/bot') ?>" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors hover:bg-slate-800 hover:text-white <?= (str_contains($_SERVER['REQUEST_URI'] ?? '', 'settings/bot') && !str_contains($_SERVER['REQUEST_URI'] ?? '', 'bot-users')) ? 'bg-slate-800/90 text-white font-semibold shadow-sm' : 'text-slate-400' ?>">
                 <i class="fa-brands fa-telegram w-5 text-center text-cyan-400"></i>
                 <span>ربات تلگرام و فروش</span>
+            </a>
+
+            <a href="<?= Helpers::url('settings/bot-users') ?>" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors hover:bg-slate-800 hover:text-white <?= str_contains($_SERVER['REQUEST_URI'] ?? '', 'bot-users') ? 'bg-slate-800/90 text-white font-semibold shadow-sm' : 'text-slate-400' ?>">
+                <i class="fa-solid fa-users text-center w-5 text-cyan-300"></i>
+                <span>کاربران ربات (Audience)</span>
             </a>
 
             <a href="<?= Helpers::url('updater') ?>" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors hover:bg-slate-800 hover:text-white <?= str_contains($_SERVER['REQUEST_URI'] ?? '', 'updater') ? 'bg-slate-800/90 text-white font-semibold shadow-sm' : 'text-slate-400' ?>">

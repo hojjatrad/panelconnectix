@@ -153,6 +153,10 @@ class TelegramBotController {
             ['text' => '☎️ پشتیبانی تلگرام', 'callback_data' => 'menu_support']
         ];
 
+        $buttons[] = [
+            ['text' => '🤝 درخواست پنل نمایندگی فروش', 'callback_data' => 'menu_reseller_apply']
+        ];
+
         return ['inline_keyboard' => $buttons];
     }
 
@@ -172,12 +176,45 @@ class TelegramBotController {
                 ],
                 [
                     ['text' => '📱 دانلود نرم‌افزارها'],
+                    ['text' => '🤝 درخواست نمایندگی'],
                     ['text' => '☎️ پشتیبانی تلگرام']
                 ]
             ],
             'resize_keyboard' => true,
             'is_persistent' => true
         ];
+    }
+
+    public static function recordBotUser(PDO $pdo, array $from, int $resellerId = 1): void {
+        $tgId = (string)($from['id'] ?? '');
+        if (empty($tgId)) return;
+
+        $firstName = $from['first_name'] ?? '';
+        $lastName = $from['last_name'] ?? '';
+        $username = $from['username'] ?? '';
+
+        try {
+            $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+            if ($driver === 'mysql') {
+                $sql = "INSERT INTO bot_users (reseller_id, tg_id, first_name, last_name, username, last_active_at) 
+                        VALUES (?, ?, ?, ?, ?, NOW()) 
+                        ON DUPLICATE KEY UPDATE 
+                        first_name = VALUES(first_name), 
+                        last_name = VALUES(last_name), 
+                        username = VALUES(username), 
+                        last_active_at = NOW()";
+            } else {
+                $sql = "INSERT INTO bot_users (reseller_id, tg_id, first_name, last_name, username, last_active_at) 
+                        VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP) 
+                        ON CONFLICT(tg_id) DO UPDATE SET 
+                        first_name = excluded.first_name, 
+                        last_name = excluded.last_name, 
+                        username = excluded.username, 
+                        last_active_at = CURRENT_TIMESTAMP";
+            }
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([$resellerId, $tgId, $firstName, $lastName, $username]);
+        } catch (Throwable $e) {}
     }
 
     /**
@@ -394,6 +431,26 @@ class TelegramBotController {
             self::showSupportInfo($chatId, $messageId);
             return;
         }
+
+        // Reseller Application Start
+        if ($data === 'menu_reseller_apply') {
+            self::startResellerApplication($pdo, $chatId, $fromId, $messageId);
+            return;
+        }
+
+        // Admin Actions: Inline Approve Reseller
+        if (str_starts_with($data, 'approve_reseller_')) {
+            $appId = (int)str_replace('approve_reseller_', '', $data);
+            self::approveResellerApplication($pdo, $appId, $chatId, $messageId);
+            return;
+        }
+
+        // Admin Actions: Inline Reject Reseller
+        if (str_starts_with($data, 'reject_reseller_')) {
+            $appId = (int)str_replace('reject_reseller_', '', $data);
+            self::rejectResellerApplication($pdo, $appId, $chatId, $messageId);
+            return;
+        }
     }
 
     /**
@@ -470,6 +527,9 @@ class TelegramBotController {
         $text = trim($msg['text'] ?? '');
         $session = self::getSession($pdo, $fromId);
 
+        // Record User in Database
+        self::recordBotUser($pdo, $msg['from'] ?? [], (int)(self::getContext($pdo)['reseller_id'] ?? 1));
+
         // Method 2: One-Click DeepLink Binding: /start bind_XXXX
         if (preg_match('/^\/start\s+bind_([a-zA-Z0-9_\-]+)/', $text, $matches)) {
             $bindToken = trim($matches[1]);
@@ -510,6 +570,16 @@ class TelegramBotController {
         }
         if ($text === '☎️ پشتیبانی تلگرام') {
             self::showSupportInfo($chatId);
+            return;
+        }
+        if ($text === '🤝 درخواست نمایندگی' || $text === '🤝 درخواست پنل نمایندگی' || $text === '/reseller') {
+            self::startResellerApplication($pdo, $chatId, $fromId);
+            return;
+        }
+
+        // Reseller Application Steps
+        if ($session && str_starts_with($session['step'], 'reseller_apply_')) {
+            self::handleResellerApplicationStep($pdo, $chatId, $fromId, $text, $session, $msg['from'] ?? []);
             return;
         }
 
@@ -1437,5 +1507,322 @@ class TelegramBotController {
         self::rejectOrderAction($pdo, $orderId);
         Helpers::flash('info', "سفارش #{$orderId} رد شد و به مشتری اطلاع داده شد.");
         Helpers::redirect('settings/bot');
+    }
+
+    public static function startResellerApplication(PDO $pdo, string $chatId, string $fromId, ?int $messageId = null): void {
+        self::setSession($pdo, $fromId, 'reseller_apply_brand', []);
+
+        $msg = "🤝 <b>درخواست دریافت پنل نمایندگی فروش</b>\n\n"
+             . "به جمع همکاران ما خوش آمدید! با دریافت پنل اختصاصی شما قادر خواهید بود:\n"
+             . "• ایجاد اشتراک با برند، نام و لوگوی شخصی خودتان\n"
+             . "• اتصال ربات تلگرام اختصاصی با توکن دلخواه خودتان\n"
+             . "• دریافت تخفیف عمده‌فروشی روی تمامی پلن‌ها\n"
+             . "• دریافت وجه مستقیم از مشتریان به شماره کارت شخصی خودتان\n\n"
+             . "━━━━━━━━━━━━━━━━━━\n"
+             . "📝 <b>مرحله ۱ از ۴:</b>\n"
+             . "لطفاً <b>نام کامل یا نام برند تجاری</b> خود را ارسال فرمایید:\n"
+             . "<i>(مثال: نوین نت یا علیرضا حسینی)</i>";
+
+        $keyboard = [
+            'inline_keyboard' => [
+                [['text' => '❌ انصراف و بازگشت به منو', 'callback_data' => 'menu_main']]
+            ]
+        ];
+
+        $botToken = self::getContext($pdo)['bot_token'];
+        if ($messageId) {
+            TelegramBot::editMessageText($msg, $chatId, $messageId, $keyboard, $botToken);
+        } else {
+            TelegramBot::sendMessage($msg, $chatId, $keyboard, $botToken);
+        }
+    }
+
+    private static function handleResellerApplicationStep(PDO $pdo, string $chatId, string $fromId, string $text, array $session, array $fromUser): void {
+        $step = $session['step'];
+        $data = $session['data'] ?? [];
+        $botToken = self::getContext($pdo)['bot_token'];
+
+        if ($text === '❌ انصراف' || $text === '/cancel') {
+            self::clearSession($pdo, $fromId);
+            TelegramBot::sendMessage("❌ فرآیند درخواست نمایندگی لغو گردید.", $chatId, self::getMainMenuInlineKeyboard($pdo, $fromId), $botToken);
+            return;
+        }
+
+        if ($step === 'reseller_apply_brand') {
+            if (mb_strlen($text) < 2) {
+                TelegramBot::sendMessage("⚠️ لطفاً نام یا برند معتبری وارد فرمایید (حداقل ۲ حرف):", $chatId, null, $botToken);
+                return;
+            }
+            $data['brand_name'] = $text;
+            self::setSession($pdo, $fromId, 'reseller_apply_contact', $data);
+
+            $msg = "📱 <b>مرحله ۲ از ۴:</b>\n\n"
+                 . "لطفاً <b>شماره تماس همراه</b> یا <b>آیدی پشتیبانی تلگرام</b> خود را جهت هماهنگی ارسال نمایید:\n"
+                 . "<i>(مثال: 09121234567 یا @MySupport)</i>";
+            TelegramBot::sendMessage($msg, $chatId, null, $botToken);
+            return;
+        }
+
+        if ($step === 'reseller_apply_contact') {
+            if (mb_strlen($text) < 4) {
+                TelegramBot::sendMessage("⚠️ لطفاً اطلاعات تماس معتبری وارد نمایید:", $chatId, null, $botToken);
+                return;
+            }
+            $data['contact_info'] = $text;
+            self::setSession($pdo, $fromId, 'reseller_apply_username', $data);
+
+            $msg = "👤 <b>مرحله ۳ از ۴:</b>\n\n"
+                 . "لطفاً <b>نام کاربری انگلیسی دلخواه</b> جهت ورود به پنل نمایندگی را وارد نمایید:\n"
+                 . "<i>(فقط حروف و اعداد انگلیسی، بدون فاصله، مثلاً: novin_net)</i>";
+            TelegramBot::sendMessage($msg, $chatId, null, $botToken);
+            return;
+        }
+
+        if ($step === 'reseller_apply_username') {
+            $pref = strtolower(trim(preg_replace('/[^a-zA-Z0-9_]/', '', $text)));
+            if (strlen($pref) < 3) {
+                TelegramBot::sendMessage("⚠️ نام کاربری باید حداقل ۳ کاراکتر انگلیسی باشد. لطفاً مجدداً ارسال نمایید:", $chatId, null, $botToken);
+                return;
+            }
+
+            $chk = $pdo->prepare("SELECT id FROM users WHERE username = ?");
+            $chk->execute([$pref]);
+            if ($chk->fetch()) {
+                TelegramBot::sendMessage("⚠️ این نام کاربری (<code>{$pref}</code>) قبلاً در سیستم ثبت شده است. لطفاً نام دیگری انتخاب فرمایید:", $chatId, null, $botToken);
+                return;
+            }
+
+            $data['preferred_username'] = $pref;
+            self::setSession($pdo, $fromId, 'reseller_apply_sales', $data);
+
+            $msg = "📊 <b>مرحله ۴ از ۴ (پایانی):</b>\n\n"
+                 . "لطفاً <b>تعداد فروش تقریبی کلاینت در ماه</b> یا سابقه فعالیت خود را به صورت کوتاه بیان فرمایید:\n"
+                 . "<i>(مثال: پیش‌بینی فروش ۵۰ الی ۱۰۰ اشتراک در ماه)</i>";
+            TelegramBot::sendMessage($msg, $chatId, null, $botToken);
+            return;
+        }
+
+        if ($step === 'reseller_apply_sales') {
+            $data['estimated_sales'] = $text;
+            self::clearSession($pdo, $fromId);
+
+            $userTgName = trim(($fromUser['first_name'] ?? '') . ' ' . ($fromUser['last_name'] ?? ''));
+            $userTgUsername = $fromUser['username'] ?? '';
+
+            // Save in database
+            $stmt = $pdo->prepare("INSERT INTO reseller_applications 
+                (user_tg_id, user_tg_name, user_tg_username, brand_name, contact_info, preferred_username, estimated_sales, status) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')");
+            $stmt->execute([
+                $fromId,
+                $userTgName,
+                $userTgUsername,
+                $data['brand_name'] ?? 'بی‌نام',
+                $data['contact_info'] ?? '-',
+                $data['preferred_username'] ?? ('reseller_' . rand(100, 999)),
+                $data['estimated_sales'] ?? '-'
+            ]);
+            $appId = (int)$pdo->lastInsertId();
+
+            // Confirmation to User
+            $doneMsg = "✅ <b>درخواست نمایندگی شما با موفقیت ثبت شد!</b>\n\n"
+                     . "🏷 <b>نام برند:</b> {$data['brand_name']}\n"
+                     . "👤 <b>نام کاربری انتخابی:</b> <code>{$data['preferred_username']}</code>\n"
+                     . "📞 <b>ارتباط:</b> {$data['contact_info']}\n"
+                     . "📊 <b>پیش‌بینی فروش:</b> {$data['estimated_sales']}\n\n"
+                     . "اطلاعات شما برای مدیریت سیستم ارسال گردید. به محض تایید، اطلاعات ورود به پنل از طریق همین ربات برای شما ارسال خواهد شد.\n\n"
+                     . "از همراهی شما سپاسگزاریم 🙏";
+            TelegramBot::sendMessage($doneMsg, $chatId, self::getMainMenuInlineKeyboard($pdo, $fromId), $botToken);
+
+            // Notification to Admin
+            $adminChatId = self::getContext($pdo)['admin_chat_id'];
+            if (!empty($adminChatId)) {
+                $adminMsg = "🔔 <b>درخواست جدید اخذ پنل نمایندگی</b>\n\n"
+                          . "🏷 <b>نام برند / متقاضی:</b> <b>{$data['brand_name']}</b>\n"
+                          . "👤 <b>کاربر تلگرام:</b> @" . ($userTgUsername ?: 'ندارد') . " ({$userTgName})\n"
+                          . "🆔 <b>آیدی عددی:</b> <code>{$fromId}</code>\n"
+                          . "📞 <b>اطلاعات تماس:</b> {$data['contact_info']}\n"
+                          . "🔑 <b>نام کاربری درخواستی:</b> <code>{$data['preferred_username']}</code>\n"
+                          . "📊 <b>پیش‌بینی فروش:</b> {$data['estimated_sales']}\n\n"
+                          . "جهت تعیین وضعیت این درخواست یکی از دکمه‌های زیر را لمس نمایید:";
+
+                $adminKb = [
+                    'inline_keyboard' => [
+                        [
+                            ['text' => '✅ تایید و صدور آنی پنل', 'callback_data' => 'approve_reseller_' . $appId],
+                            ['text' => '❌ رد درخواست', 'callback_data' => 'reject_reseller_' . $appId]
+                        ]
+                    ]
+                ];
+                TelegramBot::sendMessage($adminMsg, $adminChatId, $adminKb, $botToken);
+            }
+        }
+    }
+
+    public static function approveResellerApplication(PDO $pdo, int $appId, string $adminChatId, ?int $messageId = null): void {
+        $stmt = $pdo->prepare("SELECT * FROM reseller_applications WHERE id = ?");
+        $stmt->execute([$appId]);
+        $app = $stmt->fetch();
+
+        if (!$app) {
+            TelegramBot::sendMessage("⚠️ درخواست یافت نشد.", $adminChatId);
+            return;
+        }
+
+        if ($app['status'] === 'approved') {
+            TelegramBot::sendMessage("ℹ️ این درخواست قبلاً تایید شده است.", $adminChatId);
+            return;
+        }
+
+        // Generate temporary password
+        $tempPassword = 'res_' . substr(bin2hex(random_bytes(3)), 0, 6);
+        $passwordHash = password_hash($tempPassword, PASSWORD_BCRYPT);
+        $username = strtolower($app['preferred_username']);
+
+        $check = $pdo->prepare("SELECT id FROM users WHERE username = ?");
+        $check->execute([$username]);
+        if ($check->fetch()) {
+            $username .= '_' . rand(10, 99);
+        }
+
+        $apiToken = 'reseller_' . bin2hex(random_bytes(16));
+        $brandName = !empty($app['brand_name']) ? $app['brand_name'] : $username;
+
+        $stmtUser = $pdo->prepare("INSERT INTO users 
+            (username, password_hash, role, full_name, brand_name, wallet_balance, credit_limit, discount_percent, allowed_groups, api_token, support_username) 
+            VALUES (?, ?, 'reseller', ?, ?, 0, 0, 15, 'all', ?, ?)");
+        $stmtUser->execute([$username, $passwordHash, $brandName, $brandName, $apiToken, $app['contact_info']]);
+        $newUserId = (int)$pdo->lastInsertId();
+
+        $pdo->prepare("INSERT INTO branding_metadata (user_id, brand_name, theme_color) VALUES (?, ?, 'violet')")
+            ->execute([$newUserId, $brandName]);
+
+        $plans = $pdo->query("SELECT * FROM plans WHERE is_active = 1")->fetchAll();
+        foreach ($plans as $p) {
+            $pdo->prepare("INSERT OR IGNORE INTO reseller_plans (reseller_id, plan_id, custom_title, custom_category, retail_price) VALUES (?, ?, ?, 'پیش‌فرض', ?)")
+                ->execute([$newUserId, $p['id'], $p['title'], $p['base_price']]);
+        }
+
+        $pdo->prepare("UPDATE reseller_applications SET status = 'approved', approved_user_id = ? WHERE id = ?")
+            ->execute([$newUserId, $appId]);
+
+        // Notify User via Telegram
+        $loginUrl = Helpers::fullUrl('login');
+        $userMsg = "🎉 <b>تبریک! درخواست نمایندگی شما با موفقیت تایید شد.</b>\n\n"
+                 . "حساب نمایندگی اختصاصی شما با موفقیت صادر گردید:\n\n"
+                 . "🌐 <b>آدرس ورود به پنل:</b> {$loginUrl}\n"
+                 . "👤 <b>نام کاربری:</b> <code>{$username}</code>\n"
+                 . "🔑 <b>رمز عبور اولیه:</b> <code>{$tempPassword}</code>\n\n"
+                 . "💡 <b>اقدامات بعدی:</b>\n"
+                 . "۱. پس از اولین ورود، در صورت تمایل رمز خود را تغییر دهید.\n"
+                 . "۲. در منوی «ربات تلگرام و فروش»، توکن ربات اختصاصی خود را وارد و متصل نمایید.\n"
+                 . "۳. شماره کارت و قیمت‌های فروش خود را تنظیم کنید.";
+
+        $botToken = self::getContext($pdo)['bot_token'];
+        TelegramBot::sendMessage($userMsg, $app['user_tg_id'], null, $botToken);
+
+        $adminResult = "✅ <b>درخواست نمایندگی تایید و صادر شد!</b>\n\n"
+                     . "🏷 <b>برند:</b> {$brandName}\n"
+                     . "👤 <b>نام کاربری پنل:</b> <code>{$username}</code>\n"
+                     . "🔑 <b>رمز عبور:</b> <code>{$tempPassword}</code>\n"
+                     . "🆔 <b>تلگرام نماینده:</b> @" . ($app['user_tg_username'] ?: 'ندارد') . " (<code>{$app['user_tg_id']}</code>)\n"
+                     . "🌐 اطلاعات ورود برای متقاضی ارسال گردید.";
+
+        if ($messageId) {
+            TelegramBot::editMessageText($adminResult, $adminChatId, $messageId, null, $botToken);
+        } else {
+            TelegramBot::sendMessage($adminResult, $adminChatId, null, $botToken);
+        }
+    }
+
+    public static function rejectResellerApplication(PDO $pdo, int $appId, string $adminChatId, ?int $messageId = null): void {
+        $stmt = $pdo->prepare("SELECT * FROM reseller_applications WHERE id = ?");
+        $stmt->execute([$appId]);
+        $app = $stmt->fetch();
+
+        if (!$app) return;
+
+        $pdo->prepare("UPDATE reseller_applications SET status = 'rejected' WHERE id = ?")->execute([$appId]);
+
+        $botToken = self::getContext($pdo)['bot_token'];
+        TelegramBot::sendMessage("همکار گرامی، با بررسی مشخصات متأسفانه در حال حاضر امکان پذیرش درخواست نمایندگی جدید میسر نمی‌باشد. در صورت نیاز با پشتیبانی در ارتباط باشید.", $app['user_tg_id'], null, $botToken);
+
+        $adminResult = "❌ درخواست نمایندگی متقاضی @" . ($app['user_tg_username'] ?: $app['user_tg_id']) . " رد شد.";
+        if ($messageId) {
+            TelegramBot::editMessageText($adminResult, $adminChatId, $messageId, null, $botToken);
+        } else {
+            TelegramBot::sendMessage($adminResult, $adminChatId, null, $botToken);
+        }
+    }
+
+    public function botUsers(): void {
+        Auth::requireAdmin();
+        $pdo = Database::getConnection();
+        Database::ensureExtendedTablesExist($pdo);
+
+        $users = $pdo->query("SELECT * FROM bot_users ORDER BY last_active_at DESC LIMIT 500")->fetchAll();
+        $totalCount = (int)$pdo->query("SELECT COUNT(*) FROM bot_users")->fetchColumn();
+        $isMysql = ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql');
+        $activeSql = $isMysql 
+            ? "SELECT COUNT(*) FROM bot_users WHERE last_active_at >= NOW() - INTERVAL 1 DAY"
+            : "SELECT COUNT(*) FROM bot_users WHERE last_active_at >= datetime('now', '-1 day')";
+        $active24hCount = (int)$pdo->query($activeSql)->fetchColumn();
+        $hasUsernameCount = (int)$pdo->query("SELECT COUNT(*) FROM bot_users WHERE username IS NOT NULL AND username != ''")->fetchColumn();
+        $totalOrdersCount = (int)$pdo->query("SELECT COUNT(*) FROM bot_orders")->fetchColumn();
+
+        require __DIR__ . '/../views/settings/bot_users.php';
+    }
+
+    public function sendUserMessage(): void {
+        Auth::requireAdmin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
+            Helpers::redirect('settings/bot-users');
+        }
+
+        $userTgId = trim($_POST['user_tg_id'] ?? '');
+        $message = trim($_POST['message'] ?? '');
+
+        if (empty($userTgId) || empty($message)) {
+            Helpers::flash('error', 'شناسه کاربر و متن پیام الزامی است.');
+            Helpers::redirect('settings/bot-users');
+        }
+
+        $sent = TelegramBot::sendMessage($message, $userTgId);
+        if ($sent) {
+            Helpers::flash('success', "پیام با موفقیت به کاربر {$userTgId} ارسال شد.");
+        } else {
+            Helpers::flash('error', "ارسال پیام به کاربر تلگرام ناموفق بود.");
+        }
+
+        Helpers::redirect('settings/bot-users');
+    }
+
+    public function broadcast(): void {
+        Auth::requireAdmin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
+            Helpers::redirect('settings/bot-users');
+        }
+
+        $message = trim($_POST['message'] ?? '');
+        if (empty($message)) {
+            Helpers::flash('error', 'متن پیام همگانی الزامی است.');
+            Helpers::redirect('settings/bot-users');
+        }
+
+        $pdo = Database::getConnection();
+        $users = $pdo->query("SELECT tg_id FROM bot_users WHERE is_blocked = 0")->fetchAll();
+
+        $successCount = 0;
+        foreach ($users as $u) {
+            $sent = TelegramBot::sendMessage($message, (string)$u['tg_id']);
+            if ($sent) $successCount++;
+            usleep(50000); // 50ms pause to respect Telegram limits
+        }
+
+        Helpers::logActivity('bot_broadcast', "ارسال پیام همگانی به {$successCount} کاربر تلگرام", 'system');
+        Helpers::flash('success', "پیام همگانی با موفقیت برای {$successCount} نفر از اعضای ربات ارسال گردید.");
+        Helpers::redirect('settings/bot-users');
     }
 }

@@ -99,6 +99,11 @@ $router->post('servers/sync', [ServerController::class, 'syncNow']);
 $router->get('resellers', [ResellerController::class, 'index']);
 $router->post('resellers/store', [ResellerController::class, 'store']);
 $router->post('resellers/adjust', [ResellerController::class, 'adjustBalance']);
+$router->post('resellers/set-credit-limit', [ResellerController::class, 'setCreditLimit']);
+$router->get('resellers/clients', [ResellerController::class, 'clients']);
+$router->get('resellers/applications', [ResellerController::class, 'applications']);
+$router->post('resellers/applications/approve', [ResellerController::class, 'approveApplication']);
+$router->post('resellers/applications/reject', [ResellerController::class, 'rejectApplication']);
 
 // Reseller Dedicated Portal
 $router->get('reseller/bot', [ResellerPortalController::class, 'bot']);
@@ -131,6 +136,9 @@ $router->post('profile/regenerate-token', [ProfileController::class, 'regenerate
 
 // Telegram Bot Management & Webhook
 $router->get('settings/bot', [TelegramBotController::class, 'manage']);
+$router->get('settings/bot-users', [TelegramBotController::class, 'botUsers']);
+$router->post('settings/bot-users/send-msg', [TelegramBotController::class, 'sendUserMessage']);
+$router->post('settings/bot-broadcast', [TelegramBotController::class, 'broadcast']);
 $router->post('settings/bot', [TelegramBotController::class, 'updateSettings']);
 $router->post('settings/bot/set-webhook', [TelegramBotController::class, 'setWebhookAction']);
 $router->post('settings/bot/test-message', [TelegramBotController::class, 'testMessageAction']);

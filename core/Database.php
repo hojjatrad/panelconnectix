@@ -96,7 +96,8 @@ class Database {
                     'zarinpal_merchant' => 'VARCHAR(64) NULL',
                     'support_username' => 'VARCHAR(128) NULL',
                     'welcome_message' => 'TEXT NULL',
-                    'custom_domain' => 'VARCHAR(128) NULL'
+                    'custom_domain' => 'VARCHAR(128) NULL',
+                    'credit_limit' => 'BIGINT DEFAULT 0'
                 ];
 
                 foreach ($cols as $col => $def) {
@@ -132,6 +133,40 @@ class Database {
                     INDEX `idx_rp_plan` (`plan_id`)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
 
+                $pdo->exec("CREATE TABLE IF NOT EXISTS `bot_users` (
+                    `id` INT AUTO_INCREMENT PRIMARY KEY,
+                    `reseller_id` INT NULL DEFAULT 1,
+                    `tg_id` VARCHAR(64) UNIQUE NOT NULL,
+                    `first_name` VARCHAR(128) NULL,
+                    `last_name` VARCHAR(128) NULL,
+                    `username` VARCHAR(128) NULL,
+                    `phone` VARCHAR(32) NULL,
+                    `is_blocked` TINYINT(1) DEFAULT 0,
+                    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    `last_active_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    INDEX `idx_bu_reseller` (`reseller_id`),
+                    INDEX `idx_bu_tg` (`tg_id`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
+
+                $pdo->exec("CREATE TABLE IF NOT EXISTS `reseller_applications` (
+                    `id` INT AUTO_INCREMENT PRIMARY KEY,
+                    `user_tg_id` VARCHAR(64) NOT NULL,
+                    `user_tg_name` VARCHAR(128) NULL,
+                    `user_tg_username` VARCHAR(128) NULL,
+                    `brand_name` VARCHAR(128) NOT NULL,
+                    `contact_info` VARCHAR(128) NOT NULL,
+                    `preferred_username` VARCHAR(64) NOT NULL,
+                    `estimated_sales` VARCHAR(64) NULL,
+                    `experience_notes` TEXT NULL,
+                    `status` VARCHAR(32) DEFAULT 'pending',
+                    `approved_user_id` INT NULL,
+                    `admin_notes` TEXT NULL,
+                    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX `idx_ra_tg` (`user_tg_id`),
+                    INDEX `idx_ra_status` (`status`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
+
             } else {
                 // SQLite
                 $cols = [
@@ -147,7 +182,8 @@ class Database {
                     'zarinpal_merchant' => 'VARCHAR(64) NULL',
                     'support_username' => 'VARCHAR(128) NULL',
                     'welcome_message' => 'TEXT NULL',
-                    'custom_domain' => 'VARCHAR(128) NULL'
+                    'custom_domain' => 'VARCHAR(128) NULL',
+                    'credit_limit' => 'BIGINT DEFAULT 0'
                 ];
                 foreach ($cols as $col => $def) {
                     try {
@@ -170,6 +206,36 @@ class Database {
                     `custom_category` VARCHAR(64) DEFAULT 'پیش‌فرض',
                     `retail_price` BIGINT NOT NULL,
                     `is_active` TINYINT(1) DEFAULT 1,
+                    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP
+                );");
+
+                $pdo->exec("CREATE TABLE IF NOT EXISTS `bot_users` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT,
+                    `reseller_id` INT NULL DEFAULT 1,
+                    `tg_id` VARCHAR(64) UNIQUE NOT NULL,
+                    `first_name` VARCHAR(128) NULL,
+                    `last_name` VARCHAR(128) NULL,
+                    `username` VARCHAR(128) NULL,
+                    `phone` VARCHAR(32) NULL,
+                    `is_blocked` TINYINT(1) DEFAULT 0,
+                    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    `last_active_at` DATETIME DEFAULT CURRENT_TIMESTAMP
+                );");
+
+                $pdo->exec("CREATE TABLE IF NOT EXISTS `reseller_applications` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT,
+                    `user_tg_id` VARCHAR(64) NOT NULL,
+                    `user_tg_name` VARCHAR(128) NULL,
+                    `user_tg_username` VARCHAR(128) NULL,
+                    `brand_name` VARCHAR(128) NOT NULL,
+                    `contact_info` VARCHAR(128) NOT NULL,
+                    `preferred_username` VARCHAR(64) NOT NULL,
+                    `estimated_sales` VARCHAR(64) NULL,
+                    `experience_notes` TEXT NULL,
+                    `status` VARCHAR(32) DEFAULT 'pending',
+                    `approved_user_id` INT NULL,
+                    `admin_notes` TEXT NULL,
                     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
                     `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP
                 );");
