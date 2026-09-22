@@ -4,7 +4,7 @@ require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Setting.php';
 
 class Updater {
-    public const CURRENT_VERSION = '2.4.6';
+    public const CURRENT_VERSION = '2.4.7';
 
     public static function getCurrentVersion(): string {
         return Setting::get('current_version', self::CURRENT_VERSION);
@@ -172,8 +172,12 @@ class Updater {
         }
 
         // Find root directory inside extracted zip (GitHub zips enclose files in a root directory)
-        $subDirs = glob($extractPath . '/*', GLOB_ONLYDIR);
-        $sourceDir = (!empty($subDirs) && is_dir($subDirs[0])) ? $subDirs[0] : $extractPath;
+        if (file_exists($extractPath . '/index.php')) {
+            $sourceDir = $extractPath;
+        } else {
+            $subDirs = glob($extractPath . '/*', GLOB_ONLYDIR);
+            $sourceDir = (!empty($subDirs) && is_dir($subDirs[0])) ? $subDirs[0] : $extractPath;
+        }
 
         // Copy files over panel root, skipping sensitive local configs
         $panelRoot = realpath(__DIR__ . '/..');
