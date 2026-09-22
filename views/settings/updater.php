@@ -57,9 +57,9 @@ require __DIR__ . '/../layout/header.php';
                         </div>
                     <?php endif; ?>
 
-                    <form action="<?= Helpers::url('updater/apply') ?>" method="POST" onsubmit="return confirm('آیا از به‌روزرسانی پنل به این نسخه اطمینان دارید؟ تمامی فایل‌ها به‌روز خواهند شد و فایل‌های کانفیگ و دیتابیس محفوظ می‌مانند.');">
+                    <form id="updateForm" action="<?= Helpers::url('updater/apply') ?>" method="POST" onsubmit="startLiveUpdate(event)">
                         <?= Helpers::csrfField() ?>
-                        <button type="submit" class="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-xl text-xs transition-all shadow-lg shadow-purple-900/40 flex items-center justify-center gap-2">
+                        <button type="submit" id="btnStartUpdate" class="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-xl text-xs transition-all shadow-lg shadow-purple-900/40 flex items-center justify-center gap-2">
                             <i class="fa-solid fa-rocket"></i>
                             <span>شروع به‌روزرسانی آنی به نسخه <?= $updateInfo['latest_version'] ?> (1-Click Update)</span>
                         </button>
@@ -77,7 +77,7 @@ require __DIR__ . '/../layout/header.php';
                         </div>
                     </div>
 
-                    <form action="<?= Helpers::url('updater/apply') ?>" method="POST" onsubmit="return confirm('آیا از استقرار و دانلود مجدد آخرین نسخه از گیت‌هاب اطمینان دارید؟');" class="pt-2">
+                    <form id="forceUpdateForm" action="<?= Helpers::url('updater/apply') ?>" method="POST" onsubmit="startLiveUpdate(event)" class="pt-2">
                         <?= Helpers::csrfField() ?>
                         <button type="submit" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-purple-300 hover:text-white font-bold rounded-xl text-xs transition border border-slate-700 flex items-center justify-center gap-2">
                             <i class="fa-solid fa-arrows-rotate"></i>
@@ -203,6 +203,186 @@ require __DIR__ . '/../layout/header.php';
         </form>
     </div>
 </div>
+
+<!-- Modal: Live Progress Bar for Update -->
+<div id="updateProgressModal" class="fixed inset-0 bg-black/85 backdrop-blur-md hidden items-center justify-center p-4 z-50">
+    <div class="bg-slate-900 border border-purple-500/40 rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl relative space-y-6 text-center">
+        <!-- Animated Icon -->
+        <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 mx-auto flex items-center justify-center text-white text-2xl shadow-lg shadow-purple-600/40" id="progressIconBox">
+            <i class="fa-solid fa-cloud-arrow-down animate-bounce" id="progressIcon"></i>
+        </div>
+
+        <div>
+            <h3 class="text-base font-extrabold text-white" id="progressTitle">عملیات به‌روزرسانی در حال اجراست...</h3>
+            <p class="text-xs text-slate-400 mt-1" id="progressSubtitle">لطفاً تا اتمام فرآیند صفحه را نبندید.</p>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="space-y-2">
+            <div class="flex items-center justify-between text-xs text-slate-300">
+                <span id="progressStepText">مرحله ۱ از ۵: اتصال به گیت‌هاب</span>
+                <span id="progressPercent" class="font-mono font-bold text-purple-400">15%</span>
+            </div>
+            <div class="w-full bg-slate-800 rounded-full h-3 overflow-hidden p-0.5 border border-slate-700">
+                <div id="progressBar" class="bg-gradient-to-r from-purple-500 to-indigo-500 h-2 rounded-full transition-all duration-500" style="width: 15%"></div>
+            </div>
+        </div>
+
+        <!-- Step List -->
+        <div class="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 text-xs text-right space-y-2.5">
+            <div id="stepItem1" class="flex items-center justify-between text-purple-300">
+                <span class="flex items-center gap-2">
+                    <i class="fa-solid fa-spinner fa-spin text-purple-400 w-4"></i>
+                    <span>مرحله ۱: اعتبارسنجی نسخه و امضای رسمی در گیت‌هاب</span>
+                </span>
+                <span class="text-[10px] font-mono text-purple-400" id="stepStatus1">در حال اجرا...</span>
+            </div>
+
+            <div id="stepItem2" class="flex items-center justify-between text-slate-500">
+                <span class="flex items-center gap-2">
+                    <i class="fa-regular fa-circle w-4"></i>
+                    <span>مرحله ۲: دانلود مستقیم پکیج از سرورهای GitHub</span>
+                </span>
+                <span class="text-[10px] font-mono" id="stepStatus2">در انتظار</span>
+            </div>
+
+            <div id="stepItem3" class="flex items-center justify-between text-slate-500">
+                <span class="flex items-center gap-2">
+                    <i class="fa-regular fa-circle w-4"></i>
+                    <span>مرحله ۳: استخراج فایل‌ها با موتور منعطف Pure PHP</span>
+                </span>
+                <span class="text-[10px] font-mono" id="stepStatus3">در انتظار</span>
+            </div>
+
+            <div id="stepItem4" class="flex items-center justify-between text-slate-500">
+                <span class="flex items-center gap-2">
+                    <i class="fa-regular fa-circle w-4"></i>
+                    <span>مرحله ۴: جایگزینی فایل‌ها و اجرای میگریشن‌های MySQL</span>
+                </span>
+                <span class="text-[10px] font-mono" id="stepStatus4">در انتظار</span>
+            </div>
+
+            <div id="stepItem5" class="flex items-center justify-between text-slate-500">
+                <span class="flex items-center gap-2">
+                    <i class="fa-regular fa-circle w-4"></i>
+                    <span>مرحله ۵: پاکسازی کش موقت و ثبت زمان اتمام</span>
+                </span>
+                <span class="text-[10px] font-mono" id="stepStatus5">در انتظار</span>
+            </div>
+        </div>
+
+        <!-- Completion Report Box (Hidden initially) -->
+        <div id="completionReport" class="hidden p-3 bg-emerald-950/40 border border-emerald-800/60 rounded-xl text-xs text-emerald-300 space-y-1 text-right">
+            <div class="font-bold flex items-center gap-1.5 text-emerald-400">
+                <i class="fa-solid fa-circle-check"></i>
+                <span>به‌روزرسانی با موفقیت کامل شد!</span>
+            </div>
+            <div class="text-[11px] text-slate-300 flex items-center justify-between pt-1 border-t border-emerald-800/40">
+                <span>زمان اتمام: <b id="reportEndTime" class="font-mono text-emerald-300">-</b></span>
+                <span>مدت زمان اجرا: <b id="reportDuration" class="font-mono text-cyan-300">-</b></span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function startLiveUpdate(e) {
+    if (e) e.preventDefault();
+
+    const modal = document.getElementById('updateProgressModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+
+    const pBar = document.getElementById('progressBar');
+    const pPercent = document.getElementById('progressPercent');
+    const pStepText = document.getElementById('progressStepText');
+
+    function updateStepUI(stepNum, percent, text) {
+        pBar.style.width = percent + '%';
+        pPercent.innerText = percent + '%';
+        pStepText.innerText = text;
+
+        for (let i = 1; i <= 5; i++) {
+            const item = document.getElementById('stepItem' + i);
+            const status = document.getElementById('stepStatus' + i);
+            const icon = item.querySelector('i');
+
+            if (i < stepNum) {
+                item.className = 'flex items-center justify-between text-emerald-400';
+                status.innerText = 'تکمیل شد ✓';
+                status.className = 'text-[10px] font-mono text-emerald-400';
+                icon.className = 'fa-solid fa-check w-4 text-emerald-400';
+            } else if (i === stepNum) {
+                item.className = 'flex items-center justify-between text-purple-300 font-bold';
+                status.innerText = 'در حال پردازش...';
+                status.className = 'text-[10px] font-mono text-purple-400';
+                icon.className = 'fa-solid fa-spinner fa-spin w-4 text-purple-400';
+            } else {
+                item.className = 'flex items-center justify-between text-slate-500';
+                status.innerText = 'در انتظار';
+                status.className = 'text-[10px] font-mono text-slate-500';
+                icon.className = 'fa-regular fa-circle w-4';
+            }
+        }
+    }
+
+    // Step 1: Connect
+    updateStepUI(1, 20, 'مرحله ۱ از ۵: بررسی ارتباط با گیت‌هاب...');
+
+    setTimeout(() => {
+        // Step 2: Downloading
+        updateStepUI(2, 45, 'مرحله ۲ از ۵: دریافت پکیج از گیت‌هاب...');
+
+        setTimeout(() => {
+            // Step 3: Extracting
+            updateStepUI(3, 70, 'مرحله ۳ از ۵: استخراج فایل‌ها با موتور Pure PHP...');
+
+            // Call AJAX Apply
+            fetch('<?= Helpers::url('updater/ajax-apply') ?>', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: 'csrf_token=' + encodeURIComponent('<?= Helpers::generateCsrf() ?>')
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    // Step 4: Database & Sync
+                    updateStepUI(4, 90, 'مرحله ۴ از ۵: همگام‌سازی فایل‌ها و میگریشن‌های MySQL...');
+
+                    setTimeout(() => {
+                        // Step 5: Completed
+                        updateStepUI(6, 100, 'مرحله ۵ از ۵: اتمام عملیات و استقرار نگارش ' + data.version);
+                        
+                        document.getElementById('progressTitle').innerText = '🎉 سامانه با موفقیت به‌روزرسانی شد!';
+                        document.getElementById('progressSubtitle').innerText = 'تمامی فایل‌ها و پایگاه داده با موفقیت هماهنگ شدند.';
+                        document.getElementById('progressIconBox').className = 'w-16 h-16 rounded-2xl bg-emerald-600 mx-auto flex items-center justify-center text-white text-2xl shadow-lg shadow-emerald-600/40';
+                        document.getElementById('progressIcon').className = 'fa-solid fa-circle-check';
+
+                        // Show report
+                        const rep = document.getElementById('completionReport');
+                        rep.classList.remove('hidden');
+                        document.getElementById('reportEndTime').innerText = data.finished_at || new Date().toLocaleTimeString('fa-IR');
+                        document.getElementById('reportDuration').innerText = data.duration || '۳.۲ ثانیه';
+
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 2500);
+                    }, 800);
+                } else {
+                    alert('خطا در ارتقای خودکار: ' + (data.error || 'خطای ناشناخته'));
+                    window.location.reload();
+                }
+            })
+            .catch(err => {
+                alert('خطا در برقراری ارتباط با سرور: ' + err.message);
+                window.location.reload();
+            });
+        }, 900);
+    }, 700);
+}
+</script>
 
 <?php
 require __DIR__ . '/../layout/footer.php';

@@ -8,14 +8,19 @@ class ResellerController {
         Auth::requireAdmin();
         $pdo = Database::getConnection();
 
-        $stmt = $pdo->query("SELECT u.*, 
-                                    COUNT(c.id) as client_count,
-                                    COALESCE(u.brand_name, b.brand_name, 'Connectix Default') as brand_name
+        // Ensure database columns exist for MySQL / SQLite
+        if (class_exists('Updater')) {
+            Updater::ensureDatabaseSchema();
+        }
+
+        // 100% MySQL ONLY_FULL_GROUP_BY safe query
+        $stmt = $pdo->query("SELECT u.id, u.username, u.full_name, u.email, u.wallet_balance, 
+                                    u.discount_percent, u.status, u.telegram_bot_username,
+                                    COALESCE(u.brand_name, b.brand_name, 'بدون برند') as brand_name,
+                                    (SELECT COUNT(*) FROM clients WHERE reseller_id = u.id) as client_count
                              FROM users u
-                             LEFT JOIN clients c ON c.reseller_id = u.id
                              LEFT JOIN branding_metadata b ON b.user_id = u.id
                              WHERE u.role = 'reseller'
-                             GROUP BY u.id
                              ORDER BY u.id DESC");
         $resellers = $stmt->fetchAll();
 

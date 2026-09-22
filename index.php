@@ -154,6 +154,7 @@ $router->post('logs/clear', [LogController::class, 'clear']);
 $router->get('updater', [UpdateController::class, 'index']);
 $router->get('updater/check', [UpdateController::class, 'checkNow']);
 $router->post('updater/apply', [UpdateController::class, 'apply']);
+$router->post('updater/ajax-apply', [UpdateController::class, 'ajaxApply']);
 $router->post('updater/settings', [UpdateController::class, 'saveSettings']);
 $router->post('updater/git-push', [UpdateController::class, 'gitPushAction']);
 $router->post('updater/webhook', [UpdateController::class, 'webhook']);

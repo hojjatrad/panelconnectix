@@ -47,6 +47,20 @@ class UpdateController {
         Helpers::redirect('updater');
     }
 
+    public function ajaxApply(): void {
+        Auth::requireAdmin();
+        header('Content-Type: application/json; charset=utf-8');
+
+        $startTime = microtime(true);
+        $result = Updater::applyUpdate();
+        $duration = round(microtime(true) - $startTime, 2);
+
+        $result['duration'] = $duration . ' ثانیه';
+        $result['finished_at'] = date('H:i:s (Y/m/d)');
+        echo json_encode($result);
+        exit;
+    }
+
     public function saveSettings(): void {
         Auth::requireAdmin();
         if (!Helpers::verifyCsrf()) {
