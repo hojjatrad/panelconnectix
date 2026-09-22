@@ -49,10 +49,13 @@ require __DIR__ . '/../layout/header.php';
                 <select name="plan_id" id="planSelect" required onchange="calculateCost()"
                         class="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:ring-1 focus:ring-purple-500">
                     <option value="" disabled selected>لطفاً یک پلن انتخاب کنید...</option>
-                    <?php foreach ($plans as $p): 
+                    <?php 
+                    $tier = Provisioner::getResellerTier($user['id']);
+                    $effectiveDiscount = (int)$tier['discount'];
+                    foreach ($plans as $p): 
                         $effectivePrice = $p['reseller_price'];
-                        if ($user['discount_percent'] > 0) {
-                            $effectivePrice = $effectivePrice - ($effectivePrice * ($user['discount_percent'] / 100));
+                        if ($effectiveDiscount > 0) {
+                            $effectivePrice = $effectivePrice - ($effectivePrice * ($effectiveDiscount / 100));
                         }
                     ?>
                         <option value="<?= $p['id'] ?>" data-price="<?= $effectivePrice ?>" data-group="<?= $p['server_group'] ?>" data-free="<?= $p['is_free'] ?>">
@@ -90,7 +93,7 @@ require __DIR__ . '/../layout/header.php';
                 </div>
                 <div class="flex justify-between items-center text-slate-400">
                     <span>تخفیف نمایندگی شما:</span>
-                    <span class="font-bold text-purple-400"><?= $user['discount_percent'] ?>%</span>
+                    <span class="font-bold text-purple-400"><?= $effectiveDiscount ?>% (سطح <?= $tier['title'] ?> <?= $tier['badge'] ?>)</span>
                 </div>
                 <div class="border-t border-slate-700/60 pt-2 flex justify-between items-center font-bold">
                     <span class="text-slate-300">کسر از کیف پول:</span>

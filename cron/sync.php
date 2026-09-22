@@ -5,6 +5,7 @@ require_once __DIR__ . '/../core/Helpers.php';
 require_once __DIR__ . '/../core/Setting.php';
 require_once __DIR__ . '/../core/TelegramBot.php';
 require_once __DIR__ . '/../drivers/DriverFactory.php';
+require_once __DIR__ . '/../controllers/ServerController.php';
 
 // Allow running via CLI or Web with secret token
 if (php_sapi_name() !== 'cli') {
@@ -22,6 +23,15 @@ $eol = $isCli ? "\n" : "<br>\n";
 echo "[" . date('Y-m-d H:i:s') . "] Starting Sync & Reserved Subscriptions Engine..." . $eol;
 
 $pdo = Database::getConnection();
+
+// 1. Automatic Server Health Check & Failover Ping
+try {
+    $healthResults = ServerController::performHealthCheck();
+    $onlineServers = count(array_filter($healthResults, fn($s) => $s['status'] === 'online'));
+    echo "[Server Health] Checked " . count($healthResults) . " nodes | Online: {$onlineServers}" . $eol;
+} catch (Throwable $e) {
+    echo "[Server Health Error] " . $e->getMessage() . $eol;
+}
 
 // Fetch active clients and their servers
 $stmt = $pdo->query("SELECT c.*, s.name as server_name, s.driver as server_driver, s.api_url, s.api_username, s.api_password, s.api_token,
@@ -47,32 +57,60 @@ foreach ($clients as $c) {
             $c['traffic_used_bytes'] = $usedBytes;
         }
 
+        // Target Telegram Chat ID (from client table or previous bot orders)
+        $targetTg = $c['telegram_chat_id'] ?? null;
+        if (empty($targetTg)) {
+            $stmtUserTg = $pdo->prepare("SELECT user_tg_id FROM bot_orders WHERE client_id = ? ORDER BY id DESC LIMIT 1");
+            $stmtUserTg->execute([$c['id']]);
+            $targetTg = $stmtUserTg->fetchColumn();
+        }
+
         // Check if exhausted
         $isTrafficDone = ($c['traffic_limit_bytes'] > 0 && $c['traffic_used_bytes'] >= $c['traffic_limit_bytes']);
         $isTimeDone = (!empty($c['expire_at']) && strtotime($c['expire_at']) <= time());
 
-        // Check if traffic is nearly exhausted (>85%) but not yet expired
+        // 1. Proactive Alert: 80% Traffic Warning
         if (!$isTrafficDone && !$isTimeDone && $c['traffic_limit_bytes'] > 0) {
             $usageRatio = $c['traffic_used_bytes'] / $c['traffic_limit_bytes'];
-            if ($usageRatio >= 0.85) {
-                // Send near-exhaustion notice if ordered via bot
-                $stmtUserTg = $pdo->prepare("SELECT user_tg_id FROM bot_orders WHERE client_id = ? ORDER BY id DESC LIMIT 1");
-                $stmtUserTg->execute([$c['id']]);
-                $userTgId = $stmtUserTg->fetchColumn();
-                if (!empty($userTgId)) {
+            if ($usageRatio >= 0.80 && empty($c['alert_80_sent'])) {
+                if (!empty($targetTg)) {
                     $usedGb = round($c['traffic_used_bytes'] / (1024*1024*1024), 1);
                     $totalGb = round($c['traffic_limit_bytes'] / (1024*1024*1024), 1);
-                    $warnNotice = "⚠️ <b>هشدار اتمام حجم اشتراک</b>\n\n"
-                                . "کاربر گرامی <code>{$c['username']}</code>، بیش از ۸۵٪ از ترافیک سرویس شما مصرف شده است:\n"
+                    $warnNotice = "⚠️ <b>هشدار مصرف ترافیک (۸۰٪)</b>\n\n"
+                                . "کاربر گرامی اشتراک <code>{$c['username']}</code>:\n"
+                                . "بیش از ۸۰٪ از حجم بسته شما مصرف شده است:\n"
                                 . "📊 مصرف: <b>{$usedGb}GB</b> از <b>{$totalGb}GB</b>\n\n"
-                                . "برای جلوگیری از قطع سرویس، می‌توانید همین حالا پلن تمدیدی رزرو کنید تا پس از اتمام خودکار فعال شود.";
+                                . "💡 برای جلوگیری از قطع سرویس، می‌توانید همین حالا پلن تمدیدی رزرو کنید تا پس از اتمام خودکار فعال شود.";
                     $warnKeyboard = [
                         'inline_keyboard' => [
                             [['text' => '🔄 رزرو تمدید خودکار', 'callback_data' => 'menu_renew']]
                         ]
                     ];
-                    TelegramBot::sendMessage($warnNotice, (string)$userTgId, $warnKeyboard);
+                    TelegramBot::sendMessage($warnNotice, (string)$targetTg, $warnKeyboard);
                 }
+                $pdo->prepare("UPDATE clients SET alert_80_sent = 1 WHERE id = ?")->execute([$c['id']]);
+            }
+        }
+
+        // 2. Proactive Alert: 48-Hour Expiration Warning
+        if (!$isTrafficDone && !$isTimeDone && !empty($c['expire_at'])) {
+            $timeLeft = strtotime($c['expire_at']) - time();
+            if ($timeLeft > 0 && $timeLeft <= 172800 && empty($c['alert_exp_sent'])) {
+                if (!empty($targetTg)) {
+                    $expDays = round($timeLeft / 86400, 1);
+                    $warnExp = "⏳ <b>هشدار زمان پایان اشتراک</b>\n\n"
+                             . "کاربر گرامی اشتراک <code>{$c['username']}</code>:\n"
+                             . "کمتر از ۴۸ ساعت ({$expDays} روز) تا پایان اعتبار اشتراک شما باقی مانده است.\n"
+                             . "📅 تاریخ انقضا: {$c['expire_at']}\n\n"
+                             . "🔄 جهت جلوگیری از قطعی اتصال، روی دکمه زیر کلیک کنید:";
+                    $warnKeyboard = [
+                        'inline_keyboard' => [
+                            [['text' => '🔄 تمدید اشتراک', 'callback_data' => 'menu_renew']]
+                        ]
+                    ];
+                    TelegramBot::sendMessage($warnExp, (string)$targetTg, $warnKeyboard);
+                }
+                $pdo->prepare("UPDATE clients SET alert_exp_sent = 1 WHERE id = ?")->execute([$c['id']]);
             }
         }
 
@@ -83,7 +121,7 @@ foreach ($clients as $c) {
                 $newExpire = date('Y-m-d H:i:s', time() + ($c['reserved_days'] * 86400));
 
                 $pdo->beginTransaction();
-                $pdo->prepare("UPDATE clients SET traffic_limit_bytes = traffic_limit_bytes + ?, expire_at = ?, status = 'active' WHERE id = ?")
+                $pdo->prepare("UPDATE clients SET traffic_limit_bytes = traffic_limit_bytes + ?, expire_at = ?, status = 'active', alert_80_sent = 0, alert_exp_sent = 0, alert_final_sent = 0 WHERE id = ?")
                     ->execute([$addBytes, $newExpire, $c['id']]);
                 
                 $appliedAt = date('Y-m-d H:i:s');
@@ -101,17 +139,14 @@ foreach ($clients as $c) {
                            . "📅 انقضای جدید: {$newExpire}";
                 TelegramBot::sendMessage($botNotice);
 
-                // Notify User on Telegram if they ordered via bot
-                $stmtUserTg = $pdo->prepare("SELECT user_tg_id FROM bot_orders WHERE client_id = ? ORDER BY id DESC LIMIT 1");
-                $stmtUserTg->execute([$c['id']]);
-                $userTgId = $stmtUserTg->fetchColumn();
-                if (!empty($userTgId)) {
+                // Notify User on Telegram
+                if (!empty($targetTg)) {
                     $userNotice = "⚡️ <b>پلن رزرو شده شما به صورت خودکار فعال شد!</b>\n\n"
                                 . "👤 نام کاربری: <code>{$c['username']}</code>\n"
                                 . "📦 حجم افزوده شده: <b>{$c['reserved_gb']} گیگابایت</b>\n"
                                 . "⏳ تاریخ انقضای جدید: {$newExpire}\n\n"
                                 . "اتصال شما بدون قطعی و با بالاترین سرعت برقرار است.";
-                    TelegramBot::sendMessage($userNotice, (string)$userTgId);
+                    TelegramBot::sendMessage($userNotice, (string)$targetTg);
                 }
 
                 echo "Activated reserved plan for user: {$c['username']} (+{$c['reserved_gb']}GB)" . $eol;
@@ -122,10 +157,7 @@ foreach ($clients as $c) {
                 $expiredCount++;
 
                 // Notify User of expiration
-                $stmtUserTg = $pdo->prepare("SELECT user_tg_id FROM bot_orders WHERE client_id = ? ORDER BY id DESC LIMIT 1");
-                $stmtUserTg->execute([$c['id']]);
-                $userTgId = $stmtUserTg->fetchColumn();
-                if (!empty($userTgId)) {
+                if (!empty($targetTg) && empty($c['alert_final_sent'])) {
                     $expNotice = "🔴 <b>اشتراک شما منقضی گردید</b>\n\n"
                                . "👤 نام کاربری: <code>{$c['username']}</code>\n"
                                . "جهت فعال‌سازی مجدد و تمدید اشتراک، لطفاً از دکمه زیر استفاده نمایید:";
@@ -134,7 +166,8 @@ foreach ($clients as $c) {
                             [['text' => '🔄 تمدید اشتراک', 'callback_data' => 'menu_renew']]
                         ]
                     ];
-                    TelegramBot::sendMessage($expNotice, (string)$userTgId, $expKeyboard);
+                    TelegramBot::sendMessage($expNotice, (string)$targetTg, $expKeyboard);
+                    $pdo->prepare("UPDATE clients SET alert_final_sent = 1 WHERE id = ?")->execute([$c['id']]);
                 }
             }
         }
@@ -157,25 +190,32 @@ if (time() - $lastBackup >= 86400) {
         $handle = fopen($tempPath, 'w');
 
         fwrite($handle, "-- Connectix Automatic Daily Database Backup\n-- Date: " . date('Y-m-d H:i:s') . "\n\n");
-        $tables = ['users', 'server_nodes', 'plans', 'clients', 'reserved_plans', 'transactions', 'branding_metadata', 'notifications', 'system_settings', 'bot_orders', 'bot_sessions', 'activity_logs'];
+        $tables = [
+            'users', 'server_nodes', 'plans', 'clients', 'reserved_plans', 
+            'transactions', 'branding_metadata', 'notifications', 'system_settings', 
+            'bot_orders', 'bot_users', 'bot_sessions', 'reseller_plans', 
+            'reseller_applications', 'trial_logs', 'crypto_payments', 'activity_logs'
+        ];
 
         foreach ($tables as $t) {
-            $rows = $pdo->query("SELECT * FROM {$t}")->fetchAll();
-            if (!empty($rows)) {
-                fwrite($handle, "-- Table: {$t}\n");
-                foreach ($rows as $row) {
-                    $cols = '`' . implode('`, `', array_keys($row)) . '`';
-                    $vals = array_map(function($v) use ($pdo) {
-                        return $v === null ? 'NULL' : $pdo->quote((string)$v);
-                    }, $row);
-                    fwrite($handle, "INSERT INTO `{$t}` ({$cols}) VALUES (" . implode(', ', $vals) . ");\n");
+            try {
+                $rows = $pdo->query("SELECT * FROM {$t}")->fetchAll();
+                if (!empty($rows)) {
+                    fwrite($handle, "-- Table: {$t}\n");
+                    foreach ($rows as $row) {
+                        $cols = '`' . implode('`, `', array_keys($row)) . '`';
+                        $vals = array_map(function($v) use ($pdo) {
+                            return $v === null ? 'NULL' : $pdo->quote((string)$v);
+                        }, $row);
+                        fwrite($handle, "INSERT INTO `{$t}` ({$cols}) VALUES (" . implode(', ', $vals) . ");\n");
+                    }
+                    fwrite($handle, "\n");
                 }
-                fwrite($handle, "\n");
-            }
+            } catch (Throwable $tblErr) {}
         }
         fclose($handle);
 
-        $caption = "📦 <b>پشتیبان‌گیری خودکار ۲۴ ساعته سیستم</b>\n📅 تاریخ: " . date('Y-m-d H:i:s') . "\n🛡 ارسال خودکار توسط کرون جاب";
+        $caption = "📦 <b>پشتیبان‌گیری خودکار ۲۴ ساعته سیستم</b>\n📅 تاریخ: " . date('Y-m-d H:i:s') . "\n🛡 ارسال خودکار دیتابیس توسط کرون جاب";
         TelegramBot::sendDocument($tempPath, $caption);
         @unlink($tempPath);
 

@@ -60,6 +60,7 @@ require __DIR__ . '/../layout/header.php';
                         <th class="p-3.5 font-semibold">نام در تلگرام</th>
                         <th class="p-3.5 font-semibold">یوزرنیم (@)</th>
                         <th class="p-3.5 font-semibold">شناسه عددی (Chat ID)</th>
+                        <th class="p-3.5 font-semibold">زیرمجموعه‌ها و پاداش</th>
                         <th class="p-3.5 font-semibold">اولین عضویت</th>
                         <th class="p-3.5 font-semibold">آخرین فعالیت</th>
                         <th class="p-3.5 font-semibold text-center">عملیات</th>
@@ -82,6 +83,12 @@ require __DIR__ . '/../layout/header.php';
                                 <?php endif; ?>
                             </td>
                             <td class="p-3.5 font-mono text-purple-300 select-all"><?= htmlspecialchars($u['tg_id']) ?></td>
+                            <td class="p-3.5">
+                                <span class="font-bold text-cyan-300 font-mono"><?= number_format($u['referral_count'] ?? 0) ?> نفر</span>
+                                <?php if (!empty($u['referral_balance'])): ?>
+                                    <span class="text-[10px] text-emerald-400 block font-mono"><?= Helpers::formatMoney($u['referral_balance']) ?></span>
+                                <?php endif; ?>
+                            </td>
                             <td class="p-3.5 font-mono text-slate-400 text-[11px]"><?= $u['created_at'] ?></td>
                             <td class="p-3.5 font-mono text-slate-300 text-[11px]"><?= $u['last_active_at'] ?></td>
                             <td class="p-3.5 text-center">

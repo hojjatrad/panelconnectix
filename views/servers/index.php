@@ -12,10 +12,10 @@ require __DIR__ . '/../layout/header.php';
     </div>
 
     <div class="flex items-center flex-wrap gap-2">
-        <button onclick="pingAllServers()" class="px-4 py-2 bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/30 text-xs font-bold rounded-xl transition-all shadow-sm flex items-center gap-2">
-            <i class="fa-solid fa-gauge-high"></i>
-            <span>پایش و تست پینگ تمام نودها</span>
-        </button>
+        <a href="<?= Helpers::url('servers/health-check') ?>" class="px-4 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold rounded-xl transition-all shadow-sm flex items-center gap-2">
+            <i class="fa-solid fa-heart-pulse"></i>
+            <span>پایش سلامت نودها و سوئیچ هوشمند (Failover)</span>
+        </a>
 
         <form method="POST" action="<?= Helpers::url('servers/sync') ?>" class="m-0">
             <?= Helpers::csrfField() ?>
@@ -47,8 +47,8 @@ require __DIR__ . '/../layout/header.php';
                     <span class="text-xs text-slate-400 font-mono block mt-1"><?= htmlspecialchars($s['sub_domain'] ?: $s['api_url']) ?></span>
                 </div>
                 <div class="flex items-center gap-2">
-                    <span id="ping-badge-<?= $s['id'] ?>" class="px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-slate-800 text-slate-400 border border-slate-700">
-                        ⚡ -- ms
+                    <span id="ping-badge-<?= $s['id'] ?>" class="px-2 py-0.5 rounded text-[11px] font-mono font-semibold <?= (($s['health_status'] ?? '') === 'offline') ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30' : 'bg-slate-800 text-cyan-300 border border-slate-700' ?>">
+                        ⚡ <?= !empty($s['latency_ms']) ? $s['latency_ms'] . ' ms' : '-- ms' ?>
                     </span>
                     <span class="px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase font-mono bg-slate-800 text-purple-400 border border-slate-700">
                         <?= htmlspecialchars($s['driver']) ?>
@@ -59,9 +59,17 @@ require __DIR__ . '/../layout/header.php';
             <!-- Server Metrics Grid -->
             <div class="grid grid-cols-4 gap-2 bg-slate-800/40 p-3 rounded-xl border border-slate-800 text-center text-xs">
                 <div>
-                    <span class="text-[10px] text-slate-400 block mb-0.5">وضعیت سرویس</span>
-                    <span id="status-text-<?= $s['id'] ?>" class="font-bold <?= ($stat['status'] ?? '') === 'online' ? 'text-emerald-400' : 'text-amber-400' ?>">
-                        <?= ($stat['status'] ?? '') === 'online' ? 'برخط' : 'آماده' ?>
+                    <span class="text-[10px] text-slate-400 block mb-0.5">وضعیت سلامت نود</span>
+                    <span id="status-text-<?= $s['id'] ?>" class="font-bold <?= match($s['health_status'] ?? 'online') {
+                        'offline' => 'text-rose-400',
+                        'degraded' => 'text-amber-400',
+                        default => 'text-emerald-400'
+                    } ?>">
+                        <?= match($s['health_status'] ?? 'online') {
+                            'offline' => 'قطع (Failover)',
+                            'degraded' => 'تاخیر بالا',
+                            default => 'سالم و فعال'
+                        } ?>
                     </span>
                 </div>
                 <div>

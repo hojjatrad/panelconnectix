@@ -77,7 +77,8 @@ class ApiController {
         $pdo = Database::getConnection();
         $plans = $pdo->query("SELECT * FROM plans WHERE is_active = 1 ORDER BY base_price ASC")->fetchAll();
 
-        $discount = (int)$user['discount_percent'];
+        $tierInfo = Provisioner::getResellerTier((int)$user['id']);
+        $discount = (int)$tierInfo['discount'];
         $result = [];
         foreach ($plans as $p) {
             $price = (int)$p['reseller_price'];
@@ -125,10 +126,12 @@ class ApiController {
             self::jsonError('پلن یافت نشد یا غیرفعال است.');
         }
 
-        // Price Calculation
+        // Price Calculation with Tiered Discount
+        $tierInfo = Provisioner::getResellerTier((int)$user['id']);
+        $discount = (int)$tierInfo['discount'];
         $cost = (int)$plan['reseller_price'];
-        if ($user['discount_percent'] > 0) {
-            $cost = (int)($cost - ($cost * ($user['discount_percent'] / 100)));
+        if ($discount > 0) {
+            $cost = (int)($cost - ($cost * ($discount / 100)));
         }
 
         if ($user['role'] !== 'admin' && $plan['is_free'] == 0 && $user['wallet_balance'] < $cost) {

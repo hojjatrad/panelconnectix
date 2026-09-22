@@ -94,6 +94,8 @@ $router->get('servers/test', [ServerController::class, 'testConnection']);
 $router->get('servers/ping', [ServerController::class, 'ping']);
 $router->get('servers/sync', [ServerController::class, 'syncNow']);
 $router->post('servers/sync', [ServerController::class, 'syncNow']);
+$router->get('servers/health-check', [ServerController::class, 'checkHealth']);
+$router->post('servers/health-check', [ServerController::class, 'checkHealth']);
 
 // Resellers Management (Admin only)
 $router->get('resellers', [ResellerController::class, 'index']);

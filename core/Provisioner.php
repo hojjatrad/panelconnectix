@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/Database.php';
 require_once __DIR__ . '/Helpers.php';
+require_once __DIR__ . '/Setting.php';
 require_once __DIR__ . '/../drivers/DriverFactory.php';
 
 class Provisioner {
@@ -32,13 +33,7 @@ class Provisioner {
             $stmtServer->execute([$serverId]);
             $server = $stmtServer->fetch();
         } else {
-            // Pick default or first active server for the plan's group
-            $stmtServer = $pdo->prepare("SELECT * FROM server_nodes WHERE is_active = 1 AND (server_group = ? OR server_group = 'default') ORDER BY id ASC LIMIT 1");
-            $stmtServer->execute([$plan['server_group']]);
-            $server = $stmtServer->fetch();
-            if (!$server) {
-                $server = $pdo->query("SELECT * FROM server_nodes WHERE is_active = 1 LIMIT 1")->fetch();
-            }
+            $server = self::findBestServer($plan['server_group'] ?? 'default', $pdo);
         }
 
         if (!$server) {
@@ -183,5 +178,183 @@ class Provisioner {
         } catch (Throwable $e) {
             return ['success' => false, 'error' => 'خطا در تمدید روی سرور: ' . $e->getMessage()];
         }
+    }
+
+    /**
+     * Find best healthy server with automatic failover and lowest latency
+     */
+    public static function findBestServer(string $clusterGroup = 'default', ?PDO $pdo = null): ?array {
+        if (!$pdo) $pdo = Database::getConnection();
+
+        // 1. Try healthy active servers for this group with lowest latency
+        $stmt = $pdo->prepare("SELECT * FROM server_nodes 
+                               WHERE is_active = 1 
+                                 AND (health_status = 'online' OR health_status IS NULL)
+                                 AND (server_group = ? OR server_group = 'default')
+                               ORDER BY latency_ms ASC, id ASC LIMIT 1");
+        $stmt->execute([$clusterGroup]);
+        $server = $stmt->fetch();
+
+        // 2. Fallback to any online server
+        if (!$server) {
+            $server = $pdo->query("SELECT * FROM server_nodes 
+                                  WHERE is_active = 1 
+                                    AND (health_status != 'offline' OR health_status IS NULL)
+                                  ORDER BY latency_ms ASC, id ASC LIMIT 1")->fetch();
+        }
+
+        // 3. Last resort fallback: any active server
+        if (!$server) {
+            $server = $pdo->query("SELECT * FROM server_nodes WHERE is_active = 1 LIMIT 1")->fetch();
+        }
+
+        return $server ?: null;
+    }
+
+    /**
+     * Calculate Reseller Tier and effective discount
+     */
+    public static function getResellerTier(int $resellerId): array {
+        $pdo = Database::getConnection();
+        $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
+        $stmt->execute([$resellerId]);
+        $user = $stmt->fetch();
+        if (!$user) {
+            return ['tier' => 'bronze', 'title' => 'برنزی', 'badge' => '🥉', 'discount' => 15, 'client_count' => 0];
+        }
+
+        $baseDiscount = (int)$user['discount_percent'];
+        $autoTier = (int)($user['auto_tier_enabled'] ?? 1);
+
+        // Count active clients
+        $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM clients WHERE reseller_id = ? AND status = 'active'");
+        $stmtCount->execute([$resellerId]);
+        $clientCount = (int)$stmtCount->fetchColumn();
+
+        if ($clientCount >= 100) {
+            $tier = 'diamond';
+            $title = 'الماس';
+            $badge = '💎';
+            $tierDiscount = 45;
+        } elseif ($clientCount >= 50) {
+            $tier = 'gold';
+            $title = 'طلایی';
+            $badge = '🥇';
+            $tierDiscount = 35;
+        } elseif ($clientCount >= 20) {
+            $tier = 'silver';
+            $title = 'نقره‌ای';
+            $badge = '🥈';
+            $tierDiscount = 25;
+        } else {
+            $tier = 'bronze';
+            $title = 'برنزی';
+            $badge = '🥉';
+            $tierDiscount = 15;
+        }
+
+        $effectiveDiscount = $autoTier ? max($baseDiscount, $tierDiscount) : $baseDiscount;
+
+        return [
+            'tier' => $tier,
+            'title' => $title,
+            'badge' => $badge,
+            'discount' => $effectiveDiscount,
+            'base_discount' => $baseDiscount,
+            'client_count' => $clientCount,
+            'auto_tier' => $autoTier
+        ];
+    }
+
+    /**
+     * Create Free Trial Account (1 GB, 24 Hours)
+     */
+    public static function createTrialAccount(?string $telegramId = null, ?int $resellerId = 1, ?string $ip = null): array {
+        $pdo = Database::getConnection();
+        $trialEnabled = (bool)Setting::get('trial_enabled', 1);
+        if (!$trialEnabled) {
+            return ['success' => false, 'error' => 'سامانه تست رایگان موقتاً غیرفعال است.'];
+        }
+
+        $hours = (int)Setting::get('trial_duration_hours', 24);
+        $trafficGb = (int)Setting::get('trial_traffic_gb', 1);
+
+        // Check if user already got a trial today
+        $today = date('Y-m-d 00:00:00');
+        if (!empty($telegramId)) {
+            $stmtCheck = $pdo->prepare("SELECT id FROM trial_logs WHERE telegram_id = ? AND created_at >= ?");
+            $stmtCheck->execute([$telegramId, $today]);
+            if ($stmtCheck->fetch()) {
+                return ['success' => false, 'error' => 'شما امروز سهمیه اکانت تست رایگان خود را دریافت کرده‌اید. برای اتصال دائمی، اشتراک تهیه فرمایید.'];
+            }
+        }
+
+        // Pick best healthy server
+        $server = self::findBestServer('default', $pdo);
+        if (!$server) {
+            return ['success' => false, 'error' => 'سروری برای ارائه اکانت تست در دسترس نیست.'];
+        }
+
+        $username = 'test_' . substr(bin2hex(random_bytes(3)), 0, 6);
+        $password = substr(bin2hex(random_bytes(4)), 0, 8);
+        $uuid = Helpers::generateUUID();
+        $subToken = Helpers::generateToken(24);
+        $trafficBytes = $trafficGb * 1024 * 1024 * 1024;
+        $expireAt = date('Y-m-d H:i:s', strtotime("+{$hours} hours"));
+
+        // Provision on remote node
+        try {
+            $driver = DriverFactory::create($server);
+            $driverPayload = [
+                'username' => $username,
+                'password' => $password,
+                'uuid' => $uuid,
+                'sub_token' => $subToken,
+                'traffic_limit_bytes' => $trafficBytes,
+                'expire_timestamp' => strtotime($expireAt)
+            ];
+            $driverResult = $driver->createUser($driverPayload);
+            if (!$driverResult['success']) {
+                return ['success' => false, 'error' => 'خطا در نود سرور: ' . ($driverResult['error'] ?? 'خطای نامشخص')];
+            }
+        } catch (Throwable $e) {
+            return ['success' => false, 'error' => 'خطا در ارتباط با سرور: ' . $e->getMessage()];
+        }
+
+        // Save client
+        $stmtClient = $pdo->prepare("INSERT INTO clients 
+            (reseller_id, server_id, plan_id, username, password, uuid, sub_token, traffic_limit_bytes, traffic_used_bytes, expire_at, status, custom_note, telegram_chat_id) 
+            VALUES (?, ?, NULL, ?, ?, ?, ?, ?, 0, ?, 'active', 'اکانت تست رایگان', ?)");
+        $stmtClient->execute([
+            $resellerId ?: 1,
+            $server['id'],
+            $username,
+            $password,
+            $uuid,
+            $subToken,
+            $trafficBytes,
+            $expireAt,
+            $telegramId
+        ]);
+        $clientId = (int)$pdo->lastInsertId();
+
+        // Log trial
+        $stmtLog = $pdo->prepare("INSERT INTO trial_logs (user_id, reseller_id, telegram_id, ip_address, client_id) VALUES (?, ?, ?, ?, ?)");
+        $stmtLog->execute([$resellerId, $resellerId, $telegramId, $ip ?: ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'), $clientId]);
+
+        $subUrl = Helpers::fullUrl("sub/{$subToken}");
+
+        return [
+            'success' => true,
+            'client_id' => $clientId,
+            'username' => $username,
+            'password' => $password,
+            'uuid' => $uuid,
+            'sub_url' => $subUrl,
+            'traffic_gb' => $trafficGb,
+            'hours' => $hours,
+            'expire_at' => $expireAt,
+            'server_name' => $server['name']
+        ];
     }
 }

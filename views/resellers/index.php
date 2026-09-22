@@ -51,10 +51,23 @@ $pendingCount = $pendingAppsCount ?? 0;
                     $balance = (int)$r['wallet_balance'];
                     $limit = (int)($r['credit_limit'] ?? 0);
                     $isDebt = ($balance < 0);
+                    $tier = Provisioner::getResellerTier($r['id']);
                 ?>
                     <tr class="hover:bg-slate-800/30 transition-colors">
                         <td class="p-3.5">
-                            <span class="font-bold text-white font-mono"><?= htmlspecialchars($r['username']) ?></span>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="font-bold text-white font-mono"><?= htmlspecialchars($r['username']) ?></span>
+                                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold 
+                                    <?= match($tier['tier']) {
+                                        'diamond' => 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30',
+                                        'gold' => 'bg-amber-500/10 text-amber-400 border border-amber-500/30',
+                                        'silver' => 'bg-slate-300/10 text-slate-300 border border-slate-400/30',
+                                        default => 'bg-amber-800/10 text-amber-500 border border-amber-700/30'
+                                    } ?>" title="رتبه پلکانی بر اساس تعداد کاربران فعال">
+                                    <span><?= $tier['badge'] ?></span>
+                                    <span>سطح <?= $tier['title'] ?></span>
+                                </span>
+                            </div>
                             <span class="text-[10px] text-slate-400 block mt-0.5"><?= htmlspecialchars($r['full_name'] ?? 'بی‌نام') ?></span>
                         </td>
                         <td class="p-3.5">
@@ -85,8 +98,8 @@ $pendingCount = $pendingAppsCount ?? 0;
                             <?php endif; ?>
                         </td>
                         <td class="p-3.5">
-                            <button onclick="openDiscountModal(<?= $r['id'] ?>, '<?= htmlspecialchars($r['username']) ?>', <?= (int)$r['discount_percent'] ?>)" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30 transition text-xs group" title="کلیک برای ویرایش درصد تخفیف">
-                                <span><?= $r['discount_percent'] ?>%</span>
+                            <button onclick="openDiscountModal(<?= $r['id'] ?>, '<?= htmlspecialchars($r['username']) ?>', <?= (int)$tier['discount'] ?>)" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30 transition text-xs group" title="کلیک برای ویرایش درصد تخفیف (موثر: <?= $tier['discount'] ?>٪)">
+                                <span><?= $tier['discount'] ?>%</span>
                                 <i class="fa-solid fa-pen text-[9px] text-purple-400 group-hover:scale-125 transition-transform"></i>
                             </button>
                         </td>

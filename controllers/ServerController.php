@@ -235,4 +235,65 @@ class ServerController {
         Helpers::flash('success', "همگام‌سازی لحظه‌ای با موفقیت انجام شد: {$synced} کلاینت بررسی و {$reservedActivated} پلن رزرو فعال شدند.");
         Helpers::redirect('servers');
     }
+
+    /**
+     * Run full health check and ping on all active server nodes
+     */
+    public static function performHealthCheck(): array {
+        $pdo = Database::getConnection();
+        $servers = $pdo->query("SELECT * FROM server_nodes WHERE is_active = 1")->fetchAll();
+        $results = [];
+
+        foreach ($servers as $server) {
+            $parsed = parse_url($server['api_url']);
+            $host = $parsed['host'] ?? '';
+            $port = $parsed['port'] ?? (($parsed['scheme'] ?? 'http') === 'https' ? 443 : 80);
+
+            if ($server['driver'] === 'mock') {
+                $latency = rand(15, 35);
+                $status = 'online';
+                $err = null;
+            } elseif (empty($host)) {
+                $status = 'offline';
+                $latency = 9999;
+                $err = 'آدرس نامعتبر';
+            } else {
+                $startTime = microtime(true);
+                $errno = 0;
+                $errstr = '';
+                $socket = @fsockopen($host, $port, $errno, $errstr, 2.5);
+                if ($socket) {
+                    $latency = (int)round((microtime(true) - $startTime) * 1000);
+                    fclose($socket);
+                    $status = ($latency > 1500) ? 'degraded' : 'online';
+                    $err = null;
+                } else {
+                    $status = 'offline';
+                    $latency = 9999;
+                    $err = $errstr ?: 'تایم‌اوت در اتصال';
+                }
+            }
+
+            try {
+                $pdo->prepare("UPDATE server_nodes SET health_status = ?, latency_ms = ?, last_checked_at = ?, error_message = ? WHERE id = ?")
+                    ->execute([$status, $latency, date('Y-m-d H:i:s'), $err, $server['id']]);
+            } catch (Throwable $e) {}
+
+            $results[$server['id']] = [
+                'name' => $server['name'],
+                'status' => $status,
+                'latency' => $latency,
+                'error' => $err
+            ];
+        }
+
+        return $results;
+    }
+
+    public function checkHealth(): void {
+        Auth::requireAdmin();
+        $results = self::performHealthCheck();
+        Helpers::flash('success', 'پایش سلامت ' . count($results) . ' سرور با موفقیت انجام شد و وضعیت‌ها به‌روزرسانی گردید.');
+        Helpers::redirect('servers');
+    }
 }

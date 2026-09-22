@@ -20,8 +20,8 @@ class BillingController {
                                      ORDER BY t.id DESC LIMIT 50")->fetchAll();
 
         // Gateway Settings
-        $tetherWallet = Setting::get('tether_wallet', 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t');
-        $usdtRate = (int)Setting::get('usdt_rate', '95000');
+        $tetherWallet = Setting::get('crypto_usdt_trc20_address') ?: Setting::get('tether_wallet', 'TYDZSxdW3k9pqm5vWc1qV8tZ4bM7n8k9pL');
+        $usdtRate = (int)(Setting::get('crypto_usdt_rate') ?: Setting::get('usdt_rate', '98000'));
         $bankCard = Setting::get('bank_card', '6037-9975-1234-5678');
         $bankCardOwner = Setting::get('bank_card_owner', 'مدیریت پنل کانکتیکس');
 

@@ -17,6 +17,14 @@ $zarinMerchant = $settings['zarinpal_merchant'] ?? '';
 $nextpayKey = $settings['nextpay_apikey'] ?? '';
 $nowpaymentsKey = $settings['nowpayments_apikey'] ?? '';
 
+$cryptoUsdtWallet = $settings['crypto_usdt_trc20_address'] ?? '';
+$cryptoUsdtRate = $settings['crypto_usdt_rate'] ?? '98000';
+$trialEnabled = ($settings['trial_enabled'] ?? '1') === '1';
+$trialHours = $settings['trial_duration_hours'] ?? '24';
+$trialGb = $settings['trial_traffic_gb'] ?? '1';
+$referralEnabled = ($settings['referral_enabled'] ?? '1') === '1';
+$referralPercent = $settings['referral_commission_percent'] ?? '10';
+
 $webhookUrl = Helpers::fullUrl('webhook.php');
 $isWebhookSet = !empty($webhookInfo['result']['url'] ?? '');
 ?>
@@ -236,6 +244,77 @@ $isWebhookSet = !empty($webhookInfo['result']['url'] ?? '');
                     <div>
                         <label class="block text-[11px] font-medium text-slate-400 mb-1">کلید API نکست‌پی یا نوپیمنتس</label>
                         <input type="text" name="nextpay_apikey" value="<?= htmlspecialchars($nextpayKey) ?>" placeholder="API Key" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500 font-mono text-left" dir="ltr">
+                    </div>
+                </div>
+
+                <!-- Cryptocurrency (Tether TRC20) Section -->
+                <div class="pt-3 border-t border-slate-800/80 space-y-3">
+                    <div class="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                        <i class="fa-brands fa-bitcoin"></i>
+                        <span>درگاه پرداخت ارزی و تتر (USDT - TRC20)</span>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-400 mb-1">آدرس کیف پول تتر TRON (TRC20)</label>
+                        <input type="text" name="crypto_usdt_trc20_address" value="<?= htmlspecialchars($cryptoUsdtWallet) ?>" placeholder="TYDZSxdW3k9pqm5vWc1qV8tZ4bM7n8k9pL" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-amber-500 font-mono text-left" dir="ltr">
+                        <span class="text-[10px] text-slate-500 mt-0.5 block">مشتری با واریز به این آدرس و ارسال کد هش (TXID) سفارش را تحویل می‌گیرد.</span>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-400 mb-1">نرخ محاسبه هر تتر به تومان</label>
+                        <div class="relative">
+                            <input type="number" name="crypto_usdt_rate" value="<?= htmlspecialchars($cryptoUsdtRate) ?>" placeholder="98000" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-amber-500 font-mono text-center">
+                            <span class="absolute left-3 top-2 text-[10px] text-slate-400">تومان</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Free Trial System Section -->
+                <div class="pt-3 border-t border-slate-800/80 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <div class="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
+                            <i class="fa-solid fa-gift"></i>
+                            <span>سامانه اکانت تست رایگان</span>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" name="trial_enabled" value="1" class="sr-only peer" <?= $trialEnabled ? 'checked' : '' ?>>
+                            <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                        </label>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[11px] font-medium text-slate-400 mb-1">حجم تست (گیگابایت)</label>
+                            <input type="number" name="trial_traffic_gb" value="<?= htmlspecialchars($trialGb) ?>" min="1" max="10" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono text-center">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-medium text-slate-400 mb-1">مهلت استفاده (ساعت)</label>
+                            <input type="number" name="trial_duration_hours" value="<?= htmlspecialchars($trialHours) ?>" min="1" max="72" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono text-center">
+                        </div>
+                    </div>
+                    <span class="text-[10px] text-slate-500 block">هر کاربر تلگرام به صورت روزانه فقط ۱ بار مجاز به دریافت تست رایگان خواهد بود.</span>
+                </div>
+
+                <!-- Referral Program Section -->
+                <div class="pt-3 border-t border-slate-800/80 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <div class="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
+                            <i class="fa-solid fa-users-rays"></i>
+                            <span>سامانه زیرمجموعه‌گیری و بازاریابی (Referral)</span>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" name="referral_enabled" value="1" class="sr-only peer" <?= $referralEnabled ? 'checked' : '' ?>>
+                            <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-600"></div>
+                        </label>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-400 mb-1">درصد پورسانت معرف از هر خرید</label>
+                        <div class="relative">
+                            <input type="number" name="referral_commission_percent" value="<?= htmlspecialchars($referralPercent) ?>" min="0" max="50" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono text-center">
+                            <span class="absolute left-3 top-2 text-xs text-slate-400 font-bold">%</span>
+                        </div>
+                        <span class="text-[10px] text-slate-500 mt-0.5 block">به ازای هر خرید توسط زیرمجموعه، این درصد به صورت شارژ نقدی به کیف‌پول معرف اضافه می‌شود.</span>
                     </div>
                 </div>
 

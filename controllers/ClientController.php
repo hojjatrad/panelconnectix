@@ -148,10 +148,12 @@ class ClientController {
             Helpers::redirect('clients/create');
         }
 
-        // Price Calculation with Reseller Discount
+        // Price Calculation with Tiered Reseller Discount
+        $tierInfo = Provisioner::getResellerTier($user['id']);
+        $discount = (int)$tierInfo['discount'];
         $cost = $plan['reseller_price'];
-        if ($user['discount_percent'] > 0) {
-            $cost = $cost - ($cost * ($user['discount_percent'] / 100));
+        if ($discount > 0) {
+            $cost = $cost - ($cost * ($discount / 100));
         }
         $cost = (int)$cost;
 

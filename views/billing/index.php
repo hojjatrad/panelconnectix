@@ -14,7 +14,8 @@ require __DIR__ . '/../layout/header.php';
             <div class="bg-gradient-to-br from-purple-900/60 to-slate-900 border border-purple-800/40 rounded-2xl p-5 my-4">
                 <span class="text-xs text-purple-200 block mb-1">موجودی فعلی حساب:</span>
                 <span class="text-2xl font-black text-white"><?= Helpers::formatMoney($user['wallet_balance']) ?></span>
-                <span class="text-[10px] text-purple-300 block mt-2">تخفیف همکاری فعال: <?= $user['discount_percent'] ?>%</span>
+                <?php $tier = Provisioner::getResellerTier($user['id']); ?>
+                <span class="text-[10px] text-purple-300 block mt-2">تخفیف همکاری فعال: <?= $tier['discount'] ?>% (سطح <?= $tier['title'] ?> <?= $tier['badge'] ?>)</span>
             </div>
 
             <form action="<?= Helpers::url('billing/topup') ?>" method="POST" class="space-y-4 text-xs">

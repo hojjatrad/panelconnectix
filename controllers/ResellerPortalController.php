@@ -164,10 +164,9 @@ class ResellerPortalController {
         $userId = self::checkResellerAccess();
         $pdo = Database::getConnection();
 
-        // Get reseller info for discount rate
-        $stmtU = $pdo->prepare("SELECT discount_percent FROM users WHERE id = ?");
-        $stmtU->execute([$userId]);
-        $discount = (int)$stmtU->fetchColumn();
+        // Get reseller info for tiered discount rate
+        $tier = Provisioner::getResellerTier($userId);
+        $discount = (int)$tier['discount'];
 
         // Get all base system plans with reseller overrides
         $sql = "SELECT p.*, 
@@ -260,10 +259,12 @@ class ResellerPortalController {
         $stmt->execute($params);
         $orders = $stmt->fetchAll();
 
-        // Get reseller wallet
+        // Get reseller wallet and tiered discount
         $stmtUser = $pdo->prepare("SELECT wallet_balance, discount_percent FROM users WHERE id = ?");
         $stmtUser->execute([$userId]);
         $resellerInfo = $stmtUser->fetch();
+        $tier = Provisioner::getResellerTier($userId);
+        $resellerInfo['discount_percent'] = $tier['discount'];
 
         require __DIR__ . '/../views/reseller/orders.php';
     }
