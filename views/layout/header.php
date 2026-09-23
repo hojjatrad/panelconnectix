@@ -56,6 +56,31 @@ if (!function_exists('isActiveRoute')) {
         .accordion-content.collapsed { max-height: 0 !important; opacity: 0; pointer-events: none; overflow: hidden; }
         .chevron-icon { transition: transform 0.2s ease; }
         .chevron-icon.rotated { transform: rotate(-90deg); }
+        /* Touch & Mobile Modal Scrolling */
+        .modal-overlay {
+            overflow-y: auto !important;
+            -webkit-overflow-scrolling: touch;
+        }
+        .modal-box {
+            max-height: 88vh !important;
+            overflow-y: auto !important;
+            -webkit-overflow-scrolling: touch;
+        }
+        @media (max-width: 768px) {
+            div[id*="Modal"].fixed.inset-0 {
+                overflow-y: auto !important;
+                -webkit-overflow-scrolling: touch;
+                padding: 0.75rem !important;
+                align-items: flex-start !important;
+            }
+            div[id*="Modal"] > div {
+                max-height: 88vh !important;
+                overflow-y: auto !important;
+                -webkit-overflow-scrolling: touch;
+                margin-top: auto !important;
+                margin-bottom: auto !important;
+            }
+        }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col md:flex-row antialiased selection:bg-purple-600 selection:text-white">

@@ -178,8 +178,8 @@ require __DIR__ . '/../layout/header.php';
 </div>
 
 <!-- Modal to add Server -->
-<div id="newServerModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative">
+<div id="newServerModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto modal-overlay">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl relative my-auto max-h-[88vh] overflow-y-auto modal-box">
         <button onclick="closeNewServerModal()" class="absolute top-4 left-4 text-slate-400 hover:text-white">
             <i class="fa-solid fa-xmark text-lg"></i>
         </button>
@@ -284,8 +284,8 @@ require __DIR__ . '/../layout/header.php';
 </div>
 
 <!-- Modal to edit Server -->
-<div id="editServerModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative">
+<div id="editServerModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto modal-overlay">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl relative my-auto max-h-[88vh] overflow-y-auto modal-box">
         <button onclick="closeEditServerModal()" class="absolute top-4 left-4 text-slate-400 hover:text-white">
             <i class="fa-solid fa-xmark text-lg"></i>
         </button>
@@ -745,8 +745,8 @@ require __DIR__ . '/../layout/header.php';
 </script>
 
 <!-- Modal: Bulk Server Migration -->
-<div id="migrateModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative">
+<div id="migrateModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto modal-overlay">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl relative my-auto max-h-[88vh] overflow-y-auto modal-box">
         <button onclick="closeMigrateModal()" class="absolute top-4 left-4 text-slate-400 hover:text-white transition-colors">
             <i class="fa-solid fa-xmark text-lg"></i>
         </button>

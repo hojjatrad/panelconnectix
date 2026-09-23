@@ -420,8 +420,8 @@ require __DIR__ . '/../layout/header.php';
 </div>
 
 <!-- Modal 2: Renew Subscription -->
-<div id="renewModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl relative">
+<div id="renewModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto modal-overlay">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-5 sm:p-6 shadow-2xl relative my-auto max-h-[88vh] overflow-y-auto modal-box">
         <button onclick="closeRenewModal()" class="absolute top-4 left-4 text-slate-400 hover:text-white">
             <i class="fa-solid fa-xmark text-lg"></i>
         </button>
@@ -457,8 +457,8 @@ require __DIR__ . '/../layout/header.php';
 </div>
 
 <!-- Modal 3: Reserve Plan -->
-<div id="reserveModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl relative">
+<div id="reserveModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto modal-overlay">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-5 sm:p-6 shadow-2xl relative my-auto max-h-[88vh] overflow-y-auto modal-box">
         <button onclick="closeReserveModal()" class="absolute top-4 left-4 text-slate-400 hover:text-white">
             <i class="fa-solid fa-xmark text-lg"></i>
         </button>
@@ -788,8 +788,8 @@ ${c.sub_url}`;
 </div>
 
 <!-- Modal: Quick Test Account Creation with Traffic Selection -->
-<div id="testAccountModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
-    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl relative space-y-4">
+<div id="testAccountModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto modal-overlay">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl relative space-y-4 my-auto max-h-[88vh] overflow-y-auto modal-box">
         <button onclick="closeTestModal()" class="absolute top-4 left-4 text-slate-400 hover:text-white transition">
             <i class="fa-solid fa-xmark text-lg"></i>
         </button>

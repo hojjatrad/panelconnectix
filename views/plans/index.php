@@ -243,8 +243,8 @@ foreach ($customPlanCats as $idx => $custCat) {
 
 <?php if (Auth::isAdmin()): ?>
 <!-- Modal: Create Plan -->
-<div id="newPlanModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
-    <div class="bg-slate-900 border border-purple-500/40 rounded-2xl max-w-md w-full p-6 shadow-2xl relative text-xs">
+<div id="newPlanModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto modal-overlay">
+    <div class="bg-slate-900 border border-purple-500/40 rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl relative text-xs my-auto max-h-[88vh] overflow-y-auto modal-box">
         <button onclick="closeNewPlanModal()" class="absolute top-4 left-4 text-slate-400 hover:text-white">
             <i class="fa-solid fa-xmark text-lg"></i>
         </button>
@@ -407,8 +407,8 @@ foreach ($customPlanCats as $idx => $custCat) {
 </div>
 
 <!-- Modal: Edit Plan -->
-<div id="editPlanModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
-    <div class="bg-slate-900 border border-amber-500/40 rounded-2xl max-w-md w-full p-6 shadow-2xl relative text-xs">
+<div id="editPlanModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto modal-overlay">
+    <div class="bg-slate-900 border border-amber-500/40 rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl relative text-xs my-auto max-h-[88vh] overflow-y-auto modal-box">
         <button onclick="closeEditPlanModal()" class="absolute top-4 left-4 text-slate-400 hover:text-white">
             <i class="fa-solid fa-xmark text-lg"></i>
         </button>
