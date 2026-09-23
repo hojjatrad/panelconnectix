@@ -2377,14 +2377,22 @@ class TelegramBotController {
      * Auto Create Forum Topics in Supergroup
      */
     public function autoCreateTopicsAction(): void {
-        header('Content-Type: application/json');
+        header('Content-Type: application/json; charset=utf-8');
         Auth::requireLogin();
 
-        $logChat = trim(Setting::get('bot_log_channel', Setting::get('telegram_admin_id', '')));
+        $inputChat = trim($_POST['log_channel'] ?? '');
+        $logChat = !empty($inputChat) ? $inputChat : trim(Setting::get('bot_log_channel', ''));
+        if (empty($logChat)) {
+            $logChat = trim(Setting::get('telegram_admin_id', ''));
+        }
+        if (!empty($inputChat)) {
+            Setting::set('bot_log_channel', $inputChat);
+        }
+
         if (empty($logChat)) {
             echo json_encode([
                 'success' => false,
-                'message' => 'شناسه سوپرگروه لاگ سیستم (مثلاً -1001234567890) در فیلد بالا تنظیم نشده است.'
+                'message' => 'شناسه سوپرگروه لاگ سیستم (مثلاً -1001234567890) ارسال نشده و در تنظیمات نیز یافت نشد.'
             ]);
             return;
         }

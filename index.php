@@ -336,6 +336,7 @@ $router->post('settings/bot-users/send-msg', [TelegramBotController::class, 'sen
 $router->post('settings/bot-broadcast', [TelegramBotController::class, 'broadcast']);
 $router->post('settings/bot', [TelegramBotController::class, 'updateSettings']);
 $router->post('settings/bot/auto-create-topics', [TelegramBotController::class, 'autoCreateTopicsAction']);
+$router->post('bot/auto-create-topics', [TelegramBotController::class, 'autoCreateTopicsAction']);
 $router->post('settings/bot/set-webhook', [TelegramBotController::class, 'setWebhookAction']);
 $router->post('settings/bot/test-message', [TelegramBotController::class, 'testMessageAction']);
 $router->post('settings/bot/delete-webhook', [TelegramBotController::class, 'deleteWebhookAction']);

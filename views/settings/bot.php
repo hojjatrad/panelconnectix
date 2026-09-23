@@ -617,20 +617,30 @@ function autoCreateForumTopics() {
     }
 
     btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>در حال ساخت تاپیک‌ها...</span>';
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>در حال ساخت ۱۱ تاپیک...</span>';
     status.className = 'text-[10px] text-amber-400 mt-1 block';
-    status.innerText = 'در حال ارتباط با API تلگرام و ایجاد ۵ تاپیک تفکیک شده...';
+    status.innerText = 'در حال ارتباط با API تلگرام و ایجاد ۱۱ تاپیک اختصاصی...';
 
-    fetch('<?= Helpers::url('bot/auto-create-topics') ?>', {
+    const fd = new FormData();
+    fd.append('log_channel', logChannel);
+    fd.append('csrf_token', '<?= Helpers::csrfToken() ?>');
+
+    fetch('<?= Helpers::url('settings/bot/auto-create-topics') ?>', {
         method: 'POST',
         headers: {
             'X-Requested-With': 'XMLHttpRequest'
-        }
+        },
+        body: fd
     })
-    .then(r => r.json())
+    .then(r => {
+        if (!r.ok) {
+            throw new Error('کد خطای سرور: ' + r.status + ' (' + r.statusText + ')');
+        }
+        return r.json();
+    })
     .then(data => {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> <span>ایجاد خودکار تاپیک‌ها</span>';
+        btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> <span>ساخت خودکار تاپیک‌ها</span>';
         
         if (data.results) {
             for (let k in data.results) {
@@ -651,9 +661,9 @@ function autoCreateForumTopics() {
     })
     .catch(err => {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> <span>ایجاد خودکار تاپیک‌ها</span>';
+        btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> <span>ساخت خودکار تاپیک‌ها</span>';
         status.className = 'text-[10px] text-rose-400 mt-1 block';
-        status.innerText = 'خطا در ارتباط با سرور: ' + err;
+        status.innerText = 'خطا در ارتباط با سرور: ' + err.message;
     });
 }
 </script>
