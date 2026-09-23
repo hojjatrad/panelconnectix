@@ -190,16 +190,27 @@ if (empty($categories)) $categories = ['۱ ماهه', '۲ ماهه', '۳ ماه�
                 </div>
 
                 <div>
-                    <label class="block text-slate-300 mb-1 font-semibold">دسته‌بندی محصول *</label>
-                    <input type="text" name="category" list="cat-suggestions" value="۱ ماهه" required placeholder="مثلاً: ۱ ماهه یا اقتصادی" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-medium">
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="block text-slate-300 font-semibold">دسته‌بندی محصول (دوره / عنوان)</label>
+                        <a href="<?= Helpers::url('categories') ?>" target="_blank" class="text-[10px] text-purple-400 hover:text-purple-300">
+                            <i class="fa-solid fa-plus-circle"></i> مدیریت دسته‌ها
+                        </a>
+                    </div>
+                    <input type="text" name="category" list="cat-suggestions" value="۱ ماهه" required placeholder="مثلاً: ۱ ماهه، ۳ ماهه یا ویژه" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-medium">
                     <datalist id="cat-suggestions">
+                        <?php if (!empty($planCategories)): ?>
+                            <?php foreach ($planCategories as $pCat): ?>
+                                <option value="<?= htmlspecialchars($pCat['name']) ?>">
+                            <?php endforeach; ?>
+                        <?php endif; ?>
                         <option value="۱ ماهه">
                         <option value="۲ ماهه">
                         <option value="۳ ماهه">
                         <option value="۶ ماهه">
+                        <option value="۱۲ ماهه">
                         <option value="اقتصادی">
                         <option value="VIP تجاری">
-                        <option value="ایران اکسس (ملی)">
+                        <option value="نامحدود">
                     </datalist>
                 </div>
 

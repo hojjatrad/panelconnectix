@@ -16,7 +16,8 @@ class PlanController {
                               LEFT JOIN categories c ON (p.category_id = c.id OR (p.category_id IS NULL AND p.server_group = c.slug))
                               ORDER BY p.is_free DESC, p.base_price ASC")->fetchAll();
         $servers = $pdo->query("SELECT * FROM server_nodes WHERE is_active = 1 ORDER BY name ASC")->fetchAll();
-        $dbCategories = $pdo->query("SELECT * FROM categories WHERE is_active = 1 AND type IN ('plan', 'both') ORDER BY sort_order ASC, id ASC")->fetchAll();
+        $dbCategories = $pdo->query("SELECT * FROM categories WHERE is_active = 1 AND type IN ('servers', 'server', 'both') ORDER BY sort_order ASC, id ASC")->fetchAll();
+        $planCategories = $pdo->query("SELECT * FROM categories WHERE is_active = 1 AND type IN ('plans', 'plan', 'both') ORDER BY sort_order ASC, id ASC")->fetchAll();
         require __DIR__ . '/../views/plans/index.php';
     }
 

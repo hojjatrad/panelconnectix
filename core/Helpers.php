@@ -53,6 +53,10 @@ class Helpers {
         return $_SESSION['csrf_token'];
     }
 
+    public static function generateCsrf(): string {
+        return self::csrfToken();
+    }
+
     public static function csrfField(): string {
         $token = self::csrfToken();
         return '<input type="hidden" name="csrf_token" value="' . htmlspecialchars($token, ENT_QUOTES, 'UTF-8') . '">';

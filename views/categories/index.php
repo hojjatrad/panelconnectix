@@ -42,12 +42,14 @@ $totalPlansInCats = array_sum(array_column($categories, 'plan_count'));
         </div>
 
         <div class="bg-slate-900/70 border border-slate-800 p-4 rounded-2xl flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center text-lg">
-                <i class="fa-solid fa-circle-check"></i>
+            <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center text-lg">
+                <i class="fa-solid fa-cubes"></i>
             </div>
             <div>
-                <span class="text-[11px] text-slate-400 block">دسته‌های فعال</span>
-                <span class="text-lg font-black text-emerald-400 font-mono"><?= $activeCategories ?> فعال</span>
+                <span class="text-[11px] text-slate-400 block">دسته‌های پلن</span>
+                <span class="text-lg font-black text-amber-300 font-mono">
+                    <?= count(array_filter($categories, fn($c) => in_array($c['type'] ?? '', ['plan', 'plans', 'both']))) ?> دسته
+                </span>
             </div>
         </div>
 
@@ -56,20 +58,38 @@ $totalPlansInCats = array_sum(array_column($categories, 'plan_count'));
                 <i class="fa-solid fa-server"></i>
             </div>
             <div>
-                <span class="text-[11px] text-slate-400 block">سرورهای متصل</span>
-                <span class="text-lg font-black text-cyan-300 font-mono"><?= $totalServersInCats ?> سرور</span>
+                <span class="text-[11px] text-slate-400 block">خوشه‌های سرور</span>
+                <span class="text-lg font-black text-cyan-300 font-mono">
+                    <?= count(array_filter($categories, fn($c) => in_array($c['type'] ?? '', ['server', 'servers', 'both']))) ?> خوشه
+                </span>
             </div>
         </div>
 
         <div class="bg-slate-900/70 border border-slate-800 p-4 rounded-2xl flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center text-lg">
-                <i class="fa-solid fa-cubes"></i>
+            <div class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center text-lg">
+                <i class="fa-solid fa-circle-check"></i>
             </div>
             <div>
-                <span class="text-[11px] text-slate-400 block">پلن‌های متصل</span>
-                <span class="text-lg font-black text-amber-300 font-mono"><?= $totalPlansInCats ?> پلن</span>
+                <span class="text-[11px] text-slate-400 block">دسته‌های فعال</span>
+                <span class="text-lg font-black text-emerald-400 font-mono"><?= $activeCategories ?> فعال</span>
             </div>
         </div>
+    </div>
+
+    <!-- Category Type Navigation Tabs -->
+    <div class="flex items-center gap-2 border-b border-slate-800 pb-2 flex-wrap">
+        <button type="button" onclick="switchCategoryFilter('all')" id="tabBtn-cat-all" class="cat-filter-tab px-4 py-2 rounded-xl text-xs font-bold transition bg-purple-600 text-white shadow-md flex items-center gap-2">
+            <i class="fa-solid fa-layer-group"></i>
+            <span>همه دسته‌بندی‌ها (<?= $totalCategories ?>)</span>
+        </button>
+        <button type="button" onclick="switchCategoryFilter('plans')" id="tabBtn-cat-plans" class="cat-filter-tab px-4 py-2 rounded-xl text-xs font-medium transition bg-slate-900 text-slate-400 hover:text-white border border-slate-800 flex items-center gap-2">
+            <i class="fa-solid fa-cubes text-amber-400"></i>
+            <span>دسته‌بندی‌های پلن‌ها و تعرفه‌ها</span>
+        </button>
+        <button type="button" onclick="switchCategoryFilter('servers')" id="tabBtn-cat-servers" class="cat-filter-tab px-4 py-2 rounded-xl text-xs font-medium transition bg-slate-900 text-slate-400 hover:text-white border border-slate-800 flex items-center gap-2">
+            <i class="fa-solid fa-server text-cyan-400"></i>
+            <span>خوشه‌های سرورها و لوکیشن‌ها</span>
+        </button>
     </div>
 
     <!-- Categories Table -->
@@ -115,7 +135,7 @@ $totalPlansInCats = array_sum(array_column($categories, 'plan_count'));
                                 default => 'bg-purple-500/10 text-purple-300 border-purple-500/30'
                             };
                         ?>
-                            <tr class="hover:bg-slate-800/30 transition-colors">
+                            <tr class="cat-row hover:bg-slate-800/30 transition-colors" data-type="<?= htmlspecialchars($c['type'] ?? 'both') ?>">
                                 <td class="p-3.5 text-slate-500 font-mono"><?= $idx + 1 ?></td>
                                 <td class="p-3.5 whitespace-nowrap">
                                     <div class="flex items-center gap-2.5">
@@ -136,14 +156,14 @@ $totalPlansInCats = array_sum(array_column($categories, 'plan_count'));
                                 <td class="p-3.5 whitespace-nowrap">
                                     <span class="px-2 py-0.5 rounded text-[10px] font-bold 
                                         <?= match($c['type']) {
-                                            'server' => 'bg-cyan-500/10 text-cyan-300 border border-cyan-500/20',
-                                            'plan' => 'bg-amber-500/10 text-amber-300 border border-amber-500/20',
+                                            'server', 'servers' => 'bg-cyan-500/10 text-cyan-300 border border-cyan-500/20',
+                                            'plan', 'plans' => 'bg-amber-500/10 text-amber-300 border border-amber-500/20',
                                             default => 'bg-purple-500/10 text-purple-300 border border-purple-500/20'
                                         } ?>">
                                         <?= match($c['type']) {
-                                            'server' => 'فقط سرورها',
-                                            'plan' => 'فقط پلن‌ها',
-                                            default => 'سرورها و پلن‌ها'
+                                            'server', 'servers' => 'فقط سرورها',
+                                            'plan', 'plans' => 'فقط پلن‌ها',
+                                            default => 'مشترک (سرور و پلن)'
                                         } ?>
                                     </span>
                                 </td>
@@ -219,15 +239,15 @@ $totalPlansInCats = array_sum(array_column($categories, 'plan_count'));
             <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
                     <label class="block text-slate-300 mb-1 font-semibold">دامنه کاربرد</label>
-                    <select name="type" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white">
-                        <option value="both" selected>سرورها و پلن‌ها</option>
-                        <option value="server">فقط سرورها</option>
-                        <option value="plan">فقط پلن‌ها</option>
+                    <select name="type" id="createCatType" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white">
+                        <option value="both" selected>🌐 مشترک (سرورها و پلن‌ها)</option>
+                        <option value="plans">📦 دسته‌بندی پلن‌ها و تعرفه‌ها</option>
+                        <option value="servers">🖥 خوشه‌های سرور و لوکیشن‌ها</option>
                     </select>
                 </div>
                 <div>
                     <label class="block text-slate-300 mb-1 font-semibold">آیکون FontAwesome</label>
-                    <input type="text" name="icon" value="fa-server" dir="ltr" placeholder="fa-globe" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
+                    <input type="text" name="icon" id="createCatIcon" value="fa-server" dir="ltr" placeholder="fa-globe" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
                 </div>
                 <div>
                     <label class="block text-slate-300 mb-1 font-semibold">رنگ نشانگر</label>
@@ -345,7 +365,47 @@ $totalPlansInCats = array_sum(array_column($categories, 'plan_count'));
 </form>
 
 <script>
+let currentCatFilter = 'all';
+
+function switchCategoryFilter(type) {
+    currentCatFilter = type;
+    const tabs = ['all', 'plans', 'servers'];
+    tabs.forEach(t => {
+        const btn = document.getElementById('tabBtn-cat-' + t);
+        if (btn) {
+            if (t === type) {
+                btn.className = 'cat-filter-tab px-4 py-2 rounded-xl text-xs font-bold transition bg-purple-600 text-white shadow-md flex items-center gap-2';
+            } else {
+                btn.className = 'cat-filter-tab px-4 py-2 rounded-xl text-xs font-medium transition bg-slate-900 text-slate-400 hover:text-white border border-slate-800 flex items-center gap-2';
+            }
+        }
+    });
+
+    const rows = document.querySelectorAll('.cat-row');
+    rows.forEach(row => {
+        const rowType = row.getAttribute('data-type') || 'both';
+        if (type === 'all') {
+            row.style.display = '';
+        } else if (type === 'plans') {
+            row.style.display = (rowType === 'plans' || rowType === 'plan' || rowType === 'both') ? '' : 'none';
+        } else if (type === 'servers') {
+            row.style.display = (rowType === 'servers' || rowType === 'server' || rowType === 'both') ? '' : 'none';
+        }
+    });
+}
+
 function openCreateCatModal() {
+    const typeSelect = document.getElementById('createCatType');
+    const iconInput = document.getElementById('createCatIcon');
+    if (currentCatFilter === 'plans') {
+        if (typeSelect) typeSelect.value = 'plans';
+        if (iconInput) iconInput.value = 'fa-cubes';
+    } else if (currentCatFilter === 'servers') {
+        if (typeSelect) typeSelect.value = 'servers';
+        if (iconInput) iconInput.value = 'fa-server';
+    } else {
+        if (typeSelect) typeSelect.value = 'both';
+    }
     document.getElementById('createCatModal').classList.remove('hidden');
 }
 function closeCreateCatModal() {

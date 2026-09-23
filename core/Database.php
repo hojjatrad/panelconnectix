@@ -322,14 +322,35 @@ class Database {
                 if ($catCount === 0) {
                     $defaultCats = [
                         ['پیش‌فرض (استاندارد)', 'default', 'both', 'fa-globe', 'purple', 'خوشه سرورها و پلن‌های استاندارد بین‌الملل', 1],
-                        ['سرورهای VIP و پرسرعت', 'vip', 'both', 'fa-crown', 'amber', 'سرورهای بهینه‌شده با پهنای باند اختصاصی و پینگ پایین', 2],
+                        ['سرورهای VIP و پرسرعت', 'vip', 'servers', 'fa-crown', 'amber', 'سرورهای بهینه‌شده با پهنای باند اختصاصی و پینگ پایین', 2],
                         ['سرورهای اقتصادی (Economic)', 'economic', 'both', 'fa-tag', 'blue', 'پلن‌های باصرفه و اقتصادی جهت وب‌گردی روزمره', 3],
                         ['ایران اکسس (ملی و نامحدود)', 'iran_access', 'both', 'fa-shield-halved', 'emerald', 'سرورهای با دسترسی به سایت‌های داخلی و ترافیک نامحدود', 4],
-                        ['مخصوص بازی و گیمینگ (Gaming)', 'gaming', 'both', 'fa-gamepad', 'cyan', 'سرورهای تونل‌شده بدون نوسان و کمترین زمان پاسخگویی', 5],
+                        ['مخصوص بازی و گیمینگ (Gaming)', 'gaming', 'servers', 'fa-gamepad', 'cyan', 'سرورهای تونل‌شده بدون نوسان و کمترین زمان پاسخگویی', 5],
+                        ['پلن‌های ۱ ماهه', 'period_1m', 'plans', 'fa-calendar-days', 'purple', 'اشتراک‌های استاندارد ۳۰ روزه', 10],
+                        ['پلن‌های ۲ ماهه', 'period_2m', 'plans', 'fa-calendar-week', 'blue', 'اشتراک‌های میان‌مدت ۶۰ روزه', 11],
+                        ['پلن‌های ۳ ماهه', 'period_3m', 'plans', 'fa-calendar-check', 'amber', 'اشتراک‌های فصلی ۹۰ روزه با تخفیف', 12],
+                        ['پلن‌های ۶ ماهه و سالانه', 'period_long', 'plans', 'fa-calendar-plus', 'emerald', 'اشتراک‌های بلندمدت با بیشترین صرفه اقتصادی', 13],
+                        ['پلن‌های نامحدود / حجمی', 'unlimited_custom', 'plans', 'fa-infinity', 'cyan', 'پلن‌های با ترافیک بالا یا نامحدود زمانی', 14],
                     ];
                     $stmtCat = $pdo->prepare("INSERT INTO categories (name, slug, type, icon, badge_color, description, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)");
                     foreach ($defaultCats as $dc) {
                         $stmtCat->execute($dc);
+                    }
+                } else {
+                    // Ensure plan categories also exist if only servers were seeded
+                    $planCatCount = (int)$pdo->query("SELECT COUNT(*) FROM categories WHERE type IN ('plans', 'plan')")->fetchColumn();
+                    if ($planCatCount === 0) {
+                        $defaultPlanCats = [
+                            ['پلن‌های ۱ ماهه', 'period_1m', 'plans', 'fa-calendar-days', 'purple', 'اشتراک‌های استاندارد ۳۰ روزه', 10],
+                            ['پلن‌های ۲ ماهه', 'period_2m', 'plans', 'fa-calendar-week', 'blue', 'اشتراک‌های میان‌مدت ۶۰ روزه', 11],
+                            ['پلن‌های ۳ ماهه', 'period_3m', 'plans', 'fa-calendar-check', 'amber', 'اشتراک‌های فصلی ۹۰ روزه با تخفیف', 12],
+                            ['پلن‌های ۶ ماهه و سالانه', 'period_long', 'plans', 'fa-calendar-plus', 'emerald', 'اشتراک‌های بلندمدت با بیشترین صرفه اقتصادی', 13],
+                            ['پلن‌های نامحدود / حجمی', 'unlimited_custom', 'plans', 'fa-infinity', 'cyan', 'پلن‌های با ترافیک بالا یا نامحدود زمانی', 14],
+                        ];
+                        $stmtCat = $pdo->prepare("INSERT INTO categories (name, slug, type, icon, badge_color, description, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                        foreach ($defaultPlanCats as $dpc) {
+                            $stmtCat->execute($dpc);
+                        }
                     }
                 }
             } catch (Throwable $e) {}

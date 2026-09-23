@@ -261,6 +261,27 @@ if (function_exists('clearstatcache')) {
     @clearstatcache(true);
 }
 
+// 7. Emergency SQL Restore Handler (Upload backup .sql directly in repair tool)
+$sqlRestoreMsg = '';
+if (!empty($_FILES['emergency_sql_file']['tmp_name']) && $_FILES['emergency_sql_file']['error'] === UPLOAD_ERR_OK) {
+    $uploadedFile = $_FILES['emergency_sql_file'];
+    $ext = strtolower(pathinfo($uploadedFile['name'], PATHINFO_EXTENSION));
+    if ($ext === 'sql') {
+        $sqlContent = file_get_contents($uploadedFile['tmp_name']);
+        if (!empty($sqlContent)) {
+            require_once __DIR__ . '/core/Database.php';
+            $restoreRes = Database::restoreFromSql($sqlContent);
+            if ($restoreRes['success']) {
+                $sqlRestoreMsg = "<div class='p-3 bg-emerald-950/80 border border-emerald-800 text-emerald-200 rounded-xl text-xs'>✅ پایگاه داده با موفقیت بازگردانی شد! ({$restoreRes['executed']} دستور با موفقیت اعمال گردید)</div>";
+            } else {
+                $sqlRestoreMsg = "<div class='p-3 bg-rose-950/80 border border-rose-800 text-rose-200 rounded-xl text-xs'>❌ خطا در بازگردانی: " . htmlspecialchars($restoreRes['error'] ?? '') . "</div>";
+            }
+        }
+    } else {
+        $sqlRestoreMsg = "<div class='p-3 bg-amber-950/80 border border-amber-800 text-amber-200 rounded-xl text-xs'>⚠️ لطفاً فقط فایل پشتیبان با پسوند .sql آپلود فرمایید.</div>";
+    }
+}
+
 // Check overall status
 $allOk = true;
 foreach ($stepResults as $r) {
@@ -348,6 +369,23 @@ foreach ($stepResults as $r) {
                     <span>ترمیم مجدد فایل‌ها</span>
                 </a>
             </div>
+        </div>
+
+        <!-- Emergency SQL Backup Restore Card -->
+        <div class="p-4 bg-slate-950/80 border border-slate-800 rounded-2xl space-y-2.5 text-xs">
+            <div class="flex items-center gap-2 text-white font-bold">
+                <i class="fa-solid fa-database text-amber-400"></i>
+                <span>بازگردانی اضطراری پایگاه داده با بکاپ تلگرام (.sql)</span>
+            </div>
+            <p class="text-[11px] text-slate-400">در صورتی که دیتابیس دچار تداخل یا پاک‌شدگی شده است، فایل SQL ارسالی به تلگرام را انتخاب فرمایید:</p>
+            <?= $sqlRestoreMsg ?>
+            <form action="repair.php" method="POST" enctype="multipart/form-data" class="space-y-2">
+                <input type="file" name="emergency_sql_file" accept=".sql" required class="w-full text-xs text-slate-400 file:mr-0 file:ml-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-amber-300 hover:file:bg-slate-700 bg-slate-900 p-1.5 rounded-xl border border-slate-800">
+                <button type="submit" class="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl transition flex items-center justify-center gap-1.5 shadow-md shadow-amber-900/30">
+                    <i class="fa-solid fa-rotate-left"></i>
+                    <span>آپلود و بازگردانی دیتابیس از فایل SQL</span>
+                </button>
+            </form>
         </div>
 
         <div class="text-[11px] text-center text-slate-500 pt-2 border-t border-slate-800/80">

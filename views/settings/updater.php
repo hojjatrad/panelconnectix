@@ -350,7 +350,7 @@ function startLiveUpdate(e) {
                     'Content-Type': 'application/x-www-form-urlencoded',
                     'X-Requested-With': 'XMLHttpRequest'
                 },
-                body: 'csrf_token=' + encodeURIComponent('<?= Helpers::generateCsrf() ?>')
+                body: 'csrf_token=' + encodeURIComponent('<?= Helpers::csrfToken() ?>')
             })
             .then(res => res.json())
             .then(data => {
