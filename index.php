@@ -2,15 +2,21 @@
 $scriptDir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? ''));
 $basePath = ($scriptDir === '/' || $scriptDir === '.') ? '' : rtrim($scriptDir, '/');
 
-// Direct install route handling
+// Direct install or repair route handling
 $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
-if (str_ends_with($requestPath, 'install.php') || str_ends_with($requestPath, '/install')) {
+$routeParam = $_GET['route'] ?? '';
+
+if (str_ends_with($requestPath, 'install.php') || str_ends_with($requestPath, '/install') || $routeParam === 'install.php' || $routeParam === 'install') {
     require_once __DIR__ . '/install.php';
     exit;
 }
 
+if (str_ends_with($requestPath, 'repair.php') || str_ends_with($requestPath, '/repair') || $routeParam === 'repair.php' || $routeParam === 'repair') {
+    require_once __DIR__ . '/repair.php';
+    exit;
+}
+
 // Intercept Telegram Webhook on ANY variation
-$routeParam = $_GET['route'] ?? '';
 if (str_ends_with($requestPath, 'webhook.php') || str_ends_with($requestPath, '/webhook') 
     || $routeParam === 'webhook.php' || $routeParam === 'webhook' || $routeParam === 'telegram/webhook') {
     require_once __DIR__ . '/webhook.php';
@@ -22,40 +28,152 @@ if (str_contains($requestPath, 'cron/sync.php') || str_contains($requestPath, 's
     exit;
 }
 
-require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/core/Database.php';
-require_once __DIR__ . '/core/Helpers.php';
-require_once __DIR__ . '/core/Setting.php';
-require_once __DIR__ . '/core/TelegramBot.php';
-require_once __DIR__ . '/core/Auth.php';
-require_once __DIR__ . '/core/Provisioner.php';
-require_once __DIR__ . '/core/Payment.php';
-require_once __DIR__ . '/core/Updater.php';
-require_once __DIR__ . '/core/Router.php';
+// 1. Dynamic autoloader for core, controllers, and drivers
+spl_autoload_register(function ($class) {
+    $searchPaths = [
+        __DIR__ . '/core/' . $class . '.php',
+        __DIR__ . '/controllers/' . $class . '.php',
+        __DIR__ . '/drivers/' . $class . '.php'
+    ];
+    foreach ($searchPaths as $path) {
+        if (file_exists($path)) {
+            require_once $path;
+            return true;
+        }
+    }
+    return false;
+});
 
-// Controllers
-require_once __DIR__ . '/controllers/AuthController.php';
-require_once __DIR__ . '/controllers/DashboardController.php';
-require_once __DIR__ . '/controllers/ClientController.php';
-require_once __DIR__ . '/controllers/PlanController.php';
-require_once __DIR__ . '/controllers/ServerController.php';
-require_once __DIR__ . '/controllers/ResellerController.php';
-require_once __DIR__ . '/controllers/BillingController.php';
-require_once __DIR__ . '/controllers/MetadataController.php';
-require_once __DIR__ . '/controllers/NotificationController.php';
-require_once __DIR__ . '/controllers/SublinkController.php';
-require_once __DIR__ . '/controllers/TelegramBotController.php';
-require_once __DIR__ . '/controllers/PaymentController.php';
-require_once __DIR__ . '/controllers/ApiController.php';
-require_once __DIR__ . '/controllers/ProfileController.php';
-require_once __DIR__ . '/controllers/ResellerPortalController.php';
-require_once __DIR__ . '/controllers/LogController.php';
-require_once __DIR__ . '/controllers/UpdateController.php';
-require_once __DIR__ . '/controllers/TicketController.php';
-require_once __DIR__ . '/controllers/AppGuideController.php';
-require_once __DIR__ . '/controllers/CouponController.php';
-require_once __DIR__ . '/controllers/CategoryController.php';
-require_once __DIR__ . '/core/Updater.php';
+// 2. Load Core Components Safely
+$coreComponents = [
+    'config.php',
+    'core/Database.php',
+    'core/Helpers.php',
+    'core/Setting.php',
+    'core/TelegramBot.php',
+    'core/Auth.php',
+    'core/Provisioner.php',
+    'core/Payment.php',
+    'core/Updater.php',
+    'core/Router.php'
+];
+
+foreach ($coreComponents as $component) {
+    $cPath = __DIR__ . '/' . $component;
+    if (file_exists($cPath)) {
+        require_once $cPath;
+    }
+}
+
+// 3. Load All Controllers Safely
+$expectedControllers = [
+    'AuthController', 'DashboardController', 'ClientController', 'PlanController',
+    'ServerController', 'CategoryController', 'ResellerController', 'BillingController',
+    'MetadataController', 'NotificationController', 'SublinkController', 'TelegramBotController',
+    'PaymentController', 'ApiController', 'ProfileController', 'ResellerPortalController',
+    'LogController', 'UpdateController', 'TicketController', 'AppGuideController', 'CouponController'
+];
+
+$missingControllers = [];
+foreach ($expectedControllers as $ctrl) {
+    $file = __DIR__ . '/controllers/' . $ctrl . '.php';
+    if (file_exists($file)) {
+        require_once $file;
+    } else {
+        $missingControllers[] = $ctrl;
+    }
+}
+
+// 4. If critical controllers are missing, attempt instant self-heal
+if (!empty($missingControllers)) {
+    $healed = false;
+    $repo = 'hojjatrad/panelconnectix';
+    $token = '';
+    try {
+        if (class_exists('Setting')) {
+            $repo = Setting::get('github_repo', $repo);
+            $token = Setting::get('github_token', '');
+        }
+    } catch (Throwable $e) {}
+
+    $url = "https://api.github.com/repos/{$repo}/zipball/main";
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    $headers = ['User-Agent: Connectix-AutoHeal'];
+    if (!empty($token)) $headers[] = "Authorization: token {$token}";
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    $zipData = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($httpCode === 200 && strlen($zipData) > 5000) {
+        $tmpZip = sys_get_temp_dir() . '/heal_' . time() . '.zip';
+        $tmpExtract = sys_get_temp_dir() . '/heal_ext_' . time();
+        file_put_contents($tmpZip, $zipData);
+
+        if (class_exists('Updater') && Updater::extractZip($tmpZip, $tmpExtract)) {
+            $subDirs = glob($tmpExtract . '/*', GLOB_ONLYDIR);
+            $sourceDir = (!empty($subDirs) && is_dir($subDirs[0])) ? $subDirs[0] : $tmpExtract;
+            if (is_dir($sourceDir . '/controllers')) {
+                Updater::copyDirectory($sourceDir . '/controllers', __DIR__ . '/controllers', []);
+                $healed = true;
+            }
+        }
+        @unlink($tmpZip);
+    }
+
+    if ($healed) {
+        foreach ($missingControllers as $ctrl) {
+            $file = __DIR__ . '/controllers/' . $ctrl . '.php';
+            if (file_exists($file)) {
+                require_once $file;
+            }
+        }
+    } else {
+        http_response_code(500);
+        ?>
+        <!DOCTYPE html>
+        <html lang="fa" dir="rtl">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>بازیابی اضطراری سیستم | Connectix Panel</title>
+            <script src="https://cdn.tailwindcss.com"></script>
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+            <style>
+                @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;600;700;800;900&display=swap');
+                * { font-family: 'Vazirmatn', sans-serif; }
+            </style>
+        </head>
+        <body class="bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center p-4">
+            <div class="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 text-center space-y-4 shadow-2xl">
+                <div class="w-16 h-16 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 mx-auto flex items-center justify-center text-3xl">
+                    <i class="fa-solid fa-wrench"></i>
+                </div>
+                <h1 class="text-lg font-bold text-white">برخی فایل‌های کنترلی سیستم در هاست یافت نشدند</h1>
+                <p class="text-xs text-slate-400 leading-relaxed">
+                    فایل‌های زیر در مسیر controllers یافت نشدند (احتمالاً به دلیل اکسترکت ناقص یا اختلال دسترسی فایل‌ها در هاست):<br>
+                    <code class="text-amber-300 font-mono text-[11px] mt-2 inline-block bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800"><?= htmlspecialchars(implode(', ', $missingControllers)) ?></code>
+                </p>
+                <div class="pt-3 space-y-2">
+                    <a href="repair.php?restore_files=1" class="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-lg shadow-purple-900/30">
+                        <i class="fa-solid fa-cloud-arrow-down"></i>
+                        <span>دانلود و ترمیم خودکار فایل‌های گمشده از گیت‌هاب</span>
+                    </a>
+                    <a href="index.php" class="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium rounded-xl text-xs transition block">
+                        تلاش مجدد و بارگذاری صفحه
+                    </a>
+                </div>
+            </div>
+        </body>
+        </html>
+        <?php
+        exit;
+    }
+}
 
 $router = new Router();
 

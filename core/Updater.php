@@ -4,7 +4,7 @@ require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Setting.php';
 
 class Updater {
-    public const CURRENT_VERSION = '2.7.0';
+    public const CURRENT_VERSION = '2.7.1';
 
     public static function getCurrentVersion(): string {
         return Setting::get('current_version', self::CURRENT_VERSION);
@@ -302,10 +302,14 @@ class Updater {
         return $fileCount > 0;
     }
 
-    private static function copyDirectory(string $src, string $dst, array $skipped): void {
+    public static function copyDirectory(string $src, string $dst, array $skipped = []): void {
         $dir = @opendir($src);
         if (!$dir) return;
-        @mkdir($dst, 0777, true);
+        if (!is_dir($dst)) {
+            @mkdir($dst, 0755, true);
+        }
+        @chmod($dst, 0755);
+
         while (($file = readdir($dir)) !== false) {
             if ($file === '.' || $file === '..') continue;
             
@@ -319,10 +323,12 @@ class Updater {
             if (is_dir($srcFile)) {
                 self::copyDirectory($srcFile, $dstFile, $skipped);
             } else {
-                if (file_exists($dstFile)) {
-                    @chmod($dstFile, 0666);
-                    @unlink($dstFile);
+                $parentDir = dirname($dstFile);
+                if (!is_dir($parentDir)) {
+                    @mkdir($parentDir, 0755, true);
+                    @chmod($parentDir, 0755);
                 }
+
                 $copied = @copy($srcFile, $dstFile);
                 if (!$copied) {
                     $content = @file_get_contents($srcFile);

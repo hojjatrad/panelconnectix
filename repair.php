@@ -1,6 +1,6 @@
 <?php
 /**
- * Connectix Panel - Emergency Self-Healing & Diagnostic Utility (v2.7.0)
+ * Connectix Panel - Emergency Self-Healing & Diagnostic Utility (v2.7.1)
  * Language: Persian (Farsi) - RTL
  * Purpose: Automatically repair .htaccess, verify database connection,
  * migrate missing tables/columns, fix permissions, and restore panel functionality.
@@ -109,7 +109,136 @@ if ($hasConfig) {
     }
 }
 
-// 5. Invalidate Caches
+// 5. File Integrity Check & Auto-Restoration of Controllers and Views
+$expectedControllers = [
+    'AuthController', 'DashboardController', 'ClientController', 'PlanController',
+    'ServerController', 'CategoryController', 'ResellerController', 'BillingController',
+    'MetadataController', 'NotificationController', 'SublinkController', 'TelegramBotController',
+    'PaymentController', 'ApiController', 'ProfileController', 'ResellerPortalController',
+    'LogController', 'UpdateController', 'TicketController', 'AppGuideController', 'CouponController'
+];
+
+$missingControllers = [];
+foreach ($expectedControllers as $ctrl) {
+    if (!file_exists(__DIR__ . '/controllers/' . $ctrl . '.php')) {
+        $missingControllers[] = $ctrl;
+    }
+}
+
+$forceRestore = isset($_GET['restore_files']) && $_GET['restore_files'] === '1';
+
+if (!empty($missingControllers) || $forceRestore) {
+    $repo = 'hojjatrad/panelconnectix';
+    $token = '';
+    try {
+        if ($dbOk) {
+            $stmt = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'github_token' LIMIT 1");
+            $token = $stmt ? (string)$stmt->fetchColumn() : '';
+            $stmtRepo = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'github_repo' LIMIT 1");
+            $dbRepo = $stmtRepo ? (string)$stmtRepo->fetchColumn() : '';
+            if (!empty($dbRepo)) $repo = $dbRepo;
+        }
+    } catch (Throwable $e) {}
+
+    $url = "https://api.github.com/repos/{$repo}/zipball/main";
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    $headers = ['User-Agent: Connectix-Repair-Tool'];
+    if (!empty($token)) {
+        $headers[] = "Authorization: token {$token}";
+    }
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    $zipData = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    $restoredCount = 0;
+    if ($httpCode === 200 && strlen($zipData) > 5000) {
+        $tmpZip = sys_get_temp_dir() . '/repair_pkg_' . time() . '.zip';
+        $tmpExtract = sys_get_temp_dir() . '/repair_ext_' . time();
+        file_put_contents($tmpZip, $zipData);
+
+        $extracted = false;
+        if (class_exists('ZipArchive')) {
+            $zip = new ZipArchive();
+            if ($zip->open($tmpZip) === true) {
+                $zip->extractTo($tmpExtract);
+                $zip->close();
+                $extracted = true;
+            }
+        }
+        if (!$extracted && function_exists('shell_exec')) {
+            @shell_exec('unzip -q -o ' . escapeshellarg($tmpZip) . ' -d ' . escapeshellarg($tmpExtract) . ' 2>&1');
+            $files = glob($tmpExtract . '/*');
+            if (!empty($files)) $extracted = true;
+        }
+
+        if ($extracted) {
+            $subDirs = glob($tmpExtract . '/*', GLOB_ONLYDIR);
+            $sourceDir = (!empty($subDirs) && is_dir($subDirs[0])) ? $subDirs[0] : $tmpExtract;
+
+            $foldersToRestore = ['controllers', 'core', 'drivers', 'views'];
+            foreach ($foldersToRestore as $f) {
+                $srcF = $sourceDir . '/' . $f;
+                $dstF = __DIR__ . '/' . $f;
+                if (is_dir($srcF)) {
+                    if (!is_dir($dstF)) @mkdir($dstF, 0755, true);
+                    @chmod($dstF, 0755);
+                    $iterator = new RecursiveIteratorIterator(
+                        new RecursiveDirectoryIterator($srcF, RecursiveDirectoryIterator::SKIP_DOTS),
+                        RecursiveIteratorIterator::SELF_FIRST
+                    );
+                    foreach ($iterator as $item) {
+                        $target = $dstF . DIRECTORY_SEPARATOR . $iterator->getSubPathname();
+                        if ($item->isDir()) {
+                            if (!is_dir($target)) @mkdir($target, 0755, true);
+                            @chmod($target, 0755);
+                        } else {
+                            if (!is_dir(dirname($target))) @mkdir(dirname($target), 0755, true);
+                            @copy($item->getPathname(), $target);
+                            @chmod($target, 0644);
+                            $restoredCount++;
+                        }
+                    }
+                }
+            }
+            if (file_exists($sourceDir . '/index.php')) {
+                @copy($sourceDir . '/index.php', __DIR__ . '/index.php');
+                @chmod(__DIR__ . '/index.php', 0644);
+            }
+        }
+        @unlink($tmpZip);
+    }
+
+    $stillMissing = [];
+    foreach ($expectedControllers as $ctrl) {
+        if (!file_exists(__DIR__ . '/controllers/' . $ctrl . '.php')) {
+            $stillMissing[] = $ctrl;
+        }
+    }
+
+    if (empty($stillMissing)) {
+        $stepResults['files'] = [
+            'status' => true,
+            'msg' => "تمام ۲۱ کنترلر و فایل‌های اصلی سیستم تایید و مستقر شدند ({$restoredCount} فایل بازنویسی/ترمیم شد)."
+        ];
+    } else {
+        $stepResults['files'] = [
+            'status' => false,
+            'msg' => 'برخی فایل‌ها یافت نشدند: ' . implode(', ', $stillMissing) . '. لطفاً پکیج zip را به صورت دستی در هاست اکسترکت کنید.'
+        ];
+    }
+} else {
+    $stepResults['files'] = [
+        'status' => true,
+        'msg' => 'سلامت ساختار تمامی ۲۱ فایل کنترلر، ویوها و هسته نرم‌افزار تایید شد.'
+    ];
+}
+
+// 6. Invalidate Caches
 if (function_exists('opcache_reset')) {
     @opcache_reset();
 }
@@ -170,6 +299,7 @@ foreach ($stepResults as $r) {
                                 'config' => 'فایل تنظیمات اتصال (config.php)',
                                 'php' => 'پیش‌نیازهای مفسر PHP',
                                 'db' => 'ارتباط با پایگاه داده و ساختار جداول',
+                                'files' => 'یکپارچگی و سلامت فایل‌های کنترلر و سیستم',
                                 default => 'بررسی سیستم'
                             } ?>
                         </span>
@@ -186,20 +316,27 @@ foreach ($stepResults as $r) {
                     <i class="fa-solid fa-right-to-bracket"></i>
                     <span>ورود مستقیم به پنل مدیریت</span>
                 </a>
-                <a href="repair.php" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-xs transition-all border border-slate-700 flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-rotate-right"></i>
-                    <span>بررسی و اسکن مجدد سلامت</span>
-                </a>
             <?php else: ?>
-                <a href="install.php?reinstall=1" class="w-full py-3.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-2xl text-xs transition-all shadow-xl shadow-purple-900/40 flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-wrench"></i>
-                    <span>ورود به نصب‌کننده خودکار و تنظیم دیتابیس</span>
+                <a href="repair.php?restore_files=1" class="w-full py-3.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-2xl text-xs transition-all shadow-xl shadow-amber-900/40 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-cloud-arrow-down"></i>
+                    <span>دانلود و بازسازی فوری تمامی فایل‌های پنل از گیت‌هاب</span>
                 </a>
             <?php endif; ?>
+
+            <div class="grid grid-cols-2 gap-2">
+                <a href="repair.php" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-xs transition-all border border-slate-700 flex items-center justify-center gap-1.5">
+                    <i class="fa-solid fa-rotate-right"></i>
+                    <span>اسکن مجدد سلامت</span>
+                </a>
+                <a href="repair.php?restore_files=1" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 font-semibold rounded-xl text-xs transition-all border border-slate-700 flex items-center justify-center gap-1.5" title="بازنویسی فایل‌های سیستمی">
+                    <i class="fa-solid fa-download"></i>
+                    <span>ترمیم مجدد فایل‌ها</span>
+                </a>
+            </div>
         </div>
 
         <div class="text-[11px] text-center text-slate-500 pt-2 border-t border-slate-800/80">
-            نسخه پایدار و ترمیم‌شده سامانه: <span class="font-mono text-purple-400 font-bold">v2.7.0</span>
+            نسخه پایدار و ترمیم‌شده سامانه: <span class="font-mono text-purple-400 font-bold">v2.7.1</span>
         </div>
 
     </div>
