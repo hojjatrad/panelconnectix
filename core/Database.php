@@ -333,7 +333,8 @@ class Database {
                 'latency_ms' => 'INT DEFAULT 0',
                 'last_checked_at' => 'DATETIME NULL',
                 'error_message' => 'TEXT NULL',
-                'category_id' => 'INT NULL DEFAULT NULL'
+                'category_id' => 'INT NULL DEFAULT NULL',
+                'config_template' => 'TEXT NULL'
             ];
             foreach ($serverCols as $c => $d) {
                 self::safeAddColumn($pdo, 'server_nodes', $c, $d);

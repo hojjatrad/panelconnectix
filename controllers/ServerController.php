@@ -49,6 +49,7 @@ class ServerController {
         $categoryId = !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null;
         $subDomain = trim($_POST['sub_domain'] ?? '');
         $maxClients = (int)($_POST['max_clients'] ?? 500);
+        $configTemplate = trim($_POST['config_template'] ?? '');
 
         if (empty($name) || empty($apiUrl)) {
             Helpers::flash('error', 'نام سرور و آدرس API الزامی هستند.');
@@ -61,9 +62,9 @@ class ServerController {
             if ($catSlug) $serverGroup = $catSlug;
         }
 
-        $stmt = $pdo->prepare("INSERT INTO server_nodes (name, driver, api_url, api_username, api_password, api_token, server_group, category_id, sub_domain, max_clients) 
-                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->execute([$name, $driver, $apiUrl, $username, $password, $token, $serverGroup, $categoryId, $subDomain, $maxClients]);
+        $stmt = $pdo->prepare("INSERT INTO server_nodes (name, driver, api_url, api_username, api_password, api_token, server_group, category_id, sub_domain, max_clients, config_template) 
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$name, $driver, $apiUrl, $username, $password, $token, $serverGroup, $categoryId, $subDomain, $maxClients, $configTemplate]);
 
         Helpers::flash('success', 'سرور جدید با موفقیت به سامانه افزوده شد.');
         Helpers::redirect('servers');
@@ -87,6 +88,7 @@ class ServerController {
         $categoryId = !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null;
         $subDomain = trim($_POST['sub_domain'] ?? '');
         $maxClients = (int)($_POST['max_clients'] ?? 500);
+        $configTemplate = trim($_POST['config_template'] ?? '');
 
         if ($id <= 0 || empty($name) || empty($apiUrl)) {
             Helpers::flash('error', 'اطلاعات ارسالی سرور ناقص است.');
@@ -100,11 +102,11 @@ class ServerController {
         }
 
         if (!empty($password)) {
-            $stmt = $pdo->prepare("UPDATE server_nodes SET name = ?, driver = ?, api_url = ?, api_username = ?, api_password = ?, api_token = ?, server_group = ?, category_id = ?, sub_domain = ?, max_clients = ? WHERE id = ?");
-            $stmt->execute([$name, $driver, $apiUrl, $username, $password, $token, $serverGroup, $categoryId, $subDomain, $maxClients, $id]);
+            $stmt = $pdo->prepare("UPDATE server_nodes SET name = ?, driver = ?, api_url = ?, api_username = ?, api_password = ?, api_token = ?, server_group = ?, category_id = ?, sub_domain = ?, max_clients = ?, config_template = ? WHERE id = ?");
+            $stmt->execute([$name, $driver, $apiUrl, $username, $password, $token, $serverGroup, $categoryId, $subDomain, $maxClients, $configTemplate, $id]);
         } else {
-            $stmt = $pdo->prepare("UPDATE server_nodes SET name = ?, driver = ?, api_url = ?, api_username = ?, api_token = ?, server_group = ?, category_id = ?, sub_domain = ?, max_clients = ? WHERE id = ?");
-            $stmt->execute([$name, $driver, $apiUrl, $username, $token, $serverGroup, $categoryId, $subDomain, $maxClients, $id]);
+            $stmt = $pdo->prepare("UPDATE server_nodes SET name = ?, driver = ?, api_url = ?, api_username = ?, api_token = ?, server_group = ?, category_id = ?, sub_domain = ?, max_clients = ?, config_template = ? WHERE id = ?");
+            $stmt->execute([$name, $driver, $apiUrl, $username, $token, $serverGroup, $categoryId, $subDomain, $maxClients, $configTemplate, $id]);
         }
 
         Helpers::flash('success', "تنظیمات سرور '{$name}' با موفقیت به‌روزرسانی شد.");

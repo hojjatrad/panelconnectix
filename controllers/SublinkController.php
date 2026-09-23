@@ -157,8 +157,34 @@ class SublinkController {
 
     public static function buildConfigs(array $client): array {
         $pdo = Database::getConnection();
+        $uuid = !empty($client['uuid']) ? $client['uuid'] : 'adc6ed75-e6bd-4a15-911a-e29f09eee801';
+        $username = $client['username'] ?? 'user';
+        $brand = !empty($client['brand_name']) ? preg_replace('/[^\p{L}\p{N}_-]/u', '', str_replace(' ', '_', $client['brand_name'])) : 'Connectix';
 
-        // 1. If client is on a real node (Marzban / Pasargad / 3x-ui), fetch real links directly from the remote node
+        // 1. Check if server node has custom config_template
+        if (!empty($client['server_id'])) {
+            try {
+                $stmtNode = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ?");
+                $stmtNode->execute([(int)$client['server_id']]);
+                $node = $stmtNode->fetch(PDO::FETCH_ASSOC);
+                if ($node && !empty($node['config_template'])) {
+                    $tmpl = trim($node['config_template']);
+                    $lines = array_filter(array_map('trim', explode("\n", $tmpl)));
+                    $out = [];
+                    foreach ($lines as $i => $l) {
+                        $parsed = str_replace(
+                            ['{uuid}', '{username}', '{remark}'],
+                            [$uuid, $username, "{$brand}-{$username}"],
+                            $l
+                        );
+                        $out['tpl_' . ($i + 1)] = $parsed;
+                    }
+                    if (!empty($out)) return $out;
+                }
+            } catch (Throwable $e) {}
+        }
+
+        // 2. If client is on a real node (Marzban / Pasargad / 3x-ui), fetch real links directly from the remote node
         if (!empty($client['server_id'])) {
             try {
                 $stmtNode = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ?");

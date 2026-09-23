@@ -241,6 +241,15 @@ require __DIR__ . '/../layout/header.php';
                 </div>
             </div>
 
+            <div>
+                <label class="block text-slate-300 mb-1 font-semibold flex items-center justify-between">
+                    <span>الگوی کانفیگ اختصاصی سرور (VLESS Reality / Trojan)</span>
+                    <span class="text-[10px] text-cyan-400 font-normal">اختیاری - پشتیبانی از {uuid}</span>
+                </label>
+                <textarea name="config_template" rows="2" dir="ltr" placeholder="vless://{uuid}@gga1.montago-shop.ir:443?encryption=none&security=reality&type=tcp&headerType=none&flow=xtls-rprx-vision&sni=delivery.mp.microsoft.com&fp=edge&pbk=PjR-SM4fOm2fY4mTqWoqZDRyxontvpailM0gBqUxlUQ&sid=070a23aed243#{remark}" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-[11px] leading-relaxed"></textarea>
+                <span class="text-[10px] text-slate-400 mt-0.5 block">اگر وارد شود، تمام ساب‌لینک‌ها و ربات دقیقاً از این الگو با جایگذاری UUID کلاینت استفاده می‌کنند.</span>
+            </div>
+
             <div class="pt-1">
                 <div id="new_test_result" class="hidden mb-3 p-3 rounded-xl text-xs transition-all"></div>
                 <div class="flex items-center gap-2">
@@ -330,6 +339,15 @@ require __DIR__ . '/../layout/header.php';
                 </div>
             </div>
 
+            <div>
+                <label class="block text-slate-300 mb-1 font-semibold flex items-center justify-between">
+                    <span>الگوی کانفیگ اختصاصی سرور (VLESS Reality / Trojan)</span>
+                    <span class="text-[10px] text-cyan-400 font-normal">اختیاری - پشتیبانی از {uuid}</span>
+                </label>
+                <textarea name="config_template" id="edit_server_config_template" rows="2" dir="ltr" placeholder="vless://{uuid}@gga1.montago-shop.ir:443?encryption=none&security=reality&type=tcp&headerType=none&flow=xtls-rprx-vision&sni=delivery.mp.microsoft.com&fp=edge&pbk=PjR-SM4fOm2fY4mTqWoqZDRyxontvpailM0gBqUxlUQ&sid=070a23aed243#{remark}" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-[11px] leading-relaxed"></textarea>
+                <span class="text-[10px] text-slate-400 mt-0.5 block">اگر وارد شود، تمام ساب‌لینک‌ها و ربات دقیقاً از این الگو با جایگذاری UUID کلاینت استفاده می‌کنند.</span>
+            </div>
+
             <div class="pt-1">
                 <div id="edit_test_result" class="hidden mb-3 p-3 rounded-xl text-xs transition-all"></div>
                 <div class="flex items-center gap-2">
@@ -387,6 +405,9 @@ require __DIR__ . '/../layout/header.php';
         document.getElementById('edit_server_api_username').value = s.api_username || '';
         document.getElementById('edit_server_sub_domain').value = s.sub_domain || '';
         document.getElementById('edit_server_max_clients').value = (s.max_clients !== null && s.max_clients !== undefined) ? s.max_clients : 0;
+        if (document.getElementById('edit_server_config_template')) {
+            document.getElementById('edit_server_config_template').value = s.config_template || '';
+        }
 
         document.getElementById('editServerModal').classList.remove('hidden');
         document.getElementById('editServerModal').classList.add('flex');
