@@ -133,6 +133,9 @@ $pendingCount = $pendingAppsCount ?? 0;
                                 <button onclick="copyResellerDetails('<?= htmlspecialchars($r['username']) ?>', '<?= htmlspecialchars($r['brand_name']) ?>', '<?= htmlspecialchars($r['panel_password_display'] ?? '') ?>')" class="w-8 h-8 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 transition flex items-center justify-center text-xs" title="کپی پیام آماده حاوی آدرس پنل و مشخصات برای ارسال به نماینده">
                                     <i class="fa-solid fa-share-nodes"></i>
                                 </button>
+                                <button onclick="openDeleteResellerModal(<?= $r['id'] ?>, '<?= htmlspecialchars($r['username']) ?>', <?= (int)$r['client_count'] ?>, '<?= Helpers::formatMoney($r['wallet_balance']) ?>')" class="w-8 h-8 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition flex items-center justify-center text-xs" title="حذف حساب این نماینده">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
                             </div>
                         </td>
                     </tr>
@@ -395,7 +398,91 @@ function generateRandomPwd() {
     }
     document.getElementById('resetPwdInput').value = pwd;
 }
+
+function openDeleteResellerModal(userId, username, clientCount, balance) {
+    document.getElementById('deleteResellerUserId').value = userId;
+    document.getElementById('deleteResellerUsername').innerText = username;
+    document.getElementById('deleteResellerClients').innerText = clientCount + ' کلاینت';
+    document.getElementById('deleteResellerBalance').innerText = balance;
+    document.getElementById('deleteResellerModal').classList.remove('hidden');
+    document.getElementById('deleteResellerModal').classList.add('flex');
+}
+
+function closeDeleteResellerModal() {
+    document.getElementById('deleteResellerModal').classList.remove('flex');
+    document.getElementById('deleteResellerModal').classList.add('hidden');
+}
 </script>
+
+<!-- Modal: Delete Reseller -->
+<div id="deleteResellerModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl relative text-xs space-y-4">
+        <button onclick="closeDeleteResellerModal()" class="absolute top-4 left-4 text-slate-400 hover:text-white">
+            <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+
+        <div class="flex items-center gap-3 text-rose-400">
+            <div class="w-10 h-10 rounded-2xl bg-rose-500/20 flex items-center justify-center text-lg">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <div>
+                <h3 class="text-base font-bold text-white">حذف حساب نماینده فروش</h3>
+                <span class="text-slate-400 text-[11px]">این اقدام غیرقابل بازگشت است</span>
+            </div>
+        </div>
+
+        <p class="text-slate-300">
+            آیا از حذف حساب نماینده <strong id="deleteResellerUsername" class="text-white font-mono"></strong> اطمینان دارید؟
+        </p>
+
+        <div class="p-3 bg-slate-800/80 rounded-xl space-y-1.5 border border-slate-700/80">
+            <div class="flex justify-between text-slate-400">
+                <span>تعداد کاربران فعال این نماینده:</span>
+                <strong id="deleteResellerClients" class="text-white font-mono">۰</strong>
+            </div>
+            <div class="flex justify-between text-slate-400">
+                <span>تراز مالی فعلی:</span>
+                <strong id="deleteResellerBalance" class="text-emerald-400 font-mono">۰ تومان</strong>
+            </div>
+        </div>
+
+        <form action="<?= Helpers::url('resellers/delete') ?>" method="POST" class="space-y-4">
+            <?= Helpers::csrfField() ?>
+            <input type="hidden" name="user_id" id="deleteResellerUserId">
+
+            <div>
+                <label class="block text-slate-300 mb-2 font-semibold">تکلیف کاربران این نماینده چه شود؟</label>
+                <div class="space-y-2">
+                    <label class="flex items-start gap-2.5 p-3 rounded-xl bg-slate-800/50 border border-slate-700 cursor-pointer hover:border-purple-500 transition">
+                        <input type="radio" name="client_action" value="reassign" checked class="mt-0.5 text-purple-600 focus:ring-purple-500">
+                        <div>
+                            <strong class="text-white block font-medium">انتقال کاربران به مدیریت کل (پیشنهادی)</strong>
+                            <span class="text-slate-400 text-[11px]">مشتریان این نماینده به حساب مدیر کل منتقل شده و اتصال و اشتراک آن‌ها قطع نمی‌شود.</span>
+                        </div>
+                    </label>
+
+                    <label class="flex items-start gap-2.5 p-3 rounded-xl bg-slate-800/50 border border-slate-700 cursor-pointer hover:border-rose-500 transition">
+                        <input type="radio" name="client_action" value="delete" class="mt-0.5 text-rose-600 focus:ring-rose-500">
+                        <div>
+                            <strong class="text-rose-300 block font-medium">حذف کامل کاربران از سرورها و دیتابیس</strong>
+                            <span class="text-slate-400 text-[11px]">تمامی کانفیگ‌های کاربران این نماینده از روی نودها و پنل پاک خواهند شد.</span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                <button type="button" onclick="closeDeleteResellerModal()" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition">
+                    انصراف
+                </button>
+                <button type="submit" class="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl transition shadow flex items-center gap-1.5">
+                    <i class="fa-solid fa-trash"></i>
+                    <span>تأیید و حذف نماینده</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 
 <!-- Modal: Reset Password -->
 <div id="resetPwdModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">

@@ -220,25 +220,102 @@ class ResellerController {
         $pdo = Database::getConnection();
 
         $resellerId = (int)($_GET['id'] ?? 0);
-        $stmtUser = $pdo->prepare("SELECT * FROM users WHERE id = ? AND role = 'reseller'");
-        $stmtUser->execute([$resellerId]);
-        $reseller = $stmtUser->fetch();
+        $reseller = null;
+        if ($resellerId > 0) {
+            $stmtUser = $pdo->prepare("SELECT * FROM users WHERE id = ? AND role = 'reseller'");
+            $stmtUser->execute([$resellerId]);
+            $reseller = $stmtUser->fetch();
+
+            if (!$reseller) {
+                Helpers::flash('error', 'نماینده مورد نظر یافت نشد.');
+                Helpers::redirect('resellers');
+                return;
+            }
+        }
+
+        $allResellers = $pdo->query("SELECT id, username, full_name, brand_name, wallet_balance, credit_limit, discount_percent FROM users WHERE role = 'reseller' ORDER BY username ASC")->fetchAll();
+
+        $sql = "SELECT c.*, s.name as server_name, p.title as plan_title, u.username as reseller_username, u.brand_name as reseller_brand 
+                FROM clients c 
+                LEFT JOIN server_nodes s ON c.server_id = s.id 
+                LEFT JOIN plans p ON c.plan_id = p.id 
+                LEFT JOIN users u ON c.reseller_id = u.id ";
+
+        if ($resellerId > 0) {
+            $sql .= " WHERE c.reseller_id = ? ORDER BY c.id DESC";
+            $stmtClients = $pdo->prepare($sql);
+            $stmtClients->execute([$resellerId]);
+        } else {
+            $sql .= " WHERE u.role = 'reseller' ORDER BY c.id DESC";
+            $stmtClients = $pdo->query($sql);
+        }
+        $clients = $stmtClients->fetchAll();
+
+        require __DIR__ . '/../views/resellers/clients.php';
+    }
+
+    public function delete(): void {
+        Auth::requireAdmin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
+            Helpers::redirect('resellers');
+        }
+
+        $userId = (int)($_POST['user_id'] ?? 0);
+        $clientAction = trim($_POST['client_action'] ?? 'reassign'); // 'reassign' or 'delete'
+
+        if ($userId <= 1) {
+            Helpers::flash('error', 'حساب کاربری مدیر کل سامانه امکان حذف ندارد.');
+            Helpers::redirect('resellers');
+        }
+
+        $pdo = Database::getConnection();
+        $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ? AND role = 'reseller'");
+        $stmt->execute([$userId]);
+        $reseller = $stmt->fetch();
 
         if (!$reseller) {
             Helpers::flash('error', 'نماینده مورد نظر یافت نشد.');
             Helpers::redirect('resellers');
         }
 
-        $stmtClients = $pdo->prepare("SELECT c.*, s.name as server_name, p.title as plan_title 
-                                      FROM clients c 
-                                      LEFT JOIN server_nodes s ON c.server_id = s.id 
-                                      LEFT JOIN plans p ON c.plan_id = p.id 
-                                      WHERE c.reseller_id = ? 
-                                      ORDER BY c.id DESC");
-        $stmtClients->execute([$resellerId]);
-        $clients = $stmtClients->fetchAll();
+        $adminId = Auth::id() ?: 1;
 
-        require __DIR__ . '/../views/resellers/clients.php';
+        if ($clientAction === 'delete') {
+            // Remove all clients from node servers
+            $clients = $pdo->query("SELECT c.*, s.driver, s.api_url, s.api_token, s.api_username, s.api_password, s.name as server_name 
+                                    FROM clients c 
+                                    LEFT JOIN server_nodes s ON c.server_id = s.id 
+                                    WHERE c.reseller_id = {$userId}")->fetchAll();
+            require_once __DIR__ . '/../drivers/DriverFactory.php';
+            foreach ($clients as $c) {
+                if (!empty($c['server_id']) && !empty($c['driver'])) {
+                    try {
+                        $driver = DriverFactory::create($c);
+                        $driver->deleteUser($c['username']);
+                    } catch (Throwable $e) {}
+                }
+            }
+            $pdo->prepare("DELETE FROM clients WHERE reseller_id = ?")->execute([$userId]);
+        } else {
+            // Reassign to Super Admin so customer VPN connections are not broken
+            $pdo->prepare("UPDATE clients SET reseller_id = ? WHERE reseller_id = ?")->execute([$adminId, $userId]);
+        }
+
+        // Clean up reseller auxiliary records
+        $pdo->prepare("DELETE FROM reseller_plans WHERE reseller_id = ?")->execute([$userId]);
+        $pdo->prepare("DELETE FROM branding_metadata WHERE user_id = ?")->execute([$userId]);
+        $pdo->prepare("DELETE FROM bot_orders WHERE reseller_id = ?")->execute([$userId]);
+        $pdo->prepare("DELETE FROM transactions WHERE user_id = ?")->execute([$userId]);
+        $pdo->prepare("DELETE FROM tickets WHERE user_id = ?")->execute([$userId]);
+        $pdo->prepare("UPDATE reseller_applications SET approved_user_id = NULL WHERE approved_user_id = ?")->execute([$userId]);
+
+        // Delete user
+        $pdo->prepare("DELETE FROM users WHERE id = ?")->execute([$userId]);
+
+        Helpers::logActivity('reseller_delete', "حذف حساب نماینده {$reseller['username']} (اقدام برای کلاینت‌ها: {$clientAction})", 'reseller', (string)$userId);
+        Helpers::flash('success', "حساب نماینده {$reseller['username']} با موفقیت از سیستم حذف گردید.");
+        Helpers::redirect('resellers');
     }
 
     public function applications(): void {
