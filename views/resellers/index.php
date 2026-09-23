@@ -124,10 +124,13 @@ $pendingCount = $pendingAppsCount ?? 0;
                                 <button onclick="openCreditLimitModal(<?= $r['id'] ?>, '<?= htmlspecialchars($r['username']) ?>', <?= $limit ?>)" class="w-8 h-8 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 transition flex items-center justify-center text-xs" title="تنظیم سقف بدهی و اعتبار مجاز">
                                     <i class="fa-solid fa-scale-balanced"></i>
                                 </button>
+                                <button onclick="openResetPwdModal(<?= $r['id'] ?>, '<?= htmlspecialchars($r['username']) ?>', '<?= htmlspecialchars($r['panel_password_display'] ?? '') ?>')" class="w-8 h-8 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 transition flex items-center justify-center text-xs" title="تغییر یا مشاهده کلمه عبور پنل این نماینده">
+                                    <i class="fa-solid fa-key"></i>
+                                </button>
                                 <a href="<?= Helpers::url('resellers/clients?id=' . $r['id']) ?>" class="w-8 h-8 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 transition flex items-center justify-center text-xs" title="مشاهده و نظارت بر کاربران این نماینده">
                                     <i class="fa-solid fa-users"></i>
                                 </a>
-                                <button onclick="copyResellerDetails('<?= htmlspecialchars($r['username']) ?>', '<?= htmlspecialchars($r['brand_name']) ?>')" class="w-8 h-8 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 transition flex items-center justify-center text-xs" title="کپی پیام آماده حاوی آدرس پنل و مشخصات برای ارسال به نماینده">
+                                <button onclick="copyResellerDetails('<?= htmlspecialchars($r['username']) ?>', '<?= htmlspecialchars($r['brand_name']) ?>', '<?= htmlspecialchars($r['panel_password_display'] ?? '') ?>')" class="w-8 h-8 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 transition flex items-center justify-center text-xs" title="کپی پیام آماده حاوی آدرس پنل و مشخصات برای ارسال به نماینده">
                                     <i class="fa-solid fa-share-nodes"></i>
                                 </button>
                             </div>
@@ -347,19 +350,91 @@ function closeNewResellerModal() {
     document.getElementById('newResellerModal').classList.add('hidden');
 }
 
-function copyResellerDetails(username, brandName) {
+function copyResellerDetails(username, brandName, password) {
     const loginUrl = '<?= Helpers::fullUrl('login') ?>';
-    const text = `🌟 اطلاعات پنل نمایندگی شما (${brandName}):\n\n` +
+    let text = `🌟 اطلاعات پنل نمایندگی شما (${brandName}):\n\n` +
                  `🌐 آدرس ورود به پنل:\n${loginUrl}\n\n` +
-                 `👤 نام کاربری:\n${username}\n\n` +
-                 `💡 برای اتصال ربات تلگرام اختصاصی و اطلاعات حساب، پس از ورود به بخش «ربات تلگرام و فروش» مراجعه فرمایید.`;
+                 `👤 نام کاربری:\n${username}\n\n`;
+    if (password && password.length > 0) {
+        text += `🔑 کلمه عبور:\n${password}\n\n`;
+    }
+    text += `💡 برای اتصال ربات تلگرام اختصاصی و اطلاعات حساب، پس از ورود به بخش «ربات تلگرام و فروش» مراجعه فرمایید.`;
     navigator.clipboard.writeText(text).then(() => {
         alert('✅ پیام آماده با مشخصات کامل پنل کپی شد! می‌توانید آن را مستقیماً در تلگرام یا واتساپ برای نماینده ارسال نمایید.');
     }).catch(err => {
         alert('خطا در کپی: ' + err);
     });
 }
+
+function openResetPwdModal(userId, username, currentPwd) {
+    document.getElementById('resetPwdUserId').value = userId;
+    document.getElementById('resetPwdUsername').innerText = username;
+    var box = document.getElementById('currentPwdBox');
+    var val = document.getElementById('currentPwdVal');
+    if (currentPwd && currentPwd.length > 0) {
+        val.innerText = currentPwd;
+        box.classList.remove('hidden');
+    } else {
+        box.classList.add('hidden');
+    }
+    document.getElementById('resetPwdInput').value = '';
+    document.getElementById('resetPwdModal').classList.remove('hidden');
+    document.getElementById('resetPwdModal').classList.add('flex');
+}
+
+function closeResetPwdModal() {
+    document.getElementById('resetPwdModal').classList.remove('flex');
+    document.getElementById('resetPwdModal').classList.add('hidden');
+}
+
+function generateRandomPwd() {
+    const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#%';
+    let pwd = '';
+    for (let i = 0; i < 10; i++) {
+        pwd += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    document.getElementById('resetPwdInput').value = pwd;
+}
 </script>
+
+<!-- Modal: Reset Password -->
+<div id="resetPwdModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl relative text-xs">
+        <button onclick="closeResetPwdModal()" class="absolute top-4 left-4 text-slate-400 hover:text-white">
+            <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+
+        <h3 class="text-base font-bold text-white mb-1 flex items-center gap-2">
+            <i class="fa-solid fa-key text-amber-400"></i>
+            <span>تغییر کلمه عبور نماینده</span>
+        </h3>
+        <p class="text-slate-400 mb-4">نماینده: <span id="resetPwdUsername" class="font-bold text-white font-mono"></span></p>
+
+        <div id="currentPwdBox" class="p-3 bg-slate-800/80 rounded-xl mb-4 border border-slate-700/80 hidden">
+            <span class="text-[11px] text-slate-400 block mb-1">آخرین کلمه عبور ثبت‌شده در سیستم:</span>
+            <span id="currentPwdVal" class="font-mono text-sm font-bold text-emerald-400 select-all"></span>
+        </div>
+
+        <form action="<?= Helpers::url('resellers/reset-password') ?>" method="POST" class="space-y-4">
+            <?= Helpers::csrfField() ?>
+            <input type="hidden" name="user_id" id="resetPwdUserId">
+
+            <div>
+                <label class="block text-slate-300 mb-1 font-semibold">کلمه عبور جدید (حداقل ۶ کاراکتر) *</label>
+                <div class="flex gap-2">
+                    <input type="text" name="new_password" id="resetPwdInput" required minlength="6" placeholder="مثلاً: Pass@123" class="flex-1 bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-center">
+                    <button type="button" onclick="generateRandomPwd()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl border border-slate-700 text-xs font-semibold" title="تولید خودکار رمز تصادفی">
+                        <i class="fa-solid fa-shuffle"></i>
+                    </button>
+                </div>
+            </div>
+
+            <button type="submit" class="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl shadow-md mt-2">
+                ذخیره کلمه عبور جدید
+            </button>
+        </form>
+    </div>
+</div>
 
 <?php
 require __DIR__ . '/../layout/footer.php';

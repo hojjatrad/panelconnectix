@@ -24,7 +24,7 @@ class ResellerController {
         // 2. Query resellers with credit limit & safe fallback
         try {
             $stmt = $pdo->query("SELECT u.id, u.username, u.full_name, u.email, u.wallet_balance, 
-                                        u.discount_percent, u.status, u.telegram_bot_username,
+                                        u.discount_percent, u.status, u.telegram_bot_username, u.panel_password_display,
                                         COALESCE(u.credit_limit, 0) as credit_limit,
                                         COALESCE(u.brand_name, b.brand_name, 'بدون برند') as brand_name,
                                         (SELECT COUNT(*) FROM clients WHERE reseller_id = u.id) as client_count
@@ -38,6 +38,7 @@ class ResellerController {
             try {
                 $stmt = $pdo->query("SELECT u.id, u.username, u.full_name, u.email, u.wallet_balance, 
                                             u.discount_percent, u.status,
+                                            '' as panel_password_display,
                                             0 as credit_limit,
                                             '' as telegram_bot_username,
                                             'بدون برند' as brand_name,
@@ -86,9 +87,9 @@ class ResellerController {
         $hash = password_hash($password, PASSWORD_BCRYPT);
         $apiToken = 'reseller_' . bin2hex(random_bytes(16));
 
-        $stmt = $pdo->prepare("INSERT INTO users (username, password_hash, role, full_name, brand_name, email, wallet_balance, credit_limit, discount_percent, allowed_groups, api_token) 
-                               VALUES (?, ?, 'reseller', ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->execute([$username, $hash, $fullName, $fullName, $email, $initialBalance, $creditLimit, $discount, $groups, $apiToken]);
+        $stmt = $pdo->prepare("INSERT INTO users (username, password_hash, role, full_name, brand_name, email, wallet_balance, credit_limit, discount_percent, allowed_groups, api_token, panel_password_display) 
+                               VALUES (?, ?, 'reseller', ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$username, $hash, $fullName, $fullName, $email, $initialBalance, $creditLimit, $discount, $groups, $apiToken, $password]);
         $newId = (int)$pdo->lastInsertId();
 
         // Default branding
@@ -181,6 +182,36 @@ class ResellerController {
 
         Helpers::logActivity('reseller_discount', "تغییر درصد تخفیف نماینده {$userId} به {$discount}٪", 'reseller', (string)$userId);
         Helpers::flash('success', "درصد تخفیف نماینده با موفقیت به {$discount}٪ تغییر یافت.");
+        Helpers::redirect('resellers');
+    }
+
+    public function resetPassword(): void {
+        Auth::requireAdmin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
+            Helpers::redirect('resellers');
+        }
+
+        $userId = (int)($_POST['user_id'] ?? 0);
+        $newPass = trim($_POST['new_password'] ?? '');
+
+        if ($userId <= 0 || empty($newPass)) {
+            Helpers::flash('error', 'اطلاعات نامعتبر است.');
+            Helpers::redirect('resellers');
+        }
+
+        if (strlen($newPass) < 6) {
+            Helpers::flash('error', 'کلمه عبور باید حداقل ۶ کاراکتر باشد.');
+            Helpers::redirect('resellers');
+        }
+
+        $pdo = Database::getConnection();
+        $hash = password_hash($newPass, PASSWORD_BCRYPT);
+        $pdo->prepare("UPDATE users SET password_hash = ?, panel_password_display = ? WHERE id = ?")
+            ->execute([$hash, $newPass, $userId]);
+
+        Helpers::logActivity('reseller_reset_pwd', "تغییر کلمه عبور نماینده شناسه {$userId}", 'reseller', (string)$userId);
+        Helpers::flash('success', "کلمه عبور نماینده با موفقیت به {$newPass} تغییر یافت.");
         Helpers::redirect('resellers');
     }
 

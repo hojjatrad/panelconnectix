@@ -105,12 +105,12 @@ foreach ($clients as $c) {
             $usageRatio = $c['traffic_used_bytes'] / $c['traffic_limit_bytes'];
             if ($usageRatio >= 0.80 && empty($c['alert_80_sent'])) {
                 if (!empty($targetTg)) {
-                    $usedGb = round($c['traffic_used_bytes'] / (1024*1024*1024), 1);
-                    $totalGb = round($c['traffic_limit_bytes'] / (1024*1024*1024), 1);
+                    $usedStr = Helpers::formatBytes($c['traffic_used_bytes']);
+                    $totalStr = Helpers::formatBytes($c['traffic_limit_bytes']);
                     $warnNotice = "⚠️ <b>هشدار مصرف ترافیک (۸۰٪)</b>\n\n"
                                 . "کاربر گرامی اشتراک <code>{$c['username']}</code>:\n"
                                 . "بیش از ۸۰٪ از حجم بسته شما مصرف شده است:\n"
-                                . "📊 مصرف: <b>{$usedGb}GB</b> از <b>{$totalGb}GB</b>\n\n"
+                                . "📊 مصرف: <b>{$usedStr}</b> از <b>{$totalStr}</b>\n\n"
                                 . "💡 برای جلوگیری از قطع سرویس، می‌توانید همین حالا پلن تمدیدی رزرو کنید تا پس از اتمام خودکار فعال شود.";
                     $warnKeyboard = [
                         'inline_keyboard' => [
@@ -147,8 +147,8 @@ foreach ($clients as $c) {
 
         if ($isTrafficDone || $isTimeDone) {
             if (!empty($c['reserved_id'])) {
-                // Activate reserved plan
-                $addBytes = (int)$c['reserved_gb'] * 1024 * 1024 * 1024;
+                // Activate reserved plan (supports both MB and GB seamlessly)
+                $addBytes = (int)round((float)$c['reserved_gb'] * 1024 * 1024 * 1024);
                 $newExpire = date('Y-m-d H:i:s', time() + ($c['reserved_days'] * 86400));
 
                 $pdo->beginTransaction();

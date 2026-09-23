@@ -236,6 +236,7 @@ $router->post('resellers/store', [ResellerController::class, 'store']);
 $router->post('resellers/adjust', [ResellerController::class, 'adjustBalance']);
 $router->post('resellers/set-credit-limit', [ResellerController::class, 'setCreditLimit']);
 $router->post('resellers/update-discount', [ResellerController::class, 'updateDiscount']);
+$router->post('resellers/reset-password', [ResellerController::class, 'resetPassword']);
 $router->get('resellers/clients', [ResellerController::class, 'clients']);
 $router->get('resellers/applications', [ResellerController::class, 'applications']);
 $router->post('resellers/applications/approve', [ResellerController::class, 'approveApplication']);

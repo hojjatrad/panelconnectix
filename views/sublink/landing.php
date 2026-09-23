@@ -161,11 +161,15 @@ $renewalLink = !empty($client['renewal_url']) ? $client['renewal_url'] : (!empty
 
             <!-- Reserved Plan Banner (if queued) -->
             <?php if (!empty($client['reserved_id'])): ?>
+                <?php
+                $resTr = (float)($client['reserved_gb'] ?? 0);
+                $resTrTxt = ($resTr > 0 && $resTr < 1) ? round($resTr * 1024) . 'MB' : (($resTr == (int)$resTr ? (int)$resTr : $resTr) . 'GB');
+                ?>
                 <div class="p-3 bg-cyan-950/50 border border-cyan-800/60 rounded-xl text-xs text-cyan-200 flex items-center gap-2.5">
                     <i class="fa-solid fa-sparkles text-cyan-400 text-sm"></i>
                     <div>
                         <strong class="block text-cyan-300 font-bold">پلن رزرو هوشمند فعال است!</strong>
-                        <span>یک بسته <?= $client['reserved_gb'] ?>GB رزرو دارید که پس از پایان حجم فعلی، خودکار فعال خواهد شد.</span>
+                        <span>یک بسته <?= $resTrTxt ?> رزرو دارید که پس از پایان حجم فعلی، خودکار فعال خواهد شد.</span>
                     </div>
                 </div>
             <?php endif; ?>

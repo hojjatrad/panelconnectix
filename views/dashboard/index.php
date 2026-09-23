@@ -48,6 +48,27 @@ require __DIR__ . '/../layout/header.php';
                 </span>
             </div>
             <p class="text-xs text-slate-400 mt-1"><?= htmlspecialchars($tierInfo['next_target'] ?? 'تخفیف حداکثری فعال است.') ?></p>
+            <?php if ($tierInfo['tier'] !== 'diamond'): ?>
+                <?php
+                $currentClients = (int)($tierInfo['client_count'] ?? 0);
+                $nextTargetNum = match($tierInfo['tier']) {
+                    'bronze' => 10,
+                    'silver' => 25,
+                    'gold' => 50,
+                    default => 50
+                };
+                $tierProgress = min(100, round(($currentClients / $nextTargetNum) * 100));
+                ?>
+                <div class="mt-2 w-full max-w-sm">
+                    <div class="flex justify-between text-[10px] text-slate-400 mb-1 font-mono">
+                        <span class="font-sans">مسیر ارتقای خودکار:</span>
+                        <span class="text-purple-300 font-bold"><?= $currentClients ?> / <?= $nextTargetNum ?> کلاینت (<?= $tierProgress ?>%)</span>
+                    </div>
+                    <div class="w-full bg-slate-950/80 rounded-full h-1.5 overflow-hidden border border-slate-800">
+                        <div class="h-full bg-gradient-to-r from-purple-500 to-emerald-400 rounded-full transition-all duration-500" style="width: <?= $tierProgress ?>%"></div>
+                    </div>
+                </div>
+            <?php endif; ?>
         </div>
     </div>
 

@@ -63,9 +63,9 @@ require __DIR__ . '/../layout/header.php';
                 </thead>
                 <tbody class="divide-y divide-slate-800/70">
                     <?php foreach ($clients as $idx => $c): 
-                        $usedGb = round($c['traffic_used_bytes'] / (1024*1024*1024), 2);
-                        $totalGb = round($c['traffic_limit_bytes'] / (1024*1024*1024), 2);
-                        $percent = ($totalGb > 0) ? min(100, round(($usedGb / $totalGb) * 100)) : 0;
+                        $usedStr = Helpers::formatBytes($c['traffic_used_bytes']);
+                        $totalStr = Helpers::formatBytes($c['traffic_limit_bytes']);
+                        $percent = ($c['traffic_limit_bytes'] > 0) ? min(100, round(($c['traffic_used_bytes'] / $c['traffic_limit_bytes']) * 100)) : 0;
                     ?>
                         <tr class="hover:bg-slate-800/30 transition-colors">
                             <td class="p-3.5 font-mono text-slate-400"><?= $idx + 1 ?></td>
@@ -77,8 +77,8 @@ require __DIR__ . '/../layout/header.php';
                             <td class="p-3.5">
                                 <div class="space-y-1 w-32">
                                     <div class="flex justify-between text-[10px] text-slate-400 font-mono">
-                                        <span><?= $usedGb ?> GB</span>
-                                        <span><?= $totalGb ?> GB</span>
+                                        <span><?= $usedStr ?></span>
+                                        <span><?= $totalStr ?></span>
                                     </div>
                                     <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
                                         <div class="h-full rounded-full <?= $percent > 90 ? 'bg-rose-500' : ($percent > 70 ? 'bg-amber-500' : 'bg-purple-500') ?>" style="width: <?= $percent ?>%"></div>
