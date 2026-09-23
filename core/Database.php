@@ -327,6 +327,14 @@ class Database {
                 self::safeAddColumn($pdo, 'plans', $c, $d);
             }
 
+            $isMysql = ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql');
+            if ($isMysql) {
+                try {
+                    $pdo->exec("ALTER TABLE `plans` MODIFY COLUMN `traffic_gb` DECIMAL(10,3) NOT NULL DEFAULT 1.000");
+                    $pdo->exec("ALTER TABLE `reserved_plans` MODIFY COLUMN `traffic_gb` DECIMAL(10,3) NOT NULL DEFAULT 1.000");
+                } catch (Throwable $e) {}
+            }
+
             // Seed Default Categories if empty
             try {
                 $catCount = (int)$pdo->query("SELECT COUNT(*) FROM categories")->fetchColumn();
@@ -495,7 +503,7 @@ CREATE TABLE IF NOT EXISTS server_nodes (
 CREATE TABLE IF NOT EXISTS plans (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
-    traffic_gb INTEGER NOT NULL,
+    traffic_gb REAL NOT NULL,
     duration_days INTEGER NOT NULL,
     base_price INTEGER NOT NULL, -- Tomans
     reseller_price INTEGER NOT NULL, -- Tomans
@@ -530,7 +538,7 @@ CREATE TABLE IF NOT EXISTS reserved_plans (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     client_id INTEGER NOT NULL,
     plan_id INTEGER NOT NULL,
-    traffic_gb INTEGER NOT NULL,
+    traffic_gb REAL NOT NULL,
     duration_days INTEGER NOT NULL,
     status TEXT NOT NULL DEFAULT 'queued', -- 'queued', 'applied', 'cancelled'
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

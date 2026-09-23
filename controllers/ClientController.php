@@ -799,21 +799,33 @@ class ClientController {
         $user = Auth::user();
         $userId = Auth::id();
 
-        // Find default active server
-        $server = $pdo->query("SELECT * FROM server_nodes WHERE is_active = 1 ORDER BY id ASC LIMIT 1")->fetch();
+        // Server selection (chosen or default active)
+        $serverId = (int)($_POST['server_id'] ?? 0);
+        if ($serverId > 0) {
+            $server = $pdo->query("SELECT * FROM server_nodes WHERE id = {$serverId} AND is_active = 1")->fetch();
+        } else {
+            $server = $pdo->query("SELECT * FROM server_nodes WHERE is_active = 1 ORDER BY id ASC LIMIT 1")->fetch();
+        }
+
         if (!$server) {
             Helpers::flash('error', 'هیچ سرور فعالی برای ایجاد اکانت تست در دسترس نیست.');
             Helpers::redirect('clients');
         }
+
+        $trafficMb = (int)($_POST['traffic_mb'] ?? 200);
+        if ($trafficMb <= 0) $trafficMb = 200;
+        $hours = (int)($_POST['hours'] ?? 24);
+        if ($hours <= 0) $hours = 24;
 
         // Generate credentials
         $username = 'test_' . substr(bin2hex(random_bytes(3)), 0, 6);
         $password = substr(bin2hex(random_bytes(3)), 0, 6);
         $uuid = Helpers::generateUUID();
         $subToken = Helpers::generateToken(24);
-        $trafficBytes = 1 * 1024 * 1024 * 1024; // 1 GB test
-        $expireAt = date('Y-m-d H:i:s', strtotime("+1 day"));
-        $customNote = 'اکانت تست ۲۴ ساعته (رایگان)';
+        $trafficBytes = (int)$trafficMb * 1024 * 1024;
+        $expireAt = date('Y-m-d H:i:s', time() + ($hours * 3600));
+        $trafficText = ($trafficMb >= 1024) ? round($trafficMb / 1024, 1) . ' گیگابایت' : $trafficMb . ' مگابایت';
+        $customNote = "اکانت تست {$hours} ساعته ({$trafficText})";
 
         // Remote driver creation
         $driver = DriverFactory::create($server);
@@ -836,8 +848,8 @@ class ClientController {
         $stmt->execute([$userId, $server['id'], $username, $password, $uuid, $subToken, $trafficBytes, $expireAt, $customNote]);
         $newId = $pdo->lastInsertId();
 
-        Helpers::logActivity('test_account_create', "ایجاد اکانت تست ۲۴ ساعته {$username} روی سرور {$server['name']}", 'client', $newId);
-        Helpers::flash('success', "اکانت تست ۱ روزه با نام کاربری {$username} با موفقیت صادر گردید.");
+        Helpers::logActivity('test_account_create', "ایجاد اکانت تست {$trafficText} ({$username}) روی سرور {$server['name']}", 'client', $newId);
+        Helpers::flash('success', "اکانت تست {$hours} ساعته با حجم {$trafficText} و نام کاربری {$username} با موفقیت صادر گردید.");
         Helpers::redirect('clients');
     }
 }

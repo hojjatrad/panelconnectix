@@ -712,9 +712,18 @@ class TelegramBotController {
         $priceFa = number_format($order['amount']) . ' تومان';
         $titlePrefix = ($order['order_type'] === 'renew') ? 'پیش‌فاکتور تمدید اشتراک' : 'پیش‌فاکتور خرید اشتراک جدید';
 
+        $trafficVal = (float)($order['traffic_gb'] ?? 0);
+        if ($trafficVal > 0 && $trafficVal < 1) {
+            $trafficText = round($trafficVal * 1024) . ' مگابایت';
+        } elseif ($trafficVal >= 1) {
+            $trafficText = ($trafficVal == (int)$trafficVal ? (int)$trafficVal : $trafficVal) . ' گیگابایت';
+        } else {
+            $trafficText = 'نامحدود';
+        }
+
         $msg = "🛒 <b>{$titlePrefix}</b>\n\n"
              . "📦 <b>پلن انتخابی:</b> {$order['display_title']}\n"
-             . "💾 <b>حجم ترافیک:</b> {$order['traffic_gb']} گیگابایت\n"
+             . "💾 <b>حجم ترافیک:</b> {$trafficText}\n"
              . "⏳ <b>مدت اعتبار:</b> {$order['duration_days']} روز\n";
 
         if (!empty($order['coupon_code'])) {
@@ -1494,8 +1503,18 @@ class TelegramBotController {
 
         $buttons = [];
         foreach ($plans as $p) {
-            $priceFa = number_format($p['display_price']) . ' ت';
-            $btnText = "{$p['display_title']} ({$p['traffic_gb']}GB - {$p['duration_days']} روز) | {$priceFa}";
+            $priceFa = !empty($p['is_free']) ? 'رایگان' : (number_format($p['display_price']) . ' ت');
+            $trafficVal = (float)$p['traffic_gb'];
+            if ($trafficVal > 0 && $trafficVal < 1) {
+                $trafficText = round($trafficVal * 1024) . 'MB';
+            } elseif ($trafficVal >= 1) {
+                $trafficText = ($trafficVal == (int)$trafficVal ? (int)$trafficVal : $trafficVal) . 'GB';
+            } else {
+                $trafficText = 'نامحدود';
+            }
+            $daysText = $p['duration_days'] . 'D';
+            $ipText = !empty($p['ip_limit']) ? " | {$p['ip_limit']}U" : "";
+            $btnText = "🔄 {$trafficText} | {$daysText}{$ipText} | {$priceFa}";
             $buttons[] = [['text' => $btnText, 'callback_data' => 'select_renew_plan_' . $client['id'] . '_' . $p['id']]];
         }
         $buttons[] = [['text' => '🔙 بازگشت', 'callback_data' => 'view_acc_' . $clientId]];
@@ -1615,9 +1634,18 @@ class TelegramBotController {
         $buttons = [];
         $row = [];
         foreach ($filteredPlans as $p) {
-            $priceFa = number_format($p['display_price']) . ' ت';
-            $ipText = !empty($p['ip_limit']) ? " ({$p['ip_limit']}ک)" : "";
-            $btnText = "📦 {$p['traffic_gb']}G{$ipText} ({$p['duration_days']}ر) - {$priceFa}";
+            $priceFa = !empty($p['is_free']) ? 'رایگان' : (number_format($p['display_price']) . ' ت');
+            $trafficVal = (float)$p['traffic_gb'];
+            if ($trafficVal > 0 && $trafficVal < 1) {
+                $trafficText = round($trafficVal * 1024) . 'MB';
+            } elseif ($trafficVal >= 1) {
+                $trafficText = ($trafficVal == (int)$trafficVal ? (int)$trafficVal : $trafficVal) . 'GB';
+            } else {
+                $trafficText = 'نامحدود';
+            }
+            $daysText = $p['duration_days'] . 'D';
+            $ipText = !empty($p['ip_limit']) ? " | {$p['ip_limit']}U" : "";
+            $btnText = "📦 {$trafficText} | {$daysText}{$ipText} | {$priceFa}";
             $row[] = ['text' => $btnText, 'callback_data' => 'select_plan_' . $p['id']];
             if (count($row) === 2) {
                 $buttons[] = $row;
@@ -2586,7 +2614,7 @@ class TelegramBotController {
         $msg = "🎁 <b>اکانت تست رایگان شما با موفقیت فعال گردید!</b>\n\n"
              . "👤 <b>نام کاربری:</b> <code>{$res['username']}</code>\n"
              . "🔑 <b>کلمه عبور:</b> <code>{$res['password']}</code>\n"
-             . "📦 <b>حجم تست:</b> {$res['traffic_gb']} گیگابایت\n"
+             . "📦 <b>حجم تست:</b> {$res['traffic_text']}\n"
              . "⏳ <b>مهلت تست:</b> {$res['hours']} ساعت\n"
              . "🌐 <b>سرور متصل:</b> {$res['server_name']}\n\n"
              . "🔗 <b>لینک اتصال ساب‌لینک هوشمند:</b>\n"

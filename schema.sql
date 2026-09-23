@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS `server_nodes` (
 CREATE TABLE IF NOT EXISTS `plans` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `title` VARCHAR(128) NOT NULL,
-    `traffic_gb` INT NOT NULL,
+    `traffic_gb` DECIMAL(10,3) NOT NULL,
     `duration_days` INT NOT NULL,
     `base_price` BIGINT NOT NULL,
     `reseller_price` BIGINT NOT NULL,
@@ -135,7 +135,7 @@ CREATE TABLE IF NOT EXISTS `reserved_plans` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `client_id` INT NOT NULL,
     `plan_id` INT NOT NULL,
-    `traffic_gb` INT NOT NULL,
+    `traffic_gb` DECIMAL(10,3) NOT NULL,
     `duration_days` INT NOT NULL,
     `status` ENUM('queued', 'applied', 'cancelled') NOT NULL DEFAULT 'queued',
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -448,5 +448,5 @@ INSERT INTO `system_settings` (`setting_key`, `setting_value`) VALUES
 ('github_branch', 'main'),
 ('github_webhook_secret', 'gh_hook_sec_vpbotn_2026'),
 ('brand_name', 'Connectix VPN'),
-('current_version', '2.8.1')
+('current_version', '2.8.2')
 ON DUPLICATE KEY UPDATE `setting_value`=VALUES(`setting_value`);

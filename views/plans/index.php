@@ -142,9 +142,13 @@ foreach ($customPlanCats as $idx => $custCat) {
                     </div>
 
                     <div class="my-4 space-y-2 text-xs bg-slate-800/30 p-3 rounded-xl border border-slate-800">
+                        <?php 
+                        $trVal = (float)$p['traffic_gb'];
+                        $trDisplay = ($trVal > 0 && $trVal < 1) ? round($trVal * 1024) . ' مگابایت' : (($trVal == (int)$trVal ? (int)$trVal : $trVal) . ' گیگابایت');
+                        ?>
                         <div class="flex justify-between text-slate-400">
                             <span>حجم ترافیک:</span>
-                            <span class="font-bold text-white font-mono"><?= $p['traffic_gb'] ?> گیگابایت</span>
+                            <span class="font-bold text-white font-mono"><?= $trDisplay ?></span>
                         </div>
                         <div class="flex justify-between text-slate-400">
                             <span>مدت اعتبار:</span>
@@ -329,12 +333,18 @@ foreach ($customPlanCats as $idx => $custCat) {
 
             <div class="grid grid-cols-2 gap-3">
                 <div>
-                    <label class="block text-slate-300 mb-1 font-semibold">حجم (گیگابایت) *</label>
-                    <input type="number" name="traffic_gb" required min="1" value="50" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
+                    <label class="block text-slate-300 mb-1 font-semibold">حجم ترافیک *</label>
+                    <div class="flex gap-1.5">
+                        <input type="number" step="any" name="traffic_gb" required min="0.01" value="50" class="flex-1 bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-center">
+                        <select name="traffic_unit" class="bg-slate-800 border border-slate-700 rounded-xl px-2 text-white text-xs font-bold">
+                            <option value="gb" selected>GB</option>
+                            <option value="mb">MB</option>
+                        </select>
+                    </div>
                 </div>
                 <div>
                     <label class="block text-slate-300 mb-1 font-semibold">مدت اعتبار (روز) *</label>
-                    <input type="number" name="duration_days" required min="1" value="30" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
+                    <input type="number" name="duration_days" required min="1" value="30" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-center">
                 </div>
             </div>
 
@@ -472,12 +482,18 @@ foreach ($customPlanCats as $idx => $custCat) {
 
             <div class="grid grid-cols-2 gap-3">
                 <div>
-                    <label class="block text-slate-300 mb-1 font-semibold">حجم (گیگابایت) *</label>
-                    <input type="number" name="traffic_gb" id="edit_traffic_gb" required min="1" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
+                    <label class="block text-slate-300 mb-1 font-semibold">حجم ترافیک *</label>
+                    <div class="flex gap-1.5">
+                        <input type="number" step="any" name="traffic_gb" id="edit_traffic_gb" required min="0.01" class="flex-1 bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-center">
+                        <select name="traffic_unit" id="edit_traffic_unit" class="bg-slate-800 border border-slate-700 rounded-xl px-2 text-white text-xs font-bold">
+                            <option value="gb" selected>GB</option>
+                            <option value="mb">MB</option>
+                        </select>
+                    </div>
                 </div>
                 <div>
                     <label class="block text-slate-300 mb-1 font-semibold">مدت اعتبار (روز) *</label>
-                    <input type="number" name="duration_days" id="edit_duration_days" required min="1" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
+                    <input type="number" name="duration_days" id="edit_duration_days" required min="1" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-center">
                 </div>
             </div>
 
@@ -591,7 +607,16 @@ foreach ($customPlanCats as $idx => $custCat) {
         }
 
         document.getElementById('edit_server_id').value = p.server_id || '';
-        document.getElementById('edit_traffic_gb').value = p.traffic_gb;
+        
+        var trVal = parseFloat(p.traffic_gb || 0);
+        if (trVal > 0 && trVal < 1) {
+            document.getElementById('edit_traffic_gb').value = Math.round(trVal * 1024);
+            document.getElementById('edit_traffic_unit').value = 'mb';
+        } else {
+            document.getElementById('edit_traffic_gb').value = trVal;
+            document.getElementById('edit_traffic_unit').value = 'gb';
+        }
+
         document.getElementById('edit_duration_days').value = p.duration_days;
         document.getElementById('edit_ip_limit').value = p.ip_limit ?? 2;
         document.getElementById('edit_base_price').value = p.base_price;

@@ -36,7 +36,9 @@ class PlanController {
         }
 
         $title = trim($_POST['title'] ?? '');
-        $traffic = (int)($_POST['traffic_gb'] ?? 0);
+        $trafficInput = (float)($_POST['traffic_gb'] ?? 0);
+        $trafficUnit = strtolower(trim($_POST['traffic_unit'] ?? 'gb'));
+        $traffic = ($trafficUnit === 'mb') ? round($trafficInput / 1024, 4) : $trafficInput;
         $days = (int)($_POST['duration_days'] ?? 0);
         $basePrice = (int)($_POST['base_price'] ?? 0);
         $resellerPrice = (int)($_POST['reseller_price'] ?? 0);
@@ -90,7 +92,9 @@ class PlanController {
 
         $id = (int)($_POST['id'] ?? 0);
         $title = trim($_POST['title'] ?? '');
-        $traffic = (int)($_POST['traffic_gb'] ?? 0);
+        $trafficInput = (float)($_POST['traffic_gb'] ?? 0);
+        $trafficUnit = strtolower(trim($_POST['traffic_unit'] ?? 'gb'));
+        $traffic = ($trafficUnit === 'mb') ? round($trafficInput / 1024, 4) : $trafficInput;
         $days = (int)($_POST['duration_days'] ?? 0);
         $basePrice = (int)($_POST['base_price'] ?? 0);
         $resellerPrice = (int)($_POST['reseller_price'] ?? 0);

@@ -319,11 +319,11 @@ class Provisioner {
         $hours = (int)Setting::get('trial_duration_hours', 24);
         if ($hours <= 0) $hours = 24;
 
-        // Support MB or GB (If trial_traffic_mb is set, use it; otherwise fallback to trial_traffic_gb * 1024)
+        // Support MB or GB (If trial_traffic_mb is set, use it; otherwise fallback to trial_traffic_gb * 1024, default 200MB)
         $trafficMb = (int)Setting::get('trial_traffic_mb', 0);
         if ($trafficMb <= 0) {
-            $trafficGb = (int)Setting::get('trial_traffic_gb', 1);
-            $trafficMb = $trafficGb > 0 ? $trafficGb * 1024 : 500;
+            $trafficGb = (float)Setting::get('trial_traffic_gb', 0);
+            $trafficMb = $trafficGb > 0 ? (int)round($trafficGb * 1024) : 200;
         }
 
         // Check if user already got a trial today
@@ -391,6 +391,8 @@ class Provisioner {
 
         $subUrl = Helpers::fullUrl("sub/{$subToken}");
 
+        $trafficText = ($trafficMb >= 1024) ? (round($trafficMb / 1024, 1) . ' گیگابایت') : ($trafficMb . ' مگابایت');
+
         return [
             'success' => true,
             'client_id' => $clientId,
@@ -398,7 +400,8 @@ class Provisioner {
             'password' => $password,
             'uuid' => $uuid,
             'sub_url' => $subUrl,
-            'traffic_gb' => $trafficGb,
+            'traffic_mb' => $trafficMb,
+            'traffic_text' => $trafficText,
             'hours' => $hours,
             'expire_at' => $expireAt,
             'server_name' => $server['name']

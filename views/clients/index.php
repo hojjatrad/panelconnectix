@@ -13,13 +13,10 @@ require __DIR__ . '/../layout/header.php';
     </div>
 
     <div class="flex items-center gap-2">
-        <form method="POST" action="<?= Helpers::url('clients/test-account') ?>" class="m-0" onsubmit="return confirm('آیا مایلید یک اکانت تست ۲۴ ساعته (۱ گیگابایت رایگان) فوراً ایجاد شود؟');">
-            <?= Helpers::csrfField() ?>
-            <button type="submit" class="px-3.5 py-2.5 bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/30 text-xs font-bold rounded-xl transition-all shadow-sm flex items-center gap-1.5" title="صدور آنی اکانت تست ۱ روزه رایگان">
-                <i class="fa-solid fa-wand-magic-sparkles"></i>
-                <span>اکانت تست سریع</span>
-            </button>
-        </form>
+        <button type="button" onclick="openTestModal()" class="px-3.5 py-2.5 bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/30 text-xs font-bold rounded-xl transition-all shadow-sm flex items-center gap-1.5" title="صدور آنی اکانت تست با حجم دلخواه (مثلاً ۲۰۰ یا ۵۰۰ مگابایت)">
+            <i class="fa-solid fa-wand-magic-sparkles"></i>
+            <span>صدور اکانت تست سریع</span>
+        </button>
 
         <a href="<?= Helpers::url('clients/export') ?>?<?= http_build_query($_GET) ?>" class="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center gap-2" title="دانلود خروجی اکسل و CSV از نتایج فیلترشده">
             <i class="fa-solid fa-file-excel text-emerald-400"></i>
@@ -784,6 +781,91 @@ ${c.sub_url}`;
         </form>
     </div>
 </div>
+
+<!-- Modal: Quick Test Account Creation with Traffic Selection -->
+<div id="testAccountModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl relative space-y-4">
+        <button onclick="closeTestModal()" class="absolute top-4 left-4 text-slate-400 hover:text-white transition">
+            <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-wand-magic-sparkles text-cyan-400"></i>
+            <span>صدور آنی اکانت تست</span>
+        </h3>
+        <p class="text-xs text-slate-400">حجم ترافیک مورد نظر برای این اکانت تست را تعیین نمایید (مثلاً ۲۰۰ یا ۵۰۰ مگابایت):</p>
+
+        <form action="<?= Helpers::url('clients/test-account') ?>" method="POST" class="space-y-4 text-xs">
+            <?= Helpers::csrfField() ?>
+
+            <div>
+                <label class="block text-slate-300 mb-1.5 font-semibold">انتخاب سریع حجم ترافیک:</label>
+                <div class="grid grid-cols-3 gap-2">
+                    <button type="button" onclick="setTestMb(200)" class="py-2 rounded-xl bg-slate-800 hover:bg-cyan-600/30 text-slate-200 hover:text-cyan-300 border border-slate-700 font-mono font-bold text-xs transition">
+                        ۲۰۰ مگابایت
+                    </button>
+                    <button type="button" onclick="setTestMb(500)" class="py-2 rounded-xl bg-slate-800 hover:bg-cyan-600/30 text-slate-200 hover:text-cyan-300 border border-slate-700 font-mono font-bold text-xs transition">
+                        ۵۰۰ مگابایت
+                    </button>
+                    <button type="button" onclick="setTestMb(1024)" class="py-2 rounded-xl bg-slate-800 hover:bg-cyan-600/30 text-slate-200 hover:text-cyan-300 border border-slate-700 font-mono font-bold text-xs transition">
+                        ۱ گیگابایت
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-slate-300 mb-1 font-semibold">حجم تست (مگابایت) *</label>
+                    <input type="number" name="traffic_mb" id="test_traffic_mb" value="200" required min="50" max="50000" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-center">
+                    <span class="text-[10px] text-slate-400 mt-0.5 block">مثال: 200 یا 500</span>
+                </div>
+                <div>
+                    <label class="block text-slate-300 mb-1 font-semibold">مدت زمان (ساعت) *</label>
+                    <input type="number" name="hours" value="24" required min="1" max="720" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-center">
+                    <span class="text-[10px] text-slate-400 mt-0.5 block">پیش‌فرض ۲۴ ساعت</span>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-slate-300 mb-1 font-semibold">سرور مقصد:</label>
+                <select name="server_id" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white">
+                    <option value="0">⚡️ انتخاب خودکار اولین سرور فعال</option>
+                    <?php if (!empty($servers)): ?>
+                        <?php foreach ($servers as $s): ?>
+                            <option value="<?= $s['id'] ?>"><?= htmlspecialchars($s['name']) ?> (<?= strtoupper($s['driver']) ?>)</option>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </select>
+            </div>
+
+            <button type="submit" class="w-full py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl text-xs transition shadow-md mt-2 flex items-center justify-center gap-2">
+                <i class="fa-solid fa-bolt"></i>
+                <span>صدور و فعال‌سازی اکانت تست</span>
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+function openTestModal() {
+    var m = document.getElementById('testAccountModal');
+    if (m) {
+        m.classList.remove('hidden');
+        m.classList.add('flex');
+    }
+}
+function closeTestModal() {
+    var m = document.getElementById('testAccountModal');
+    if (m) {
+        m.classList.remove('flex');
+        m.classList.add('hidden');
+    }
+}
+function setTestMb(mb) {
+    var inp = document.getElementById('test_traffic_mb');
+    if (inp) inp.value = mb;
+}
+</script>
 
 <?php
 require __DIR__ . '/../layout/footer.php';
