@@ -30,6 +30,11 @@ require __DIR__ . '/../layout/header.php';
             </button>
         </form>
 
+        <a href="<?= Helpers::url('categories') ?>" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-purple-300 border border-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm flex items-center gap-2">
+            <i class="fa-solid fa-layer-group"></i>
+            <span>مدیریت خوشه‌ها و لوکیشن‌ها</span>
+        </a>
+
         <button onclick="openNewServerModal()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all shadow-md flex items-center gap-2">
             <i class="fa-solid fa-plus"></i>
             <span>افزودن سرور جدید</span>
