@@ -476,5 +476,5 @@ INSERT INTO `system_settings` (`setting_key`, `setting_value`) VALUES
 ('github_branch', 'main'),
 ('github_webhook_secret', 'gh_hook_sec_vpbotn_2026'),
 ('brand_name', 'Connectix VPN'),
-('current_version', '2.9.2')
+('current_version', '3.0.0')
 ON DUPLICATE KEY UPDATE `setting_value`=VALUES(`setting_value`);

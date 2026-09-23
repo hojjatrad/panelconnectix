@@ -411,6 +411,14 @@ $router->get('api/v1/plans', [ApiController::class, 'getPlans']);
 $router->post('api/v1/client/create', [ApiController::class, 'createClient']);
 $router->get('api/v1/client/info', [ApiController::class, 'getClientInfo']);
 
+// Dedicated Client Mobile & Desktop App Endpoints (v1)
+$router->get('settings/app-api', [ApiController::class, 'showAppApiDoc']);
+$router->post('api/v1/app/login', [ApiController::class, 'appLogin']);
+$router->get('api/v1/app/profile', [ApiController::class, 'appProfile']);
+$router->get('api/v1/app/configs', [ApiController::class, 'appConfigs']);
+$router->get('api/v1/app/announcements', [ApiController::class, 'appAnnouncements']);
+$router->post('api/v1/app/feedback', [ApiController::class, 'appFeedback']);
+
 // Dispatch Request with graceful error protection
 try {
     $router->dispatch();

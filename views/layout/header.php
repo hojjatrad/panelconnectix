@@ -274,6 +274,10 @@ if (!function_exists('isActiveRoute')) {
                     <i id="chevron-system" class="fa-solid fa-chevron-down chevron-icon text-[9px] text-slate-500"></i>
                 </button>
                 <div id="content-system" class="accordion-content space-y-0.5 mt-0.5 pr-2">
+                    <a href="<?= Helpers::url('settings/app-api') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('app-api', $currentUri) ? 'bg-cyan-600/15 text-cyan-300 font-bold border-r-2 border-cyan-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
+                        <i class="fa-solid fa-code w-4 text-center text-cyan-400"></i>
+                        <span>وب‌سرویس و اپلیکیشن اختصاصی</span>
+                    </a>
                     <a href="<?= Helpers::url('settings/app-guides') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('app-guides', $currentUri) ? 'bg-teal-600/15 text-teal-300 font-bold border-r-2 border-teal-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
                         <i class="fa-solid fa-mobile-screen-button w-4 text-center text-emerald-400"></i>
                         <span>نرم‌افزارها و راهنما</span>

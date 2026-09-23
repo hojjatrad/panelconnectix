@@ -1,0 +1,27 @@
+name: connectix_vpn
+description: Connectix Professional Multiplatform VPN Client (User & Password Login)
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  http: ^1.1.0
+  shared_preferences: ^2.2.0
+  flutter_v2ray: ^0.2.1
+  url_launcher: ^6.1.14
+  percent_indicator: ^4.2.3
+  google_fonts: ^5.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+
+flutter:
+  uses-material-design: true

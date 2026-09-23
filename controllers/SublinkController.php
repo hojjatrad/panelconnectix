@@ -110,7 +110,7 @@ class SublinkController {
         $pdo->prepare("UPDATE clients SET last_connected_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$client['id']]);
 
         // 6. Generate Connection Configs with Operator-Specific Routing
-        $configs = $this->buildConfigs($client);
+        $configs = self::buildConfigs($client);
 
         if ($isApp && !isset($_GET['web'])) {
             $this->outputRawSubscription($client, $configs);
@@ -119,7 +119,7 @@ class SublinkController {
         }
     }
 
-    private function buildConfigs(array $client): array {
+    public static function buildConfigs(array $client): array {
         $uuid = $client['uuid'];
         $username = $client['username'];
         $brand = !empty($client['brand_name']) ? preg_replace('/[^\p{L}\p{N}_-]/u', '', str_replace(' ', '_', $client['brand_name'])) : 'Connectix';
