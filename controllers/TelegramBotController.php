@@ -2417,6 +2417,11 @@ class TelegramBotController {
                           . "<code>{$prov['node_sublink']}</code>\n\n";
         }
 
+        if (!empty($prov['vless_link'])) {
+            $customerMsg .= "🚀 <b>کانکشن مستقیم (کپی با یک لمس):</b>\n"
+                          . "<code>{$prov['vless_link']}</code>\n\n";
+        }
+
         $customerMsg .= "📱 <i>برای اتصال، بارکد فوق را اسکن نمایید یا روی دکمه‌های زیر ضربه بزنید:</i>";
 
         $customerKeyboard = [
@@ -3702,6 +3707,11 @@ class TelegramBotController {
         if (!empty($res['node_sublink'])) {
             $msg .= "⚡ <b>لینک مستقیم سرور:</b>\n"
                   . "<code>{$res['node_sublink']}</code>\n\n";
+        }
+
+        if (!empty($res['vless_link'])) {
+            $msg .= "🚀 <b>کانکشن مستقیم (کپی با یک لمس):</b>\n"
+                  . "<code>{$res['vless_link']}</code>\n\n";
         }
 
         $msg .= "📱 <i>برای اتصال، لینک بالا را در نرم‌افزارهای v2rayNG یا Streisand وارد فرمایید یا بارکد فوق را اسکن نمایید.</i>";

@@ -234,6 +234,12 @@ class ServerController {
             $stats = $driver->getNodeStats();
             $lastErr = method_exists($driver, 'getLastError') ? $driver->getLastError() : null;
 
+            if ($auth) {
+                $pdo->prepare("UPDATE server_nodes SET health_status = 'online', last_check_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$id]);
+            } else {
+                $pdo->prepare("UPDATE server_nodes SET health_status = 'offline', last_check_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$id]);
+            }
+
             $message = $auth 
                 ? 'اتصال با موفقیت برقرار شد!' 
                 : ($lastErr ?: 'عدم توانایی در احراز هویت با سرور');

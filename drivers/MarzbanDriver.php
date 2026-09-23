@@ -158,6 +158,28 @@ class MarzbanDriver implements PanelDriverInterface {
         return false;
     }
 
+    public function getInbounds(): array {
+        if (!$this->authenticate()) return [];
+        $res = $this->request($this->apiPrefix . '/inbounds');
+        if ($res['success'] && is_array($res['data'])) {
+            $inbounds = [];
+            foreach ($res['data'] as $proto => $items) {
+                if (is_array($items)) {
+                    $inbounds[$proto] = [];
+                    foreach ($items as $item) {
+                        if (is_array($item) && !empty($item['tag'])) {
+                            $inbounds[$proto][] = $item['tag'];
+                        } elseif (is_string($item)) {
+                            $inbounds[$proto][] = $item;
+                        }
+                    }
+                }
+            }
+            return $inbounds;
+        }
+        return [];
+    }
+
     public function createUser(array $payload): array {
         if (!$this->authenticate()) {
             return [
@@ -168,30 +190,66 @@ class MarzbanDriver implements PanelDriverInterface {
             ];
         }
 
+        // Fetch dynamic active inbounds from server (Reality, VMess, Trojan, etc.)
+        $inbounds = $this->getInbounds();
+
+        $proxies = [
+            'vless' => ['id' => $payload['uuid'], 'flow' => 'xtls-rprx-vision'],
+            'vmess' => ['id' => $payload['uuid']],
+            'trojan' => ['password' => $payload['password'] ?? $payload['uuid']],
+            'shadowsocks' => ['password' => $payload['password'] ?? $payload['uuid'], 'method' => 'chacha20-ietf-poly1305']
+        ];
+
+        // Filter proxies to only protocols present in active inbounds if inbounds were returned
+        if (!empty($inbounds)) {
+            $filteredProxies = [];
+            foreach ($inbounds as $proto => $tags) {
+                $protoLower = strtolower($proto);
+                if (isset($proxies[$protoLower])) {
+                    $filteredProxies[$protoLower] = $proxies[$protoLower];
+                }
+            }
+            if (!empty($filteredProxies)) {
+                $proxies = $filteredProxies;
+            }
+        }
+
         $body = [
             'username' => $payload['username'],
-            'proxies' => [
-                'vless' => ['id' => $payload['uuid']],
-                'vmess' => ['id' => $payload['uuid']]
-            ],
-            'inbounds' => [],
+            'proxies' => $proxies,
             'expire' => $payload['expire_timestamp'] ?? null,
             'data_limit' => $payload['traffic_limit_bytes'] ?? 0,
             'data_limit_reset_strategy' => 'no_reset',
             'status' => 'active',
-            'note' => 'Provisioned via Connectix Panel'
+            'note' => 'Provisioned automatically via Connectix Panel'
         ];
+
+        // Only attach inbounds map if we fetched non-empty inbounds from Marzban API
+        if (!empty($inbounds)) {
+            $body['inbounds'] = $inbounds;
+        }
 
         $res = $this->request($this->apiPrefix . '/user', 'POST', $body);
         if ($res['success']) {
-            $subUrl = $res['data']['subscription_url'] ?? '';
-            if (empty($subUrl) && !empty($res['data']['links'])) {
-                $subUrl = $res['data']['links'][0] ?? '';
+            $data = $res['data'] ?? [];
+            $subUrl = $data['subscription_url'] ?? '';
+            $links = $data['links'] ?? [];
+
+            // If subscription_url is empty, fallback to first config link
+            if (empty($subUrl) && !empty($links)) {
+                $subUrl = $links[0];
             }
+            // Ensure full absolute URL if relative path returned
+            if (!empty($subUrl) && str_starts_with($subUrl, '/')) {
+                $subUrl = $this->baseUrl . $subUrl;
+            }
+
             return [
                 'success' => true,
                 'uuid' => $payload['uuid'],
-                'sublink' => $subUrl,
+                'sublink' => $subUrl ?: ($this->baseUrl . '/sub/' . $payload['uuid']),
+                'links' => $links,
+                'vless_link' => $links[0] ?? '',
                 'error' => null
             ];
         }
