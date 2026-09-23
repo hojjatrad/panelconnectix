@@ -321,6 +321,7 @@ class Database {
                 'start_on_first_use' => 'TINYINT(1) DEFAULT 0',
                 'first_connected_at' => 'DATETIME NULL',
                 'duration_days' => 'INT DEFAULT 30',
+                'node_sublink' => 'TEXT NULL',
                 'custom_note' => 'TEXT NULL'
             ];
             foreach ($clientCols as $c => $d) {

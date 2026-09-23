@@ -72,6 +72,7 @@ class Provisioner {
         $expireTimestamp = strtotime($expireAt);
 
         // 1. Provision on remote node
+        $nodeSublink = null;
         try {
             $driver = DriverFactory::create($server);
             $driverPayload = [
@@ -86,6 +87,7 @@ class Provisioner {
             if (!$driverResult['success']) {
                 return ['success' => false, 'error' => 'خطا در ثبت کاربر روی سرور نود: ' . ($driverResult['error'] ?? 'خطای نامشخص')];
             }
+            $nodeSublink = $driverResult['sublink'] ?? null;
         } catch (Throwable $e) {
             return ['success' => false, 'error' => 'استثنا در برقراری ارتباط با سرور نود: ' . $e->getMessage()];
         }
@@ -93,8 +95,8 @@ class Provisioner {
         // 2. Insert into database
         try {
             $stmt = $pdo->prepare("INSERT INTO clients 
-                (reseller_id, server_id, plan_id, username, password, uuid, sub_token, traffic_limit_bytes, traffic_used_bytes, expire_at, status, custom_note, telegram_chat_id) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'active', ?, ?)");
+                (reseller_id, server_id, plan_id, username, password, uuid, sub_token, node_sublink, traffic_limit_bytes, traffic_used_bytes, expire_at, status, custom_note, telegram_chat_id) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'active', ?, ?)");
             $stmt->execute([
                 $resellerId,
                 $server['id'],
@@ -103,6 +105,7 @@ class Provisioner {
                 $password,
                 $uuid,
                 $subToken,
+                $nodeSublink,
                 $trafficBytes,
                 $expireAt,
                 $customNote,
@@ -120,6 +123,7 @@ class Provisioner {
                 'uuid' => $uuid,
                 'sub_token' => $subToken,
                 'sub_url' => $subUrl,
+                'node_sublink' => $nodeSublink,
                 'expire_at' => $expireAt,
                 'traffic_gb' => $plan['traffic_gb'],
                 'server_id' => (int)$server['id'],
@@ -365,6 +369,7 @@ class Provisioner {
         $expireAt = date('Y-m-d H:i:s', strtotime("+{$hours} hours"));
 
         // Provision on remote node
+        $nodeSublink = null;
         try {
             $driver = DriverFactory::create($server);
             $driverPayload = [
@@ -379,14 +384,15 @@ class Provisioner {
             if (!$driverResult['success']) {
                 return ['success' => false, 'error' => 'خطا در نود سرور: ' . ($driverResult['error'] ?? 'خطای نامشخص')];
             }
+            $nodeSublink = $driverResult['sublink'] ?? null;
         } catch (Throwable $e) {
             return ['success' => false, 'error' => 'خطا در ارتباط با سرور: ' . $e->getMessage()];
         }
 
         // Save client
         $stmtClient = $pdo->prepare("INSERT INTO clients 
-            (reseller_id, server_id, plan_id, username, password, uuid, sub_token, traffic_limit_bytes, traffic_used_bytes, expire_at, status, custom_note, telegram_chat_id) 
-            VALUES (?, ?, NULL, ?, ?, ?, ?, ?, 0, ?, 'active', 'اکانت تست رایگان', ?)");
+            (reseller_id, server_id, plan_id, username, password, uuid, sub_token, node_sublink, traffic_limit_bytes, traffic_used_bytes, expire_at, status, custom_note, telegram_chat_id) 
+            VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, 0, ?, 'active', 'اکانت تست رایگان', ?)");
         $stmtClient->execute([
             $resellerId ?: 1,
             $server['id'],
@@ -394,6 +400,7 @@ class Provisioner {
             $password,
             $uuid,
             $subToken,
+            $nodeSublink,
             $trafficBytes,
             $expireAt,
             $telegramId
@@ -415,6 +422,7 @@ class Provisioner {
             'password' => $password,
             'uuid' => $uuid,
             'sub_url' => $subUrl,
+            'node_sublink' => $nodeSublink,
             'traffic_mb' => $trafficMb,
             'traffic_text' => $trafficText,
             'hours' => $hours,

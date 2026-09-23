@@ -109,7 +109,43 @@ class SublinkController {
         // 5. Update last connected timestamp
         $pdo->prepare("UPDATE clients SET last_connected_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$client['id']]);
 
-        // 6. Generate Connection Configs with Operator-Specific Routing
+        // 6. Direct Proxy from Real Node Sublink if present
+        if (!empty($client['node_sublink'])) {
+            $ch = curl_init($client['node_sublink']);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 8);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+            curl_setopt($ch, CURLOPT_USERAGENT, $_SERVER['HTTP_USER_AGENT'] ?? 'v2rayNG/1.8.5');
+            $sub = curl_exec($ch);
+            $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($code >= 200 && $code < 400 && !empty($sub)) {
+                if ($isApp && !isset($_GET['web'])) {
+                    header('Content-Type: text/plain; charset=utf-8');
+                    header('Profile-Update-Interval: 6');
+                    header('Content-Disposition: inline; filename="connectix_sub.txt"');
+                    echo $sub;
+                    exit;
+                }
+                $decoded = base64_decode(trim($sub), true) ?: $sub;
+                $lines = array_filter(array_map('trim', explode("\n", $decoded)));
+                $out = [];
+                foreach ($lines as $i => $l) {
+                    if (str_starts_with($l, 'vless://') || str_starts_with($l, 'vmess://') || str_starts_with($l, 'trojan://') || str_starts_with($l, 'ss://')) {
+                        $out['sub_link_' . ($i + 1)] = $l;
+                    }
+                }
+                if (!empty($out)) {
+                    $this->renderWebLanding($client, $out);
+                    exit;
+                }
+            }
+        }
+
+        // 7. Generate Connection Configs with Operator-Specific Routing
         $configs = self::buildConfigs($client);
 
         if ($isApp && !isset($_GET['web'])) {

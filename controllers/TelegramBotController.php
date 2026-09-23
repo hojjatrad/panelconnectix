@@ -2410,8 +2410,14 @@ class TelegramBotController {
                      . "⏳ <b>مهلت استفاده:</b> {$prov['expire_at']}\n"
                      . "🌐 <b>سرور:</b> {$prov['server_name']}\n\n"
                      . "🔗 <b>لینک اتصال اختصاصی شما (Sublink):</b>\n"
-                     . "<code>{$prov['sub_url']}</code>\n\n"
-                     . "📱 <i>برای اتصال، بارکد فوق را اسکن نمایید یا روی دکمه‌های زیر ضربه بزنید:</i>";
+                     . "<code>{$prov['sub_url']}</code>\n\n";
+
+        if (!empty($prov['node_sublink'])) {
+            $customerMsg .= "⚡ <b>لینک مستقیم سرور:</b>\n"
+                          . "<code>{$prov['node_sublink']}</code>\n\n";
+        }
+
+        $customerMsg .= "📱 <i>برای اتصال، بارکد فوق را اسکن نمایید یا روی دکمه‌های زیر ضربه بزنید:</i>";
 
         $customerKeyboard = [
             'inline_keyboard' => [
@@ -3691,8 +3697,14 @@ class TelegramBotController {
              . "⏳ <b>مهلت تست:</b> {$res['hours']} ساعت\n"
              . "🌐 <b>سرور متصل:</b> {$res['server_name']}\n\n"
              . "🔗 <b>لینک اتصال ساب‌لینک هوشمند:</b>\n"
-             . "<code>{$subUrl}</code>\n\n"
-             . "📱 <i>برای اتصال، لینک بالا را در نرم‌افزارهای v2rayNG یا Streisand وارد فرمایید یا بارکد فوق را اسکن نمایید.</i>";
+             . "<code>{$subUrl}</code>\n\n";
+
+        if (!empty($res['node_sublink'])) {
+            $msg .= "⚡ <b>لینک مستقیم سرور:</b>\n"
+                  . "<code>{$res['node_sublink']}</code>\n\n";
+        }
+
+        $msg .= "📱 <i>برای اتصال، لینک بالا را در نرم‌افزارهای v2rayNG یا Streisand وارد فرمایید یا بارکد فوق را اسکن نمایید.</i>";
 
         $kb = [
             'inline_keyboard' => [

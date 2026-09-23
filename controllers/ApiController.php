@@ -471,7 +471,31 @@ class ApiController {
         require_once __DIR__ . '/SublinkController.php';
 
         $realLinks = [];
-        if (!empty($client['server_id'])) {
+
+        // 1. First priority: Check stored node_sublink directly
+        if (!empty($client['node_sublink'])) {
+            $ch = curl_init($client['node_sublink']);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 6);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+            curl_setopt($ch, CURLOPT_USERAGENT, 'v2rayNG/1.8.5');
+            $subContent = curl_exec($ch);
+            curl_close($ch);
+            if (!empty($subContent)) {
+                $decoded = base64_decode(trim($subContent), true) ?: $subContent;
+                $lines = array_filter(array_map('trim', explode("\n", $decoded)));
+                foreach ($lines as $line) {
+                    if (str_starts_with($line, 'vless://') || str_starts_with($line, 'vmess://') || str_starts_with($line, 'trojan://') || str_starts_with($line, 'ss://')) {
+                        $realLinks[] = $line;
+                    }
+                }
+            }
+        }
+
+        // 2. Second priority: Query driver directly
+        if (empty($realLinks) && !empty($client['server_id'])) {
             try {
                 $stmtNode = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ?");
                 $stmtNode->execute([(int)$client['server_id']]);
@@ -486,7 +510,9 @@ class ApiController {
                         $ch = curl_init($liveData['subscription_url']);
                         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
                         curl_setopt($ch, CURLOPT_TIMEOUT, 6);
+                        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
                         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
                         $subContent = curl_exec($ch);
                         curl_close($ch);
                         if (!empty($subContent)) {
