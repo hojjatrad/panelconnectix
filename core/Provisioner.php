@@ -235,6 +235,21 @@ class Provisioner {
                                            COALESCE(s.latency_ms, 999) ASC LIMIT 1")->fetch();
         }
 
+        // 2.5 Prioritize ANY Real active server in the system regardless of ping health status
+        // (Temporary ping timeout should not prevent order provisioning if it is the only active server)
+        if (!$server) {
+            $stmt = $pdo->prepare("SELECT s.*, (SELECT COUNT(*) FROM clients WHERE server_id = s.id) as client_count 
+                                   FROM server_nodes s 
+                                   WHERE s.is_active = 1 
+                                     AND s.driver != 'mock'
+                                     AND {$capacityCondition}
+                                   ORDER BY (CASE WHEN s.server_group = ? THEN 0 ELSE 1 END) ASC,
+                                            client_count ASC, 
+                                            COALESCE(s.latency_ms, 999) ASC LIMIT 1");
+            $stmt->execute([$clusterGroup]);
+            $server = $stmt->fetch();
+        }
+
         // 3. Fallback to mock / testing servers matching group
         if (!$server) {
             $stmt = $pdo->prepare("SELECT s.*, (SELECT COUNT(*) FROM clients WHERE server_id = s.id) as client_count 

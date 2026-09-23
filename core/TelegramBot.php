@@ -259,6 +259,46 @@ class TelegramBot {
         return isset($res['ok']) && $res['ok'] === true;
     }
 
+    public static function editMessageCaption(string $caption, string $chatId, int $messageId, $replyMarkup = null, ?string $customToken = null): bool {
+        if (mb_strlen($caption) > 1020) {
+            $caption = mb_substr($caption, 0, 1016) . '...';
+        }
+        $params = [
+            'chat_id' => $chatId,
+            'message_id' => $messageId,
+            'caption' => $caption,
+            'parse_mode' => 'HTML'
+        ];
+
+        if ($replyMarkup !== null) {
+            $params['reply_markup'] = $replyMarkup;
+        }
+
+        $res = self::request('editMessageCaption', $params, $customToken);
+        return isset($res['ok']) && $res['ok'] === true;
+    }
+
+    /**
+     * Edit message text OR caption depending on whether original message was text or media (e.g. photo receipts)
+     * If editing fails entirely, it safely falls back to sending a reply message so details are never lost.
+     */
+    public static function editAnyMessage(string $content, string $chatId, int $messageId, $replyMarkup = null, ?string $customToken = null): bool {
+        // 1. Try editing message text
+        $resText = self::editMessageText($content, $chatId, $messageId, $replyMarkup, $customToken);
+        if ($resText) {
+            return true;
+        }
+
+        // 2. If it was a photo or document message (like a payment receipt), edit caption
+        $resCaption = self::editMessageCaption($content, $chatId, $messageId, $replyMarkup, $customToken);
+        if ($resCaption) {
+            return true;
+        }
+
+        // 3. Fallback: If both fail, send as a new message so the result is never silently dropped
+        return self::sendMessage($content, $chatId, $replyMarkup, $customToken);
+    }
+
     public static function answerCallbackQuery(string $callbackQueryId, ?string $text = null, bool $showAlert = false, ?string $customToken = null): bool {
         $params = [
             'callback_query_id' => $callbackQueryId,

@@ -341,7 +341,24 @@ class TelegramBotController {
         $messageId = $cb['message']['message_id'] ?? null;
         $chatId = (string)($cb['message']['chat']['id'] ?? $fromId);
 
-        TelegramBot::answerCallbackQuery($cbId);
+        // Defer answerCallbackQuery for actions that provide custom alerts/toasts
+        $customAnswerPrefixes = [
+            'check_join', 'confirm_db_restore',
+            'admin_approve_', 'admin_reject_',
+            'admin_approve_charge_', 'admin_reject_charge_',
+            'admin_crypto_approve_', 'admin_crypto_reject_',
+            'approve_reseller_'
+        ];
+        $isCustomAction = false;
+        foreach ($customAnswerPrefixes as $prefix) {
+            if (str_starts_with($data, $prefix) || $data === $prefix) {
+                $isCustomAction = true;
+                break;
+            }
+        }
+        if (!$isCustomAction) {
+            TelegramBot::answerCallbackQuery($cbId);
+        }
 
         // Force Join Check handler
         if ($data === 'check_join') {
@@ -639,26 +656,48 @@ class TelegramBotController {
         // Admin Actions: Approve Wallet Topup
         if (str_starts_with($data, 'admin_approve_charge_')) {
             $orderId = (int)str_replace('admin_approve_charge_', '', $data);
-            self::approveWalletChargeOrder($pdo, $orderId, $chatId, $messageId);
+            self::approveWalletChargeOrder($pdo, $orderId, $chatId, $messageId, $cbId);
             return;
         }
 
         // Admin Actions: Reject Wallet Topup
         if (str_starts_with($data, 'admin_reject_charge_')) {
             $orderId = (int)str_replace('admin_reject_charge_', '', $data);
-            self::rejectWalletChargeOrder($pdo, $orderId, $chatId, $messageId);
+            self::rejectWalletChargeOrder($pdo, $orderId, $chatId, $messageId, $cbId);
             return;
         }
 
         // Admin Actions: Approve Order
         if (str_starts_with($data, 'admin_approve_')) {
             $orderId = (int)str_replace('admin_approve_', '', $data);
+            $ctx = self::getContext($pdo);
+            $botToken = $ctx['bot_token'];
             $result = self::approveOrderAction($pdo, $orderId, $fromId);
-            if ($messageId) {
-                $statusText = $result['success'] 
-                    ? "✅ <b>سفارش #{$orderId} با موفقیت تایید و تحویل شد.</b>\n👤 کاربر: <code>{$result['username']}</code>\n🔑 کلمه عبور: <code>{$result['password']}</code>\n🔗 لینک: {$result['sub_url']}"
-                    : "⚠️ خطا در تایید سفارش #{$orderId}: " . $result['error'];
-                TelegramBot::editMessageText($statusText, $chatId, $messageId);
+
+            if ($result['success']) {
+                TelegramBot::answerCallbackQuery($cbId, "✅ سفارش #{$orderId} تایید و تحویل شد.", false, $botToken);
+                $statusText = "✅ <b>سفارش #{$orderId} با موفقیت تایید و تحویل شد.</b>\n"
+                            . "👤 کاربر: <code>{$result['username']}</code>\n"
+                            . "🔑 کلمه عبور: <code>{$result['password']}</code>\n"
+                            . "🔗 لینک ساب‌لینک: <code>{$result['sub_url']}</code>";
+                if ($messageId) {
+                    TelegramBot::editAnyMessage($statusText, $chatId, $messageId, null, $botToken);
+                }
+            } else {
+                $err = $result['error'] ?? 'خطای نامشخص در اتصال به سرور';
+                TelegramBot::answerCallbackQuery($cbId, "⚠️ خطا در تایید: " . mb_substr($err, 0, 150), true, $botToken);
+                $statusText = "⚠️ <b>خطا در تایید سفارش #{$orderId}:</b>\n{$err}\n\n<i>می‌توانید پس از بررسی سرور، مجدداً تلاش فرمایید.</i>";
+                $retryKb = [
+                    'inline_keyboard' => [
+                        [
+                            ['text' => '🔄 تلاش مجدد جهت تایید', 'callback_data' => 'admin_approve_' . $orderId],
+                            ['text' => '❌ رد سفارش', 'callback_data' => 'admin_reject_' . $orderId]
+                        ]
+                    ]
+                ];
+                if ($messageId) {
+                    TelegramBot::editAnyMessage($statusText, $chatId, $messageId, $retryKb, $botToken);
+                }
             }
             return;
         }
@@ -666,9 +705,12 @@ class TelegramBotController {
         // Admin Actions: Reject Order
         if (str_starts_with($data, 'admin_reject_')) {
             $orderId = (int)str_replace('admin_reject_', '', $data);
+            $ctx = self::getContext($pdo);
+            $botToken = $ctx['bot_token'];
             self::rejectOrderAction($pdo, $orderId, $fromId);
+            TelegramBot::answerCallbackQuery($cbId, "❌ سفارش #{$orderId} رد شد.", false, $botToken);
             if ($messageId) {
-                TelegramBot::editMessageText("❌ <b>سفارش #{$orderId} توسط مدیر رد شد.</b>", $chatId, $messageId);
+                TelegramBot::editAnyMessage("❌ <b>سفارش #{$orderId} توسط مدیر رد شد.</b>", $chatId, $messageId, null, $botToken);
             }
             return;
         }
@@ -2296,8 +2338,26 @@ class TelegramBotController {
             return ['success' => false, 'error' => 'سفارش یافت نشد.'];
         }
 
+        // Handle wallet charge orders if routed here
+        if ($order['order_type'] === 'charge_wallet') {
+            self::approveWalletChargeOrder($pdo, $orderId, $adminId ?: (string)$order['user_tg_id']);
+            return ['success' => true, 'username' => 'کیف‌پول', 'password' => '---', 'sub_url' => ''];
+        }
+
         if ($order['payment_status'] === 'paid') {
+            if (!empty($order['client_id'])) {
+                $stmtCl = $pdo->prepare("SELECT * FROM clients WHERE id = ?");
+                $stmtCl->execute([$order['client_id']]);
+                $cl = $stmtCl->fetch();
+                if ($cl) {
+                    return ['success' => true, 'username' => $cl['username'], 'password' => $cl['password'] ?: '123456', 'sub_url' => Helpers::subUrl($cl['sub_token'])];
+                }
+            }
             return ['success' => true, 'username' => 'قبلاً فعال شده', 'password' => '---', 'sub_url' => ''];
+        }
+
+        if (empty($order['plan_id'])) {
+            return ['success' => false, 'error' => 'پلن این سفارش مشخص نیست یا حذف شده است.'];
         }
 
         $resellerId = (int)($order['reseller_id'] ?? 1);
@@ -2919,14 +2979,20 @@ class TelegramBotController {
     /**
      * Admin Approve Wallet Top-up
      */
-    public static function approveWalletChargeOrder(PDO $pdo, int $orderId, string $adminChatId, ?int $messageId = null): void {
+    public static function approveWalletChargeOrder(PDO $pdo, int $orderId, string $adminChatId, ?int $messageId = null, ?string $cbId = null): void {
         $stmt = $pdo->prepare("SELECT * FROM bot_orders WHERE id = ?");
         $stmt->execute([$orderId]);
         $order = $stmt->fetch();
 
+        $ctx = self::getContext($pdo);
+        $botToken = $ctx['bot_token'];
+
         if (!$order || $order['payment_status'] === 'approved' || $order['payment_status'] === 'paid') {
+            if ($cbId) {
+                TelegramBot::answerCallbackQuery($cbId, "⚠️ این سفارش قبلاً تایید یا بررسی شده است.", true, $botToken);
+            }
             if ($messageId) {
-                TelegramBot::editMessageText("⚠️ این سفارش قبلاً تایید یا پرداخت گردیده است.", $adminChatId, $messageId);
+                TelegramBot::editAnyMessage("⚠️ این سفارش قبلاً تایید یا پرداخت گردیده است.", $adminChatId, $messageId, null, $botToken);
             }
             return;
         }
@@ -2968,11 +3034,13 @@ class TelegramBotController {
         $pdo->prepare("UPDATE bot_orders SET payment_status = 'approved', updated_at = CURRENT_TIMESTAMP WHERE id = ?")
             ->execute([$orderId]);
 
-        $ctx = self::getContext($pdo);
-        $botToken = $ctx['bot_token'];
+        if ($cbId) {
+            TelegramBot::answerCallbackQuery($cbId, "✅ شارژ کیف‌پول با موفقیت تایید و اعمال شد.", false, $botToken);
+        }
 
         if ($messageId) {
-            TelegramBot::editMessageText("✅ <b>شارژ کیف‌پول سفارش #{$orderId} با موفقیت تایید شد.</b>\n👤 کاربر: <code>{$userTgId}</code>\n💰 واریزی: " . number_format($baseAmount) . " تومان\n🎁 هدیه بانس: " . number_format($bonusAmount) . " تومان\n💳 اعتبار افزوده شده: " . number_format($totalCredit) . " تومان\n📊 موجودی جدید کاربر: " . number_format($newBalance) . " تومان", $adminChatId, $messageId, null, $botToken);
+            $adminText = "✅ <b>شارژ کیف‌پول سفارش #{$orderId} با موفقیت تایید شد.</b>\n👤 کاربر: <code>{$userTgId}</code>\n💰 واریزی: " . number_format($baseAmount) . " تومان\n🎁 هدیه بانس: " . number_format($bonusAmount) . " تومان\n💳 اعتبار افزوده شده: " . number_format($totalCredit) . " تومان\n📊 موجودی جدید کاربر: " . number_format($newBalance) . " تومان";
+            TelegramBot::editAnyMessage($adminText, $adminChatId, $messageId, null, $botToken);
         }
 
         $userMsg = "🎉 <b>کیف‌پول شما با موفقیت شارژ گردید!</b>\n\n"
@@ -2999,14 +3067,20 @@ class TelegramBotController {
     /**
      * Admin Reject Wallet Top-up
      */
-    public static function rejectWalletChargeOrder(PDO $pdo, int $orderId, string $adminChatId, ?int $messageId = null): void {
+    public static function rejectWalletChargeOrder(PDO $pdo, int $orderId, string $adminChatId, ?int $messageId = null, ?string $cbId = null): void {
         $stmt = $pdo->prepare("SELECT * FROM bot_orders WHERE id = ?");
         $stmt->execute([$orderId]);
         $order = $stmt->fetch();
 
+        $ctx = self::getContext($pdo);
+        $botToken = $ctx['bot_token'];
+
         if (!$order) {
+            if ($cbId) {
+                TelegramBot::answerCallbackQuery($cbId, "⚠️ سفارش یافت نشد.", true, $botToken);
+            }
             if ($messageId) {
-                TelegramBot::editMessageText("⚠️ سفارش یافت نشد.", $adminChatId, $messageId);
+                TelegramBot::editAnyMessage("⚠️ سفارش یافت نشد.", $adminChatId, $messageId, null, $botToken);
             }
             return;
         }
@@ -3014,11 +3088,12 @@ class TelegramBotController {
         $pdo->prepare("UPDATE bot_orders SET payment_status = 'rejected', updated_at = CURRENT_TIMESTAMP WHERE id = ?")
             ->execute([$orderId]);
 
-        $ctx = self::getContext($pdo);
-        $botToken = $ctx['bot_token'];
+        if ($cbId) {
+            TelegramBot::answerCallbackQuery($cbId, "❌ درخواست شارژ کیف‌پول رد شد.", false, $botToken);
+        }
 
         if ($messageId) {
-            TelegramBot::editMessageText("❌ <b>درخواست شارژ کیف‌پول سفارش #{$orderId} رد شد.</b>", $adminChatId, $messageId, null, $botToken);
+            TelegramBot::editAnyMessage("❌ <b>درخواست شارژ کیف‌پول سفارش #{$orderId} رد شد.</b>", $adminChatId, $messageId, null, $botToken);
         }
 
         $userMsg = "❌ <b>درخواست شارژ کیف‌پول شما تایید نگردید.</b>\n\nکد پیگیری: <code>{$order['order_code']}</code>\nمبلغ: " . number_format($order['amount']) . " تومان\n\nدر صورت کسر وجه از حساب، با پشتیبانی در تماس باشید.";
@@ -3540,7 +3615,7 @@ class TelegramBotController {
                      . "🌐 اطلاعات ورود برای متقاضی ارسال گردید.";
 
         if ($messageId) {
-            TelegramBot::editMessageText($adminResult, $adminChatId, $messageId, null, $botToken);
+            TelegramBot::editAnyMessage($adminResult, $adminChatId, $messageId, null, $botToken);
         } else {
             TelegramBot::sendMessage($adminResult, $adminChatId, null, $botToken);
         }
@@ -3560,7 +3635,7 @@ class TelegramBotController {
 
         $adminResult = "❌ درخواست نمایندگی متقاضی @" . ($app['user_tg_username'] ?: $app['user_tg_id']) . " رد شد.";
         if ($messageId) {
-            TelegramBot::editMessageText($adminResult, $adminChatId, $messageId, null, $botToken);
+            TelegramBot::editAnyMessage($adminResult, $adminChatId, $messageId, null, $botToken);
         } else {
             TelegramBot::sendMessage($adminResult, $adminChatId, null, $botToken);
         }
@@ -4039,7 +4114,7 @@ class TelegramBotController {
         $crypto = $stmt->fetch();
 
         if (!$crypto || $crypto['status'] === 'confirmed') {
-            if ($messageId) TelegramBot::editMessageText("⚠️ این پرداخت قبلاً تایید یا بررسی شده است.", $adminChatId, $messageId);
+            if ($messageId) TelegramBot::editAnyMessage("⚠️ این پرداخت قبلاً تایید یا بررسی شده است.", $adminChatId, $messageId);
             return;
         }
 
@@ -4049,7 +4124,7 @@ class TelegramBotController {
         
         $msg = "✅ <b>تراکنش تتر #{$cryptoId} با موفقیت تایید شد!</b>\nسفارش مربوطه فعال و تحویل داده شد.";
         if ($messageId) {
-            TelegramBot::editMessageText($msg, $adminChatId, $messageId);
+            TelegramBot::editAnyMessage($msg, $adminChatId, $messageId);
         } else {
             TelegramBot::sendMessage($msg, $adminChatId);
         }
@@ -4061,7 +4136,7 @@ class TelegramBotController {
     public static function rejectCryptoPayment(PDO $pdo, int $cryptoId, string $adminChatId, ?int $messageId = null): void {
         $pdo->prepare("UPDATE crypto_payments SET status = 'rejected', updated_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$cryptoId]);
         if ($messageId) {
-            TelegramBot::editMessageText("❌ <b>تراکنش تتر #{$cryptoId} توسط مدیر رد شد.</b>", $adminChatId, $messageId);
+            TelegramBot::editAnyMessage("❌ <b>تراکنش تتر #{$cryptoId} توسط مدیر رد شد.</b>", $adminChatId, $messageId);
         }
     }
 }
