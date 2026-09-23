@@ -55,7 +55,11 @@ require __DIR__ . '/../layout/header.php';
                                 <td class="p-3.5">
                                     <span class="font-bold text-white block"><?= htmlspecialchars($p['title']) ?></span>
                                     <span class="text-[11px] text-slate-400">
-                                        <?= $p['traffic_gb'] ?> گیگابایت | <?= $p['duration_days'] ?> روزه
+                                        <?php
+                                        $tr = (float)$p['traffic_gb'];
+                                        $trTxt = ($tr > 0 && $tr < 1) ? round($tr * 1024) . ' مگابایت' : (($tr == (int)$tr ? (int)$tr : $tr) . ' گیگابایت');
+                                        ?>
+                                        <?= $trTxt ?> | <?= $p['duration_days'] ?> روزه
                                     </span>
                                 </td>
 

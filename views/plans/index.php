@@ -331,20 +331,36 @@ foreach ($customPlanCats as $idx => $custCat) {
                 </div>
             </div>
 
-            <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label class="block text-slate-300 mb-1 font-semibold">حجم ترافیک *</label>
-                    <div class="flex gap-1.5">
-                        <input type="number" step="any" name="traffic_gb" required min="0.01" value="50" class="flex-1 bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-center">
-                        <select name="traffic_unit" class="bg-slate-800 border border-slate-700 rounded-xl px-2 text-white text-xs font-bold">
-                            <option value="gb" selected>GB</option>
-                            <option value="mb">MB</option>
-                        </select>
-                    </div>
+            <div>
+                <div class="flex items-center justify-between mb-1.5">
+                    <label class="block text-slate-300 font-semibold">حجم ترافیک و مدت اعتبار *</label>
+                    <span class="text-[11px] text-slate-400">امکان انتخاب مگابایت (MB) برای پلن‌های تست یا گیگابایت (GB)</span>
                 </div>
-                <div>
-                    <label class="block text-slate-300 mb-1 font-semibold">مدت اعتبار (روز) *</label>
-                    <input type="number" name="duration_days" required min="1" value="30" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-center">
+                <!-- Quick Preset Chips -->
+                <div class="flex flex-wrap items-center gap-1.5 mb-2.5">
+                    <span class="text-[10px] text-slate-500 ml-1">انتخاب سریع:</span>
+                    <button type="button" onclick="setCreateTraffic(200, 'mb')" class="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-300 border border-slate-700 text-[11px] font-mono transition">200 MB (تست)</button>
+                    <button type="button" onclick="setCreateTraffic(500, 'mb')" class="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-300 border border-slate-700 text-[11px] font-mono transition">500 MB (تست)</button>
+                    <button type="button" onclick="setCreateTraffic(10, 'gb')" class="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-purple-500/20 text-slate-300 hover:text-purple-300 border border-slate-700 text-[11px] font-mono transition">10 GB</button>
+                    <button type="button" onclick="setCreateTraffic(30, 'gb')" class="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-purple-500/20 text-slate-300 hover:text-purple-300 border border-slate-700 text-[11px] font-mono transition">30 GB</button>
+                    <button type="button" onclick="setCreateTraffic(50, 'gb')" class="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-purple-500/20 text-slate-300 hover:text-purple-300 border border-slate-700 text-[11px] font-mono transition">50 GB</button>
+                    <button type="button" onclick="setCreateTraffic(100, 'gb')" class="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-purple-500/20 text-slate-300 hover:text-purple-300 border border-slate-700 text-[11px] font-mono transition">100 GB</button>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <div class="flex gap-1.5">
+                            <input type="number" step="any" name="traffic_gb" id="create_traffic_val" required min="0.01" value="50" oninput="updateCreateHelper()" class="flex-1 bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-center">
+                            <select name="traffic_unit" id="create_traffic_unit" onchange="updateCreateHelper()" class="bg-slate-800 border border-slate-700 rounded-xl px-2.5 text-white text-xs font-bold">
+                                <option value="gb" selected>گیگابایت (GB)</option>
+                                <option value="mb">مگابایت (MB)</option>
+                            </select>
+                        </div>
+                        <div id="create_traffic_helper" class="text-[11px] text-cyan-400 mt-1 font-mono">معادل: ۵۰ گیگابایت (۵۱,۲۰۰ مگابایت)</div>
+                    </div>
+                    <div>
+                        <input type="number" name="duration_days" required min="1" value="30" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-center">
+                        <span class="text-[10px] text-slate-500 mt-1 block text-center">مدت اعتبار به روز (مثلاً ۳۰ روزه)</span>
+                    </div>
                 </div>
             </div>
 
@@ -480,20 +496,36 @@ foreach ($customPlanCats as $idx => $custCat) {
                 </div>
             </div>
 
-            <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label class="block text-slate-300 mb-1 font-semibold">حجم ترافیک *</label>
-                    <div class="flex gap-1.5">
-                        <input type="number" step="any" name="traffic_gb" id="edit_traffic_gb" required min="0.01" class="flex-1 bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-center">
-                        <select name="traffic_unit" id="edit_traffic_unit" class="bg-slate-800 border border-slate-700 rounded-xl px-2 text-white text-xs font-bold">
-                            <option value="gb" selected>GB</option>
-                            <option value="mb">MB</option>
-                        </select>
-                    </div>
+            <div>
+                <div class="flex items-center justify-between mb-1.5">
+                    <label class="block text-slate-300 font-semibold">حجم ترافیک و مدت اعتبار *</label>
+                    <span class="text-[11px] text-slate-400">امکان تغییر واحد به مگابایت (MB) یا گیگابایت (GB)</span>
                 </div>
-                <div>
-                    <label class="block text-slate-300 mb-1 font-semibold">مدت اعتبار (روز) *</label>
-                    <input type="number" name="duration_days" id="edit_duration_days" required min="1" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-center">
+                <!-- Quick Preset Chips -->
+                <div class="flex flex-wrap items-center gap-1.5 mb-2.5">
+                    <span class="text-[10px] text-slate-500 ml-1">انتخاب سریع:</span>
+                    <button type="button" onclick="setEditTraffic(200, 'mb')" class="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-300 border border-slate-700 text-[11px] font-mono transition">200 MB (تست)</button>
+                    <button type="button" onclick="setEditTraffic(500, 'mb')" class="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-300 border border-slate-700 text-[11px] font-mono transition">500 MB (تست)</button>
+                    <button type="button" onclick="setEditTraffic(10, 'gb')" class="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-purple-500/20 text-slate-300 hover:text-purple-300 border border-slate-700 text-[11px] font-mono transition">10 GB</button>
+                    <button type="button" onclick="setEditTraffic(30, 'gb')" class="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-purple-500/20 text-slate-300 hover:text-purple-300 border border-slate-700 text-[11px] font-mono transition">30 GB</button>
+                    <button type="button" onclick="setEditTraffic(50, 'gb')" class="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-purple-500/20 text-slate-300 hover:text-purple-300 border border-slate-700 text-[11px] font-mono transition">50 GB</button>
+                    <button type="button" onclick="setEditTraffic(100, 'gb')" class="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-purple-500/20 text-slate-300 hover:text-purple-300 border border-slate-700 text-[11px] font-mono transition">100 GB</button>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <div class="flex gap-1.5">
+                            <input type="number" step="any" name="traffic_gb" id="edit_traffic_gb" required min="0.01" oninput="updateEditHelper()" class="flex-1 bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-center">
+                            <select name="traffic_unit" id="edit_traffic_unit" onchange="updateEditHelper()" class="bg-slate-800 border border-slate-700 rounded-xl px-2.5 text-white text-xs font-bold">
+                                <option value="gb">گیگابایت (GB)</option>
+                                <option value="mb">مگابایت (MB)</option>
+                            </select>
+                        </div>
+                        <div id="edit_traffic_helper" class="text-[11px] text-cyan-400 mt-1 font-mono">معادل: ۰</div>
+                    </div>
+                    <div>
+                        <input type="number" name="duration_days" id="edit_duration_days" required min="1" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-center">
+                        <span class="text-[10px] text-slate-500 mt-1 block text-center">مدت اعتبار به روز</span>
+                    </div>
                 </div>
             </div>
 
@@ -616,6 +648,7 @@ foreach ($customPlanCats as $idx => $custCat) {
             document.getElementById('edit_traffic_gb').value = trVal;
             document.getElementById('edit_traffic_unit').value = 'gb';
         }
+        updateEditHelper();
 
         document.getElementById('edit_duration_days').value = p.duration_days;
         document.getElementById('edit_ip_limit').value = p.ip_limit ?? 2;
@@ -669,6 +702,70 @@ foreach ($customPlanCats as $idx => $custCat) {
             card.style.display = match ? '' : 'none';
         });
     }
+
+    function updateCreateHelper() {
+        var inp = document.getElementById('create_traffic_val');
+        var sel = document.getElementById('create_traffic_unit');
+        var el = document.getElementById('create_traffic_helper');
+        if (!inp || !sel || !el) return;
+        var val = parseFloat(inp.value || 0);
+        var unit = sel.value;
+        if (val <= 0 || isNaN(val)) {
+            el.innerText = 'لطفاً مقدار معتبر وارد نمایید';
+            return;
+        }
+        if (unit === 'mb') {
+            var inGb = (val / 1024).toFixed(3);
+            el.innerText = 'معادل دقیق: ' + Number(val).toLocaleString('fa-IR') + ' مگابایت (' + inGb + ' گیگابایت)';
+        } else {
+            var inMb = Math.round(val * 1024);
+            el.innerText = 'معادل دقیق: ' + Number(val).toLocaleString('fa-IR') + ' گیگابایت (' + inMb.toLocaleString('fa-IR') + ' مگابایت)';
+        }
+    }
+
+    function setCreateTraffic(val, unit) {
+        var inp = document.getElementById('create_traffic_val');
+        var sel = document.getElementById('create_traffic_unit');
+        if (inp && sel) {
+            inp.value = val;
+            sel.value = unit;
+            updateCreateHelper();
+        }
+    }
+
+    function updateEditHelper() {
+        var inp = document.getElementById('edit_traffic_gb');
+        var sel = document.getElementById('edit_traffic_unit');
+        var el = document.getElementById('edit_traffic_helper');
+        if (!inp || !sel || !el) return;
+        var val = parseFloat(inp.value || 0);
+        var unit = sel.value;
+        if (val <= 0 || isNaN(val)) {
+            el.innerText = 'لطفاً مقدار معتبر وارد نمایید';
+            return;
+        }
+        if (unit === 'mb') {
+            var inGb = (val / 1024).toFixed(3);
+            el.innerText = 'معادل دقیق: ' + Number(val).toLocaleString('fa-IR') + ' مگابایت (' + inGb + ' گیگابایت)';
+        } else {
+            var inMb = Math.round(val * 1024);
+            el.innerText = 'معادل دقیق: ' + Number(val).toLocaleString('fa-IR') + ' گیگابایت (' + inMb.toLocaleString('fa-IR') + ' مگابایت)';
+        }
+    }
+
+    function setEditTraffic(val, unit) {
+        var inp = document.getElementById('edit_traffic_gb');
+        var sel = document.getElementById('edit_traffic_unit');
+        if (inp && sel) {
+            inp.value = val;
+            sel.value = unit;
+            updateEditHelper();
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        updateCreateHelper();
+    });
 </script>
 <?php endif; ?>
 

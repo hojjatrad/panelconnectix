@@ -59,9 +59,11 @@ require __DIR__ . '/../layout/header.php';
                         if ($effectiveDiscount > 0) {
                             $effectivePrice = $effectivePrice - ($effectivePrice * ($effectiveDiscount / 100));
                         }
+                        $trVal = (float)$p['traffic_gb'];
+                        $trTxt = ($trVal > 0 && $trVal < 1) ? round($trVal * 1024) . ' مگابایت' : (($trVal == (int)$trVal ? (int)$trVal : $trVal) . ' گیگابایت');
                     ?>
                         <option value="<?= $p['id'] ?>" data-price="<?= $effectivePrice ?>" data-group="<?= $p['server_group'] ?>" data-server-id="<?= $p['server_id'] ?? '' ?>" data-ip-limit="<?= $p['ip_limit'] ?? 2 ?>" data-free="<?= $p['is_free'] ?>">
-                            <?= htmlspecialchars($p['title']) ?> (<?= $p['traffic_gb'] ?> گیگابایت / <?= $p['duration_days'] ?> روزه) - <?= $p['is_free'] ? 'رایگان (تست)' : Helpers::formatMoney($effectivePrice) ?>
+                            <?= htmlspecialchars($p['title']) ?> (<?= $trTxt ?> / <?= $p['duration_days'] ?> روزه) - <?= $p['is_free'] ? 'رایگان (تست)' : Helpers::formatMoney($effectivePrice) ?>
                         </option>
                     <?php endforeach; ?>
                 </select>

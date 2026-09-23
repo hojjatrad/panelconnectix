@@ -78,7 +78,11 @@ require __DIR__ . '/../layout/header.php';
 
                             <td class="p-3.5">
                                 <span class="font-bold text-white block"><?= htmlspecialchars($o['custom_title'] ?: $o['base_plan_title']) ?></span>
-                                <span class="text-[10px] text-slate-400"><?= $o['traffic_gb'] ?>GB | <?= $o['duration_days'] ?> روزه</span>
+                                <?php
+                                $tr = (float)$o['traffic_gb'];
+                                $trTxt = ($tr > 0 && $tr < 1) ? round($tr * 1024) . 'MB' : (($tr == (int)$tr ? (int)$tr : $tr) . 'GB');
+                                ?>
+                                <span class="text-[10px] text-slate-400"><?= $trTxt ?> | <?= $o['duration_days'] ?> روزه</span>
                             </td>
 
                             <td class="p-3.5">
