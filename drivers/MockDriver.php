@@ -38,11 +38,11 @@ class MockDriver implements PanelDriverInterface {
 
     public function getUser(string $username): ?array {
         return [
-            'traffic_used_bytes' => 15 * 1024 * 1024 * 1024,
+            'traffic_used_bytes' => 0,
             'traffic_limit_bytes' => 50 * 1024 * 1024 * 1024,
-            'expire_at' => date('Y-m-d H:i:s', strtotime('+20 days')),
+            'expire_at' => date('Y-m-d H:i:s', strtotime('+30 days')),
             'status' => 'active',
-            'online' => true
+            'online' => false
         ];
     }
 

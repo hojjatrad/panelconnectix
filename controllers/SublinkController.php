@@ -120,6 +120,47 @@ class SublinkController {
     }
 
     public static function buildConfigs(array $client): array {
+        $pdo = Database::getConnection();
+
+        // 1. If client is on a real node (Marzban / Pasargad / 3x-ui), fetch real links directly from the remote node
+        if (!empty($client['server_id'])) {
+            try {
+                $stmtNode = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ?");
+                $stmtNode->execute([(int)$client['server_id']]);
+                $node = $stmtNode->fetch(PDO::FETCH_ASSOC);
+                if ($node && $node['driver'] !== 'mock') {
+                    $driver = DriverFactory::create($node);
+                    $liveUser = $driver->getUser($client['username']);
+                    if (!empty($liveUser['links']) && is_array($liveUser['links'])) {
+                        $out = [];
+                        foreach ($liveUser['links'] as $i => $l) {
+                            $out['node_link_' . ($i + 1)] = $l;
+                        }
+                        if (!empty($out)) return $out;
+                    }
+                    if (!empty($liveUser['subscription_url'])) {
+                        $ch = curl_init($liveUser['subscription_url']);
+                        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                        curl_setopt($ch, CURLOPT_TIMEOUT, 6);
+                        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                        $sub = curl_exec($ch);
+                        curl_close($ch);
+                        if (!empty($sub)) {
+                            $decoded = base64_decode(trim($sub), true) ?: $sub;
+                            $lines = array_filter(array_map('trim', explode("\n", $decoded)));
+                            $out = [];
+                            foreach ($lines as $i => $l) {
+                                if (str_starts_with($l, 'vless://') || str_starts_with($l, 'vmess://') || str_starts_with($l, 'trojan://') || str_starts_with($l, 'ss://')) {
+                                    $out['sub_link_' . ($i + 1)] = $l;
+                                }
+                            }
+                            if (!empty($out)) return $out;
+                        }
+                    }
+                }
+            } catch (Throwable $e) {}
+        }
+
         $uuid = !empty($client['uuid']) ? $client['uuid'] : 'adc6ed75-e6bd-4a15-911a-e29f09eee801';
         $username = $client['username'] ?? 'user';
         $brand = !empty($client['brand_name']) ? preg_replace('/[^\p{L}\p{N}_-]/u', '', str_replace(' ', '_', $client['brand_name'])) : 'Connectix';
