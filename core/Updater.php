@@ -75,23 +75,23 @@ class Updater {
 
             if ($rawHttp === 200 && preg_match("/CURRENT_VERSION\s*=\s*['\"]([^'\"]+)['\"]/", (string)$rawCode, $matches)) {
                 $remoteVer = trim($matches[1]);
-                $hasUpdate = version_compare($remoteVer, $currentVer, '>');
+                if (version_compare($remoteVer, $currentVer, '>')) {
+                    $result = [
+                        'has_update' => true,
+                        'current_version' => $currentVer,
+                        'latest_version' => $remoteVer,
+                        'release_title' => "انتشار نسخه جدید {$remoteVer} در گیت‌هاب",
+                        'changelog' => "ارتقا به نگارش {$remoteVer}: افزودن تب‌های اختصاصی دسته‌بندی پلن‌ها، سیستم بازگردانی هوشمند دیتابیس و بهینه‌سازی‌های جامع هسته سامانه.",
+                        'download_url' => "https://github.com/{$repo}/archive/refs/heads/{$branch}.zip",
+                        'published_at' => date('Y-m-d H:i:s'),
+                        'checked_at' => date('Y-m-d H:i:s'),
+                        'type' => 'release'
+                    ];
 
-                $result = [
-                    'has_update' => $hasUpdate,
-                    'current_version' => $currentVer,
-                    'latest_version' => $remoteVer,
-                    'release_title' => $hasUpdate ? "انتشار نسخه جدید {$remoteVer} در گیت‌هاب" : "نسخه پایدار {$currentVer}",
-                    'changelog' => "ارتقا به نگارش {$remoteVer}: افزودن تب‌های اختصاصی دسته‌بندی پلن‌ها، سیستم بازگردانی هوشمند دیتابیس و بهینه‌سازی‌های جامع هسته سامانه.",
-                    'download_url' => "https://github.com/{$repo}/archive/refs/heads/{$branch}.zip",
-                    'published_at' => date('Y-m-d H:i:s'),
-                    'checked_at' => date('Y-m-d H:i:s'),
-                    'type' => 'release'
-                ];
-
-                Setting::set('update_check_cache', json_encode($result));
-                Setting::set('update_check_time', (string)time());
-                return $result;
+                    Setting::set('update_check_cache', json_encode($result));
+                    Setting::set('update_check_time', (string)time());
+                    return $result;
+                }
             }
         }
 
