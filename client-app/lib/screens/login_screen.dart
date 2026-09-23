@@ -66,12 +66,23 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              final newUrl = controller.text.trim();
+              String newUrl = controller.text.trim();
+              if (newUrl.endsWith('/')) {
+                newUrl = newUrl.substring(0, newUrl.length - 1);
+              }
+              if (!newUrl.startsWith('http://') && !newUrl.startsWith('https://')) {
+                newUrl = 'https://$newUrl';
+              }
               if (newUrl.isNotEmpty) {
                 ApiService.baseUrl = newUrl;
                 final prefs = await SharedPreferences.getInstance();
                 await prefs.setString('api_base_url', newUrl);
-                if (mounted) Navigator.pop(ctx);
+                if (mounted) {
+                  setState(() {
+                    _errorMessage = '';
+                  });
+                  Navigator.pop(ctx);
+                }
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF9333EA)),
@@ -89,6 +100,14 @@ class _LoginScreenState extends State<LoginScreen> {
     if (u.isEmpty || p.isEmpty) {
       setState(() {
         _errorMessage = 'لطفاً نام کاربری و رمز عبور را وارد فرمایید.';
+      });
+      return;
+    }
+
+    if (ApiService.baseUrl.contains("your-domain.com")) {
+      _showServerUrlDialog();
+      setState(() {
+        _errorMessage = 'لطفاً ابتدا آدرس دامنه یا سرور پنل خود را وارد فرمایید.';
       });
       return;
     }
@@ -179,7 +198,45 @@ class _LoginScreenState extends State<LoginScreen> {
                   'ورود اختصاصی با نام کاربری و کلمه عبور',
                   style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
                 ),
-                const SizedBox(height: 36),
+                const SizedBox(height: 12),
+                InkWell(
+                  onTap: _showServerUrlDialog,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E293B),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: ApiService.baseUrl.contains("your-domain.com") ? const Color(0xFFF59E0B) : const Color(0xFF334155),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          ApiService.baseUrl.contains("your-domain.com") ? Icons.warning_amber_rounded : Icons.dns_outlined,
+                          size: 15,
+                          color: ApiService.baseUrl.contains("your-domain.com") ? const Color(0xFFF59E0B) : const Color(0xFF10B981),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          ApiService.baseUrl.contains("your-domain.com")
+                              ? 'تنظیم آدرس سرور پنل (کلیک کنید)'
+                              : ApiService.baseUrl.replaceAll("https://", "").replaceAll("http://", ""),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: ApiService.baseUrl.contains("your-domain.com") ? const Color(0xFFF59E0B) : const Color(0xFF94A3B8),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const Icon(Icons.edit, size: 12, color: Color(0xFF64748B)),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
 
                 // Username input
                 TextField(
