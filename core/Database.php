@@ -361,6 +361,15 @@ class Database {
                 } catch (Throwable $e) {}
             }
 
+            // Auto-disable mock servers and detach them from plans if at least one real server is active
+            try {
+                $hasRealServer = (int)$pdo->query("SELECT COUNT(*) FROM server_nodes WHERE driver != 'mock' AND is_active = 1")->fetchColumn();
+                if ($hasRealServer > 0) {
+                    $pdo->exec("UPDATE server_nodes SET is_active = 0 WHERE driver = 'mock'");
+                    $pdo->exec("UPDATE plans SET server_id = NULL WHERE server_id IN (SELECT id FROM server_nodes WHERE driver = 'mock')");
+                }
+            } catch (Throwable $e) {}
+
             // Seed Default Categories if empty
             try {
                 $catCount = (int)$pdo->query("SELECT COUNT(*) FROM categories")->fetchColumn();

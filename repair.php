@@ -120,6 +120,15 @@ if ($hasConfig) {
             } catch (Throwable $e) {}
         }
 
+        // Auto-disable mock servers if any real server exists
+        try {
+            $hasReal = (int)$pdo->query("SELECT COUNT(*) FROM server_nodes WHERE driver != 'mock' AND is_active = 1")->fetchColumn();
+            if ($hasReal > 0) {
+                $pdo->exec("UPDATE server_nodes SET is_active = 0 WHERE driver = 'mock'");
+                $pdo->exec("UPDATE plans SET server_id = NULL WHERE server_id IN (SELECT id FROM server_nodes WHERE driver = 'mock')");
+            }
+        } catch (Throwable $e) {}
+
         $stepResults['db'] = [
             'status' => true, 
             'msg' => "ارتباط با پایگاه داده برقراره و تعداد {$tableCount} جدول تایید شد. {$adminMsg}"
@@ -417,7 +426,7 @@ foreach ($stepResults as $r) {
         </div>
 
         <div class="text-[11px] text-center text-slate-500 pt-2 border-t border-slate-800/80">
-            نسخه پایدار و ترمیم‌شده سامانه: <span class="font-mono text-purple-400 font-bold">v2.8.6</span>
+            نسخه پایدار و ترمیم‌شده سامانه: <span class="font-mono text-purple-400 font-bold">v3.1.0</span>
         </div>
 
     </div>

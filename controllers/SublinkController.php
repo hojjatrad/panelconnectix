@@ -109,6 +109,32 @@ class SublinkController {
         // 5. Update last connected timestamp
         $pdo->prepare("UPDATE clients SET last_connected_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$client['id']]);
 
+        // 5.5 Auto-upgrade client to real server if client was created on mock or has no node_sublink
+        if (empty($client['node_sublink']) || (!empty($client['driver']) && $client['driver'] === 'mock')) {
+            $realServer = Provisioner::findBestServer('default', $pdo);
+            if ($realServer && $realServer['driver'] !== 'mock') {
+                try {
+                    $driver = DriverFactory::create($realServer);
+                    $driverPayload = [
+                        'username' => $client['username'],
+                        'password' => $client['password'],
+                        'uuid' => $client['uuid'],
+                        'sub_token' => $client['sub_token'],
+                        'traffic_limit_bytes' => (int)$client['traffic_limit_bytes'],
+                        'expire_timestamp' => !empty($client['expire_at']) ? strtotime($client['expire_at']) : (time() + 30 * 86400)
+                    ];
+                    $resDriver = $driver->createUser($driverPayload);
+                    if ($resDriver['success'] && !empty($resDriver['sublink'])) {
+                        $client['node_sublink'] = $resDriver['sublink'];
+                        $client['server_id'] = $realServer['id'];
+                        $client['driver'] = $realServer['driver'];
+                        $pdo->prepare("UPDATE clients SET server_id = ?, node_sublink = ? WHERE id = ?")
+                            ->execute([$realServer['id'], $resDriver['sublink'], $client['id']]);
+                    }
+                } catch (Throwable $e) {}
+            }
+        }
+
         // 6. Direct Proxy from Real Node Sublink if present
         if (!empty($client['node_sublink'])) {
             $ch = curl_init($client['node_sublink']);

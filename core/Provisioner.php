@@ -28,6 +28,7 @@ class Provisioner {
         }
 
         // Fetch Server (Specific passed ID -> Plan-bound Server -> Cluster Best Server)
+        $server = null;
         if ($serverId !== null && $serverId > 0) {
             $stmtServer = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ? AND is_active = 1");
             $stmtServer->execute([$serverId]);
@@ -37,12 +38,17 @@ class Provisioner {
             $stmtServer = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ? AND is_active = 1");
             $stmtServer->execute([(int)$plan['server_id']]);
             $server = $stmtServer->fetch();
-            if (!$server) {
-                // Failover fallback to cluster group if bound node is inactive
-                $server = self::findBestServer($plan['server_group'] ?? 'default', $pdo);
+        }
+
+        // CRITICAL GUARD: If no server was found, OR if the selected server is a MOCK server:
+        // Automatically upgrade to the best REAL active server (driver != 'mock')!
+        if (!$server || $server['driver'] === 'mock') {
+            $bestReal = self::findBestServer($plan['server_group'] ?? 'default', $pdo);
+            if ($bestReal && $bestReal['driver'] !== 'mock') {
+                $server = $bestReal;
+            } elseif (!$server) {
+                $server = $bestReal;
             }
-        } else {
-            $server = self::findBestServer($plan['server_group'] ?? 'default', $pdo);
         }
 
         if (!$server) {
@@ -369,8 +375,13 @@ class Provisioner {
             $stmt->execute([$trialServerId]);
             $server = $stmt->fetch();
         }
-        if (!$server) {
-            $server = self::findBestServer('default', $pdo);
+        if (!$server || $server['driver'] === 'mock') {
+            $bestReal = self::findBestServer('default', $pdo);
+            if ($bestReal && $bestReal['driver'] !== 'mock') {
+                $server = $bestReal;
+            } elseif (!$server) {
+                $server = $bestReal;
+            }
         }
         if (!$server) {
             return ['success' => false, 'error' => 'سروری برای ارائه اکانت تست در دسترس نیست.'];
