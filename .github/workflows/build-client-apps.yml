@@ -36,13 +36,13 @@ jobs:
           cd client-app
           flutter create --org com.connectix.vpn --project-name connectix_vpn .
           
-          # Generate Production Release Keystore for Android 9+ v2/v3 Signing
+          # Generate Production Release Keystore for Android 9+ v1/v2 Signing
           keytool -genkey -v -keystore android/app/release.keystore \
             -alias connectix -keyalg RSA -keysize 2048 -validity 10000 \
             -storepass connectix123 -keypass connectix123 \
             -dname "CN=Connectix VPN, OU=Client, O=Connectix, L=Tehran, ST=Tehran, C=IR"
 
-          # Configure build.gradle with minSdk 21, multiDex, and Release Signing
+          # Configure build.gradle with minSdk 21, targetSdk 34, multiDex, and Production Signing
           cat << 'EOF' > android/app/build.gradle
           plugins {
               id "com.android.application"
@@ -71,9 +71,6 @@ jobs:
                   versionCode = 1
                   versionName = "1.0.0"
                   multiDexEnabled = true
-                  ndk {
-                      abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86_64'
-                  }
               }
 
               signingConfigs {
@@ -113,6 +110,7 @@ jobs:
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.INTERNET"/>
               <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
               <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
               <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
               <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE"/>
