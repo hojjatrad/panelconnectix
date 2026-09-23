@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../core/Database.php';
 require_once __DIR__ . '/../core/Helpers.php';
+require_once __DIR__ . '/../core/Setting.php';
 require_once __DIR__ . '/../drivers/DriverFactory.php';
 
 class SublinkController {
@@ -122,7 +123,7 @@ class SublinkController {
         $uuid = $client['uuid'];
         $username = $client['username'];
         $brand = !empty($client['brand_name']) ? preg_replace('/[^\p{L}\p{N}_-]/u', '', str_replace(' ', '_', $client['brand_name'])) : 'Connectix';
-        $domain = !empty($client['sub_domain']) ? $client['sub_domain'] : parse_url($client['api_url'] ?? '', PHP_URL_HOST) ?: 'fi.connectix.space';
+        $domain = !empty($client['sub_domain']) ? $client['sub_domain'] : (parse_url($client['api_url'] ?? '', PHP_URL_HOST) ?: 'fi.connectix.space');
 
         // 1. همراه اول (MCI) - VLESS Reality TLS (کمترین پینگ و دور زدن فیلترینگ شدید همراه اول)
         $mciReality = "vless://{$uuid}@{$domain}:443?encryption=none&security=reality&sni={$domain}&fp=chrome&pbk=mock_pbk_connectix_anti_filter&sid=123456&type=tcp&headerType=none#{$brand}-همراه_اول-MCI-{$username}";
