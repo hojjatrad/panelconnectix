@@ -200,10 +200,42 @@
             </div>
         </div>
 
+        <!-- TAB 4: Lucky Wheel -->
+        <?php if (Setting::get('btn_wheel_enabled', '1') === '1'): ?>
+        <div id="tabWheel" class="hidden space-y-4 text-center">
+            <div class="p-5 bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800 rounded-3xl shadow-xl space-y-4">
+                <h3 class="text-sm font-extrabold text-white flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-gift text-amber-400 text-lg"></i>
+                    <span>گردونه شانس و هدیه ۲۴ ساعته</span>
+                </h3>
+                <p class="text-xs text-slate-400">روزانه یک بار گردونه را بچرخانید و شارژ رایگان کیف‌پول یا کدهای تخفیف ویژه برنده شوید!</p>
+
+                <!-- Wheel Visual Container -->
+                <div class="relative w-48 h-48 mx-auto my-4 flex items-center justify-center">
+                    <div id="wheelGraphic" class="w-full h-full rounded-full border-4 border-amber-400/40 shadow-2xl shadow-amber-500/20 bg-gradient-to-tr from-purple-900 via-slate-900 to-indigo-900 flex items-center justify-center relative overflow-hidden transition-all duration-[4000ms] ease-out">
+                        <div class="text-center space-y-1">
+                            <i class="fa-solid fa-crown text-3xl text-amber-400 animate-bounce"></i>
+                            <span class="text-[10px] text-white font-extrabold block">LUCKY SPIN</span>
+                        </div>
+                    </div>
+                    <!-- Pointer Indicator -->
+                    <div class="absolute -top-3 inset-x-0 mx-auto w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent border-t-[16px] border-t-amber-400 z-10"></div>
+                </div>
+
+                <div id="wheelStatus" class="text-xs font-bold text-amber-300 min-h-[24px]"></div>
+
+                <button id="btnSpin" onclick="spinWheel()" class="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black rounded-xl text-xs shadow-lg shadow-amber-500/30 transition active:scale-95 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-play"></i>
+                    <span>چرخاندن گردونه شانس</span>
+                </button>
+            </div>
+        </div>
+        <?php endif; ?>
+
     </main>
 
     <!-- Bottom Navigation Bar -->
-    <nav class="fixed bottom-0 inset-x-0 bg-slate-950/95 backdrop-blur border-t border-slate-800/80 px-4 py-2 z-30 flex items-center justify-around text-[10px]">
+    <nav class="fixed bottom-0 inset-x-0 bg-slate-950/95 backdrop-blur border-t border-slate-800/80 px-2 py-2 z-30 flex items-center justify-around text-[10px]">
         <button onclick="switchTab('tabSubscriptions')" id="navSubscriptions" class="nav-btn flex flex-col items-center text-purple-400 font-bold gap-1 transition">
             <i class="fa-solid fa-bolt text-base"></i>
             <span>اشتراک من</span>
@@ -212,6 +244,12 @@
             <i class="fa-solid fa-store text-base"></i>
             <span>فروشگاه پلن</span>
         </button>
+        <?php if (Setting::get('btn_wheel_enabled', '1') === '1'): ?>
+        <button onclick="switchTab('tabWheel')" id="navWheel" class="nav-btn flex flex-col items-center text-slate-400 gap-1 transition">
+            <i class="fa-solid fa-gift text-base text-amber-400"></i>
+            <span>گردونه شانس</span>
+        </button>
+        <?php endif; ?>
         <button onclick="switchTab('tabApps')" id="navApps" class="nav-btn flex flex-col items-center text-slate-400 gap-1 transition">
             <i class="fa-solid fa-download text-base"></i>
             <span>نرم‌افزارها</span>
@@ -254,6 +292,8 @@
             document.getElementById('tabSubscriptions').classList.add('hidden');
             document.getElementById('tabPlans').classList.add('hidden');
             document.getElementById('tabApps').classList.add('hidden');
+            const wheelTab = document.getElementById('tabWheel');
+            if (wheelTab) wheelTab.classList.add('hidden');
 
             document.getElementById(tabId).classList.remove('hidden');
 
@@ -267,7 +307,77 @@
                 document.getElementById('navPlans').className = 'nav-btn flex flex-col items-center text-purple-400 font-bold gap-1 transition';
             } else if (tabId === 'tabApps') {
                 document.getElementById('navApps').className = 'nav-btn flex flex-col items-center text-purple-400 font-bold gap-1 transition';
+            } else if (tabId === 'tabWheel') {
+                const navWheel = document.getElementById('navWheel');
+                if (navWheel) navWheel.className = 'nav-btn flex flex-col items-center text-amber-400 font-bold gap-1 transition';
             }
+        }
+
+        let isSpinning = false;
+        let currentRotation = 0;
+
+        function spinWheel() {
+            if (isSpinning) return;
+            const btn = document.getElementById('btnSpin');
+            const status = document.getElementById('wheelStatus');
+            const wheel = document.getElementById('wheelGraphic');
+            
+            let tgId = '';
+            if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user) {
+                tgId = window.Telegram.WebApp.initDataUnsafe.user.id;
+            }
+            if (!tgId) {
+                const params = new URLSearchParams(window.location.search);
+                tgId = params.get('tg_id') || '';
+            }
+
+            if (!tgId) {
+                alert('شناسه کاربر تلگرام یافت نشد. لطفاً این صفحه را از داخل ربات تلگرام باز فرمایید.');
+                return;
+            }
+
+            isSpinning = true;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>در حال چرخش...</span>';
+            status.innerText = 'گردونه در حال چرخیدن است...';
+
+            // Random rotation
+            currentRotation += 1800 + Math.floor(Math.random() * 360);
+            wheel.style.transform = `rotate(${currentRotation}deg)`;
+
+            const fd = new FormData();
+            fd.append('tg_id', tgId);
+
+            fetch('<?= Helpers::url('webapp/spin') ?>', {
+                method: 'POST',
+                body: fd
+            })
+            .then(r => r.json())
+            .then(data => {
+                setTimeout(() => {
+                    isSpinning = false;
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-play"></i> <span>چرخاندن مجدد گردونه</span>';
+                    
+                    if (data.success) {
+                        status.className = 'text-xs font-extrabold text-emerald-400 min-h-[24px]';
+                        status.innerText = '🎉 ' + data.reward_text;
+                        showToast('تبریک! هدیه برای شما ثبت شد 🎁');
+                    } else {
+                        status.className = 'text-xs font-bold text-amber-300 min-h-[24px]';
+                        status.innerText = data.message;
+                    }
+                }, 4000);
+            })
+            .catch(err => {
+                setTimeout(() => {
+                    isSpinning = false;
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-play"></i> <span>چرخاندن گردونه</span>';
+                    status.className = 'text-xs font-bold text-rose-400 min-h-[24px]';
+                    status.innerText = 'خطا در ارتباط با سرور.';
+                }, 2000);
+            });
         }
 
         function copySublink(url) {

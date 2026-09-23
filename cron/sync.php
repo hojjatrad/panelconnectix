@@ -257,6 +257,37 @@ if (time() - $lastBackup >= 86400) {
     }
 }
 
+// 4. Nightly Summary Report to 'nightly' Forum Topic (Once every 24 Hours)
+$lastNightlyReport = (int)Setting::get('last_cron_nightly_report', '0');
+if (time() - $lastNightlyReport >= 86400) {
+    try {
+        $todayStart = date('Y-m-d 00:00:00');
+        $stmtSales = $pdo->prepare("SELECT COUNT(*) as cnt, COALESCE(SUM(amount), 0) as total FROM transactions WHERE status = 'completed' AND created_at >= ?");
+        $stmtSales->execute([$todayStart]);
+        $salesRow = $stmtSales->fetch();
+
+        $activeClients = (int)$pdo->query("SELECT COUNT(*) FROM clients WHERE status = 'active'")->fetchColumn();
+        $totalClients = (int)$pdo->query("SELECT COUNT(*) FROM clients")->fetchColumn();
+        $totalNodes = (int)$pdo->query("SELECT COUNT(*) FROM server_nodes WHERE is_active = 1")->fetchColumn();
+
+        $nightlyMsg = "🌙 <b>گزارش جامع شبانه سامانه کانکتیکس</b>\n\n"
+            . "📅 <b>تاریخ:</b> " . Helpers::formatDate(time()) . "\n"
+            . "──────────────\n"
+            . "🛒 <b>تعداد تراکنش‌های ۲۴ ساعت اخیر:</b> " . number_format((int)($salesRow['cnt'] ?? 0)) . " تراکنش\n"
+            . "💰 <b>گردش مالی امروز:</b> " . number_format((float)abs($salesRow['total'] ?? 0)) . " تومان\n"
+            . "🟢 <b>کل کلاینت‌های فعال:</b> " . number_format($activeClients) . " از " . number_format($totalClients) . "\n"
+            . "🌐 <b>نودهای سرور فعال:</b> {$totalNodes} سرور متصل\n"
+            . "──────────────\n"
+            . "🤖 وضعیت عمومی: پایدار و نرمال ✅";
+
+        TelegramBot::sendTopicLog('nightly', $nightlyMsg);
+        Setting::set('last_cron_nightly_report', (string)time());
+        echo "[" . date('Y-m-d H:i:s') . "] Nightly report dispatched to 'nightly' topic." . $eol;
+    } catch (Throwable $e) {
+        echo "[" . date('Y-m-d H:i:s') . "] Nightly report error: " . $e->getMessage() . $eol;
+    }
+}
+
 // GitHub Auto-Update & Notification Check (Every 6 Hours)
 $lastUpdateCheck = (int)Setting::get('last_cron_update_check', '0');
 if (time() - $lastUpdateCheck >= 21600) {

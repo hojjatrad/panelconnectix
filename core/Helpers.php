@@ -137,6 +137,11 @@ class Helpers {
         return round($ratio * 100, 1) . '%';
     }
 
+    public static function formatDate(int|string $time): string {
+        $timestamp = is_numeric($time) ? (int)$time : (strtotime((string)$time) ?: time());
+        return date('Y-m-d H:i:s', $timestamp);
+    }
+
     public static function generateUUID(): string {
         $data = random_bytes(16);
         $data[6] = chr(ord($data[6]) & 0x0f | 0x40);

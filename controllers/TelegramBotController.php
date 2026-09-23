@@ -953,6 +953,22 @@ class TelegramBotController {
         // Record User in Database (Only for private chat users)
         self::recordBotUser($pdo, $msg['from'] ?? [], (int)(self::getContext($pdo)['reseller_id'] ?? 1));
 
+        // Handle Telegram WebApp Data (Mini App order submission)
+        if (isset($msg['web_app_data']['data'])) {
+            $webData = json_decode($msg['web_app_data']['data'], true);
+            if ($webData && isset($webData['action']) && $webData['action'] === 'order_plan') {
+                $planId = (int)($webData['plan_id'] ?? 0);
+                if ($planId > 0) {
+                    $mockCb = [
+                        'from' => $msg['from'] ?? [],
+                        'message' => ['chat' => ['id' => $chatId]]
+                    ];
+                    self::createOrder($pdo, $mockCb, $planId, 'new', null, null);
+                    return;
+                }
+            }
+        }
+
         // Method 2: One-Click DeepLink Binding: /start bind_XXXX
         if (preg_match('/^\/start\s+bind_([a-zA-Z0-9_\-]+)/', $text, $matches)) {
             $bindToken = trim($matches[1]);
@@ -966,6 +982,17 @@ class TelegramBotController {
             if ($inviterTgId != $fromId) {
                 self::handleReferralStart($pdo, $fromId, $inviterTgId, $msg['from'] ?? []);
             }
+        }
+
+        // Method 4: Direct Buy DeepLink: /start plan_X or /start buy_X
+        if (preg_match('/^\/start\s+(?:plan|buy)_([0-9]+)/', $text, $matches)) {
+            $planId = (int)$matches[1];
+            $mockCb = [
+                'from' => $msg['from'] ?? [],
+                'message' => ['chat' => ['id' => $chatId]]
+            ];
+            self::createOrder($pdo, $mockCb, $planId, 'new', null, null);
+            return;
         }
 
         // Force Join Channel Verification (Before interactive actions)

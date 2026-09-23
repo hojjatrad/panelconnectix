@@ -32,4 +32,96 @@ class WebappController {
 
         require __DIR__ . '/../views/webapp/index.php';
     }
+
+    public function spin(): void {
+        header('Content-Type: application/json; charset=utf-8');
+        $pdo = Database::getConnection();
+        $tgId = trim($_POST['tg_id'] ?? ($_GET['tg_id'] ?? ''));
+
+        if (empty($tgId)) {
+            echo json_encode(['success' => false, 'message' => 'شناسه کاربر تلگرام یافت نشد.']);
+            return;
+        }
+
+        if (Setting::get('btn_wheel_enabled', '1') !== '1') {
+            echo json_encode(['success' => false, 'message' => 'گردونه شانس در حال حاضر غیرفعال است.']);
+            return;
+        }
+
+        // Check 24 hour cooldown
+        $stmt = $pdo->prepare("SELECT * FROM lucky_wheel_logs WHERE user_tg_id = ? ORDER BY id DESC LIMIT 1");
+        $stmt->execute([$tgId]);
+        $last = $stmt->fetch();
+
+        $now = time();
+        if ($last) {
+            $lastTime = strtotime($last['created_at']);
+            $elapsed = $now - $lastTime;
+            $cooldown = 86400;
+            if ($elapsed < $cooldown) {
+                $diff = $cooldown - $elapsed;
+                $hours = floor($diff / 3600);
+                $minutes = floor(($diff % 3600) / 60);
+                echo json_encode([
+                    'success' => false,
+                    'cooldown' => true,
+                    'message' => "شما شانس امروز خود را استفاده کرده‌اید. زمان باقیمانده تا شانس بعدی: {$hours} ساعت و {$minutes} دقیقه.",
+                    'hours' => $hours,
+                    'minutes' => $minutes
+                ]);
+                return;
+            }
+        }
+
+        // Roll prize
+        $roll = rand(1, 100);
+        $rewardType = '';
+        $rewardVal = 0;
+        $rewardText = '';
+        $segmentIndex = 0;
+
+        if ($roll <= 40) {
+            $amounts = [5000, 8000, 10000, 15000];
+            $amount = $amounts[array_rand($amounts)];
+            $rewardType = 'wallet_credit';
+            $rewardVal = $amount;
+            $rewardText = number_format($amount) . ' تومان شارژ کیف‌پول هدیه';
+            $segmentIndex = 2;
+
+            $pdo->prepare("UPDATE bot_users SET referral_balance = referral_balance + ? WHERE tg_id = ?")
+                ->execute([$amount, $tgId]);
+        } elseif ($roll <= 80) {
+            $discountPct = (rand(1, 2) === 1) ? 15 : 20;
+            $code = 'LUCK-' . strtoupper(substr(bin2hex(random_bytes(3)), 0, 5));
+            $exp = date('Y-m-d H:i:s', time() + (48 * 3600));
+            $rewardType = 'discount_code';
+            $rewardVal = $discountPct;
+            $rewardText = "کد تخفیف {$discountPct}٪ اختصاصی: " . $code;
+            $segmentIndex = ($discountPct === 15) ? 0 : 4;
+
+            $pdo->prepare("INSERT INTO coupons (code, discount_percent, max_uses, used_count, expire_at, is_active) VALUES (?, ?, 1, 0, ?, 1)")
+                ->execute([$code, $discountPct, $exp]);
+        } else {
+            $rewardType = 'wallet_credit';
+            $rewardVal = 25000;
+            $rewardText = "جایزه بزرگ (JACKPOT): ۲۵,۰۰۰ تومان شارژ مستقیم!";
+            $segmentIndex = 6;
+
+            $pdo->prepare("UPDATE bot_users SET referral_balance = referral_balance + 25000 WHERE tg_id = ?")
+                ->execute([$tgId]);
+        }
+
+        $pdo->prepare("INSERT INTO lucky_wheel_logs (user_tg_id, reward_type, reward_value, reward_text) VALUES (?, ?, ?, ?)")
+            ->execute([$tgId, $rewardType, $rewardVal, $rewardText]);
+
+        // Supergroup topic notification
+        require_once __DIR__ . '/../core/TelegramBot.php';
+        TelegramBot::sendTopicLog('general', "🎰 <b>دریافت هدیه گردونه شانس (از مینی‌اپ)</b>\n\n👤 کاربر: <code>{$tgId}</code>\n🎁 جایزه: {$rewardText}\n⏰ زمان: " . Helpers::formatDate(time()));
+
+        echo json_encode([
+            'success' => true,
+            'reward_text' => $rewardText,
+            'segment_index' => $segmentIndex
+        ]);
+    }
 }

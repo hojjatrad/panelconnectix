@@ -351,6 +351,7 @@ $router->post('telegram/webhook', [TelegramBotController::class, 'handleWebhook'
 
 // Telegram Mini App (WebApp)
 $router->get('webapp', [WebappController::class, 'index']);
+$router->post('webapp/spin', [WebappController::class, 'spin']);
 
 // App Guides & Download Tutorials
 $router->get('settings/app-guides', [AppGuideController::class, 'index']);
