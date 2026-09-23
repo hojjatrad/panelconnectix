@@ -40,19 +40,14 @@ class Provisioner {
             $server = $stmtServer->fetch();
         }
 
-        // CRITICAL GUARD: If no server was found, OR if the selected server is a MOCK server:
-        // Automatically upgrade to the best REAL active server (driver != 'mock')!
+        // CRITICAL GUARD: Only REAL active servers (driver != 'mock') are permitted!
         if (!$server || $server['driver'] === 'mock') {
             $bestReal = self::findBestServer($plan['server_group'] ?? 'default', $pdo);
             if ($bestReal && $bestReal['driver'] !== 'mock') {
                 $server = $bestReal;
-            } elseif (!$server) {
-                $server = $bestReal;
+            } else {
+                return ['success' => false, 'error' => 'هیچ سرور واقعی فعالی در سامانه متصل نیست. لطفاً در پنل مدیریت، یک نود واقعی مرزبان یا پاسارگاد متصل فرمایید.'];
             }
-        }
-
-        if (!$server) {
-            return ['success' => false, 'error' => 'هیچ سرور فعالی برای این پلن در سیستم یافت نشد.'];
         }
 
         // Generate username if not provided
@@ -95,6 +90,9 @@ class Provisioner {
                 return ['success' => false, 'error' => 'خطا در ثبت کاربر روی سرور نود: ' . ($driverResult['error'] ?? 'خطای نامشخص')];
             }
             $nodeSublink = $driverResult['sublink'] ?? null;
+            if (empty($nodeSublink)) {
+                return ['success' => false, 'error' => 'سرور مرزبان نتوانست لینک ساب‌لینک اختصاصی تولید کند. لطفاً وضعیت اینباندهای سرور مرزبان را در پنل بررسی فرمایید.'];
+            }
         } catch (Throwable $e) {
             return ['success' => false, 'error' => 'استثنا در برقراری ارتباط با سرور نود: ' . $e->getMessage()];
         }
@@ -372,7 +370,7 @@ class Provisioner {
         $trialServerId = (int)Setting::get('trial_server_id', 0);
         $server = null;
         if ($trialServerId > 0) {
-            $stmt = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ? AND is_active = 1");
+            $stmt = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ? AND is_active = 1 AND driver != 'mock'");
             $stmt->execute([$trialServerId]);
             $server = $stmt->fetch();
         }
@@ -380,12 +378,9 @@ class Provisioner {
             $bestReal = self::findBestServer('default', $pdo);
             if ($bestReal && $bestReal['driver'] !== 'mock') {
                 $server = $bestReal;
-            } elseif (!$server) {
-                $server = $bestReal;
+            } else {
+                return ['success' => false, 'error' => 'هیچ سرور واقعی فعالی برای ارائه اکانت تست در دسترس نیست. لطفاً در پنل مدیریت، یک نود واقعی مرزبان متصل فرمایید.'];
             }
-        }
-        if (!$server) {
-            return ['success' => false, 'error' => 'سروری برای ارائه اکانت تست در دسترس نیست.'];
         }
 
         $username = 'test_' . substr(bin2hex(random_bytes(3)), 0, 6);
@@ -413,6 +408,9 @@ class Provisioner {
                 return ['success' => false, 'error' => 'خطا در نود سرور: ' . ($driverResult['error'] ?? 'خطای نامشخص')];
             }
             $nodeSublink = $driverResult['sublink'] ?? null;
+            if (empty($nodeSublink)) {
+                return ['success' => false, 'error' => 'سرور مرزبان نتوانست ساب‌لینک تست تولید کند. لطفاً اینباندهای سرور را بررسی فرمایید.'];
+            }
         } catch (Throwable $e) {
             return ['success' => false, 'error' => 'خطا در ارتباط با سرور: ' . $e->getMessage()];
         }

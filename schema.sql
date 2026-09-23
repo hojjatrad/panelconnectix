@@ -412,18 +412,9 @@ INSERT INTO `categories` (`id`, `name`, `slug`, `type`, `icon`, `badge_color`, `
 (5, 'مخصوص بازی و گیمینگ (Gaming)', 'gaming', 'both', 'fa-gamepad', 'cyan', 'سرورهای تونل‌شده بدون نوسان و کمترین زمان پاسخگویی', 5, 1)
 ON DUPLICATE KEY UPDATE `name`=VALUES(`name`);
 
--- Server Nodes are left empty by default so admin can introduce real nodes
+-- Server Nodes and Plans are left empty by default so admin can configure their own real infrastructure
 -- INSERT INTO `server_nodes` ...
-
--- Seed Default Plans
-INSERT INTO `plans` (`id`, `title`, `traffic_gb`, `duration_days`, `base_price`, `reseller_price`, `server_group`, `is_free`, `is_active`) VALUES 
-(1, 'پلن تست رایگان ۱ روزه (1GB)', 1, 1, 0, 0, 'default', 1, 1),
-(2, 'یک‌ماهه ۳۰ گیگابایت (اقتصادی)', 30, 30, 95000, 75000, 'economic', 0, 1),
-(3, 'یک‌ماهه ۵۰ گیگابایت (استاندارد)', 50, 30, 145000, 115000, 'default', 0, 1),
-(4, 'دو‌ماهه ۱۰۰ گیگابایت (VIP تجاری)', 100, 60, 270000, 210000, 'vip', 0, 1),
-(5, 'سه‌ماهه ۱۵۰ گیگابایت (ویژه)', 150, 90, 380000, 295000, 'default', 0, 1),
-(6, 'یک‌ماهه نامحدود ایران اکسس', 200, 30, 190000, 150000, 'iran_access', 0, 1)
-ON DUPLICATE KEY UPDATE `title`=VALUES(`title`);
+-- INSERT INTO `plans` ...
 
 -- Seed Default App Guides
 INSERT INTO `app_guides` (`platform`, `app_name`, `download_url`, `guide_url`, `description`, `sort_order`, `is_active`) VALUES

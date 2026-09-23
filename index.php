@@ -224,6 +224,8 @@ $router->post('servers/update', [ServerController::class, 'update']);
 $router->post('servers/migrate', [ServerController::class, 'migrateClients']);
 $router->post('servers/delete', [ServerController::class, 'delete']);
 $router->post('servers/clear-all', [ServerController::class, 'clearAll']);
+$router->post('servers/purge-all-samples', [ServerController::class, 'purgeAllSamples']);
+$router->get('servers/purge-all-samples', [ServerController::class, 'purgeAllSamples']);
 $router->get('servers/test', [ServerController::class, 'testConnection']);
 $router->post('servers/test-raw', [ServerController::class, 'testRawConnection']);
 $router->get('servers/test-raw', [ServerController::class, 'testRawConnection']);

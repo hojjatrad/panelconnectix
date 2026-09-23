@@ -258,6 +258,7 @@ $renewalLink = !empty($client['renewal_url']) ? $client['renewal_url'] : (!empty
             </div>
         </div>
 
+        <?php if (!empty($configs)): ?>
         <!-- Multi-Inbound Fallback Individual Configs Box -->
         <div class="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 space-y-3">
             <button type="button" onclick="document.getElementById('fallbackConfigsBox').classList.toggle('hidden')" class="w-full flex items-center justify-between text-xs font-bold text-slate-300 hover:text-white transition">
@@ -299,6 +300,7 @@ $renewalLink = !empty($client['renewal_url']) ? $client['renewal_url'] : (!empty
                 <?php endforeach; ?>
             </div>
         </div>
+        <?php endif; ?>
 
         <!-- Reseller Support Links -->
         <div class="pt-4 border-t border-slate-800 text-center space-y-3">

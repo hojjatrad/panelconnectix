@@ -120,6 +120,36 @@ if ($hasConfig) {
             } catch (Throwable $e) {}
         }
 
+        // Complete Purge of all sample plans, mock servers, and test clients (Clean Slate)
+        if (isset($_GET['purge_samples']) && $_GET['purge_samples'] == '1') {
+            try {
+                if ($driver === 'mysql') {
+                    $pdo->exec("SET FOREIGN_KEY_CHECKS=0");
+                    $pdo->exec("DELETE FROM bot_orders");
+                    $pdo->exec("DELETE FROM trial_logs");
+                    $pdo->exec("DELETE FROM reserved_plans");
+                    $pdo->exec("DELETE FROM clients");
+                    $pdo->exec("DELETE FROM reseller_plans");
+                    $pdo->exec("DELETE FROM plans");
+                    $pdo->exec("DELETE FROM server_nodes WHERE driver = 'mock'");
+                    $pdo->exec("SET FOREIGN_KEY_CHECKS=1");
+                } else {
+                    $pdo->exec("PRAGMA foreign_keys = OFF");
+                    $pdo->exec("DELETE FROM bot_orders");
+                    $pdo->exec("DELETE FROM trial_logs");
+                    $pdo->exec("DELETE FROM reserved_plans");
+                    $pdo->exec("DELETE FROM clients");
+                    $pdo->exec("DELETE FROM reseller_plans");
+                    $pdo->exec("DELETE FROM plans");
+                    $pdo->exec("DELETE FROM server_nodes WHERE driver = 'mock'");
+                    $pdo->exec("PRAGMA foreign_keys = ON");
+                }
+                $adminMsg .= ' [تمامی پلن‌های نمونه، سفارشات تستی و سرورهای ماک پاکسازی شدند. سیستم ۱۰۰٪ خام و آماده معرفی سرور و پلن‌های واقعی شماست.]';
+            } catch (Throwable $e) {
+                $adminMsg .= ' [خطا در پاکسازی: ' . $e->getMessage() . ']';
+            }
+        }
+
         // Auto-disable mock servers if any real server exists
         try {
             $hasReal = (int)$pdo->query("SELECT COUNT(*) FROM server_nodes WHERE driver != 'mock' AND is_active = 1")->fetchColumn();
@@ -453,6 +483,13 @@ foreach ($stepResults as $r) {
                 <a href="repair.php?clear_servers=1" onclick="return confirm('⚠️ آیا از خام‌سازی و پاکسازی کامل تمامی سرورها اطمینان دارید؟');" class="w-full py-2.5 bg-rose-950/40 hover:bg-rose-900/50 text-rose-300 font-bold rounded-xl text-xs transition border border-rose-800/50 flex items-center justify-center gap-1.5">
                     <i class="fa-solid fa-trash-can"></i>
                     <span>خام‌سازی و پاکسازی کامل سرورها (جهت معرفی سرور اختصاصی)</span>
+                </a>
+            </div>
+
+            <div>
+                <a href="repair.php?purge_samples=1" onclick="return confirm('⚠️ اخطار بسیار مهم:\nآیا از پاکسازی کامل تمامی پلن‌های نمونه، سفارشات تستی و سرورهای ماک اطمینان دارید؟\nسیستم کاملاً خام خواهد شد تا بتوانید سرور و پلن‌های اختصاصی خود را از نو تعریف کنید.');" class="w-full py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs transition shadow-lg shadow-rose-900/40 flex items-center justify-center gap-1.5">
+                    <i class="fa-solid fa-broom"></i>
+                    <span>پاکسازی کامل نمونه‌ها و شروع از صفر (شروع تمیز بدون پلن و سرور ماک)</span>
                 </a>
             </div>
         </div>

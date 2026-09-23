@@ -249,38 +249,31 @@ class SublinkController {
             } catch (Throwable $e) {}
         }
 
-        $uuid = !empty($client['uuid']) ? $client['uuid'] : 'adc6ed75-e6bd-4a15-911a-e29f09eee801';
-        $username = $client['username'] ?? 'user';
-        $brand = !empty($client['brand_name']) ? preg_replace('/[^\p{L}\p{N}_-]/u', '', str_replace(' ', '_', $client['brand_name'])) : 'Connectix';
-        
-        // Use real node domain or configured sub_domain, fallback to gga1.montago-shop.ir
-        $domain = !empty($client['sub_domain']) ? $client['sub_domain'] : (parse_url($client['api_url'] ?? '', PHP_URL_HOST) ?: 'gga1.montago-shop.ir');
-        if ($domain === 'fi.connectix.space' || $domain === '127.0.0.1') {
-            $domain = 'gga1.montago-shop.ir';
+        // 3. Fallback: If client has node_sublink, fetch configs from it
+        if (!empty($client['node_sublink'])) {
+            try {
+                $ch = curl_init($client['node_sublink']);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 6);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                $sub = curl_exec($ch);
+                curl_close($ch);
+                if (!empty($sub)) {
+                    $decoded = base64_decode(trim($sub), true) ?: $sub;
+                    $lines = array_filter(array_map('trim', explode("\n", $decoded)));
+                    $out = [];
+                    foreach ($lines as $i => $l) {
+                        if (str_starts_with($l, 'vless://') || str_starts_with($l, 'vmess://') || str_starts_with($l, 'trojan://') || str_starts_with($l, 'ss://')) {
+                            $out['sub_link_' . ($i + 1)] = $l;
+                        }
+                    }
+                    if (!empty($out)) return $out;
+                }
+            } catch (Throwable $e) {}
         }
 
-        // 1. همراه اول (MCI) - VLESS Reality Vision TLS (کمترین پینگ و دور زدن فیلترینگ شدید همراه اول)
-        $mciReality = "vless://{$uuid}@{$domain}:443?encryption=none&security=reality&type=tcp&headerType=none&flow=xtls-rprx-vision&sni=delivery.mp.microsoft.com&fp=edge&pbk=PjR-SM4fOm2fY4mTqWoqZDRyxontvpailM0gBqUxlUQ&sid=070a23aed243#{$brand}-همراه_اول-MCI-{$username}";
-
-        // 2. ایرانسل (Irancell) - VLESS Reality (مسیر پایدار بدون قطعی ایرانسل)
-        $irancellCdn = "vless://{$uuid}@{$domain}:443?encryption=none&security=reality&type=tcp&headerType=none&flow=xtls-rprx-vision&sni=delivery.mp.microsoft.com&fp=edge&pbk=PjR-SM4fOm2fY4mTqWoqZDRyxontvpailM0gBqUxlUQ&sid=070a23aed243#{$brand}-ایرانسل-MTN-{$username}";
-
-        // 3. رایتل و شاتل‌موبایل (Rightel) - VLESS Reality
-        $rightelTrojan = "vless://{$uuid}@{$domain}:443?encryption=none&security=reality&type=tcp&headerType=none&flow=xtls-rprx-vision&sni=delivery.mp.microsoft.com&fp=edge&pbk=PjR-SM4fOm2fY4mTqWoqZDRyxontvpailM0gBqUxlUQ&sid=070a23aed243#{$brand}-رایتل-Rightel-{$username}";
-
-        // 4. اینترنت خانگی و مخابرات (Wi-Fi / ADSL / FTTH)
-        $wifiVmess = "vless://{$uuid}@{$domain}:443?encryption=none&security=reality&type=tcp&headerType=none&flow=xtls-rprx-vision&sni=delivery.mp.microsoft.com&fp=edge&pbk=PjR-SM4fOm2fY4mTqWoqZDRyxontvpailM0gBqUxlUQ&sid=070a23aed243#{$brand}-مخابرات_وای‌فای-WiFi-{$username}";
-
-        // 5. سرور اختصاصی بازی و استریمینگ (Ultra Gaming Low-Ping)
-        $gamingFast = "vless://{$uuid}@{$domain}:443?encryption=none&security=reality&type=tcp&headerType=none&flow=xtls-rprx-vision&sni=delivery.mp.microsoft.com&fp=edge&pbk=PjR-SM4fOm2fY4mTqWoqZDRyxontvpailM0gBqUxlUQ&sid=070a23aed243#{$brand}-گیمینگ_پینگ_پایین-Gaming-{$username}";
-
-        return [
-            'mci_reality' => $mciReality,
-            'irancell_cdn' => $irancellCdn,
-            'rightel_trojan' => $rightelTrojan,
-            'wifi_vmess' => $wifiVmess,
-            'gaming_fast' => $gamingFast
-        ];
+        // Return empty if no real configs from node (no fake fallbacks)
+        return [];
     }
 
     private function outputRawSubscription(array $client, array $configs): void {

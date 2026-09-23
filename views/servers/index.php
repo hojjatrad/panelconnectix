@@ -49,6 +49,14 @@ require __DIR__ . '/../layout/header.php';
             </button>
         </form>
         <?php endif; ?>
+
+        <form method="POST" action="<?= Helpers::url('servers/purge-all-samples') ?>" class="m-0" onsubmit="return confirm('⚠️ اخطار بسیار مهم:\nآیا از پاکسازی کامل تمامی پلن‌های نمونه، سفارشات تستی و سرورهای ماک اطمینان دارید؟\nسیستم کاملاً خام خواهد شد تا بتوانید سرور و پلن‌های اختصاصی خود را از اول تعریف کنید.');">
+            <?= Helpers::csrfField() ?>
+            <button type="submit" class="px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition-all shadow-md flex items-center gap-1.5" title="پاکسازی تمامی نمونه‌ها و شروع تمیز از صفر">
+                <i class="fa-solid fa-broom text-[11px]"></i>
+                <span>پاکسازی کامل نمونه‌ها (شروع تمیز)</span>
+            </button>
+        </form>
     </div>
 </div>
 
