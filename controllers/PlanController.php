@@ -10,14 +10,21 @@ class PlanController {
         Database::ensureExtendedTablesExist($pdo);
 
         $plans = $pdo->query("SELECT p.*, s.name as server_name, s.driver as server_driver, s.sub_domain as server_subdomain,
-                              c.name as cluster_name, c.badge_color as cluster_color, c.icon as cluster_icon 
+                              c.name as cluster_name, c.badge_color as cluster_color, c.icon as cluster_icon, c.slug as cluster_slug 
                               FROM plans p 
                               LEFT JOIN server_nodes s ON p.server_id = s.id 
                               LEFT JOIN categories c ON (p.category_id = c.id OR (p.category_id IS NULL AND p.server_group = c.slug))
-                              ORDER BY p.is_free DESC, p.base_price ASC")->fetchAll();
-        $servers = $pdo->query("SELECT * FROM server_nodes WHERE is_active = 1 ORDER BY name ASC")->fetchAll();
-        $dbCategories = $pdo->query("SELECT * FROM categories WHERE is_active = 1 AND type IN ('servers', 'server', 'both') ORDER BY sort_order ASC, id ASC")->fetchAll();
-        $planCategories = $pdo->query("SELECT * FROM categories WHERE is_active = 1 AND type IN ('plans', 'plan', 'both') ORDER BY sort_order ASC, id ASC")->fetchAll();
+                              ORDER BY p.is_free DESC, p.base_price ASC")->fetchAll(PDO::FETCH_ASSOC);
+        $servers = $pdo->query("SELECT * FROM server_nodes WHERE is_active = 1 ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
+        
+        $allCategories = $pdo->query("SELECT * FROM categories WHERE is_active = 1 ORDER BY sort_order ASC, id ASC")->fetchAll(PDO::FETCH_ASSOC);
+        $serverCategories = array_values(array_filter($allCategories, fn($c) => in_array($c['type'] ?? '', ['servers', 'server', 'both'])));
+        $planCategories = array_values(array_filter($allCategories, fn($c) => in_array($c['type'] ?? '', ['plans', 'plan', 'both'])));
+        if (empty($planCategories)) {
+            $planCategories = $allCategories;
+        }
+        
+        $dbCategories = $serverCategories;
         require __DIR__ . '/../views/plans/index.php';
     }
 
@@ -36,7 +43,7 @@ class PlanController {
         $serverGroup = trim($_POST['server_group'] ?? 'default');
         $serverId = !empty($_POST['server_id']) ? (int)$_POST['server_id'] : null;
         $categoryId = !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null;
-        $category = trim($_POST['category'] ?? '۱ ماهه');
+        $category = trim($_POST['category'] ?? '');
         $ipLimit = max(0, (int)($_POST['ip_limit'] ?? 2));
         $showInBot = isset($_POST['show_in_bot']) ? 1 : 0;
         $isFree = isset($_POST['is_free']) ? 1 : 0;
@@ -48,8 +55,20 @@ class PlanController {
 
         $pdo = Database::getConnection();
         if ($categoryId) {
-            $catSlug = $pdo->query("SELECT slug FROM categories WHERE id = " . $categoryId)->fetchColumn();
-            if ($catSlug) $serverGroup = $catSlug;
+            $catRow = $pdo->query("SELECT * FROM categories WHERE id = " . (int)$categoryId)->fetch(PDO::FETCH_ASSOC);
+            if ($catRow) {
+                if (empty($category) || $category === '۱ ماهه') {
+                    $category = $catRow['name'];
+                }
+                if ($catRow['type'] === 'servers' || in_array($catRow['slug'], ['default', 'vip', 'economic', 'iran_access', 'gaming'])) {
+                    if (empty($serverGroup) || $serverGroup === 'default') {
+                        $serverGroup = $catRow['slug'];
+                    }
+                }
+            }
+        }
+        if (empty($category)) {
+            $category = 'عمومی';
         }
 
         $stmt = $pdo->prepare("INSERT INTO plans (title, traffic_gb, duration_days, base_price, reseller_price, server_group, server_id, category_id, category, ip_limit, show_in_bot, is_free) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
@@ -75,7 +94,7 @@ class PlanController {
         $serverGroup = trim($_POST['server_group'] ?? 'default');
         $serverId = !empty($_POST['server_id']) ? (int)$_POST['server_id'] : null;
         $categoryId = !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null;
-        $category = trim($_POST['category'] ?? '۱ ماهه');
+        $category = trim($_POST['category'] ?? '');
         $ipLimit = max(0, (int)($_POST['ip_limit'] ?? 2));
         $showInBot = isset($_POST['show_in_bot']) ? 1 : 0;
         $isFree = isset($_POST['is_free']) ? 1 : 0;
@@ -87,21 +106,24 @@ class PlanController {
 
         $pdo = Database::getConnection();
         if ($categoryId) {
-            $catSlug = $pdo->query("SELECT slug FROM categories WHERE id = " . $categoryId)->fetchColumn();
-            if ($catSlug) $serverGroup = $catSlug;
+            $catRow = $pdo->query("SELECT * FROM categories WHERE id = " . (int)$categoryId)->fetch(PDO::FETCH_ASSOC);
+            if ($catRow) {
+                if (empty($category) || $category === '۱ ماهه') {
+                    $category = $catRow['name'];
+                }
+                if ($catRow['type'] === 'servers' || in_array($catRow['slug'], ['default', 'vip', 'economic', 'iran_access', 'gaming'])) {
+                    if (empty($serverGroup) || $serverGroup === 'default') {
+                        $serverGroup = $catRow['slug'];
+                    }
+                }
+            }
+        }
+        if (empty($category)) {
+            $category = 'عمومی';
         }
 
         $stmt = $pdo->prepare("UPDATE plans SET title = ?, traffic_gb = ?, duration_days = ?, base_price = ?, reseller_price = ?, server_group = ?, server_id = ?, category_id = ?, category = ?, ip_limit = ?, show_in_bot = ?, is_free = ? WHERE id = ?");
         $stmt->execute([$title, $traffic, $days, $basePrice, $resellerPrice, $serverGroup, $serverId, $categoryId, $category, $ipLimit, $showInBot, $isFree, $id]);
-
-        if ($id <= 0 || empty($title) || $traffic <= 0 || $days <= 0) {
-            Helpers::flash('error', 'اطلاعات وارد شده برای ویرایش پلن نامعتبر است.');
-            Helpers::redirect('plans');
-        }
-
-        $pdo = Database::getConnection();
-        $stmt = $pdo->prepare("UPDATE plans SET title = ?, traffic_gb = ?, duration_days = ?, base_price = ?, reseller_price = ?, server_group = ?, server_id = ?, category = ?, ip_limit = ?, show_in_bot = ?, is_free = ? WHERE id = ?");
-        $stmt->execute([$title, $traffic, $days, $basePrice, $resellerPrice, $serverGroup, $serverId, $category, $ipLimit, $showInBot, $isFree, $id]);
 
         Helpers::flash('success', "پلن '{$title}' با موفقیت به‌روزرسانی شد.");
         Helpers::redirect('plans');

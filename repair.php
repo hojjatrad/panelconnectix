@@ -1,6 +1,6 @@
 <?php
 /**
- * Connectix Panel - Emergency Self-Healing & Diagnostic Utility (v2.7.3)
+ * Connectix Panel - Emergency Self-Healing & Diagnostic Utility (v2.7.4)
  * Language: Persian (Farsi) - RTL
  * Purpose: Automatically repair .htaccess, verify database connection,
  * migrate missing tables/columns, fix permissions, and restore panel functionality.
@@ -389,7 +389,7 @@ foreach ($stepResults as $r) {
         </div>
 
         <div class="text-[11px] text-center text-slate-500 pt-2 border-t border-slate-800/80">
-            نسخه پایدار و ترمیم‌شده سامانه: <span class="font-mono text-purple-400 font-bold">v2.7.3</span>
+            نسخه پایدار و ترمیم‌شده سامانه: <span class="font-mono text-purple-400 font-bold">v2.7.4</span>
         </div>
 
     </div>
