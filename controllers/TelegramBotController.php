@@ -213,6 +213,9 @@ class TelegramBotController {
         if (Setting::get('btn_wheel_enabled', '1') === '1') {
             $items[] = ['text' => Setting::get('btn_wheel_text', '🎰 گردونه شانس و هدیه'), 'callback_data' => 'menu_wheel'];
         }
+        if (Setting::get('btn_wallet_enabled', '1') === '1') {
+            $items[] = ['text' => Setting::get('btn_wallet_text', '💳 کیف‌پول و شارژ'), 'callback_data' => 'menu_wallet'];
+        }
         if (Setting::get('btn_referral_enabled', '1') === '1') {
             $items[] = ['text' => Setting::get('btn_referral_text', '🤝 کسب درآمد'), 'callback_data' => 'menu_referral'];
         }
@@ -260,6 +263,9 @@ class TelegramBotController {
         }
         if (Setting::get('btn_wheel_enabled', '1') === '1') {
             $items[] = ['text' => Setting::get('btn_wheel_text', '🎰 گردونه شانس و هدیه')];
+        }
+        if (Setting::get('btn_wallet_enabled', '1') === '1') {
+            $items[] = ['text' => Setting::get('btn_wallet_text', '💳 کیف‌پول و شارژ')];
         }
         if (Setting::get('btn_referral_enabled', '1') === '1') {
             $items[] = ['text' => Setting::get('btn_referral_text', '🤝 کسب درآمد')];
@@ -525,6 +531,46 @@ class TelegramBotController {
             return;
         }
 
+        // Customer Actions: Pay via Wallet Instant 1-Click
+        if (str_starts_with($data, 'pay_wallet_')) {
+            $orderId = (int)str_replace('pay_wallet_', '', $data);
+            self::processWalletPayment($pdo, $orderId, $chatId, $fromId, $messageId);
+            return;
+        }
+
+        // Customer Actions: Deficit charge for specific order
+        if (str_starts_with($data, 'charge_wallet_for_')) {
+            $orderId = (int)str_replace('charge_wallet_for_', '', $data);
+            self::showWalletTopupForOrder($pdo, $chatId, $fromId, $orderId, $messageId);
+            return;
+        }
+
+        // Customer Actions: Wallet Menu
+        if ($data === 'menu_wallet') {
+            self::showWalletMenu($pdo, $chatId, $fromId, $messageId);
+            return;
+        }
+
+        // Customer Actions: Wallet Top-up Predefined Amount
+        if (str_starts_with($data, 'wallet_topup_') && $data !== 'wallet_topup_custom') {
+            $amt = (int)str_replace('wallet_topup_', '', $data);
+            self::initiateWalletTopup($pdo, $chatId, $fromId, $amt, $messageId);
+            return;
+        }
+
+        // Customer Actions: Wallet Top-up Custom Amount Prompt
+        if ($data === 'wallet_topup_custom') {
+            self::setSession($pdo, $fromId, 'awaiting_custom_wallet_amount', []);
+            $promptMsg = "✏️ <b>شارژ با مبلغ دلخواه</b>\n\nلطفاً مبلغ مورد نظر خود را به تومان به صورت عدد (مثال: <code>150000</code>) ارسال فرمایید:";
+            $promptKb = ['inline_keyboard' => [[['text' => '🔙 بازگشت به کیف‌پول', 'callback_data' => 'menu_wallet']]]];
+            if ($messageId) {
+                TelegramBot::editMessageText($promptMsg, $chatId, $messageId, $promptKb);
+            } else {
+                TelegramBot::sendMessage($promptMsg, $chatId, $promptKb);
+            }
+            return;
+        }
+
         // Customer Actions: Pay via Card
         if (str_starts_with($data, 'pay_card_')) {
             $orderId = (int)str_replace('pay_card_', '', $data);
@@ -587,6 +633,20 @@ class TelegramBotController {
             } else {
                 TelegramBot::sendMessage($msg, $chatId, $kb);
             }
+            return;
+        }
+
+        // Admin Actions: Approve Wallet Topup
+        if (str_starts_with($data, 'admin_approve_charge_')) {
+            $orderId = (int)str_replace('admin_approve_charge_', '', $data);
+            self::approveWalletChargeOrder($pdo, $orderId, $chatId, $messageId);
+            return;
+        }
+
+        // Admin Actions: Reject Wallet Topup
+        if (str_starts_with($data, 'admin_reject_charge_')) {
+            $orderId = (int)str_replace('admin_reject_charge_', '', $data);
+            self::rejectWalletChargeOrder($pdo, $orderId, $chatId, $messageId);
             return;
         }
 
@@ -814,19 +874,36 @@ class TelegramBotController {
              . "🔢 <b>کد رهگیری:</b> <code>{$order['order_code']}</code>\n\n"
              . "روش پرداخت یا ثبت کد تخفیف را انتخاب نمایید:";
 
-        $buttons = [
-            [
-                ['text' => '💳 کارت به کارت', 'callback_data' => 'pay_card_' . $orderId],
-                ['text' => '🪙 پرداخت تتر (USDT)', 'callback_data' => 'pay_crypto_' . $orderId]
-            ],
-            [
-                ['text' => '💎 پرداخت با تون (TON)', 'callback_data' => 'pay_ton_' . $orderId]
-            ]
+        // Fetch user wallet balance
+        $stmtUser = $pdo->prepare("SELECT wallet_balance, referral_balance FROM bot_users WHERE tg_id = ?");
+        $stmtUser->execute([$order['user_tg_id']]);
+        $uRow = $stmtUser->fetch();
+        $userWallet = (int)($uRow['wallet_balance'] ?? 0) + (int)($uRow['referral_balance'] ?? 0);
+
+        $buttons = [];
+        if ($userWallet >= (int)$order['amount']) {
+            $buttons[] = [
+                ['text' => '⚡️ پرداخت آنی از موجودی کیف‌پول (' . number_format($userWallet) . ' تومان)', 'callback_data' => 'pay_wallet_' . $orderId]
+            ];
+        } else {
+            $deficit = (int)$order['amount'] - $userWallet;
+            $buttons[] = [
+                ['text' => '💳 موجودی: ' . number_format($userWallet) . ' ت (کسری: ' . number_format($deficit) . ' ت)', 'callback_data' => 'charge_wallet_for_' . $orderId]
+            ];
+        }
+
+        $buttons[] = [
+            ['text' => '💳 کارت به کارت', 'callback_data' => 'pay_card_' . $orderId],
+            ['text' => '🪙 پرداخت تتر (USDT)', 'callback_data' => 'pay_crypto_' . $orderId]
         ];
 
+        $tonAndCoupon = [
+            ['text' => '💎 پرداخت با تون (TON)', 'callback_data' => 'pay_ton_' . $orderId]
+        ];
         if (empty($order['coupon_code'])) {
-            $buttons[1][] = ['text' => '🎟 کد تخفیف', 'callback_data' => 'apply_coupon_' . $orderId];
+            $tonAndCoupon[] = ['text' => '🎟 کد تخفیف', 'callback_data' => 'apply_coupon_' . $orderId];
         }
+        $buttons[] = $tonAndCoupon;
 
         $buttons[] = [
             ['text' => '❌ انصراف از سفارش', 'callback_data' => 'cancel_order_' . $orderId]
@@ -1047,6 +1124,12 @@ class TelegramBotController {
             return;
         }
 
+        $walletText = Setting::get('btn_wallet_text', '💳 کیف‌پول و شارژ');
+        if ($text === $walletText || $text === '💳 کیف‌پول و شارژ' || $text === '💳 کیف پول' || $text === 'کیف پول' || $text === '/wallet' || $text === 'شارژ حساب') {
+            self::showWalletMenu($pdo, $chatId, $fromId);
+            return;
+        }
+
         if ($text === $refText || $text === '🤝 زیرمجموعه‌گیری و درآمد' || $text === '🤝 زیرمجموعه‌گیری و درآمدزایی' || $text === '/referral' || $text === 'زیرمجموعه‌گیری') {
             self::showReferralInfo($pdo, $chatId, $fromId);
             return;
@@ -1217,6 +1300,21 @@ class TelegramBotController {
             return;
         }
 
+        // Custom Wallet Amount Input Step
+        if ($session && $session['step'] === 'awaiting_custom_wallet_amount' && !empty($text)) {
+            $cleanNum = preg_replace('/[^0-9]/', '', $text);
+            $amount = (int)$cleanNum;
+            if ($amount < 10000) {
+                TelegramBot::sendMessage("⚠️ لطفاً یک مبلغ معتبر وارد فرمایید (حداقل ۱۰,۰۰۰ تومان):", $chatId, [
+                    'inline_keyboard' => [[['text' => '🔙 انصراف', 'callback_data' => 'menu_wallet']]]
+                ]);
+                return;
+            }
+            self::clearSession($pdo, $fromId);
+            self::initiateWalletTopup($pdo, $chatId, $fromId, $amount);
+            return;
+        }
+
         // TON TXID Submission Step
         if ($session && $session['step'] === 'awaiting_ton_txid') {
             self::handleTonTxidSubmission($pdo, $chatId, $fromId, $text, $session['data'] ?? []);
@@ -1291,25 +1389,44 @@ class TelegramBotController {
                     $adminId = $ctx['admin_chat_id'];
                     $botToken = $ctx['bot_token'];
 
-                    TelegramBot::sendMessage("✅ <b>رسید پرداخت شما با موفقیت دریافت شد.</b>\nکد سفارش: <code>{$order['order_code']}</code>\nسفارش شما بررسی و مشخصات تحویل داده خواهد شد.", $chatId, self::getMainMenuInlineKeyboard($pdo, $fromId), $botToken);
+                    if ($order['order_type'] === 'charge_wallet') {
+                        TelegramBot::sendMessage("✅ <b>رسید شارژ کیف‌پول شما دریافت شد.</b>\nکد پیگیری: <code>{$order['order_code']}</code>\nمبلغ: <b>" . number_format($order['amount']) . " تومان</b>\nپس از تایید ادمین، اعتبار به صورت خودکار به کیف‌پول شما افزوده می‌شود.", $chatId, self::getMainMenuInlineKeyboard($pdo, $fromId), $botToken);
 
-                    $adminCaption = "🔔 <b>رسید واریزی جدید (ربات {$ctx['brand_name']})</b>\n\n"
-                                  . "👤 کاربر: @" . ($order['user_tg_username'] ?: 'ندارد') . " (ID: <code>{$fromId}</code>)\n"
-                                  . "📦 پلن: <b>{$order['plan_title']}</b>\n"
-                                  . "💰 مبلغ: <b>" . number_format($order['amount']) . " تومان</b>\n";
-                    if (!empty($order['coupon_code'])) {
-                        $adminCaption .= "🎟 تخفیف: <code>{$order['coupon_code']}</code> (-" . number_format($order['discount_amount'] ?? 0) . " ت)\n";
-                    }
-                    $adminCaption .= "🔖 کد سفارش: <code>{$order['order_code']}</code>";
+                        $adminCaption = "💳 <b>درخواست شارژ کیف‌پول ({$ctx['brand_name']})</b>\n\n"
+                                      . "👤 کاربر: @" . ($order['user_tg_username'] ?: 'ندارد') . " (ID: <code>{$fromId}</code>)\n"
+                                      . "💰 مبلغ واریزی: <b>" . number_format($order['amount']) . " تومان</b>\n"
+                                      . "🔖 شناسه سفارش شارژ: <code>{$order['order_code']}</code>\n"
+                                      . "📅 تاریخ: " . Helpers::formatDate(time());
 
-                    $adminKeyboard = [
-                        'inline_keyboard' => [
-                            [
-                                ['text' => '✅ تایید و تحویل خودکار', 'callback_data' => 'admin_approve_' . $orderId],
-                                ['text' => '❌ رد سفارش', 'callback_data' => 'admin_reject_' . $orderId]
+                        $adminKeyboard = [
+                            'inline_keyboard' => [
+                                [
+                                    ['text' => '✅ تایید و شارژ کیف‌پول', 'callback_data' => 'admin_approve_charge_' . $orderId],
+                                    ['text' => '❌ رد درخواست', 'callback_data' => 'admin_reject_charge_' . $orderId]
+                                ]
                             ]
-                        ]
-                    ];
+                        ];
+                    } else {
+                        TelegramBot::sendMessage("✅ <b>رسید پرداخت شما با موفقیت دریافت شد.</b>\nکد سفارش: <code>{$order['order_code']}</code>\nسفارش شما بررسی و مشخصات تحویل داده خواهد شد.", $chatId, self::getMainMenuInlineKeyboard($pdo, $fromId), $botToken);
+
+                        $adminCaption = "🔔 <b>رسید واریزی جدید (ربات {$ctx['brand_name']})</b>\n\n"
+                                      . "👤 کاربر: @" . ($order['user_tg_username'] ?: 'ندارد') . " (ID: <code>{$fromId}</code>)\n"
+                                      . "📦 پلن: <b>{$order['plan_title']}</b>\n"
+                                      . "💰 مبلغ: <b>" . number_format($order['amount']) . " تومان</b>\n";
+                        if (!empty($order['coupon_code'])) {
+                            $adminCaption .= "🎟 تخفیف: <code>{$order['coupon_code']}</code> (-" . number_format($order['discount_amount'] ?? 0) . " ت)\n";
+                        }
+                        $adminCaption .= "🔖 کد سفارش: <code>{$order['order_code']}</code>";
+
+                        $adminKeyboard = [
+                            'inline_keyboard' => [
+                                [
+                                    ['text' => '✅ تایید و تحویل خودکار', 'callback_data' => 'admin_approve_' . $orderId],
+                                    ['text' => '❌ رد سفارش', 'callback_data' => 'admin_reject_' . $orderId]
+                                ]
+                            ]
+                        ];
+                    }
 
                     if (!empty($adminId)) {
                         TelegramBot::sendPhoto($fileId, $adminCaption, $adminId, $adminKeyboard, $botToken);
@@ -1344,22 +1461,42 @@ class TelegramBotController {
                 $adminId = $ctx['admin_chat_id'];
                 $botToken = $ctx['bot_token'];
 
-                TelegramBot::sendMessage("✅ <b>اطلاعات پرداخت ثبت شد.</b>\nکد سفارش: <code>{$order['order_code']}</code>\nپس از تایید مدیر، اشتراک فعال خواهد شد.", $chatId, self::getMainMenuInlineKeyboard($pdo, $fromId), $botToken);
+                if ($order['order_type'] === 'charge_wallet') {
+                    TelegramBot::sendMessage("✅ <b>اطلاعات واریزی شارژ کیف‌پول ثبت شد.</b>\nکد پیگیری: <code>{$order['order_code']}</code>\nپس از تایید مدیر، اعتبار به کیف‌پول شما افزوده می‌شود.", $chatId, self::getMainMenuInlineKeyboard($pdo, $fromId), $botToken);
 
-                $adminNotice = "🔔 <b>ثبت فیش متنی (ربات {$ctx['brand_name']})</b>\n👤 کاربر: @" . ($order['user_tg_username'] ?: 'ندارد') . " (ID: <code>{$fromId}</code>)\n💰 مبلغ: <b>" . number_format($order['amount']) . " تومان</b>\n";
-                if (!empty($order['coupon_code'])) {
-                    $adminNotice .= "🎟 تخفیف: <code>{$order['coupon_code']}</code> (-" . number_format($order['discount_amount'] ?? 0) . " ت)\n";
-                }
-                $adminNotice .= "📝 متن: <code>{$text}</code>\n🔖 کد: <code>{$order['order_code']}</code>";
+                    $adminNotice = "💳 <b>ثبت فیش متنی شارژ کیف‌پول ({$ctx['brand_name']})</b>\n\n"
+                                 . "👤 کاربر: @" . ($order['user_tg_username'] ?: 'ندارد') . " (ID: <code>{$fromId}</code>)\n"
+                                 . "💰 مبلغ واریزی: <b>" . number_format($order['amount']) . " تومان</b>\n"
+                                 . "📝 متن فیش: <code>{$text}</code>\n"
+                                 . "🔖 کد سفارش: <code>{$order['order_code']}</code>\n"
+                                 . "📅 تاریخ: " . Helpers::formatDate(time());
 
-                $adminKeyboard = [
-                    'inline_keyboard' => [
-                        [
-                            ['text' => '✅ تایید و تحویل خودکار', 'callback_data' => 'admin_approve_' . $orderId],
-                            ['text' => '❌ رد سفارش', 'callback_data' => 'admin_reject_' . $orderId]
+                    $adminKeyboard = [
+                        'inline_keyboard' => [
+                            [
+                                ['text' => '✅ تایید و شارژ کیف‌پول', 'callback_data' => 'admin_approve_charge_' . $orderId],
+                                ['text' => '❌ رد درخواست', 'callback_data' => 'admin_reject_charge_' . $orderId]
+                            ]
                         ]
-                    ]
-                ];
+                    ];
+                } else {
+                    TelegramBot::sendMessage("✅ <b>اطلاعات پرداخت ثبت شد.</b>\nکد سفارش: <code>{$order['order_code']}</code>\nپس از تایید مدیر، اشتراک فعال خواهد شد.", $chatId, self::getMainMenuInlineKeyboard($pdo, $fromId), $botToken);
+
+                    $adminNotice = "🔔 <b>ثبت فیش متنی (ربات {$ctx['brand_name']})</b>\n👤 کاربر: @" . ($order['user_tg_username'] ?: 'ندارد') . " (ID: <code>{$fromId}</code>)\n💰 مبلغ: <b>" . number_format($order['amount']) . " تومان</b>\n";
+                    if (!empty($order['coupon_code'])) {
+                        $adminNotice .= "🎟 تخفیف: <code>{$order['coupon_code']}</code> (-" . number_format($order['discount_amount'] ?? 0) . " ت)\n";
+                    }
+                    $adminNotice .= "📝 متن: <code>{$text}</code>\n🔖 کد: <code>{$order['order_code']}</code>";
+
+                    $adminKeyboard = [
+                        'inline_keyboard' => [
+                            [
+                                ['text' => '✅ تایید و تحویل خودکار', 'callback_data' => 'admin_approve_' . $orderId],
+                                ['text' => '❌ رد سفارش', 'callback_data' => 'admin_reject_' . $orderId]
+                            ]
+                        ]
+                    ];
+                }
                 if (!empty($adminId)) {
                     TelegramBot::sendMessage($adminNotice, $adminId, $adminKeyboard, $botToken);
                 }
@@ -2403,8 +2540,11 @@ class TelegramBotController {
             $rewardVal = $amount;
             $rewardText = number_format($amount) . ' تومان شارژ کیف‌پول هدیه';
 
-            $pdo->prepare("UPDATE bot_users SET referral_balance = referral_balance + ? WHERE tg_id = ?")
+            $pdo->prepare("UPDATE bot_users SET wallet_balance = wallet_balance + ? WHERE tg_id = ?")
                 ->execute([$amount, $fromId]);
+            $newBal = (int)$pdo->query("SELECT wallet_balance + referral_balance FROM bot_users WHERE tg_id = " . $pdo->quote($fromId))->fetchColumn();
+            $pdo->prepare("INSERT INTO wallet_logs (tg_id, amount, balance_after, type, description) VALUES (?, ?, ?, 'wheel', ?)")
+                ->execute([$fromId, $amount, $newBal, "جایزه گردونه شانس"]);
         } elseif ($roll <= 80) {
             // Discount Coupon 15% or 20%
             $discountPct = (rand(1, 2) === 1) ? 15 : 20;
@@ -2423,8 +2563,11 @@ class TelegramBotController {
                 $rewardType = 'wallet_credit';
                 $rewardVal = 25000;
                 $rewardText = "🎉 جایزه بزرگ: ۲۵,۰۰۰ تومان شارژ مستقیم کیف‌پول!";
-                $pdo->prepare("UPDATE bot_users SET referral_balance = referral_balance + 25000 WHERE tg_id = ?")
+                $pdo->prepare("UPDATE bot_users SET wallet_balance = wallet_balance + 25000 WHERE tg_id = ?")
                     ->execute([$fromId]);
+                $newBal = (int)$pdo->query("SELECT wallet_balance + referral_balance FROM bot_users WHERE tg_id = " . $pdo->quote($fromId))->fetchColumn();
+                $pdo->prepare("INSERT INTO wallet_logs (tg_id, amount, balance_after, type, description) VALUES (?, 25000, ?, 'wheel', ?)")
+                    ->execute([$fromId, $newBal, "جایزه جک‌پات گردونه شانس"]);
             } else {
                 $code = 'JACKPOT-' . strtoupper(substr(bin2hex(random_bytes(2)), 0, 4));
                 $exp = date('Y-m-d H:i:s', time() + (72 * 3600));
@@ -2465,6 +2608,410 @@ class TelegramBotController {
                   . "🎁 <b>جایزه:</b> {$rewardText}\n"
                   . "⏰ <b>زمان:</b> " . Helpers::formatDate(time());
         TelegramBot::sendTopicLog('general', $adminLog);
+    }
+
+    /**
+     * Show User Wallet & Financial Overview
+     */
+    public static function showWalletMenu(PDO $pdo, string $chatId, string $fromId, ?int $messageId = null): void {
+        $ctx = self::getContext($pdo);
+        $botToken = $ctx['bot_token'];
+
+        $stmtUser = $pdo->prepare("SELECT wallet_balance, referral_balance, referral_count FROM bot_users WHERE tg_id = ?");
+        $stmtUser->execute([$fromId]);
+        $botUser = $stmtUser->fetch();
+
+        $wBalance = (int)($botUser['wallet_balance'] ?? 0);
+        $refBalance = (int)($botUser['referral_balance'] ?? 0);
+        $totalBalance = $wBalance + $refBalance;
+        $refCount = (int)($botUser['referral_count'] ?? 0);
+
+        // Fetch last 5 wallet logs
+        $stmtLogs = $pdo->prepare("SELECT * FROM wallet_logs WHERE tg_id = ? ORDER BY id DESC LIMIT 5");
+        $stmtLogs->execute([$fromId]);
+        $recentLogs = $stmtLogs->fetchAll();
+
+        $t1Pct = (int)Setting::get('wallet_bonus_tier1_percent', 10);
+        $t2Pct = (int)Setting::get('wallet_bonus_tier2_percent', 15);
+        $t3Pct = (int)Setting::get('wallet_bonus_tier3_percent', 20);
+
+        $msg = "💳 <b>کیف‌پول اعتباری ({$ctx['brand_name']})</b>\n\n"
+             . "💰 <b>موجودی کل قابل استفاده:</b> <b>" . number_format($totalBalance) . " تومان</b>\n"
+             . "──────────────\n"
+             . "💵 موجودی شارژ مستقیم: " . number_format($wBalance) . " تومان\n"
+             . "🤝 سود حاصل از زیرمجموعه‌ها: " . number_format($refBalance) . " تومان ({$refCount} کاربر)\n\n"
+             . "🎁 <b>طرح‌های تشویقی شارژ حساب (هدیه آنی):</b>\n"
+             . "• شارژ بالای ۲۰۰,۰۰۰ ت 👈 <b>{$t1Pct}٪ شارژ هدیه</b>\n"
+             . "• شارژ بالای ۵۰۰,۰۰۰ ت 👈 <b>{$t2Pct}٪ شارژ هدیه</b>\n"
+             . "• شارژ بالای ۱,۰۰۰,۰۰۰ ت 👈 <b>{$t3Pct}٪ شارژ هدیه</b>\n\n";
+
+        if (!empty($recentLogs)) {
+            $msg .= "📜 <b>تراکنش‌های اخیر کیف‌پول:</b>\n";
+            foreach ($recentLogs as $lg) {
+                $sign = ($lg['amount'] >= 0) ? '+' : '';
+                $typeIcon = ($lg['amount'] >= 0) ? '🟢' : '🔴';
+                $msg .= "{$typeIcon} <code>" . Helpers::timeAgo($lg['created_at']) . "</code>: {$sign}" . number_format($lg['amount']) . " ت (" . htmlspecialchars($lg['description'] ?? '') . ")\n";
+            }
+            $msg .= "\n";
+        }
+
+        $msg .= "⚡️ <i>با داشتن موجودی، اشتراک‌های خود را بدون نیاز به ارسال فیش و تنها با ۱ کلیک خریداری فرمایید.</i>\n\n"
+              . "مبلغ شارژ مورد نظر خود را انتخاب فرمایید:";
+
+        $buttons = [
+            [
+                ['text' => '➕ ۵۰,۰۰۰ تومان', 'callback_data' => 'wallet_topup_50000'],
+                ['text' => '➕ ۱۰۰,۰۰۰ تومان', 'callback_data' => 'wallet_topup_100000']
+            ],
+            [
+                ['text' => "🎁 ۲۰۰,۰۰۰ ت (+{$t1Pct}٪)", 'callback_data' => 'wallet_topup_200000'],
+                ['text' => "🎁 ۵۰۰,۰۰۰ ت (+{$t2Pct}٪)", 'callback_data' => 'wallet_topup_500000']
+            ],
+            [
+                ['text' => "🔥 ۱,۰۰۰,۰۰۰ ت (+{$t3Pct}٪)", 'callback_data' => 'wallet_topup_1000000'],
+                ['text' => '✏️ مبلغ دلخواه', 'callback_data' => 'wallet_topup_custom']
+            ],
+            [
+                ['text' => '🔄 به‌روزرسانی موجودی', 'callback_data' => 'menu_wallet'],
+                ['text' => '🔙 منوی اصلی', 'callback_data' => 'menu_main']
+            ]
+        ];
+
+        $kb = ['inline_keyboard' => $buttons];
+
+        if ($messageId) {
+            TelegramBot::editMessageText($msg, $chatId, $messageId, $kb, $botToken);
+        } else {
+            TelegramBot::sendMessage($msg, $chatId, $kb, $botToken);
+        }
+    }
+
+    /**
+     * Show Deficit Topup for Order
+     */
+    public static function showWalletTopupForOrder(PDO $pdo, string $chatId, string $fromId, int $orderId, ?int $messageId = null): void {
+        $stmt = $pdo->prepare("SELECT * FROM bot_orders WHERE id = ? AND user_tg_id = ?");
+        $stmt->execute([$orderId, $fromId]);
+        $order = $stmt->fetch();
+        if (!$order) {
+            TelegramBot::sendMessage("سفارش یافت نشد.", $chatId);
+            return;
+        }
+
+        $stmtUser = $pdo->prepare("SELECT wallet_balance, referral_balance FROM bot_users WHERE tg_id = ?");
+        $stmtUser->execute([$fromId]);
+        $botUser = $stmtUser->fetch();
+        $totalBalance = (int)($botUser['wallet_balance'] ?? 0) + (int)($botUser['referral_balance'] ?? 0);
+        $orderAmount = (int)$order['amount'];
+        $deficit = max(10000, $orderAmount - $totalBalance);
+
+        $msg = "💳 <b>شارژ کسری کیف‌پول برای نهایی‌سازی سفارش</b>\n\n"
+             . "📦 سفارش: <code>{$order['order_code']}</code>\n"
+             . "💰 مبلغ سفارش: " . number_format($orderAmount) . " تومان\n"
+             . "💳 موجودی فعلی شما: " . number_format($totalBalance) . " تومان\n"
+             . "🔻 مبلغ کسری: <b>" . number_format($deficit) . " تومان</b>\n\n"
+             . "آیا مایلید دقیقاً مبلغ کسری (" . number_format($deficit) . " تومان) را شارژ فرمایید یا از بسته‌های دارای شارژ هدیه استفاده کنید؟";
+
+        $buttons = [
+            [['text' => '💳 شارژ دقیق مبلغ کسری (' . number_format($deficit) . ' ت)', 'callback_data' => 'wallet_topup_' . $deficit]],
+            [['text' => '🎁 شارژ ۲۰۰,۰۰۰ ت (+۱۰٪)', 'callback_data' => 'wallet_topup_200000']],
+            [['text' => '🎁 شارژ ۵۰۰,۰۰۰ ت (+۱۵٪)', 'callback_data' => 'wallet_topup_500000']],
+            [['text' => '🔙 بازگشت به فاکتور سفارش', 'callback_data' => 'view_order_' . $orderId]]
+        ];
+
+        $kb = ['inline_keyboard' => $buttons];
+        if ($messageId) {
+            TelegramBot::editMessageText($msg, $chatId, $messageId, $kb);
+        } else {
+            TelegramBot::sendMessage($msg, $chatId, $kb);
+        }
+    }
+
+    /**
+     * Initiate Wallet Top-up
+     */
+    public static function initiateWalletTopup(PDO $pdo, string $chatId, string $fromId, int $amount, ?int $messageId = null): void {
+        if ($amount < 10000) {
+            TelegramBot::sendMessage("⚠️ حداقل مبلغ شارژ ۱۰,۰۰۰ تومان می‌باشد.", $chatId);
+            return;
+        }
+
+        $ctx = self::getContext($pdo);
+        $botToken = $ctx['bot_token'];
+
+        $t1Amt = (int)Setting::get('wallet_bonus_tier1_amount', 200000);
+        $t1Pct = (int)Setting::get('wallet_bonus_tier1_percent', 10);
+        $t2Amt = (int)Setting::get('wallet_bonus_tier2_amount', 500000);
+        $t2Pct = (int)Setting::get('wallet_bonus_tier2_percent', 15);
+        $t3Amt = (int)Setting::get('wallet_bonus_tier3_amount', 1000000);
+        $t3Pct = (int)Setting::get('wallet_bonus_tier3_percent', 20);
+
+        $bonusPct = 0;
+        if ($amount >= $t3Amt) $bonusPct = $t3Pct;
+        elseif ($amount >= $t2Amt) $bonusPct = $t2Pct;
+        elseif ($amount >= $t1Amt) $bonusPct = $t1Pct;
+
+        $bonusAmount = (int)round($amount * ($bonusPct / 100));
+        $totalWillCredit = $amount + $bonusAmount;
+
+        $orderCode = 'WLT-' . strtoupper(substr(uniqid(), -6));
+        $stmtOrder = $pdo->prepare("INSERT INTO bot_orders (order_code, reseller_id, bot_token, user_tg_id, user_tg_name, user_tg_username, order_type, amount, payment_method, payment_status) VALUES (?, ?, ?, ?, ?, ?, 'charge_wallet', ?, 'card', 'pending_receipt')");
+        $stmtOrder->execute([
+            $orderCode,
+            $ctx['reseller_id'],
+            $botToken,
+            $fromId,
+            '',
+            '',
+            $amount
+        ]);
+        $orderId = (int)$pdo->lastInsertId();
+
+        self::setSession($pdo, $fromId, 'awaiting_receipt', ['order_id' => $orderId, 'is_wallet' => true]);
+
+        $cardNumber = $ctx['card']['number'];
+        $cardHolder = $ctx['card']['holder'];
+        $cardSheba = $ctx['card']['shaba'];
+
+        $msg = "💳 <b>درخواست شارژ حساب کاربری ({$ctx['brand_name']})</b>\n\n"
+             . "💰 <b>مبلغ واریزی:</b> <b>" . number_format($amount) . " تومان</b>\n";
+        if ($bonusAmount > 0) {
+            $msg .= "🎁 <b>هدیه ویژه ({$bonusPct}٪):</b> <b>+" . number_format($bonusAmount) . " تومان</b>\n"
+                  . "💎 <b>اعتبار نهایی پس از تایید:</b> <b>" . number_format($totalWillCredit) . " تومان</b>\n";
+        }
+        $msg .= "🔖 <b>شناسه سفارش شارژ:</b> <code>{$orderCode}</code>\n"
+              . "──────────────\n"
+              . "🔢 <b>شماره کارت مقصد:</b>\n<code>{$cardNumber}</code>\n"
+              . "👤 <b>به نام:</b> {$cardHolder}\n";
+
+        if (!empty($cardSheba)) {
+            $msg .= "📌 <b>شماره شبا:</b>\n<code>{$cardSheba}</code>\n";
+        }
+
+        $msg .= "\n⚠️ <b>دستورالعمل شارژ:</b>\n"
+              . "۱. مبلغ فوق را به شماره کارت بالا انتقال دهید.\n"
+              . "۲. سپس <b>عکس رسید فیش واریزی</b> یا <b>شماره پیگیری تراکنش</b> را همین‌جا ارسال فرمایید.\n\n"
+              . "<i>پس از تایید ادمین، مبلغ بلافاصله به کیف‌پول شما واریز خواهد شد.</i>";
+
+        $buttons = [
+            [
+                ['text' => '🪙 پرداخت با تتر (USDT)', 'callback_data' => 'pay_crypto_' . $orderId],
+                ['text' => '💎 پرداخت با تون (TON)', 'callback_data' => 'pay_ton_' . $orderId]
+            ],
+            [
+                ['text' => '❌ انصراف', 'callback_data' => 'cancel_order_' . $orderId],
+                ['text' => '🔙 بازگشت به کیف‌پول', 'callback_data' => 'menu_wallet']
+            ]
+        ];
+
+        $kb = ['inline_keyboard' => $buttons];
+
+        if ($messageId) {
+            TelegramBot::editMessageText($msg, $chatId, $messageId, $kb, $botToken);
+        } else {
+            TelegramBot::sendMessage($msg, $chatId, $kb, $botToken);
+        }
+    }
+
+    /**
+     * Process 1-Click Instant Payment from User Wallet
+     */
+    public static function processWalletPayment(PDO $pdo, int $orderId, string $chatId, string $fromId, ?int $messageId = null): void {
+        $ctx = self::getContext($pdo);
+        $botToken = $ctx['bot_token'];
+
+        $stmt = $pdo->prepare("SELECT o.*, p.title as plan_title FROM bot_orders o LEFT JOIN plans p ON o.plan_id = p.id WHERE o.id = ? AND o.user_tg_id = ? AND o.payment_status IN ('pending_receipt', 'pending')");
+        $stmt->execute([$orderId, $fromId]);
+        $order = $stmt->fetch();
+
+        if (!$order) {
+            TelegramBot::sendMessage("⚠️ سفارش یافت نشد یا قبلاً نهایی گردیده است.", $chatId, self::getMainMenuInlineKeyboard($pdo, $fromId), $botToken);
+            return;
+        }
+
+        $orderAmount = (int)$order['amount'];
+
+        $stmtUser = $pdo->prepare("SELECT wallet_balance, referral_balance FROM bot_users WHERE tg_id = ?");
+        $stmtUser->execute([$fromId]);
+        $botUser = $stmtUser->fetch();
+
+        $wBalance = (int)($botUser['wallet_balance'] ?? 0);
+        $refBalance = (int)($botUser['referral_balance'] ?? 0);
+        $totalAvail = $wBalance + $refBalance;
+
+        if ($totalAvail < $orderAmount) {
+            $deficit = $orderAmount - $totalAvail;
+            $msg = "⚠️ <b>موجودی کیف‌پول شما کافی نیست!</b>\n\n"
+                 . "💰 <b>مبلغ قابل پرداخت سفارش:</b> " . number_format($orderAmount) . " تومان\n"
+                 . "💳 <b>موجودی فعلی شما:</b> " . number_format($totalAvail) . " تومان\n"
+                 . "🔻 <b>کسری موجودی:</b> <b>" . number_format($deficit) . " تومان</b>\n\n"
+                 . "جهت تکمیل این خرید، ابتدا کیف‌پول خود را شارژ فرمایید:";
+
+            $kb = [
+                'inline_keyboard' => [
+                    [['text' => '💳 شارژ ' . number_format($deficit) . ' تومان (مبلغ کسری)', 'callback_data' => 'wallet_topup_' . $deficit]],
+                    [['text' => '➕ منوی شارژ کیف‌پول', 'callback_data' => 'menu_wallet']],
+                    [['text' => '🔙 بازگشت به فاکتور سفارش', 'callback_data' => 'view_order_' . $orderId]]
+                ]
+            ];
+
+            if ($messageId) {
+                TelegramBot::editMessageText($msg, $chatId, $messageId, $kb, $botToken);
+            } else {
+                TelegramBot::sendMessage($msg, $chatId, $kb, $botToken);
+            }
+            return;
+        }
+
+        // Deduct from wallet: first wallet_balance, then referral_balance
+        $deductWallet = min($wBalance, $orderAmount);
+        $deductRef = $orderAmount - $deductWallet;
+
+        $pdo->prepare("UPDATE bot_users SET wallet_balance = wallet_balance - ?, referral_balance = referral_balance - ? WHERE tg_id = ?")
+            ->execute([$deductWallet, $deductRef, $fromId]);
+
+        $newBalance = $totalAvail - $orderAmount;
+
+        // Log transaction in wallet_logs
+        $pdo->prepare("INSERT INTO wallet_logs (tg_id, amount, balance_after, type, description) VALUES (?, ?, ?, 'purchase', ?)")
+            ->execute([$fromId, -$orderAmount, $newBalance, "پرداخت سفارش #{$order['order_code']} (" . ($order['plan_title'] ?? 'خرید اشتراک') . ")"]);
+
+        // Set payment_method
+        $pdo->prepare("UPDATE bot_orders SET payment_method = 'wallet' WHERE id = ?")
+            ->execute([$orderId]);
+
+        // Intermediate status
+        if ($messageId) {
+            TelegramBot::editMessageText("⚡️ <b>مبلغ " . number_format($orderAmount) . " تومان از کیف‌پول کسر شد.</b>\nدر حال صدور اشتراک اختصاصی شما در ۱ ثانیه...", $chatId, $messageId, null, $botToken);
+        }
+
+        // Approve and provision!
+        $provResult = self::approveOrderAction($pdo, $orderId, 'SYSTEM_WALLET');
+
+        if (!$provResult['success']) {
+            // Refund on failure
+            $pdo->prepare("UPDATE bot_users SET wallet_balance = wallet_balance + ?, referral_balance = referral_balance + ? WHERE tg_id = ?")
+                ->execute([$deductWallet, $deductRef, $fromId]);
+            $pdo->prepare("INSERT INTO wallet_logs (tg_id, amount, balance_after, type, description) VALUES (?, ?, ?, 'refund', ?)")
+                ->execute([$fromId, $orderAmount, $totalAvail, "استرداد وجه بابت خطای ساخت اشتراک"]);
+
+            TelegramBot::sendMessage("⚠️ متاسفانه در صدور اشتراک خطایی رخ داد: " . ($provResult['error'] ?? 'نامشخص') . "\nمبلغ " . number_format($orderAmount) . " تومان به کیف‌پول شما بازگردانده شد.", $chatId, self::getMainMenuInlineKeyboard($pdo, $fromId), $botToken);
+            return;
+        }
+
+        // Forward notice to topic 'sales'
+        TelegramBot::sendTopicLog('sales', "⚡️ <b>خرید آنی ۱ ثانیه‌ای از کیف‌پول</b>\n\n👤 خریدار: <code>{$fromId}</code>\n📦 پلن: <b>" . ($order['plan_title'] ?? 'اشتراک') . "</b>\n💰 مبلغ: " . number_format($orderAmount) . " تومان\n💳 باقیمانده کیف‌پول: " . number_format($newBalance) . " تومان\n🔖 سفارش: #{$order['order_code']}");
+    }
+
+    /**
+     * Admin Approve Wallet Top-up
+     */
+    public static function approveWalletChargeOrder(PDO $pdo, int $orderId, string $adminChatId, ?int $messageId = null): void {
+        $stmt = $pdo->prepare("SELECT * FROM bot_orders WHERE id = ?");
+        $stmt->execute([$orderId]);
+        $order = $stmt->fetch();
+
+        if (!$order || $order['payment_status'] === 'approved' || $order['payment_status'] === 'paid') {
+            if ($messageId) {
+                TelegramBot::editMessageText("⚠️ این سفارش قبلاً تایید یا پرداخت گردیده است.", $adminChatId, $messageId);
+            }
+            return;
+        }
+
+        $userTgId = $order['user_tg_id'];
+        $baseAmount = (int)$order['amount'];
+
+        $t1Amt = (int)Setting::get('wallet_bonus_tier1_amount', 200000);
+        $t1Pct = (int)Setting::get('wallet_bonus_tier1_percent', 10);
+        $t2Amt = (int)Setting::get('wallet_bonus_tier2_amount', 500000);
+        $t2Pct = (int)Setting::get('wallet_bonus_tier2_percent', 15);
+        $t3Amt = (int)Setting::get('wallet_bonus_tier3_amount', 1000000);
+        $t3Pct = (int)Setting::get('wallet_bonus_tier3_percent', 20);
+
+        $bonusPercent = 0;
+        if ($baseAmount >= $t3Amt) {
+            $bonusPercent = $t3Pct;
+        } elseif ($baseAmount >= $t2Amt) {
+            $bonusPercent = $t2Pct;
+        } elseif ($baseAmount >= $t1Amt) {
+            $bonusPercent = $t1Pct;
+        }
+
+        $bonusAmount = (int)round($baseAmount * ($bonusPercent / 100));
+        $totalCredit = $baseAmount + $bonusAmount;
+
+        $pdo->prepare("UPDATE bot_users SET wallet_balance = wallet_balance + ? WHERE tg_id = ?")
+            ->execute([$totalCredit, $userTgId]);
+
+        $stmtUser = $pdo->prepare("SELECT wallet_balance, referral_balance FROM bot_users WHERE tg_id = ?");
+        $stmtUser->execute([$userTgId]);
+        $uRow = $stmtUser->fetch();
+        $newBalance = (int)($uRow['wallet_balance'] ?? 0) + (int)($uRow['referral_balance'] ?? 0);
+
+        $bonusNote = ($bonusAmount > 0) ? " (شامل " . number_format($bonusAmount) . " تومان هدیه {$bonusPercent}٪)" : "";
+        $pdo->prepare("INSERT INTO wallet_logs (tg_id, amount, balance_after, type, description) VALUES (?, ?, ?, 'deposit', ?)")
+            ->execute([$userTgId, $totalCredit, $newBalance, "شارژ کیف‌پول سفارش #{$order['order_code']}{$bonusNote}"]);
+
+        $pdo->prepare("UPDATE bot_orders SET payment_status = 'approved', updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+            ->execute([$orderId]);
+
+        $ctx = self::getContext($pdo);
+        $botToken = $ctx['bot_token'];
+
+        if ($messageId) {
+            TelegramBot::editMessageText("✅ <b>شارژ کیف‌پول سفارش #{$orderId} با موفقیت تایید شد.</b>\n👤 کاربر: <code>{$userTgId}</code>\n💰 واریزی: " . number_format($baseAmount) . " تومان\n🎁 هدیه بانس: " . number_format($bonusAmount) . " تومان\n💳 اعتبار افزوده شده: " . number_format($totalCredit) . " تومان\n📊 موجودی جدید کاربر: " . number_format($newBalance) . " تومان", $adminChatId, $messageId, null, $botToken);
+        }
+
+        $userMsg = "🎉 <b>کیف‌پول شما با موفقیت شارژ گردید!</b>\n\n"
+                 . "💰 <b>مبلغ واریزی:</b> " . number_format($baseAmount) . " تومان\n";
+        if ($bonusAmount > 0) {
+            $userMsg .= "🎁 <b>بانس هدیه تشویقی ({$bonusPercent}٪):</b> " . number_format($bonusAmount) . " تومان\n";
+        }
+        $userMsg .= "💳 <b>موجودی کل جدید شما:</b> <b>" . number_format($newBalance) . " تومان</b>\n\n"
+                  . "⚡️ <i>اکنون می‌توانید اشتراک‌های خود را بدون نیاز به ارسال فیش و در ۱ ثانیه خریداری یا تمدید فرمایید.</i>";
+
+        $userKb = [
+            'inline_keyboard' => [
+                [['text' => '🛒 خرید اشتراک جدید', 'callback_data' => 'menu_buy']],
+                [['text' => '💳 مشاهده کیف‌پول', 'callback_data' => 'menu_wallet']],
+                [['text' => '🔙 منوی اصلی', 'callback_data' => 'menu_main']]
+            ]
+        ];
+
+        TelegramBot::sendMessage($userMsg, (string)$userTgId, $userKb, $botToken);
+
+        TelegramBot::sendTopicLog('finance', "💳 <b>شارژ موفق کیف‌پول کاربر</b>\n\n👤 کاربر: <code>{$userTgId}</code>\n💵 مبلغ واریزی: " . number_format($baseAmount) . " تومان\n🎁 بانس: " . number_format($bonusAmount) . " تومان\n📊 موجودی فعلی: " . number_format($newBalance) . " تومان\n🔢 کد پیگیری: #{$order['order_code']}");
+    }
+
+    /**
+     * Admin Reject Wallet Top-up
+     */
+    public static function rejectWalletChargeOrder(PDO $pdo, int $orderId, string $adminChatId, ?int $messageId = null): void {
+        $stmt = $pdo->prepare("SELECT * FROM bot_orders WHERE id = ?");
+        $stmt->execute([$orderId]);
+        $order = $stmt->fetch();
+
+        if (!$order) {
+            if ($messageId) {
+                TelegramBot::editMessageText("⚠️ سفارش یافت نشد.", $adminChatId, $messageId);
+            }
+            return;
+        }
+
+        $pdo->prepare("UPDATE bot_orders SET payment_status = 'rejected', updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+            ->execute([$orderId]);
+
+        $ctx = self::getContext($pdo);
+        $botToken = $ctx['bot_token'];
+
+        if ($messageId) {
+            TelegramBot::editMessageText("❌ <b>درخواست شارژ کیف‌پول سفارش #{$orderId} رد شد.</b>", $adminChatId, $messageId, null, $botToken);
+        }
+
+        $userMsg = "❌ <b>درخواست شارژ کیف‌پول شما تایید نگردید.</b>\n\nکد پیگیری: <code>{$order['order_code']}</code>\nمبلغ: " . number_format($order['amount']) . " تومان\n\nدر صورت کسر وجه از حساب، با پشتیبانی در تماس باشید.";
+        TelegramBot::sendMessage($userMsg, (string)$order['user_tg_id'], [
+            'inline_keyboard' => [[['text' => '☎️ تماس با پشتیبانی', 'callback_data' => 'menu_support']]]
+        ], $botToken);
     }
 
     // Session helpers
@@ -2542,6 +3089,7 @@ class TelegramBotController {
             'my_accounts' => '👤 حساب‌های من',
             'trial' => '🎁 تست رایگان',
             'wheel' => '🎰 گردونه شانس و هدیه',
+            'wallet' => '💳 کیف‌پول و شارژ',
             'referral' => '🤝 کسب درآمد',
             'apps' => '📱 دانلود و آموزش',
             'support' => '☎️ پشتیبانی',
@@ -2576,6 +3124,11 @@ class TelegramBotController {
         // Feature 4: Referral / Affiliate Settings
         Setting::set('referral_enabled', isset($_POST['referral_enabled']) ? '1' : '0');
         Setting::set('referral_commission_percent', (string)(int)($_POST['referral_commission_percent'] ?? 10));
+
+        // Feature: Wallet Recharge Bonuses
+        Setting::set('wallet_bonus_tier1_percent', (string)(int)($_POST['wallet_bonus_tier1_percent'] ?? 10));
+        Setting::set('wallet_bonus_tier2_percent', (string)(int)($_POST['wallet_bonus_tier2_percent'] ?? 15));
+        Setting::set('wallet_bonus_tier3_percent', (string)(int)($_POST['wallet_bonus_tier3_percent'] ?? 20));
 
         // Feature 6: Cryptocurrency / USDT TRC20 & TON Settings
         Setting::set('crypto_usdt_trc20_address', trim($_POST['crypto_usdt_trc20_address'] ?? ''));

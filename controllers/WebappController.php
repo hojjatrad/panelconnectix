@@ -29,6 +29,7 @@ class WebappController {
         $branding = $pdo->query("SELECT * FROM branding_metadata WHERE user_id = 1 LIMIT 1")->fetch(PDO::FETCH_ASSOC);
         $brandName = $branding['brand_name'] ?? 'Connectix VPN';
         $logoUrl = $branding['logo_url'] ?? '';
+        $walletBalance = (int)($botUser['wallet_balance'] ?? 0) + (int)($botUser['referral_balance'] ?? 0);
 
         require __DIR__ . '/../views/webapp/index.php';
     }
@@ -88,8 +89,11 @@ class WebappController {
             $rewardText = number_format($amount) . ' تومان شارژ کیف‌پول هدیه';
             $segmentIndex = 2;
 
-            $pdo->prepare("UPDATE bot_users SET referral_balance = referral_balance + ? WHERE tg_id = ?")
+            $pdo->prepare("UPDATE bot_users SET wallet_balance = wallet_balance + ? WHERE tg_id = ?")
                 ->execute([$amount, $tgId]);
+            $newBal = (int)$pdo->query("SELECT wallet_balance + referral_balance FROM bot_users WHERE tg_id = " . $pdo->quote($tgId))->fetchColumn();
+            $pdo->prepare("INSERT INTO wallet_logs (tg_id, amount, balance_after, type, description) VALUES (?, ?, ?, 'wheel', 'جایزه گردونه شانس (مینی‌اپ)')")
+                ->execute([$tgId, $amount, $newBal]);
         } elseif ($roll <= 80) {
             $discountPct = (rand(1, 2) === 1) ? 15 : 20;
             $code = 'LUCK-' . strtoupper(substr(bin2hex(random_bytes(3)), 0, 5));
@@ -107,8 +111,11 @@ class WebappController {
             $rewardText = "جایزه بزرگ (JACKPOT): ۲۵,۰۰۰ تومان شارژ مستقیم!";
             $segmentIndex = 6;
 
-            $pdo->prepare("UPDATE bot_users SET referral_balance = referral_balance + 25000 WHERE tg_id = ?")
+            $pdo->prepare("UPDATE bot_users SET wallet_balance = wallet_balance + 25000 WHERE tg_id = ?")
                 ->execute([$tgId]);
+            $newBal = (int)$pdo->query("SELECT wallet_balance + referral_balance FROM bot_users WHERE tg_id = " . $pdo->quote($tgId))->fetchColumn();
+            $pdo->prepare("INSERT INTO wallet_logs (tg_id, amount, balance_after, type, description) VALUES (?, 25000, ?, 'wheel', 'جک‌پات گردونه شانس (مینی‌اپ)')")
+                ->execute([$tgId, $newBal]);
         }
 
         $pdo->prepare("INSERT INTO lucky_wheel_logs (user_tg_id, reward_type, reward_value, reward_text) VALUES (?, ?, ?, ?)")

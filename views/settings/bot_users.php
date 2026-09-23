@@ -105,10 +105,9 @@ require __DIR__ . '/../layout/header.php';
                             </td>
                             <td class="p-3.5 font-mono text-purple-300 select-all"><?= htmlspecialchars($u['tg_id']) ?></td>
                             <td class="p-3.5">
-                                <span class="font-bold text-cyan-300 font-mono"><?= number_format($u['referral_count'] ?? 0) ?> نفر</span>
-                                <?php if (!empty($u['referral_balance'])): ?>
-                                    <span class="text-[10px] text-emerald-400 block font-mono"><?= Helpers::formatMoney($u['referral_balance']) ?></span>
-                                <?php endif; ?>
+                                <?php $totBal = (int)($u['wallet_balance'] ?? 0) + (int)($u['referral_balance'] ?? 0); ?>
+                                <span class="font-bold text-amber-300 font-mono block"><?= Helpers::formatMoney($totBal) ?></span>
+                                <span class="text-[10px] text-slate-400 block font-mono"><?= number_format($u['referral_count'] ?? 0) ?> زیرمجموعه (<?= Helpers::formatMoney($u['referral_balance'] ?? 0) ?>)</span>
                             </td>
                             <td class="p-3.5 font-mono text-slate-400 text-[11px]"><?= $u['created_at'] ?></td>
                             <td class="p-3.5 font-mono text-slate-300 text-[11px]"><?= $u['last_active_at'] ?></td>

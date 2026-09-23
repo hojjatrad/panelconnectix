@@ -1,6 +1,6 @@
 <?php
 /**
- * Connectix Panel - Emergency Self-Healing & Diagnostic Utility (v2.9.1)
+ * Connectix Panel - Emergency Self-Healing & Diagnostic Utility (v2.9.2)
  * Language: Persian (Farsi) - RTL
  * Purpose: Automatically repair .htaccess, verify database connection,
  * migrate missing tables/columns, fix permissions, and restore panel functionality.
@@ -135,7 +135,8 @@ $expectedControllers = [
     'ServerController', 'CategoryController', 'ResellerController', 'BillingController',
     'MetadataController', 'NotificationController', 'SublinkController', 'TelegramBotController',
     'PaymentController', 'ApiController', 'ProfileController', 'ResellerPortalController',
-    'LogController', 'UpdateController', 'TicketController', 'AppGuideController', 'CouponController'
+    'LogController', 'UpdateController', 'TicketController', 'AppGuideController', 'CouponController',
+    'WebappController'
 ];
 
 $missingControllers = [];

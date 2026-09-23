@@ -362,6 +362,7 @@ CREATE TABLE IF NOT EXISTS `bot_users` (
     `referred_by` VARCHAR(64) NULL,
     `referral_balance` BIGINT DEFAULT 0,
     `referral_count` INT DEFAULT 0,
+    `wallet_balance` BIGINT DEFAULT 0,
     `is_blocked` TINYINT(1) DEFAULT 0,
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
     `last_active_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -441,6 +442,18 @@ INSERT INTO `coupons` (`code`, `discount_percent`, `max_uses`, `used_count`, `is
 ('VIP20', 20, 50, 0, 1)
 ON DUPLICATE KEY UPDATE `code`=`code`;
 
+-- 26. User Wallet Logs Table
+CREATE TABLE IF NOT EXISTS `wallet_logs` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `tg_id` VARCHAR(64) NOT NULL,
+    `amount` BIGINT NOT NULL,
+    `balance_after` BIGINT NOT NULL,
+    `type` VARCHAR(32) NOT NULL,
+    `description` VARCHAR(255) NULL,
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX `idx_wlog_tg` (`tg_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Seed Default Admin: admin / admin123
 INSERT INTO `users` (`id`, `username`, `password_hash`, `role`, `full_name`, `email`, `wallet_balance`, `api_token`) 
 VALUES (1, 'admin', '$2y$10$7Z2v7v5uV2o6L5w2R3e1OeK3V5j7m6l5P2q8r7T4u1i9O2p3A4b5C', 'admin', 'مدیر ارشد سامانه', 'admin@connectix.local', 0, 'admin_secret_token_123')
@@ -463,5 +476,5 @@ INSERT INTO `system_settings` (`setting_key`, `setting_value`) VALUES
 ('github_branch', 'main'),
 ('github_webhook_secret', 'gh_hook_sec_vpbotn_2026'),
 ('brand_name', 'Connectix VPN'),
-('current_version', '2.9.1')
+('current_version', '2.9.2')
 ON DUPLICATE KEY UPDATE `setting_value`=VALUES(`setting_value`);

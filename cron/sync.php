@@ -225,7 +225,8 @@ if (time() - $lastBackup >= 86400) {
             'users', 'server_nodes', 'plans', 'clients', 'reserved_plans', 
             'transactions', 'branding_metadata', 'notifications', 'system_settings', 
             'bot_orders', 'bot_users', 'bot_sessions', 'reseller_plans', 
-            'reseller_applications', 'trial_logs', 'crypto_payments', 'activity_logs'
+            'reseller_applications', 'trial_logs', 'crypto_payments', 'activity_logs',
+            'coupons', 'lucky_wheel_logs', 'wallet_logs'
         ];
 
         foreach ($tables as $t) {

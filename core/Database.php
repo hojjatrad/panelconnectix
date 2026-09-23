@@ -135,6 +135,16 @@ class Database {
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )");
 
+            $pdo->exec("CREATE TABLE IF NOT EXISTS wallet_logs (
+                id $autoInc,
+                tg_id VARCHAR(64) NOT NULL,
+                amount BIGINT NOT NULL,
+                balance_after BIGINT NOT NULL,
+                type VARCHAR(32) NOT NULL,
+                description VARCHAR(255) NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )");
+
             $pdo->exec("CREATE TABLE IF NOT EXISTS crypto_payments (
                 id $autoInc,
                 user_id INT NULL,
@@ -293,7 +303,8 @@ class Database {
             $botUserCols = [
                 'referred_by' => 'VARCHAR(64) NULL',
                 'referral_balance' => 'BIGINT DEFAULT 0',
-                'referral_count' => 'INT DEFAULT 0'
+                'referral_count' => 'INT DEFAULT 0',
+                'wallet_balance' => 'BIGINT DEFAULT 0'
             ];
             foreach ($botUserCols as $c => $d) {
                 self::safeAddColumn($pdo, 'bot_users', $c, $d);

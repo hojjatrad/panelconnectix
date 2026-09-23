@@ -380,6 +380,41 @@ $isWebhookSet = !empty($webhookInfo['result']['url'] ?? '');
                             <span class="text-[10px] text-slate-500 mt-0.5 block">به ازای هر خرید توسط زیرمجموعه، این درصد به عنوان شارژ نقدی به کیف‌پول معرف اضافه می‌شود.</span>
                         </div>
                     </div>
+
+                    <!-- Wallet Recharge Bonus / Cashback Section -->
+                    <div class="pt-3 border-t border-slate-800/80 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <div class="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                                <i class="fa-solid fa-coins"></i>
+                                <span>طرح‌های تشویقی شارژ کیف‌پول (Bonus / Cashback)</span>
+                            </div>
+                        </div>
+                        <p class="text-[10px] text-slate-400">به منظور ترغیب کاربران به شارژ مبالغ بالاتر، درصدهای هدیه زیر به صورت خودکار به کیف‌پول افزوده می‌شود.</p>
+
+                        <div class="grid grid-cols-3 gap-2">
+                            <div>
+                                <label class="block text-[10px] font-medium text-slate-400 mb-1">شارژ بالای ۲۰۰ هزار ت</label>
+                                <div class="relative">
+                                    <input type="number" name="wallet_bonus_tier1_percent" value="<?= htmlspecialchars($settings['wallet_bonus_tier1_percent'] ?? '10') ?>" min="0" max="100" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-2 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono text-center">
+                                    <span class="absolute left-2 top-1.5 text-[10px] text-slate-400 font-bold">%</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-medium text-slate-400 mb-1">شارژ بالای ۵۰۰ هزار ت</label>
+                                <div class="relative">
+                                    <input type="number" name="wallet_bonus_tier2_percent" value="<?= htmlspecialchars($settings['wallet_bonus_tier2_percent'] ?? '15') ?>" min="0" max="100" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-2 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono text-center">
+                                    <span class="absolute left-2 top-1.5 text-[10px] text-slate-400 font-bold">%</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-medium text-slate-400 mb-1">شارژ بالای ۱ میلیون ت</label>
+                                <div class="relative">
+                                    <input type="number" name="wallet_bonus_tier3_percent" value="<?= htmlspecialchars($settings['wallet_bonus_tier3_percent'] ?? '20') ?>" min="0" max="100" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-2 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono text-center">
+                                    <span class="absolute left-2 top-1.5 text-[10px] text-slate-400 font-bold">%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- TAB 4: UI Customization & Supergroup Topics -->
@@ -447,6 +482,7 @@ $isWebhookSet = !empty($webhookInfo['result']['url'] ?? '');
                                 'my_accounts' => ['title' => '👤 حساب‌های من', 'text' => $settings['btn_my_accounts_text'] ?? '👤 حساب‌های من', 'enabled' => ($settings['btn_my_accounts_enabled'] ?? '1') === '1'],
                                 'trial' => ['title' => '🎁 تست رایگان', 'text' => $settings['btn_trial_text'] ?? '🎁 تست رایگان', 'enabled' => ($settings['btn_trial_enabled'] ?? '1') === '1'],
                                 'wheel' => ['title' => '🎰 گردونه شانس و هدیه', 'text' => $settings['btn_wheel_text'] ?? '🎰 گردونه شانس و هدیه', 'enabled' => ($settings['btn_wheel_enabled'] ?? '1') === '1'],
+                                'wallet' => ['title' => '💳 کیف‌پول و شارژ', 'text' => $settings['btn_wallet_text'] ?? '💳 کیف‌پول و شارژ', 'enabled' => ($settings['btn_wallet_enabled'] ?? '1') === '1'],
                                 'referral' => ['title' => '🤝 کسب درآمد', 'text' => $settings['btn_referral_text'] ?? '🤝 کسب درآمد', 'enabled' => ($settings['btn_referral_enabled'] ?? '1') === '1'],
                                 'apps' => ['title' => '📱 دانلود و آموزش', 'text' => $settings['btn_apps_text'] ?? '📱 دانلود و آموزش', 'enabled' => ($settings['btn_apps_enabled'] ?? '1') === '1'],
                                 'support' => ['title' => '☎️ پشتیبانی', 'text' => $settings['btn_support_text'] ?? '☎️ پشتیبانی', 'enabled' => ($settings['btn_support_enabled'] ?? '1') === '1'],

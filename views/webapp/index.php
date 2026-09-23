@@ -47,8 +47,13 @@
             </div>
         </div>
 
-        <div class="flex items-center gap-1.5 text-xs">
-            <span id="userName" class="font-bold text-slate-300"></span>
+        <div class="flex items-center gap-2">
+            <div class="flex items-center gap-1.5 bg-purple-950/80 border border-purple-500/30 px-2.5 py-1 rounded-xl text-xs shadow-inner">
+                <i class="fa-solid fa-wallet text-amber-400"></i>
+                <span class="text-[10px] text-slate-300">موجودی:</span>
+                <span class="font-bold text-amber-300 font-mono text-[11px]"><?= Helpers::formatMoney($walletBalance) ?></span>
+            </div>
+            <span id="userName" class="font-bold text-slate-300 text-xs hidden md:inline"></span>
         </div>
     </header>
 
@@ -163,8 +168,14 @@
 
                         <div class="text-left shrink-0">
                             <span class="text-xs font-extrabold text-emerald-400 block font-mono"><?= number_format($p['base_price']) ?> تومان</span>
-                            <button onclick="orderPlan(<?= $p['id'] ?>)" class="mt-1 px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-[10px] font-bold rounded-lg transition active:scale-95">
-                                خرید پلن
+                            <button onclick="orderPlan(<?= $p['id'] ?>)" class="mt-1 px-3 py-1.5 <?= ($walletBalance >= (int)$p['base_price']) ? 'bg-gradient-to-r from-amber-600 to-emerald-600 hover:from-amber-500 hover:to-emerald-500' : 'bg-purple-600 hover:bg-purple-700' ?> text-white text-[10px] font-bold rounded-lg transition active:scale-95 flex items-center gap-1">
+                                <?php if ($walletBalance >= (int)$p['base_price']): ?>
+                                    <i class="fa-solid fa-bolt text-amber-200"></i>
+                                    <span>خرید آنی (کیف‌پول)</span>
+                                <?php else: ?>
+                                    <i class="fa-solid fa-cart-shopping"></i>
+                                    <span>خرید پلن</span>
+                                <?php endif; ?>
                             </button>
                         </div>
                     </div>
