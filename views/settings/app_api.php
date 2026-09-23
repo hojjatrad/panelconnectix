@@ -28,14 +28,38 @@ $tgSupport = $branding['telegram_support'] ?? '@Support';
             </p>
         </div>
 
-        <div class="flex items-center gap-2">
-            <a href="#simulator" class="px-4 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl text-xs shadow-lg shadow-cyan-600/30 transition flex items-center gap-2">
-                <i class="fa-solid fa-play"></i>
-                <span>تست در شبیه‌ساز زنده</span>
+        <div class="flex flex-wrap items-center gap-2">
+            <a href="https://github.com/hojjatrad/panelconnectix/releases/download/v3.0.0/Connectix-ARM64-v8a.apk" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs shadow-lg shadow-emerald-600/30 transition flex items-center gap-2">
+                <i class="fa-brands fa-android text-sm"></i>
+                <span>دانلود APK نسخه ARM64 (پیشنهادی)</span>
             </a>
-            <a href="#flutter_code" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs border border-slate-700 transition flex items-center gap-2">
-                <i class="fa-brands fa-flutter text-sky-400"></i>
-                <span>سورس‌کد کلاینت Flutter</span>
+            <a href="https://github.com/hojjatrad/panelconnectix/releases/download/v3.0.0/Connectix-Universal.apk" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs border border-slate-700 transition flex items-center gap-2">
+                <i class="fa-solid fa-box text-cyan-400"></i>
+                <span>دانلود نسخه همگانی (Universal)</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Direct APK Downloads Banner -->
+    <div class="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-md">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center text-lg">
+                <i class="fa-brands fa-android"></i>
+            </div>
+            <div>
+                <strong class="text-xs font-bold text-white block">پکیج‌های رسمی کامپایل‌شده اندروید با امضای رسمی v1/v2</strong>
+                <span class="text-[11px] text-slate-400">سازگار با اندروید ۹ تا ۱۵ برای انواع پردازنده‌های ۶۴ بیتی و ۳۲ بیتی</span>
+            </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+            <a href="https://github.com/hojjatrad/panelconnectix/releases/download/v3.0.0/Connectix-ARM64-v8a.apk" class="px-3 py-1.5 bg-emerald-700/80 hover:bg-emerald-600 text-white rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-download"></i> ARM64 (25 MB)
+            </a>
+            <a href="https://github.com/hojjatrad/panelconnectix/releases/download/v3.0.0/Connectix-Universal.apk" class="px-3 py-1.5 bg-cyan-800/80 hover:bg-cyan-700 text-white rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-download"></i> Universal (71 MB)
+            </a>
+            <a href="https://github.com/hojjatrad/panelconnectix/releases/download/v3.0.0/Connectix-ARM32-v7a.apk" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-download"></i> ARM32 (25 MB)
             </a>
         </div>
     </div>
