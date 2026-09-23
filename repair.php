@@ -140,20 +140,35 @@ if (!empty($missingControllers) || $forceRestore) {
         }
     } catch (Throwable $e) {}
 
-    $url = "https://api.github.com/repos/{$repo}/zipball/main";
-    $ch = curl_init($url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 60);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    $headers = ['User-Agent: Connectix-Repair-Tool'];
-    if (!empty($token)) {
-        $headers[] = "Authorization: token {$token}";
+    $downloadUrls = [
+        "https://github.com/{$repo}/archive/refs/heads/main.zip",
+        "https://codeload.github.com/{$repo}/zip/refs/heads/main",
+        "https://api.github.com/repos/{$repo}/zipball/main"
+    ];
+
+    $zipData = false;
+    $httpCode = 0;
+
+    foreach ($downloadUrls as $url) {
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        $headers = ['User-Agent: Connectix-Repair-Tool'];
+        if (!empty($token) && str_contains($url, 'api.github.com')) {
+            $headers[] = "Authorization: token {$token}";
+        }
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        $zipData = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode === 200 && strlen($zipData) > 5000) {
+            break;
+        }
     }
-    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-    $zipData = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
 
     $restoredCount = 0;
     if ($httpCode === 200 && strlen($zipData) > 5000) {

@@ -157,6 +157,21 @@ class Updater {
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
+        if ($httpCode === 401 && !empty($token)) {
+            // Retry without token in case token expired or repo is public
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $downloadUrl);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 90);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, ['User-Agent: Connectix-Panel-Updater']);
+            $zipData = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+        }
+
         if (!$zipData || $httpCode >= 400 || strlen($zipData) < 1000) {
             self::deleteDirectory($tmpDir);
             return ['success' => false, 'error' => "خطا در دانلود فایل پکیج از گیت‌هاب (کد HTTP: {$httpCode})"];
@@ -376,7 +391,13 @@ class Updater {
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
         $res = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
+
+        if ($code === 401 && !empty($token)) {
+            // Token expired or invalid, retry as clean public request
+            return self::githubRequest($url, '');
+        }
 
         return $res ? json_decode($res, true) : null;
     }
