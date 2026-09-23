@@ -3,6 +3,7 @@ require_once __DIR__ . '/../core/Auth.php';
 require_once __DIR__ . '/../core/Database.php';
 require_once __DIR__ . '/../core/Helpers.php';
 require_once __DIR__ . '/../core/Setting.php';
+require_once __DIR__ . '/../core/Provisioner.php';
 
 class BillingController {
     public function index(): void {

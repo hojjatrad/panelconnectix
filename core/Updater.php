@@ -4,7 +4,7 @@ require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Setting.php';
 
 class Updater {
-    public const CURRENT_VERSION = '2.6.1';
+    public const CURRENT_VERSION = '2.6.2';
 
     public static function getCurrentVersion(): string {
         return Setting::get('current_version', self::CURRENT_VERSION);
@@ -179,9 +179,9 @@ class Updater {
             $sourceDir = (!empty($subDirs) && is_dir($subDirs[0])) ? $subDirs[0] : $extractPath;
         }
 
-        // Copy files over panel root, skipping sensitive local configs
+        // Copy files over panel root, skipping sensitive local configs and user data
         $panelRoot = realpath(__DIR__ . '/..');
-        $skipped = ['config.php', 'data', '.htaccess', 'assets/uploads'];
+        $skipped = ['config.php', 'data', 'assets/uploads'];
 
         self::copyDirectory($sourceDir, $panelRoot, $skipped);
 

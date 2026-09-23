@@ -51,7 +51,9 @@ $pendingCount = $pendingAppsCount ?? 0;
                     $balance = (int)$r['wallet_balance'];
                     $limit = (int)($r['credit_limit'] ?? 0);
                     $isDebt = ($balance < 0);
-                    $tier = Provisioner::getResellerTier($r['id']);
+                    $tier = class_exists('Provisioner') 
+                        ? Provisioner::getResellerTier($r['id']) 
+                        : ['tier' => 'bronze', 'title' => 'برنزی', 'badge' => '🥉', 'discount' => (int)($r['discount_percent'] ?? 0)];
                 ?>
                     <tr class="hover:bg-slate-800/30 transition-colors">
                         <td class="p-3.5 whitespace-nowrap">

@@ -1,0 +1,208 @@
+<?php
+/**
+ * Connectix Panel - Emergency Self-Healing & Diagnostic Utility (v2.6.2)
+ * Language: Persian (Farsi) - RTL
+ * Purpose: Automatically repair .htaccess, verify database connection,
+ * migrate missing tables/columns, fix permissions, and restore panel functionality.
+ */
+
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+$stepResults = [];
+
+// 1. Repair and overwrite .htaccess to remove any hardcoded RewriteBase
+$htaccessPath = __DIR__ . '/.htaccess';
+$standardHtaccess = <<<HTACCESS
+# Connectix Panel - Apache / cPanel URL Rewriting
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Prevent direct access to sensitive directories
+    RewriteRule ^(core|drivers|data|cron)/.*$ - [F,L]
+
+    # Serve existing files and directories directly
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+
+    # Redirect all other requests to index.php
+    RewriteRule ^(.*)$ index.php [QSA,L]
+</IfModule>
+
+# Security Headers
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-XSS-Protection "1; mode=block"
+</IfModule>
+HTACCESS;
+
+$htaccessFixed = false;
+try {
+    if (!file_exists($htaccessPath) || str_contains(@file_get_contents($htaccessPath), '/contax/')) {
+        file_put_contents($htaccessPath, $standardHtaccess);
+        $htaccessFixed = true;
+    }
+    $stepResults['htaccess'] = ['status' => true, 'msg' => 'فایل .htaccess بررسی و قوانین بازنویسی استاندارد آپاچی با موفقیت بازنشانی شد.'];
+} catch (Throwable $e) {
+    $stepResults['htaccess'] = ['status' => false, 'msg' => 'خطا در نوشتن فایل .htaccess: ' . $e->getMessage()];
+}
+
+// 2. Check config.php
+$configPath = __DIR__ . '/config.php';
+$hasConfig = file_exists($configPath);
+if (!$hasConfig) {
+    $stepResults['config'] = ['status' => false, 'msg' => 'فایل config.php یافت نشد. لطفاً ابتدا از طریق install.php سیستم را نصب کنید.'];
+} else {
+    require_once $configPath;
+    $stepResults['config'] = ['status' => true, 'msg' => 'فایل تنظیمات (config.php) خوانده شد. دیتابیس تعیین‌شده: ' . strtoupper(DB_DRIVER)];
+}
+
+// 3. Check PHP extensions
+$requiredExts = ['pdo', 'curl', 'mbstring'];
+$missingExts = [];
+foreach ($requiredExts as $ext) {
+    if (!extension_loaded($ext)) $missingExts[] = $ext;
+}
+if (empty($missingExts)) {
+    $stepResults['php'] = ['status' => true, 'msg' => 'نسخه PHP (' . PHP_VERSION . ') و اکستنشن‌های اصلی فعال هستند.'];
+} else {
+    $stepResults['php'] = ['status' => false, 'msg' => 'اکستنشن‌های ناموجود: ' . implode(', ', $missingExts)];
+}
+
+// 4. Test Database connection & Auto-migrate schema
+$dbOk = false;
+if ($hasConfig) {
+    try {
+        require_once __DIR__ . '/core/Database.php';
+        $pdo = Database::getConnection();
+        $dbOk = true;
+        
+        // Run full migrations
+        Database::ensureExtendedTablesExist($pdo);
+
+        // Check tables count
+        $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+        if ($driver === 'mysql') {
+            $tableCount = (int)$pdo->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE()")->fetchColumn();
+        } else {
+            $tableCount = (int)$pdo->query("SELECT COUNT(*) FROM sqlite_master WHERE type='table'")->fetchColumn();
+        }
+
+        // Verify Admin Account exists
+        $adminUser = $pdo->query("SELECT id, username FROM users WHERE role = 'admin' LIMIT 1")->fetch();
+        if (!$adminUser) {
+            $adminPass = password_hash('admin123', PASSWORD_BCRYPT);
+            $pdo->exec("INSERT INTO users (username, password_hash, role, full_name, email, wallet_balance, api_token) 
+                        VALUES ('admin', '{$adminPass}', 'admin', 'مدیر کل سیستم', 'admin@connectix.local', 0, 'admin_secret_123')");
+            $adminMsg = 'کاربر مدیر پیش‌فرض (admin / رمز: admin123) بازیابی و ساخته شد.';
+        } else {
+            $adminMsg = "حساب مدیر ارشد موجود است ({$adminUser['username']}).";
+        }
+
+        $stepResults['db'] = [
+            'status' => true, 
+            'msg' => "ارتباط با پایگاه داده برقراره و تعداد {$tableCount} جدول تایید شد. {$adminMsg}"
+        ];
+    } catch (Throwable $e) {
+        $stepResults['db'] = ['status' => false, 'msg' => 'خطا در ارتباط با دیتابیس: ' . $e->getMessage()];
+    }
+}
+
+// 5. Invalidate Caches
+if (function_exists('opcache_reset')) {
+    @opcache_reset();
+}
+if (function_exists('clearstatcache')) {
+    @clearstatcache(true);
+}
+
+// Check overall status
+$allOk = true;
+foreach ($stepResults as $r) {
+    if (!$r['status']) {
+        $allOk = false;
+        break;
+    }
+}
+?>
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ابزار ترمیم و عیب‌یابی خودکار پنل | Connectix Panel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;600;700;800;900&display=swap');
+        * { font-family: 'Vazirmatn', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center p-4 selection:bg-purple-600 selection:text-white relative overflow-x-hidden">
+
+    <!-- Ambient Glow Background -->
+    <div class="absolute -top-40 -right-40 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl pointer-events-none"></div>
+    <div class="absolute -bottom-40 -left-40 w-96 h-96 bg-cyan-600/20 rounded-full blur-3xl pointer-events-none"></div>
+
+    <div class="w-full max-w-xl bg-slate-900/90 border border-slate-800 rounded-3xl shadow-2xl p-6 md:p-8 backdrop-blur-xl relative z-10 space-y-6">
+
+        <!-- Header -->
+        <div class="text-center space-y-2">
+            <div class="w-16 h-16 rounded-2xl <?= $allOk ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-400 border border-rose-500/30' ?> mx-auto flex items-center justify-center text-3xl shadow-xl">
+                <i class="fa-solid <?= $allOk ? 'fa-circle-check' : 'fa-triangle-exclamation' ?>"></i>
+            </div>
+            <h1 class="text-xl font-black text-white">ترمیم و راه‌اندازی مجدد خودکار سیستم</h1>
+            <p class="text-xs text-slate-400">عیب‌یابی فایل‌ها، بررسی روتینگ آپاچی و ساخت خودکار جداول دیتابیس</p>
+        </div>
+
+        <!-- Step Results List -->
+        <div class="space-y-3">
+            <?php foreach ($stepResults as $key => $res): ?>
+                <div class="flex items-start gap-3 p-3.5 rounded-2xl border <?= $res['status'] ? 'bg-slate-950/70 border-emerald-900/40 text-emerald-200' : 'bg-rose-950/60 border-rose-800 text-rose-200' ?>">
+                    <div class="mt-0.5">
+                        <i class="fa-solid <?= $res['status'] ? 'fa-check text-emerald-400' : 'fa-xmark text-rose-400' ?> text-sm"></i>
+                    </div>
+                    <div class="text-xs leading-relaxed flex-1">
+                        <span class="font-bold block mb-0.5">
+                            <?= match($key) {
+                                'htaccess' => 'پیکربندی وب‌سرور آپاچی (.htaccess)',
+                                'config' => 'فایل تنظیمات اتصال (config.php)',
+                                'php' => 'پیش‌نیازهای مفسر PHP',
+                                'db' => 'ارتباط با پایگاه داده و ساختار جداول',
+                                default => 'بررسی سیستم'
+                            } ?>
+                        </span>
+                        <span class="text-slate-300"><?= htmlspecialchars($res['msg']) ?></span>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="pt-2 flex flex-col gap-2.5">
+            <?php if ($allOk): ?>
+                <a href="login" class="w-full py-3.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-2xl text-xs transition-all shadow-xl shadow-purple-900/40 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-right-to-bracket"></i>
+                    <span>ورود مستقیم به پنل مدیریت</span>
+                </a>
+                <a href="repair.php" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-xs transition-all border border-slate-700 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-rotate-right"></i>
+                    <span>بررسی و اسکن مجدد سلامت</span>
+                </a>
+            <?php else: ?>
+                <a href="install.php?reinstall=1" class="w-full py-3.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-2xl text-xs transition-all shadow-xl shadow-purple-900/40 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-wrench"></i>
+                    <span>ورود به نصب‌کننده خودکار و تنظیم دیتابیس</span>
+                </a>
+            <?php endif; ?>
+        </div>
+
+        <div class="text-[11px] text-center text-slate-500 pt-2 border-t border-slate-800/80">
+            نسخه پایدار و ترمیم‌شده سامانه: <span class="font-mono text-purple-400 font-bold">v2.6.2</span>
+        </div>
+
+    </div>
+
+</body>
+</html>

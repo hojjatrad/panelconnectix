@@ -14,7 +14,11 @@ require __DIR__ . '/../layout/header.php';
             <div class="bg-gradient-to-br from-purple-900/60 to-slate-900 border border-purple-800/40 rounded-2xl p-5 my-4">
                 <span class="text-xs text-purple-200 block mb-1">موجودی فعلی حساب:</span>
                 <span class="text-2xl font-black text-white"><?= Helpers::formatMoney($user['wallet_balance']) ?></span>
-                <?php $tier = Provisioner::getResellerTier($user['id']); ?>
+                <?php 
+                $tier = class_exists('Provisioner') 
+                    ? Provisioner::getResellerTier($user['id']) 
+                    : ['tier' => 'bronze', 'title' => 'برنزی', 'badge' => '🥉', 'discount' => (int)($user['discount_percent'] ?? 0)]; 
+                ?>
                 <span class="text-[10px] text-purple-300 block mt-2">تخفیف همکاری فعال: <?= $tier['discount'] ?>% (سطح <?= $tier['title'] ?> <?= $tier['badge'] ?>)</span>
             </div>
 

@@ -50,7 +50,9 @@ require __DIR__ . '/../layout/header.php';
                         class="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:ring-1 focus:ring-purple-500">
                     <option value="" disabled selected>لطفاً یک پلن انتخاب کنید...</option>
                     <?php 
-                    $tier = Provisioner::getResellerTier($user['id']);
+                    $tier = class_exists('Provisioner') 
+                        ? Provisioner::getResellerTier($user['id']) 
+                        : ['tier' => 'bronze', 'title' => 'برنزی', 'badge' => '🥉', 'discount' => (int)($user['discount_percent'] ?? 0)];
                     $effectiveDiscount = (int)$tier['discount'];
                     foreach ($plans as $p): 
                         $effectivePrice = $p['reseller_price'];
