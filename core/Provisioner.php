@@ -87,7 +87,8 @@ class Provisioner {
                 'uuid' => $uuid,
                 'sub_token' => $subToken,
                 'traffic_limit_bytes' => $trafficBytes,
-                'expire_timestamp' => $expireTimestamp
+                'expire_timestamp' => $expireTimestamp,
+                'selected_inbounds' => $server['selected_inbounds'] ?? null
             ];
             $driverResult = $driver->createUser($driverPayload);
             if (!$driverResult['success']) {
@@ -404,7 +405,8 @@ class Provisioner {
                 'uuid' => $uuid,
                 'sub_token' => $subToken,
                 'traffic_limit_bytes' => $trafficBytes,
-                'expire_timestamp' => strtotime($expireAt)
+                'expire_timestamp' => strtotime($expireAt),
+                'selected_inbounds' => $server['selected_inbounds'] ?? null
             ];
             $driverResult = $driver->createUser($driverPayload);
             if (!$driverResult['success']) {

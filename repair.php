@@ -299,6 +299,10 @@ if (!empty($missingControllers) || $forceRestore) {
                 @copy($sourceDir . '/index.php', __DIR__ . '/index.php');
                 @chmod(__DIR__ . '/index.php', 0644);
             }
+            if (file_exists($sourceDir . '/repair.php')) {
+                @copy($sourceDir . '/repair.php', __DIR__ . '/repair.php');
+                @chmod(__DIR__ . '/repair.php', 0644);
+            }
         }
         @unlink($tmpZip);
     }

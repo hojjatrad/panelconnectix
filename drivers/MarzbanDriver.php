@@ -158,6 +158,31 @@ class MarzbanDriver implements PanelDriverInterface {
         return false;
     }
 
+    public function getDetailedInbounds(): array {
+        if (!$this->authenticate()) return [];
+        $res = $this->request($this->apiPrefix . '/inbounds');
+        if ($res['success'] && is_array($res['data'])) {
+            $list = [];
+            foreach ($res['data'] as $proto => $items) {
+                if (is_array($items)) {
+                    foreach ($items as $item) {
+                        if (is_array($item)) {
+                            $list[] = [
+                                'tag' => $item['tag'] ?? 'Inbound',
+                                'protocol' => strtolower($proto),
+                                'network' => $item['network'] ?? 'tcp',
+                                'tls' => $item['tls'] ?? 'none',
+                                'port' => $item['port'] ?? 443
+                            ];
+                        }
+                    }
+                }
+            }
+            return $list;
+        }
+        return [];
+    }
+
     public function getInbounds(): array {
         if (!$this->authenticate()) return [];
         $res = $this->request($this->apiPrefix . '/inbounds');
@@ -191,10 +216,42 @@ class MarzbanDriver implements PanelDriverInterface {
         }
 
         // Fetch dynamic active inbounds from server (Reality, VMess, Trojan, etc.)
-        $inbounds = $this->getInbounds();
+        $allInbounds = $this->getInbounds();
+        $inbounds = $allInbounds;
+
+        // If specific selected inbounds were passed in payload, filter to only those tags
+        if (!empty($payload['selected_inbounds'])) {
+            $selectedTags = is_array($payload['selected_inbounds']) 
+                ? $payload['selected_inbounds'] 
+                : json_decode($payload['selected_inbounds'], true);
+
+            if (!empty($selectedTags) && is_array($selectedTags)) {
+                $filtered = [];
+                foreach ($allInbounds as $proto => $tags) {
+                    foreach ($tags as $t) {
+                        if (in_array($t, $selectedTags)) {
+                            $filtered[$proto][] = $t;
+                        }
+                    }
+                }
+                if (!empty($filtered)) {
+                    $inbounds = $filtered;
+                }
+            }
+        }
+
+        // Detect if any active VLESS inbound uses reality
+        $hasReality = false;
+        $detailed = $this->getDetailedInbounds();
+        foreach ($detailed as $d) {
+            if ($d['protocol'] === 'vless' && ($d['tls'] === 'reality' || str_contains(strtolower($d['tag']), 'reality'))) {
+                $hasReality = true;
+                break;
+            }
+        }
 
         $proxies = [
-            'vless' => ['id' => $payload['uuid'], 'flow' => 'xtls-rprx-vision'],
+            'vless' => ['id' => $payload['uuid'], 'flow' => $hasReality ? 'xtls-rprx-vision' : ''],
             'vmess' => ['id' => $payload['uuid']],
             'trojan' => ['password' => $payload['password'] ?? $payload['uuid']],
             'shadowsocks' => ['password' => $payload['password'] ?? $payload['uuid'], 'method' => 'chacha20-ietf-poly1305']

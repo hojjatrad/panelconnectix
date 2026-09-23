@@ -334,7 +334,8 @@ class Database {
                 'last_checked_at' => 'DATETIME NULL',
                 'error_message' => 'TEXT NULL',
                 'category_id' => 'INT NULL DEFAULT NULL',
-                'config_template' => 'TEXT NULL'
+                'config_template' => 'TEXT NULL',
+                'selected_inbounds' => 'TEXT NULL'
             ];
             foreach ($serverCols as $c => $d) {
                 self::safeAddColumn($pdo, 'server_nodes', $c, $d);

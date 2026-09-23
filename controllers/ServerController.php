@@ -50,6 +50,9 @@ class ServerController {
         $subDomain = trim($_POST['sub_domain'] ?? '');
         $maxClients = (int)($_POST['max_clients'] ?? 500);
         $configTemplate = trim($_POST['config_template'] ?? '');
+        $selectedInbounds = !empty($_POST['selected_inbounds']) 
+            ? (is_array($_POST['selected_inbounds']) ? json_encode(array_values($_POST['selected_inbounds']), JSON_UNESCAPED_UNICODE) : trim($_POST['selected_inbounds'])) 
+            : null;
 
         if (empty($name) || empty($apiUrl)) {
             Helpers::flash('error', 'نام سرور و آدرس API الزامی هستند.');
@@ -62,9 +65,9 @@ class ServerController {
             if ($catSlug) $serverGroup = $catSlug;
         }
 
-        $stmt = $pdo->prepare("INSERT INTO server_nodes (name, driver, api_url, api_username, api_password, api_token, server_group, category_id, sub_domain, max_clients, config_template) 
-                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->execute([$name, $driver, $apiUrl, $username, $password, $token, $serverGroup, $categoryId, $subDomain, $maxClients, $configTemplate]);
+        $stmt = $pdo->prepare("INSERT INTO server_nodes (name, driver, api_url, api_username, api_password, api_token, server_group, category_id, sub_domain, max_clients, config_template, selected_inbounds) 
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$name, $driver, $apiUrl, $username, $password, $token, $serverGroup, $categoryId, $subDomain, $maxClients, $configTemplate, $selectedInbounds]);
 
         Helpers::flash('success', 'سرور جدید با موفقیت به سامانه افزوده شد.');
         Helpers::redirect('servers');
@@ -89,6 +92,9 @@ class ServerController {
         $subDomain = trim($_POST['sub_domain'] ?? '');
         $maxClients = (int)($_POST['max_clients'] ?? 500);
         $configTemplate = trim($_POST['config_template'] ?? '');
+        $selectedInbounds = !empty($_POST['selected_inbounds']) 
+            ? (is_array($_POST['selected_inbounds']) ? json_encode(array_values($_POST['selected_inbounds']), JSON_UNESCAPED_UNICODE) : trim($_POST['selected_inbounds'])) 
+            : null;
 
         if ($id <= 0 || empty($name) || empty($apiUrl)) {
             Helpers::flash('error', 'اطلاعات ارسالی سرور ناقص است.');
@@ -102,11 +108,11 @@ class ServerController {
         }
 
         if (!empty($password)) {
-            $stmt = $pdo->prepare("UPDATE server_nodes SET name = ?, driver = ?, api_url = ?, api_username = ?, api_password = ?, api_token = ?, server_group = ?, category_id = ?, sub_domain = ?, max_clients = ?, config_template = ? WHERE id = ?");
-            $stmt->execute([$name, $driver, $apiUrl, $username, $password, $token, $serverGroup, $categoryId, $subDomain, $maxClients, $configTemplate, $id]);
+            $stmt = $pdo->prepare("UPDATE server_nodes SET name = ?, driver = ?, api_url = ?, api_username = ?, api_password = ?, api_token = ?, server_group = ?, category_id = ?, sub_domain = ?, max_clients = ?, config_template = ?, selected_inbounds = ? WHERE id = ?");
+            $stmt->execute([$name, $driver, $apiUrl, $username, $password, $token, $serverGroup, $categoryId, $subDomain, $maxClients, $configTemplate, $selectedInbounds, $id]);
         } else {
-            $stmt = $pdo->prepare("UPDATE server_nodes SET name = ?, driver = ?, api_url = ?, api_username = ?, api_token = ?, server_group = ?, category_id = ?, sub_domain = ?, max_clients = ?, config_template = ? WHERE id = ?");
-            $stmt->execute([$name, $driver, $apiUrl, $username, $token, $serverGroup, $categoryId, $subDomain, $maxClients, $configTemplate, $id]);
+            $stmt = $pdo->prepare("UPDATE server_nodes SET name = ?, driver = ?, api_url = ?, api_username = ?, api_token = ?, server_group = ?, category_id = ?, sub_domain = ?, max_clients = ?, config_template = ?, selected_inbounds = ? WHERE id = ?");
+            $stmt->execute([$name, $driver, $apiUrl, $username, $token, $serverGroup, $categoryId, $subDomain, $maxClients, $configTemplate, $selectedInbounds, $id]);
         }
 
         Helpers::flash('success', "تنظیمات سرور '{$name}' با موفقیت به‌روزرسانی شد.");
@@ -318,6 +324,76 @@ class ServerController {
                 'success' => false,
                 'message' => 'خطای سیستمی: ' . $e->getMessage()
             ]);
+        }
+    }
+
+    public function fetchInboundsAndSample(): void {
+        Auth::requireAdmin();
+        $serverId = (int)($_POST['server_id'] ?? $_GET['server_id'] ?? 0);
+        $pdo = Database::getConnection();
+
+        $server = null;
+        if ($serverId > 0) {
+            $stmt = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ?");
+            $stmt->execute([$serverId]);
+            $server = $stmt->fetch(PDO::FETCH_ASSOC);
+        }
+
+        if (!$server) {
+            $server = [
+                'name' => 'Raw Test Node',
+                'driver' => trim($_POST['driver'] ?? $_GET['driver'] ?? 'marzban'),
+                'api_url' => trim($_POST['api_url'] ?? $_GET['api_url'] ?? ''),
+                'api_username' => trim($_POST['api_username'] ?? $_GET['api_username'] ?? ''),
+                'api_password' => trim($_POST['api_password'] ?? $_GET['api_password'] ?? ''),
+                'api_token' => trim($_POST['api_token'] ?? $_GET['api_token'] ?? '')
+            ];
+        }
+
+        if (empty($server['api_url'])) {
+            Helpers::jsonResponse(['success' => false, 'message' => 'لطفاً ابتدا آدرس سرور را وارد فرمایید.']);
+        }
+
+        try {
+            $driver = DriverFactory::create($server);
+            if (!$driver->authenticate()) {
+                $lastErr = method_exists($driver, 'getLastError') ? $driver->getLastError() : 'عدم توانایی در احراز هویت با سرور';
+                Helpers::jsonResponse(['success' => false, 'message' => $lastErr, 'error' => $lastErr]);
+            }
+
+            // 1. Fetch detailed inbounds from server (tag, proto, network, tls, port)
+            $inbounds = method_exists($driver, 'getDetailedInbounds') 
+                ? $driver->getDetailedInbounds() 
+                : [];
+
+            // 2. Provision temporary sample user to fetch real native Marzban subscription & config
+            $testUser = 'mirza_' . substr(bin2hex(random_bytes(3)), 0, 6);
+            $cRes = $driver->createUser([
+                'username' => $testUser,
+                'uuid' => Helpers::generateUUID(),
+                'traffic_limit_bytes' => 1073741824, // 1GB
+                'expire_timestamp' => time() + 86400 // 1 day
+            ]);
+
+            $sampleData = null;
+            if ($cRes['success']) {
+                $sampleData = [
+                    'sublink' => $cRes['sublink'] ?? '',
+                    'vless_link' => $cRes['vless_link'] ?? '',
+                    'links' => $cRes['links'] ?? []
+                ];
+                // Clean up test user immediately
+                $driver->deleteUser($testUser);
+            }
+
+            Helpers::jsonResponse([
+                'success' => true,
+                'message' => 'اینباندهای سرور و نمونه لینک‌های مستقیم با موفقیت استخراج گردیدند.',
+                'inbounds' => $inbounds,
+                'sample' => $sampleData
+            ]);
+        } catch (Throwable $e) {
+            Helpers::jsonResponse(['success' => false, 'message' => 'خطا: ' . $e->getMessage()]);
         }
     }
 

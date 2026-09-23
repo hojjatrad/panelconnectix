@@ -2402,33 +2402,35 @@ class TelegramBotController {
             ->execute([$prov['client_id'], $orderId]);
 
         // Deliver to customer on Telegram as QR Photo + Full Caption
-        $qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=' . urlencode($prov['sub_url']);
+        $primarySub = !empty($prov['node_sublink']) ? $prov['node_sublink'] : $prov['sub_url'];
+        $qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=' . urlencode($primarySub);
+
         $customerMsg = "🎉 <b>سفارش شما تایید و اشتراک فعال گردید!</b>\n\n"
                      . "👤 <b>نام کاربری:</b> <code>{$prov['username']}</code>\n"
                      . "🔑 <b>کلمه عبور:</b> <code>{$prov['password']}</code>\n"
                      . "📦 <b>حجم اشتراک:</b> {$prov['traffic_gb']} گیگابایت\n"
                      . "⏳ <b>مهلت استفاده:</b> {$prov['expire_at']}\n"
-                     . "🌐 <b>سرور:</b> {$prov['server_name']}\n\n"
-                     . "🔗 <b>لینک اتصال اختصاصی شما (Sublink):</b>\n"
-                     . "<code>{$prov['sub_url']}</code>\n\n";
-
-        if (!empty($prov['node_sublink'])) {
-            $customerMsg .= "⚡ <b>لینک مستقیم سرور:</b>\n"
-                          . "<code>{$prov['node_sublink']}</code>\n\n";
-        }
+                     . "🌐 <b>سرور متصل:</b> {$prov['server_name']}\n\n"
+                     . "🔗 <b>لینک مستقیم ساب‌لینک سرور:</b>\n"
+                     . "<code>{$primarySub}</code>\n\n";
 
         if (!empty($prov['vless_link'])) {
             $customerMsg .= "🚀 <b>کانکشن مستقیم (کپی با یک لمس):</b>\n"
                           . "<code>{$prov['vless_link']}</code>\n\n";
         }
 
-        $customerMsg .= "📱 <i>برای اتصال، بارکد فوق را اسکن نمایید یا روی دکمه‌های زیر ضربه بزنید:</i>";
+        if (!empty($prov['node_sublink']) && $prov['node_sublink'] !== $prov['sub_url']) {
+            $customerMsg .= "🌐 <b>صفحه هوشمند وضعیت اشتراک:</b>\n"
+                          . "<code>{$prov['sub_url']}</code>\n\n";
+        }
+
+        $customerMsg .= "📱 <i>برای اتصال، لینک ساب‌لینک را در v2rayNG یا Streisand وارد فرمایید یا بارکد فوق را اسکن نمایید:</i>";
 
         $customerKeyboard = [
             'inline_keyboard' => [
-                [['text' => '🌐 باز کردن صفحه اشتراک و QR کد', 'url' => $prov['sub_url']]],
-                [['text' => '📱 دانلود نرم‌افزارهای اتصال', 'callback_data' => 'menu_apps']],
-                [['text' => '👤 حساب‌های من', 'callback_data' => 'menu_my_accounts']],
+                [['text' => '⚡ اتصال مستقیم با V2rayNG', 'url' => 'v2rayng://install-config?url=' . urlencode($primarySub)]],
+                [['text' => '🚀 اتصال با Streisand / Hiddify', 'url' => 'hiddify://install-sub?url=' . urlencode($primarySub)]],
+                [['text' => '📊 صفحه وب وضعیت اشتراک', 'url' => $prov['sub_url']]],
                 [['text' => '🔙 منوی اصلی', 'callback_data' => 'menu_main']]
             ]
         ];
@@ -3692,8 +3694,8 @@ class TelegramBotController {
             return;
         }
 
-        $subUrl = $res['sub_url'];
-        $qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=' . urlencode($subUrl);
+        $primarySub = !empty($res['node_sublink']) ? $res['node_sublink'] : $res['sub_url'];
+        $qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=' . urlencode($primarySub);
 
         $msg = "🎁 <b>اکانت تست رایگان شما با موفقیت فعال گردید!</b>\n\n"
              . "👤 <b>نام کاربری:</b> <code>{$res['username']}</code>\n"
@@ -3701,25 +3703,26 @@ class TelegramBotController {
              . "📦 <b>حجم تست:</b> {$res['traffic_text']}\n"
              . "⏳ <b>مهلت تست:</b> {$res['hours']} ساعت\n"
              . "🌐 <b>سرور متصل:</b> {$res['server_name']}\n\n"
-             . "🔗 <b>لینک اتصال ساب‌لینک هوشمند:</b>\n"
-             . "<code>{$subUrl}</code>\n\n";
-
-        if (!empty($res['node_sublink'])) {
-            $msg .= "⚡ <b>لینک مستقیم سرور:</b>\n"
-                  . "<code>{$res['node_sublink']}</code>\n\n";
-        }
+             . "🔗 <b>لینک مستقیم ساب‌لینک سرور:</b>\n"
+             . "<code>{$primarySub}</code>\n\n";
 
         if (!empty($res['vless_link'])) {
             $msg .= "🚀 <b>کانکشن مستقیم (کپی با یک لمس):</b>\n"
                   . "<code>{$res['vless_link']}</code>\n\n";
         }
 
-        $msg .= "📱 <i>برای اتصال، لینک بالا را در نرم‌افزارهای v2rayNG یا Streisand وارد فرمایید یا بارکد فوق را اسکن نمایید.</i>";
+        if (!empty($res['node_sublink']) && $res['node_sublink'] !== $res['sub_url']) {
+            $msg .= "🌐 <b>صفحه هوشمند وضعیت اشتراک:</b>\n"
+                  . "<code>{$res['sub_url']}</code>\n\n";
+        }
+
+        $msg .= "📱 <i>برای اتصال، لینک ساب‌لینک را در v2rayNG یا Streisand وارد فرمایید یا بارکد فوق را اسکن نمایید:</i>";
 
         $kb = [
             'inline_keyboard' => [
+                [['text' => '⚡ اتصال مستقیم با V2rayNG', 'url' => 'v2rayng://install-config?url=' . urlencode($primarySub)]],
+                [['text' => '🚀 اتصال با Streisand / Hiddify', 'url' => 'hiddify://install-sub?url=' . urlencode($primarySub)]],
                 [['text' => '🛒 خرید اشتراک کامل و پرسرعت', 'callback_data' => 'menu_buy']],
-                [['text' => '📱 دانلود نرم‌افزارهای اتصال', 'callback_data' => 'menu_apps']],
                 [['text' => '🔙 بازگشت به منوی اصلی', 'callback_data' => 'menu_main']]
             ]
         ];

@@ -246,8 +246,17 @@ require __DIR__ . '/../layout/header.php';
                     <span>الگوی کانفیگ اختصاصی سرور (VLESS Reality / Trojan)</span>
                     <span class="text-[10px] text-cyan-400 font-normal">اختیاری - پشتیبانی از {uuid}</span>
                 </label>
-                <textarea name="config_template" rows="2" dir="ltr" placeholder="vless://{uuid}@gga1.montago-shop.ir:443?encryption=none&security=reality&type=tcp&headerType=none&flow=xtls-rprx-vision&sni=delivery.mp.microsoft.com&fp=edge&pbk=PjR-SM4fOm2fY4mTqWoqZDRyxontvpailM0gBqUxlUQ&sid=070a23aed243#{remark}" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-[11px] leading-relaxed"></textarea>
-                <span class="text-[10px] text-slate-400 mt-0.5 block">اگر وارد شود، تمام ساب‌لینک‌ها و ربات دقیقاً از این الگو با جایگذاری UUID کلاینت استفاده می‌کنند.</span>
+                <textarea name="config_template" rows="2" dir="ltr" placeholder="اختیاری - در صورت تمایل می‌توانید الگوی دستی وارد کنید یا از دکمه استخراج خودکار زیر استفاده فرمایید" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-[11px] leading-relaxed"></textarea>
+                <span class="text-[10px] text-slate-400 mt-0.5 block">اگر خالی بماند، سیستم به صورت کاملاً خودکار لینک‌های بومی مرزبان را بدون واسطه تحویل می‌دهد.</span>
+            </div>
+
+            <!-- MirzaPro-Style Inbound Discovery & Real Live Sample Link Preview -->
+            <div class="space-y-2 pt-1 border-t border-slate-800/80">
+                <button type="button" onclick="detectInboundsAndSample('new')" id="btn_detect_new" class="w-full py-2.5 bg-gradient-to-r from-purple-900/40 via-indigo-900/40 to-slate-800 hover:from-purple-800/50 hover:to-indigo-800/50 text-purple-200 border border-purple-500/40 font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-2 shadow">
+                    <i class="fa-solid fa-satellite-dish text-purple-400"></i>
+                    <span>📡 شناسایی خودکار اینباندها و دریافت نمونه لینک زنده (مانند میرزا پرو)</span>
+                </button>
+                <div id="inbounds_container_new" class="hidden space-y-3 p-3.5 bg-slate-950/90 border border-purple-900/40 rounded-xl text-xs"></div>
             </div>
 
             <div class="pt-1">
@@ -344,8 +353,17 @@ require __DIR__ . '/../layout/header.php';
                     <span>الگوی کانفیگ اختصاصی سرور (VLESS Reality / Trojan)</span>
                     <span class="text-[10px] text-cyan-400 font-normal">اختیاری - پشتیبانی از {uuid}</span>
                 </label>
-                <textarea name="config_template" id="edit_server_config_template" rows="2" dir="ltr" placeholder="vless://{uuid}@gga1.montago-shop.ir:443?encryption=none&security=reality&type=tcp&headerType=none&flow=xtls-rprx-vision&sni=delivery.mp.microsoft.com&fp=edge&pbk=PjR-SM4fOm2fY4mTqWoqZDRyxontvpailM0gBqUxlUQ&sid=070a23aed243#{remark}" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-[11px] leading-relaxed"></textarea>
-                <span class="text-[10px] text-slate-400 mt-0.5 block">اگر وارد شود، تمام ساب‌لینک‌ها و ربات دقیقاً از این الگو با جایگذاری UUID کلاینت استفاده می‌کنند.</span>
+                <textarea name="config_template" id="edit_server_config_template" rows="2" dir="ltr" placeholder="اختیاری - در صورت تمایل می‌توانید الگوی دستی وارد کنید یا از دکمه استخراج خودکار زیر استفاده فرمایید" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-[11px] leading-relaxed"></textarea>
+                <span class="text-[10px] text-slate-400 mt-0.5 block">اگر خالی بماند، سیستم به صورت کاملاً خودکار لینک‌های بومی مرزبان را بدون واسطه تحویل می‌دهد.</span>
+            </div>
+
+            <!-- MirzaPro-Style Inbound Discovery & Real Live Sample Link Preview -->
+            <div class="space-y-2 pt-1 border-t border-slate-800/80">
+                <button type="button" onclick="detectInboundsAndSample('edit')" id="btn_detect_edit" class="w-full py-2.5 bg-gradient-to-r from-purple-900/40 via-indigo-900/40 to-slate-800 hover:from-purple-800/50 hover:to-indigo-800/50 text-purple-200 border border-purple-500/40 font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-2 shadow">
+                    <i class="fa-solid fa-satellite-dish text-purple-400"></i>
+                    <span>📡 شناسایی خودکار اینباندها و دریافت نمونه لینک زنده (مانند میرزا پرو)</span>
+                </button>
+                <div id="inbounds_container_edit" class="hidden space-y-3 p-3.5 bg-slate-950/90 border border-purple-900/40 rounded-xl text-xs"></div>
             </div>
 
             <div class="pt-1">
@@ -591,6 +609,116 @@ require __DIR__ . '/../layout/header.php';
             resultBox.className = 'mb-3 p-3.5 rounded-xl text-xs bg-rose-950/70 border border-rose-700/60 text-rose-300';
             resultBox.innerHTML = '<div class="flex items-center gap-2"><i class="fa-solid fa-triangle-exclamation text-rose-400 text-base shrink-0"></i><span>خطا در پاسخ کنترلر: ' + err.message + '</span></div>';
         });
+    }
+
+    async function detectInboundsAndSample(mode) {
+        const isNew = (mode === 'new');
+        const modal = document.getElementById(isNew ? 'newServerModal' : 'editServerModal');
+        const form = modal.querySelector('form');
+        const container = document.getElementById(isNew ? 'inbounds_container_new' : 'inbounds_container_edit');
+        const btn = document.getElementById(isNew ? 'btn_test_new' : 'btn_test_edit');
+        const detectBtn = document.getElementById(isNew ? 'btn_detect_new' : 'btn_detect_edit');
+        const origBtnText = detectBtn.innerHTML;
+
+        detectBtn.disabled = true;
+        detectBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-purple-400"></i> در حال اتصال به سرور و استخراج نمونه لینک...';
+        container.classList.remove('hidden');
+        container.innerHTML = '<div class="text-center py-4 text-slate-400"><i class="fa-solid fa-circle-notch fa-spin text-xl text-purple-400 block mb-2"></i> در حال احراز هویت با وب‌سرویس و ایجاد کلاینت تستی موقت جهت استخراج نمونه ساب‌لینک...</div>';
+
+        const formData = new FormData(form);
+
+        try {
+            const res = await fetch('<?= Helpers::url('servers/fetch-inbounds-sample') ?>', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+
+            if (!data.success) {
+                container.innerHTML = `<div class="p-3 bg-rose-950/60 border border-rose-800 text-rose-300 rounded-xl">❌ <b>خطا در ارتباط با سرور:</b> ${data.message || data.error}</div>`;
+                detectBtn.disabled = false;
+                detectBtn.innerHTML = origBtnText;
+                return;
+            }
+
+            let html = `
+                <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+                    <span class="font-bold text-white flex items-center gap-1.5">
+                        <i class="fa-solid fa-circle-check text-emerald-400"></i>
+                        <span>اینباندهای فعال شناسایی‌شده در سرور</span>
+                    </span>
+                    <span class="text-[10px] text-purple-300 bg-purple-950/80 px-2 py-0.5 rounded border border-purple-800">${(data.inbounds || []).length} اینباند فعال</span>
+                </div>
+            `;
+
+            if (data.inbounds && data.inbounds.length > 0) {
+                html += `<div class="grid grid-cols-1 md:grid-cols-2 gap-2 my-2">`;
+                data.inbounds.forEach((ib) => {
+                    html += `
+                        <label class="flex items-center gap-2 p-2 bg-slate-900 border border-slate-800 rounded-lg hover:border-purple-600/50 cursor-pointer transition">
+                            <input type="checkbox" name="selected_inbounds[]" value="${ib.tag}" checked class="rounded text-purple-600 focus:ring-0">
+                            <div class="text-[11px] leading-tight">
+                                <span class="font-mono font-bold text-white block">${ib.tag}</span>
+                                <span class="text-[10px] text-slate-400 uppercase font-mono">${ib.protocol} | ${ib.network} | ${ib.tls} | Port: ${ib.port}</span>
+                            </div>
+                        </label>
+                    `;
+                });
+                html += `</div>`;
+            } else {
+                html += `<p class="text-slate-400 text-[11px] py-1">تمام پروتکل‌های استاندارد فعال به صورت خودکار به کاربر اختصاص می‌یابند.</p>`;
+            }
+
+            if (data.sample) {
+                if (data.sample.sublink) {
+                    html += `
+                        <div class="space-y-1.5 pt-2 border-t border-slate-800">
+                            <div class="flex items-center justify-between">
+                                <span class="text-[11px] font-bold text-emerald-400">⚡ لینک ساب‌لینک مستقیم استخراج‌شده از مرزبان (مانند میرزا پرو):</span>
+                                <button type="button" onclick="navigator.clipboard.writeText('${data.sample.sublink}').then(() => alert('لینک ساب‌لینک با موفقیت کپی شد!'))" class="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] rounded border border-slate-700">
+                                    <i class="fa-regular fa-copy"></i> کپی ساب‌لینک
+                                </button>
+                            </div>
+                            <input type="text" readonly value="${data.sample.sublink}" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 font-mono text-[10px] text-emerald-300 select-all" dir="ltr">
+                        </div>
+                    `;
+                }
+
+                if (data.sample.vless_link) {
+                    html += `
+                        <div class="space-y-1.5 pt-2 border-t border-slate-800">
+                            <div class="flex items-center justify-between">
+                                <span class="text-[11px] font-bold text-purple-400">🚀 نمونه کانکشن خام تولیدشده توسط سرور:</span>
+                                <button type="button" onclick="applySampleToTemplate('${mode}', '${encodeURIComponent(data.sample.vless_link)}')" class="px-2 py-0.5 bg-purple-600/30 hover:bg-purple-600/50 text-purple-300 text-[10px] rounded border border-purple-500/40">
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i> اعمال در الگوی سرور
+                                </button>
+                            </div>
+                            <textarea readonly rows="2" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 font-mono text-[10px] text-slate-300 select-all" dir="ltr">${data.sample.vless_link}</textarea>
+                        </div>
+                    `;
+                }
+            }
+
+            container.innerHTML = html;
+        } catch (e) {
+            container.innerHTML = `<div class="p-3 bg-rose-950/60 border border-rose-800 text-rose-300 rounded-xl">❌ خطا در ارتباط: ${e.message}</div>`;
+        } finally {
+            detectBtn.disabled = false;
+            detectBtn.innerHTML = origBtnText;
+        }
+    }
+
+    function applySampleToTemplate(mode, encodedLink) {
+        const link = decodeURIComponent(encodedLink);
+        // Replace UUID with {uuid}
+        const templated = link.replace(/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/, '{uuid}');
+        const textarea = (mode === 'edit') 
+            ? document.getElementById('edit_server_config_template') 
+            : document.querySelector('#newServerModal textarea[name="config_template"]');
+        if (textarea) {
+            textarea.value = templated;
+            alert('نمونه کانکشن استخراج‌شده با موفقیت در فیلد الگوی اختصاصی سرور قرار گرفت!');
+        }
     }
 
     function openMigrateModal() {

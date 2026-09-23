@@ -227,6 +227,8 @@ $router->post('servers/clear-all', [ServerController::class, 'clearAll']);
 $router->get('servers/test', [ServerController::class, 'testConnection']);
 $router->post('servers/test-raw', [ServerController::class, 'testRawConnection']);
 $router->get('servers/test-raw', [ServerController::class, 'testRawConnection']);
+$router->post('servers/fetch-inbounds-sample', [ServerController::class, 'fetchInboundsAndSample']);
+$router->get('servers/fetch-inbounds-sample', [ServerController::class, 'fetchInboundsAndSample']);
 $router->get('servers/ping', [ServerController::class, 'ping']);
 $router->get('servers/sync', [ServerController::class, 'syncNow']);
 $router->post('servers/sync', [ServerController::class, 'syncNow']);
