@@ -129,6 +129,51 @@ if ($hasConfig) {
             }
         } catch (Throwable $e) {}
 
+        // Diagnostic API for testing live servers
+        if (isset($_GET['diag_server'])) {
+            header('Content-Type: application/json; charset=utf-8');
+            require_once __DIR__ . '/drivers/DriverFactory.php';
+            require_once __DIR__ . '/core/Helpers.php';
+            $nodes = $pdo->query("SELECT id, name, driver, api_url, api_username, is_active, health_status, server_group, config_template FROM server_nodes")->fetchAll(PDO::FETCH_ASSOC);
+            $results = [];
+            foreach ($nodes as $n) {
+                $full = $pdo->query("SELECT * FROM server_nodes WHERE id = " . (int)$n['id'])->fetch(PDO::FETCH_ASSOC);
+                $driverInst = DriverFactory::create($full);
+                $auth = $driverInst->authenticate();
+                $err = method_exists($driverInst, 'getLastError') ? $driverInst->getLastError() : null;
+                $inbounds = method_exists($driverInst, 'getInbounds') ? $driverInst->getInbounds() : [];
+                $sampleLink = null;
+                if ($auth) {
+                    $testUser = 'diag_' . substr(bin2hex(random_bytes(3)), 0, 6);
+                    $cRes = $driverInst->createUser([
+                        'username' => $testUser,
+                        'uuid' => Helpers::generateUUID(),
+                        'traffic_limit_bytes' => 1073741824,
+                        'expire_timestamp' => time() + 86400
+                    ]);
+                    if ($cRes['success']) {
+                        $sampleLink = [
+                            'sublink' => $cRes['sublink'] ?? null,
+                            'links' => $cRes['links'] ?? [],
+                            'vless_link' => $cRes['vless_link'] ?? null
+                        ];
+                        $driverInst->deleteUser($testUser);
+                    } else {
+                        $sampleLink = ['error' => $cRes['error'] ?? 'failed'];
+                    }
+                }
+                $results[] = [
+                    'node' => $n,
+                    'auth' => $auth,
+                    'error' => $err,
+                    'inbounds' => $inbounds,
+                    'sample' => $sampleLink
+                ];
+            }
+            echo json_encode($results, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
         $stepResults['db'] = [
             'status' => true, 
             'msg' => "ارتباط با پایگاه داده برقراره و تعداد {$tableCount} جدول تایید شد. {$adminMsg}"
