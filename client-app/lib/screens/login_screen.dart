@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import 'dashboard_screen.dart';
 
@@ -14,6 +15,72 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _isLoading = false;
   String _errorMessage = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedCredentials();
+  }
+
+  void _loadSavedCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    final u = prefs.getString('saved_username');
+    final p = prefs.getString('saved_password');
+    if (u != null && p != null) {
+      _usernameController.text = u;
+      _passwordController.text = p;
+    }
+  }
+
+  void _showServerUrlDialog() {
+    final controller = TextEditingController(text: ApiService.baseUrl);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF0F172A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('تنظیم آدرس سرور پنل', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('آدرس دامنه یا آی‌پی پنل خود را وارد فرمایید:', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: const Color(0xFF1E293B),
+                hintText: 'https://your-domain.com',
+                hintStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('انصراف', style: TextStyle(color: Color(0xFF94A3B8))),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final newUrl = controller.text.trim();
+              if (newUrl.isNotEmpty) {
+                ApiService.baseUrl = newUrl;
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setString('api_base_url', newUrl);
+                if (mounted) Navigator.pop(ctx);
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF9333EA)),
+            child: const Text('ذخیره آدرس', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
 
   void _doLogin() async {
     final u = _usernameController.text.trim();
@@ -59,6 +126,17 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF090D16),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings_outlined, color: Color(0xFF94A3B8)),
+            onPressed: _showServerUrlDialog,
+            tooltip: 'تنظیم آدرس سرور پنل',
+          ),
+        ],
+      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(

@@ -1,12 +1,21 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'screens/login_screen.dart';
 import 'services/api_service.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await ApiService.initBaseUrl();
-  runApp(const ConnectixApp());
+  runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    try {
+      await ApiService.initBaseUrl();
+    } catch (e) {
+      debugPrint("InitBaseUrl Error: $e");
+    }
+    runApp(const ConnectixApp());
+  }, (error, stack) {
+    debugPrint("Global Error: $error\n$stack");
+  });
 }
 
 class ConnectixApp extends StatelessWidget {
