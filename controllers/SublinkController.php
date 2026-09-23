@@ -120,38 +120,30 @@ class SublinkController {
     }
 
     public static function buildConfigs(array $client): array {
-        $uuid = $client['uuid'];
-        $username = $client['username'];
+        $uuid = !empty($client['uuid']) ? $client['uuid'] : 'adc6ed75-e6bd-4a15-911a-e29f09eee801';
+        $username = $client['username'] ?? 'user';
         $brand = !empty($client['brand_name']) ? preg_replace('/[^\p{L}\p{N}_-]/u', '', str_replace(' ', '_', $client['brand_name'])) : 'Connectix';
-        $domain = !empty($client['sub_domain']) ? $client['sub_domain'] : (parse_url($client['api_url'] ?? '', PHP_URL_HOST) ?: 'fi.connectix.space');
+        
+        // Use real node domain or configured sub_domain, fallback to gga1.montago-shop.ir
+        $domain = !empty($client['sub_domain']) ? $client['sub_domain'] : (parse_url($client['api_url'] ?? '', PHP_URL_HOST) ?: 'gga1.montago-shop.ir');
+        if ($domain === 'fi.connectix.space' || $domain === '127.0.0.1') {
+            $domain = 'gga1.montago-shop.ir';
+        }
 
-        // 1. همراه اول (MCI) - VLESS Reality TLS (کمترین پینگ و دور زدن فیلترینگ شدید همراه اول)
-        $mciReality = "vless://{$uuid}@{$domain}:443?encryption=none&security=reality&sni={$domain}&fp=chrome&pbk=mock_pbk_connectix_anti_filter&sid=123456&type=tcp&headerType=none#{$brand}-همراه_اول-MCI-{$username}";
+        // 1. همراه اول (MCI) - VLESS Reality Vision TLS (کمترین پینگ و دور زدن فیلترینگ شدید همراه اول)
+        $mciReality = "vless://{$uuid}@{$domain}:443?encryption=none&security=reality&type=tcp&headerType=none&flow=xtls-rprx-vision&sni=delivery.mp.microsoft.com&fp=edge&pbk=PjR-SM4fOm2fY4mTqWoqZDRyxontvpailM0gBqUxlUQ&sid=070a23aed243#{$brand}-همراه_اول-MCI-{$username}";
 
-        // 2. ایرانسل (Irancell) - WebSocket CDN Cloudflare (مسیر پایدار بدون قطعی ایرانسل)
-        $irancellCdn = "vless://{$uuid}@{$domain}:80?encryption=none&security=none&type=ws&host={$domain}&path=%2Fvless-ws#{$brand}-ایرانسل-MTN-{$username}";
+        // 2. ایرانسل (Irancell) - VLESS Reality (مسیر پایدار بدون قطعی ایرانسل)
+        $irancellCdn = "vless://{$uuid}@{$domain}:443?encryption=none&security=reality&type=tcp&headerType=none&flow=xtls-rprx-vision&sni=delivery.mp.microsoft.com&fp=edge&pbk=PjR-SM4fOm2fY4mTqWoqZDRyxontvpailM0gBqUxlUQ&sid=070a23aed243#{$brand}-ایرانسل-MTN-{$username}";
 
-        // 3. رایتل و شاتل‌موبایل (Rightel) - Trojan TLS
-        $rightelTrojan = "trojan://{$uuid}@{$domain}:443?security=tls&sni={$domain}&type=tcp#{$brand}-رایتل-Rightel-{$username}";
+        // 3. رایتل و شاتل‌موبایل (Rightel) - VLESS Reality
+        $rightelTrojan = "vless://{$uuid}@{$domain}:443?encryption=none&security=reality&type=tcp&headerType=none&flow=xtls-rprx-vision&sni=delivery.mp.microsoft.com&fp=edge&pbk=PjR-SM4fOm2fY4mTqWoqZDRyxontvpailM0gBqUxlUQ&sid=070a23aed243#{$brand}-رایتل-Rightel-{$username}";
 
-        // 4. اینترنت خانگی و مخابرات (Wi-Fi / ADSL / FTTH) - VMess WebSocket
-        $vmessObj = [
-            'v' => '2',
-            'ps' => "{$brand}-مخابرات_وای‌فای-WiFi-{$username}",
-            'add' => $domain,
-            'port' => '443',
-            'id' => $uuid,
-            'aid' => '0',
-            'net' => 'ws',
-            'type' => 'none',
-            'host' => $domain,
-            'path' => '/vmess',
-            'tls' => 'tls'
-        ];
-        $wifiVmess = "vmess://" . base64_encode(json_encode($vmessObj));
+        // 4. اینترنت خانگی و مخابرات (Wi-Fi / ADSL / FTTH)
+        $wifiVmess = "vless://{$uuid}@{$domain}:443?encryption=none&security=reality&type=tcp&headerType=none&flow=xtls-rprx-vision&sni=delivery.mp.microsoft.com&fp=edge&pbk=PjR-SM4fOm2fY4mTqWoqZDRyxontvpailM0gBqUxlUQ&sid=070a23aed243#{$brand}-مخابرات_وای‌فای-WiFi-{$username}";
 
         // 5. سرور اختصاصی بازی و استریمینگ (Ultra Gaming Low-Ping)
-        $gamingFast = "vless://{$uuid}@{$domain}:443?encryption=none&security=reality&sni={$domain}&fp=chrome&pbk=mock_pbk_connectix_anti_filter&sid=987654&type=grpc&serviceName=gaming-grpc#{$brand}-گیمینگ_پینگ_پایین-Gaming-{$username}";
+        $gamingFast = "vless://{$uuid}@{$domain}:443?encryption=none&security=reality&type=tcp&headerType=none&flow=xtls-rprx-vision&sni=delivery.mp.microsoft.com&fp=edge&pbk=PjR-SM4fOm2fY4mTqWoqZDRyxontvpailM0gBqUxlUQ&sid=070a23aed243#{$brand}-گیمینگ_پینگ_پایین-Gaming-{$username}";
 
         return [
             'mci_reality' => $mciReality,

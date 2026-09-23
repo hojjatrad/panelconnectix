@@ -215,7 +215,9 @@ class MarzbanDriver implements PanelDriverInterface {
                 'traffic_limit_bytes' => $u['data_limit'] ?? 0,
                 'expire_at' => !empty($u['expire']) ? date('Y-m-d H:i:s', $u['expire']) : null,
                 'status' => $u['status'] ?? 'active',
-                'online' => ($u['online_at'] ?? 0) > (time() - 300)
+                'online' => ($u['online_at'] ?? 0) > (time() - 300),
+                'links' => $u['links'] ?? [],
+                'subscription_url' => $u['subscription_url'] ?? ''
             ];
         }
         return null;

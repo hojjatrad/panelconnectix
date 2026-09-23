@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_v2ray/flutter_v2ray.dart';
 import '../models/client_model.dart';
 import '../models/server_model.dart';
 import '../services/api_service.dart';
@@ -25,6 +26,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   List<ServerModel> _servers = [];
   ServerModel? _selectedServer;
 
+  late final FlutterV2ray _flutterV2ray;
+  final ValueNotifier<V2RayStatus> _v2rayStatus = ValueNotifier<V2RayStatus>(V2RayStatus());
+
   bool _isConnected = false;
   bool _isConnecting = false;
   int _connectedSeconds = 0;
@@ -34,7 +38,44 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   void initState() {
     super.initState();
     _client = widget.client;
+    _initV2Ray();
     _loadServers();
+    _refreshProfile();
+  }
+
+  void _initV2Ray() async {
+    _flutterV2ray = FlutterV2ray(
+      onStatusChanged: (status) {
+        _v2rayStatus.value = status;
+        if (mounted) {
+          setState(() {
+            if (status.state == 'CONNECTED') {
+              _isConnected = true;
+              _isConnecting = false;
+            } else if (status.state == 'DISCONNECTED') {
+              _isConnected = false;
+              _isConnecting = false;
+              _timer?.cancel();
+            }
+          });
+        }
+      },
+    );
+
+    try {
+      await _flutterV2ray.initializeV2Ray();
+    } catch (e) {
+      debugPrint("V2Ray init error: $e");
+    }
+  }
+
+  void _refreshProfile() async {
+    final updated = await ApiService.getProfile();
+    if (updated != null && mounted) {
+      setState(() {
+        _client = updated;
+      });
+    }
   }
 
   void _loadServers() async {
@@ -49,75 +90,81 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
   }
 
-  void _toggleConnection() {
+  void _toggleConnection() async {
     if (_isConnecting) return;
 
     if (!_isConnected) {
-      // Connect
+      if (_selectedServer == null || _selectedServer!.configUri.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('لطفاً یک سرور دارای کانکشن معتبر انتخاب فرمایید.')),
+        );
+        return;
+      }
+
       setState(() {
         _isConnecting = true;
       });
 
-      Future.delayed(const Duration(milliseconds: 1200), () {
-        if (!mounted) return;
-        setState(() {
-          _isConnecting = false;
-          _isConnected = true;
-          _connectedSeconds = 0;
-        });
-
-        _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      try {
+        final hasPermission = await _flutterV2ray.requestPermission();
+        if (!hasPermission) {
+          setState(() {
+            _isConnecting = false;
+          });
           if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('مجوز اتصال وی‌پی‌ان (VPN Permission) تایید نشد.')),
+            );
+          }
+          return;
+        }
+
+        final configUri = _selectedServer!.configUri;
+        final parser = FlutterV2ray.parseFromURL(configUri);
+
+        await _flutterV2ray.startV2Ray(
+          remark: _selectedServer!.name,
+          config: parser.getFullConfiguration(),
+          proxyOnly: false, // True device-wide VPN tunnel
+        );
+
+        _connectedSeconds = 0;
+        _timer?.cancel();
+        _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+          if (mounted && _isConnected) {
             setState(() {
               _connectedSeconds++;
             });
           }
         });
-      });
+      } catch (e) {
+        setState(() {
+          _isConnecting = false;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('خطا در اتصال وی‌پی‌ان: $e')),
+          );
+        }
+      }
     } else {
       // Disconnect
+      try {
+        await _flutterV2ray.stopV2Ray();
+      } catch (_) {}
       _timer?.cancel();
       setState(() {
         _isConnected = false;
         _isConnecting = false;
-        _connectedSeconds = 0;
       });
     }
   }
 
-  String _formatTimer(int seconds) {
-    final h = (seconds ~/ 3600).toString().padLeft(2, '0');
-    final m = ((seconds % 3600) ~/ 60).toString().padLeft(2, '0');
+  String _formatDuration(int seconds) {
+    final m = (seconds ~/ 60).toString().padLeft(2, '0');
     final s = (seconds % 60).toString().padLeft(2, '0');
-    return "$h:$m:$s";
-  }
-
-  void _openServerModal() async {
-    final chosen = await showModalBottomSheet<ServerModel>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (_) => ServerListModal(
-        servers: _servers,
-        selectedServer: _selectedServer,
-      ),
-    );
-
-    if (chosen != null && mounted) {
-      setState(() {
-        _selectedServer = chosen;
-      });
-    }
-  }
-
-  void _logout() async {
-    if (_isConnected) _toggleConnection();
-    await ApiService.logout();
-    if (!mounted) return;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-    );
+    final h = (seconds ~/ 3600).toString().padLeft(2, '0');
+    return h == '00' ? '$m:$s' : '$h:$m:$s';
   }
 
   @override
@@ -128,89 +175,132 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   @override
   Widget build(BuildContext context) {
+    final statusColor = _isConnected
+        ? const Color(0xFF10B981)
+        : (_isConnecting ? const Color(0xFFF59E0B) : const Color(0xFF9333EA));
+
     return Scaffold(
       backgroundColor: const Color(0xFF090D16),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: Row(
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: const Color(0xFF9333EA).withOpacity(0.2),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.bolt, color: Color(0xFFA855F7), size: 20),
-            ),
-            const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _client.username,
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
-                ),
-                Text(
-                  _client.planTitle,
-                  style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
-                ),
-              ],
-            ),
-          ],
+        title: Text(
+          widget.branding.appName,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.power_settings_new, color: Color(0xFF94A3B8)),
-            onPressed: _logout,
+            icon: const Icon(Icons.refresh, color: Color(0xFF94A3B8)),
+            onPressed: () {
+              _refreshProfile();
+              _loadServers();
+            },
+            tooltip: 'بروزرسانی وضعیت',
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout, color: Color(0xFF94A3B8)),
+            onPressed: () async {
+              if (_isConnected) {
+                try {
+                  await _flutterV2ray.stopV2Ray();
+                } catch (_) {}
+              }
+              await ApiService.logout();
+              if (!mounted) return;
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+              );
+            },
+            tooltip: 'خروج از حساب',
           ),
         ],
       ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Traffic Quota & Expiry Card
+              // User Quota & Live Stats Card
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0F172A),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0xFF1E293B)),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF1E1B4B), Color(0xFF0F172A)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: const Color(0xFF312E81)),
                 ),
                 child: Column(
                   children: [
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('حجم باقیمانده:', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
-                        Text(
-                          '${_client.trafficRemainingGb} GB از ${_client.trafficTotalGb} GB',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _client.username,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _client.planTitle,
+                              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                            ),
+                          ],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10B981).withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
+                          ),
+                          child: Text(
+                            _client.daysRemaining,
+                            style: const TextStyle(
+                              color: Color(0xFF10B981),
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 16),
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(6),
                       child: LinearProgressIndicator(
-                        value: _client.usagePercent / 100,
+                        value: (_client.usagePercent / 100).clamp(0.0, 1.0),
                         backgroundColor: const Color(0xFF1E293B),
-                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF9333EA)),
-                        minHeight: 6,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          _client.usagePercent > 85 ? const Color(0xFFF43F5E) : const Color(0xFF6366F1),
+                        ),
+                        minHeight: 8,
                       ),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 12),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('اعتبار اشتراک:', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
                         Text(
-                          _client.daysRemaining,
-                          style: const TextStyle(color: Color(0xFFFBBF24), fontWeight: FontWeight.bold, fontSize: 12),
+                          'مصرف: ${_client.trafficUsedGb} GB',
+                          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                        ),
+                        Text(
+                          'باقیمانده: ${_client.trafficRemainingGb} GB',
+                          style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          'کل: ${_client.trafficTotalGb} GB',
+                          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
                         ),
                       ],
                     ),
@@ -218,56 +308,61 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 ),
               ),
 
-              // Central Connection Button
-              Column(
-                children: [
-                  GestureDetector(
-                    onTap: _toggleConnection,
+              const SizedBox(height: 28),
+
+              // Connect Button with Glowing Rings
+              GestureDetector(
+                onTap: _toggleConnection,
+                child: Container(
+                  width: 170,
+                  height: 170,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        statusColor.withOpacity(0.3),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                  child: Center(
                     child: Container(
-                      width: 170,
-                      height: 170,
+                      width: 130,
+                      height: 130,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          colors: _isConnected
-                              ? [const Color(0xFF10B981), const Color(0xFF059669)]
-                              : [const Color(0xFF1E293B), const Color(0xFF0F172A)],
-                        ),
-                        border: Border.all(
-                          color: _isConnected ? const Color(0xFF34D399) : const Color(0xFF334155),
-                          width: 4,
-                        ),
+                        color: const Color(0xFF0F172A),
+                        border: Border.all(color: statusColor, width: 3),
                         boxShadow: [
-                          if (_isConnected)
-                            BoxShadow(
-                              color: const Color(0xFF10B981).withOpacity(0.4),
-                              blurRadius: 35,
-                              spreadRadius: 6,
-                            ),
+                          BoxShadow(
+                            color: statusColor.withOpacity(0.4),
+                            blurRadius: 30,
+                            spreadRadius: 2,
+                          ),
                         ],
                       ),
                       child: Center(
                         child: _isConnecting
-                            ? const SizedBox(
+                            ? SizedBox(
                                 width: 36,
                                 height: 36,
-                                child: CircularProgressIndicator(color: Color(0xFFA855F7), strokeWidth: 3),
+                                child: CircularProgressIndicator(color: statusColor, strokeWidth: 3),
                               )
                             : Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Icon(
-                                    _isConnected ? Icons.shield_rounded : Icons.power_settings_new,
-                                    color: _isConnected ? Colors.white : const Color(0xFF94A3B8),
+                                    Icons.power_settings_new_rounded,
                                     size: 46,
+                                    color: statusColor,
                                   ),
-                                  const SizedBox(height: 8),
+                                  const SizedBox(height: 4),
                                   Text(
-                                    _isConnected ? 'متصل شد' : 'لمس برای اتصال',
+                                    _isConnected ? 'متصل شد' : 'اتصال',
                                     style: TextStyle(
-                                      color: _isConnected ? Colors.white : const Color(0xFFCBD5E1),
-                                      fontSize: 12,
+                                      color: statusColor,
                                       fontWeight: FontWeight.bold,
+                                      fontSize: 13,
                                     ),
                                   ),
                                 ],
@@ -275,57 +370,129 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  if (_isConnected)
-                    Text(
-                      _formatTimer(_connectedSeconds),
-                      style: const TextStyle(
-                        fontFamily: 'monospace',
-                        color: Color(0xFF34D399),
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                ],
+                ),
               ),
 
-              // Server Selection Pill
-              GestureDetector(
-                onTap: _openServerModal,
+              const SizedBox(height: 16),
+
+              // Timer & Status Tag
+              Text(
+                _isConnected
+                    ? 'زمان اتصال: ${_formatDuration(_connectedSeconds)}'
+                    : (_isConnecting ? 'در حال برقراری تونل امن...' : 'جهت اتصال لمس نمایید'),
+                style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+              ),
+
+              const SizedBox(height: 28),
+
+              // Server Selector Card
+              InkWell(
+                onTap: () async {
+                  if (_servers.isEmpty) return;
+                  final selected = await showModalBottomSheet<ServerModel>(
+                    context: context,
+                    backgroundColor: Colors.transparent,
+                    isScrollControlled: true,
+                    builder: (_) => FractionallySizedBox(
+                      heightFactor: 0.65,
+                      child: ServerListModal(
+                        servers: _servers,
+                        selectedServer: _selectedServer,
+                      ),
+                    ),
+                  );
+                  if (selected != null && mounted) {
+                    setState(() {
+                      _selectedServer = selected;
+                    });
+                    if (_isConnected) {
+                      _toggleConnection(); // reconnect with new server
+                    }
+                  }
+                },
+                borderRadius: BorderRadius.circular(20),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
                   decoration: BoxDecoration(
                     color: const Color(0xFF0F172A),
-                    borderRadius: BorderRadius.circular(18),
+                    borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: const Color(0xFF1E293B)),
                   ),
                   child: Row(
                     children: [
                       Text(
                         _selectedServer?.flag ?? '🌐',
-                        style: const TextStyle(fontSize: 22),
+                        style: const TextStyle(fontSize: 26),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 14),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               _selectedServer?.name ?? 'در حال دریافت سرورها...',
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
                             ),
+                            const SizedBox(height: 3),
                             Text(
-                              '${_selectedServer?.protocol.toUpperCase() ?? "VLESS"} • ${_selectedServer?.operatorName ?? "بهترین سرور"}',
+                              '${_selectedServer?.protocol.toUpperCase() ?? 'VLESS'} • ${_selectedServer?.operatorName ?? 'پیش‌فرض'}',
                               style: const TextStyle(color: Color(0xFF64748B), fontSize: 11),
                             ),
                           ],
                         ),
                       ),
-                      const Icon(Icons.arrow_forward_ios, color: Color(0xFF64748B), size: 14),
+                      const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF64748B)),
                     ],
                   ),
                 ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // Live Traffic Speeds if connected
+              ValueListenableBuilder<V2RayStatus>(
+                valueListenable: _v2rayStatus,
+                builder: (context, status, _) {
+                  if (!_isConnected) return const SizedBox.shrink();
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F172A),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFF1E293B)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.arrow_downward_rounded, size: 16, color: Color(0xFF10B981)),
+                            const SizedBox(width: 6),
+                            Text(
+                              'دانلود: ${status.downloadSpeed}',
+                              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                            ),
+                          ],
+                        ),
+                        Container(width: 1, height: 20, color: const Color(0xFF1E293B)),
+                        Row(
+                          children: [
+                            const Icon(Icons.arrow_upward_rounded, size: 16, color: Color(0xFF38BDF8)),
+                            const SizedBox(width: 6),
+                            Text(
+                              'آپلود: ${status.uploadSpeed}',
+                              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
             ],
           ),

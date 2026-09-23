@@ -260,7 +260,9 @@ class PasargadDriver implements PanelDriverInterface {
                     'traffic_limit_bytes' => $u['data_limit'] ?? 0,
                     'expire_at' => !empty($u['expire']) ? date('Y-m-d H:i:s', $u['expire']) : null,
                     'status' => $u['status'] ?? 'active',
-                    'online' => ($u['online_at'] ?? 0) > (time() - 300)
+                    'online' => ($u['online_at'] ?? 0) > (time() - 300),
+                    'links' => $u['links'] ?? [],
+                    'subscription_url' => $u['subscription_url'] ?? ''
                 ];
             }
         } else {
@@ -272,7 +274,9 @@ class PasargadDriver implements PanelDriverInterface {
                     'traffic_limit_bytes' => $u['total_traffic'] ?? 0,
                     'expire_at' => !empty($u['expire_time']) ? date('Y-m-d H:i:s', $u['expire_time']) : null,
                     'status' => $u['status'] ?? 'active',
-                    'online' => !empty($u['is_online'])
+                    'online' => !empty($u['is_online']),
+                    'links' => $u['links'] ?? [],
+                    'subscription_url' => $u['sub_link'] ?? ''
                 ];
             }
         }

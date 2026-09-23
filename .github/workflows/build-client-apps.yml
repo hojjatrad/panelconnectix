@@ -61,6 +61,7 @@ jobs:
 
           # Configure gradle.properties
           cat << 'EOF' >> android/gradle.properties
+          android.bundle.enableUncompressedNativeLibs=false
           android.useAndroidX=true
           android.enableJetifier=true
           EOF
@@ -91,9 +92,15 @@ jobs:
                   applicationId = "com.connectix.vpn"
                   minSdk = 21
                   targetSdk = 34
-                  versionCode = 3
-                  versionName = "1.0.2"
+                  versionCode = 4
+                  versionName = "1.0.3"
                   multiDexEnabled = true
+              }
+
+              packagingOptions {
+                  jniLibs {
+                      useLegacyPackaging = true
+                  }
               }
 
               signingConfigs {
@@ -128,17 +135,20 @@ jobs:
           }
           EOF
 
-          # Ensure AndroidManifest has clean launcher activity and matching package
+          # Ensure AndroidManifest has extractNativeLibs, VPN permissions and launcher activity
           cat << 'EOF' > android/app/src/main/AndroidManifest.xml
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.INTERNET"/>
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
               <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+              <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE"/>
               <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
               
               <application
                   android:label="Connectix VPN"
                   android:name="${applicationName}"
                   android:icon="@mipmap/ic_launcher"
+                  android:extractNativeLibs="true"
                   android:usesCleartextTraffic="true">
                   <activity
                       android:name=".MainActivity"

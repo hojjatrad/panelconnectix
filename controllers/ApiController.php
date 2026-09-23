@@ -329,6 +329,31 @@ class ApiController {
             $computedStatus = 'traffic_ended';
         }
 
+        // Synchronize live stats from real node (Marzban / Pasargad / 3x-ui)
+        if (!empty($client['server_id'])) {
+            try {
+                $stmtNode = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ?");
+                $stmtNode->execute([(int)$client['server_id']]);
+                $node = $stmtNode->fetch(PDO::FETCH_ASSOC);
+                if ($node && $node['driver'] !== 'mock') {
+                    $driver = DriverFactory::create($node);
+                    $liveData = $driver->getUser($client['username']);
+                    if ($liveData) {
+                        $liveUsed = (int)($liveData['traffic_used_bytes'] ?? $client['traffic_used_bytes']);
+                        $liveLimit = (int)($liveData['traffic_limit_bytes'] ?? $client['traffic_limit_bytes']);
+                        $liveExpire = !empty($liveData['expire_at']) ? $liveData['expire_at'] : $client['expire_at'];
+                        
+                        $client['traffic_used_bytes'] = $liveUsed;
+                        $client['traffic_limit_bytes'] = $liveLimit;
+                        $client['expire_at'] = $liveExpire;
+
+                        $pdo->prepare("UPDATE clients SET traffic_used_bytes = ?, traffic_limit_bytes = ?, expire_at = ? WHERE id = ?")
+                            ->execute([$liveUsed, $liveLimit, $liveExpire, $client['id']]);
+                    }
+                }
+            } catch (Throwable $e) {}
+        }
+
         // Generate App Token
         $appToken = 'app_' . hash_hmac('sha256', $client['sub_token'] . '_' . $client['id'], 'connectix_app_key_2026');
 
@@ -377,6 +402,32 @@ class ApiController {
      */
     public function appProfile(): void {
         $client = self::authenticateClientApp();
+        $pdo = Database::getConnection();
+
+        // Synchronize live stats from real node
+        if (!empty($client['server_id'])) {
+            try {
+                $stmtNode = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ?");
+                $stmtNode->execute([(int)$client['server_id']]);
+                $node = $stmtNode->fetch(PDO::FETCH_ASSOC);
+                if ($node && $node['driver'] !== 'mock') {
+                    $driver = DriverFactory::create($node);
+                    $liveData = $driver->getUser($client['username']);
+                    if ($liveData) {
+                        $liveUsed = (int)($liveData['traffic_used_bytes'] ?? $client['traffic_used_bytes']);
+                        $liveLimit = (int)($liveData['traffic_limit_bytes'] ?? $client['traffic_limit_bytes']);
+                        $liveExpire = !empty($liveData['expire_at']) ? $liveData['expire_at'] : $client['expire_at'];
+                        
+                        $client['traffic_used_bytes'] = $liveUsed;
+                        $client['traffic_limit_bytes'] = $liveLimit;
+                        $client['expire_at'] = $liveExpire;
+
+                        $pdo->prepare("UPDATE clients SET traffic_used_bytes = ?, traffic_limit_bytes = ?, expire_at = ? WHERE id = ?")
+                            ->execute([$liveUsed, $liveLimit, $liveExpire, $client['id']]);
+                    }
+                }
+            } catch (Throwable $e) {}
+        }
 
         $usedBytes = (int)$client['traffic_used_bytes'];
         $limitBytes = (int)$client['traffic_limit_bytes'];
@@ -416,78 +467,141 @@ class ApiController {
      */
     public function appConfigs(): void {
         $client = self::authenticateClientApp();
+        $pdo = Database::getConnection();
         require_once __DIR__ . '/SublinkController.php';
 
-        $rawConfigs = SublinkController::buildConfigs($client);
-        $rawSublink = base64_encode(implode("\n", array_values($rawConfigs)));
+        $realLinks = [];
+        if (!empty($client['server_id'])) {
+            try {
+                $stmtNode = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ?");
+                $stmtNode->execute([(int)$client['server_id']]);
+                $node = $stmtNode->fetch(PDO::FETCH_ASSOC);
+                if ($node && $node['driver'] !== 'mock') {
+                    $driver = DriverFactory::create($node);
+                    $liveData = $driver->getUser($client['username']);
+                    if (!empty($liveData['links']) && is_array($liveData['links'])) {
+                        $realLinks = $liveData['links'];
+                    } elseif (!empty($liveData['subscription_url'])) {
+                        // Fetch sublink contents
+                        $ch = curl_init($liveData['subscription_url']);
+                        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                        curl_setopt($ch, CURLOPT_TIMEOUT, 6);
+                        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                        $subContent = curl_exec($ch);
+                        curl_close($ch);
+                        if (!empty($subContent)) {
+                            $decoded = base64_decode(trim($subContent), true) ?: $subContent;
+                            $lines = array_filter(array_map('trim', explode("\n", $decoded)));
+                            foreach ($lines as $line) {
+                                if (str_starts_with($line, 'vless://') || str_starts_with($line, 'vmess://') || str_starts_with($line, 'trojan://')) {
+                                    $realLinks[] = $line;
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (Throwable $e) {}
+        }
 
-        $serverList = [
-            [
-                'id' => 'mci_reality_de',
-                'name' => '🇩🇪 آلمان - همراه اول (Reality VIP)',
-                'country_name' => 'آلمان',
-                'country_code' => 'DE',
-                'flag' => '🇩🇪',
-                'protocol' => 'vless',
-                'operator_tag' => 'mci',
-                'operator_name' => 'همراه اول',
-                'ping_url' => 'https://www.google.com/generate_204',
-                'config_uri' => $rawConfigs['mci_reality'] ?? '',
-                'is_recommended' => true
-            ],
-            [
-                'id' => 'irancell_cdn_de',
-                'name' => '🇩🇪 آلمان - ایرانسل (Cloudflare CDN)',
-                'country_name' => 'آلمان',
-                'country_code' => 'DE',
-                'flag' => '🇩🇪',
-                'protocol' => 'vless',
-                'operator_tag' => 'irancell',
-                'operator_name' => 'ایرانسل',
-                'ping_url' => 'https://www.google.com/generate_204',
-                'config_uri' => $rawConfigs['irancell_cdn'] ?? '',
-                'is_recommended' => true
-            ],
-            [
-                'id' => 'rightel_trojan_de',
-                'name' => '🇳🇱 هلند - رایتل و شاتل (Trojan TLS)',
-                'country_name' => 'هلند',
-                'country_code' => 'NL',
-                'flag' => '🇳🇱',
-                'protocol' => 'trojan',
-                'operator_tag' => 'rightel',
-                'operator_name' => 'رایتل و شاتل',
-                'ping_url' => 'https://www.google.com/generate_204',
-                'config_uri' => $rawConfigs['rightel_trojan'] ?? '',
-                'is_recommended' => false
-            ],
-            [
-                'id' => 'wifi_vmess_de',
-                'name' => '🇫🇮 فنلاند - اینترنت خانگی و مخابرات (Wi-Fi)',
-                'country_name' => 'فنلاند',
-                'country_code' => 'FI',
-                'flag' => '🇫🇮',
-                'protocol' => 'vmess',
-                'operator_tag' => 'wifi',
-                'operator_name' => 'مخابرات و وای‌فای',
-                'ping_url' => 'https://www.google.com/generate_204',
-                'config_uri' => $rawConfigs['wifi_vmess'] ?? '',
-                'is_recommended' => false
-            ],
-            [
-                'id' => 'gaming_fast_de',
-                'name' => '🇹🇷 ترکیه - پینگ پایین گیمینگ و استریم',
-                'country_name' => 'ترکیه',
-                'country_code' => 'TR',
-                'flag' => '🇹🇷',
-                'protocol' => 'vless',
-                'operator_tag' => 'all',
-                'operator_name' => 'گیمینگ پینگ پایین',
-                'ping_url' => 'https://www.google.com/generate_204',
-                'config_uri' => $rawConfigs['gaming_fast'] ?? '',
-                'is_recommended' => false
-            ]
-        ];
+        $serverList = [];
+        if (!empty($realLinks)) {
+            $idx = 1;
+            foreach ($realLinks as $link) {
+                $parsed = parse_url($link);
+                $proto = $parsed['scheme'] ?? 'vless';
+                $fragment = !empty($parsed['fragment']) ? urldecode($parsed['fragment']) : "سرور پرسرعت #$idx";
+                
+                $serverList[] = [
+                    'id' => 'node_' . $idx,
+                    'name' => $fragment,
+                    'country_name' => 'اروپا',
+                    'country_code' => 'DE',
+                    'flag' => '🌐',
+                    'protocol' => $proto,
+                    'operator_tag' => 'all',
+                    'operator_name' => 'تمام اپراتورها',
+                    'ping_url' => 'https://www.google.com/generate_204',
+                    'config_uri' => $link,
+                    'is_recommended' => ($idx === 1)
+                ];
+                $idx++;
+            }
+        }
+
+        if (empty($serverList)) {
+            $rawConfigs = SublinkController::buildConfigs($client);
+            $rawSublink = base64_encode(implode("\n", array_values($rawConfigs)));
+
+            $serverList = [
+                [
+                    'id' => 'mci_reality_de',
+                    'name' => '🇩🇪 آلمان - همراه اول (Reality VIP)',
+                    'country_name' => 'آلمان',
+                    'country_code' => 'DE',
+                    'flag' => '🇩🇪',
+                    'protocol' => 'vless',
+                    'operator_tag' => 'mci',
+                    'operator_name' => 'همراه اول',
+                    'ping_url' => 'https://www.google.com/generate_204',
+                    'config_uri' => $rawConfigs['mci_reality'] ?? '',
+                    'is_recommended' => true
+                ],
+                [
+                    'id' => 'irancell_cdn_de',
+                    'name' => '🇩🇪 آلمان - ایرانسل (Reality VIP)',
+                    'country_name' => 'آلمان',
+                    'country_code' => 'DE',
+                    'flag' => '🇩🇪',
+                    'protocol' => 'vless',
+                    'operator_tag' => 'irancell',
+                    'operator_name' => 'ایرانسل',
+                    'ping_url' => 'https://www.google.com/generate_204',
+                    'config_uri' => $rawConfigs['irancell_cdn'] ?? '',
+                    'is_recommended' => true
+                ],
+                [
+                    'id' => 'rightel_trojan_de',
+                    'name' => '🇳🇱 هلند - رایتل و شاتل (Reality VIP)',
+                    'country_name' => 'هلند',
+                    'country_code' => 'NL',
+                    'flag' => '🇳🇱',
+                    'protocol' => 'vless',
+                    'operator_tag' => 'rightel',
+                    'operator_name' => 'رایتل و شاتل',
+                    'ping_url' => 'https://www.google.com/generate_204',
+                    'config_uri' => $rawConfigs['rightel_trojan'] ?? '',
+                    'is_recommended' => false
+                ],
+                [
+                    'id' => 'wifi_vmess_de',
+                    'name' => '🇫🇮 فنلاند - اینترنت خانگی و مخابرات (Reality)',
+                    'country_name' => 'فنلاند',
+                    'country_code' => 'FI',
+                    'flag' => '🇫🇮',
+                    'protocol' => 'vless',
+                    'operator_tag' => 'wifi',
+                    'operator_name' => 'مخابرات و وای‌فای',
+                    'ping_url' => 'https://www.google.com/generate_204',
+                    'config_uri' => $rawConfigs['wifi_vmess'] ?? '',
+                    'is_recommended' => false
+                ],
+                [
+                    'id' => 'gaming_fast_de',
+                    'name' => '🇹🇷 ترکیه - پینگ پایین گیمینگ و استریم (Reality)',
+                    'country_name' => 'ترکیه',
+                    'country_code' => 'TR',
+                    'flag' => '🇹🇷',
+                    'protocol' => 'vless',
+                    'operator_tag' => 'all',
+                    'operator_name' => 'گیمینگ پینگ پایین',
+                    'ping_url' => 'https://www.google.com/generate_204',
+                    'config_uri' => $rawConfigs['gaming_fast'] ?? '',
+                    'is_recommended' => false
+                ]
+            ];
+        } else {
+            $rawSublink = base64_encode(implode("\n", array_column($serverList, 'config_uri')));
+        }
 
         self::jsonSuccess([
             'servers' => $serverList,
