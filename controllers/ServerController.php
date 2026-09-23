@@ -230,9 +230,16 @@ class ServerController {
             $driver = DriverFactory::create($server);
             $auth = $driver->authenticate();
             $stats = $driver->getNodeStats();
+            $lastErr = method_exists($driver, 'getLastError') ? $driver->getLastError() : null;
+
+            $message = $auth 
+                ? 'اتصال با موفقیت برقرار شد!' 
+                : ($lastErr ?: 'عدم توانایی در احراز هویت با سرور');
+
             Helpers::jsonResponse([
                 'success' => $auth,
-                'message' => $auth ? 'اتصال با موفقیت برقرار شد!' : 'عدم توانایی در احراز هویت با سرور',
+                'message' => $message,
+                'error' => $auth ? null : $lastErr,
                 'stats' => $stats
             ]);
         } catch (Exception $e) {

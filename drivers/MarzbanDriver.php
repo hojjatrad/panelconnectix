@@ -6,13 +6,23 @@ class MarzbanDriver implements PanelDriverInterface {
     private ?string $username;
     private ?string $password;
     private ?string $token;
-    private int $timeout = 10;
+    private string $apiPrefix = '/api';
+    private ?string $lastError = null;
+    private int $timeout = 12;
 
     public function __construct(string $baseUrl, ?string $username, ?string $password, ?string $token = null) {
-        $this->baseUrl = rtrim($baseUrl, '/');
-        $this->username = $username;
-        $this->password = $password;
-        $this->token = $token;
+        // Clean URL: remove trailing slashes, /dashboard, /admin, /api
+        $clean = rtrim(trim($baseUrl), '/');
+        $clean = preg_replace('#/(dashboard|admin|api|v1)+/?$#i', '', $clean);
+        $this->baseUrl = rtrim($clean, '/');
+
+        $this->username = $username ? trim($username) : null;
+        $this->password = $password ? trim($password) : null;
+        $this->token = $token ? trim($token) : null;
+    }
+
+    public function getLastError(): ?string {
+        return $this->lastError;
     }
 
     private function request(string $endpoint, string $method = 'GET', ?array $data = null, bool $isForm = false): array {
@@ -20,7 +30,8 @@ class MarzbanDriver implements PanelDriverInterface {
         $url = $this->baseUrl . $endpoint;
 
         $headers = [
-            'Accept: application/json'
+            'Accept: application/json',
+            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         ];
 
         if (!empty($this->token)) {
@@ -46,8 +57,10 @@ class MarzbanDriver implements PanelDriverInterface {
 
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 8);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
 
@@ -57,12 +70,35 @@ class MarzbanDriver implements PanelDriverInterface {
         curl_close($ch);
 
         if ($err) {
-            return ['success' => false, 'code' => $httpCode, 'error' => "cURL Error: $err", 'data' => null];
+            $this->lastError = "خطای اتصال به سرور (cURL): {$err}";
+            return ['success' => false, 'code' => $httpCode, 'error' => $err, 'data' => null];
         }
 
-        $decoded = json_decode($response, true);
+        $decoded = json_decode((string)$response, true);
+        $isSuccess = ($httpCode >= 200 && $httpCode < 300);
+
+        if (!$isSuccess) {
+            $detail = $decoded['detail'] ?? null;
+            if ($detail) {
+                if (is_array($detail)) {
+                    $detail = json_encode($detail, JSON_UNESCAPED_UNICODE);
+                }
+                if (stripos($detail, 'Incorrect username or password') !== false) {
+                    $this->lastError = "نام کاربری یا رمز عبور ادمین مرزبان اشتباه است.";
+                } else {
+                    $this->lastError = "پاسخ سرور: {$detail} (کد {$httpCode})";
+                }
+            } elseif ($httpCode === 403) {
+                $this->lastError = "دسترسی توسط فایروال یا کلودفلر سرور مسدود شد (خطای ۴۰۳ Cloudflare/WAF).";
+            } elseif ($httpCode === 404) {
+                $this->lastError = "مسیر وب‌سرویس مرزبان در این پورت/آدرس یافت نشد (کد ۴۰۴).";
+            } else {
+                $this->lastError = "خطای سرور مرزبان با کد HTTP {$httpCode}";
+            }
+        }
+
         return [
-            'success' => ($httpCode >= 200 && $httpCode < 300),
+            'success' => $isSuccess,
             'code' => $httpCode,
             'data' => $decoded,
             'raw' => $response
@@ -70,24 +106,53 @@ class MarzbanDriver implements PanelDriverInterface {
     }
 
     public function authenticate(): bool {
+        // 1. Try testing existing token if present
         if (!empty($this->token)) {
-            // Test existing token with /api/v1/system
-            $res = $this->request('/api/v1/system');
-            if ($res['success']) return true;
+            foreach (['/api/system', '/api/v1/system'] as $testEndpoint) {
+                $res = $this->request($testEndpoint);
+                if ($res['success']) {
+                    $this->apiPrefix = str_starts_with($testEndpoint, '/api/v1') ? '/api/v1' : '/api';
+                    return true;
+                }
+            }
         }
 
         if (empty($this->username) || empty($this->password)) {
+            $this->lastError = "نام کاربری یا رمز عبور ادمین وارد نشده است.";
             return false;
         }
 
-        $res = $this->request('/api/v1/admin/token', 'POST', [
-            'username' => $this->username,
-            'password' => $this->password
-        ], true);
+        // 2. Try auth with multiple standard Marzban routes:
+        // Priority A: /api/admin/token (Standard Marzban)
+        // Priority B: /api/v1/admin/token (Alternative/Subversion)
+        $authEndpoints = [
+            '/api/admin/token' => '/api',
+            '/api/v1/admin/token' => '/api/v1'
+        ];
 
-        if ($res['success'] && !empty($res['data']['access_token'])) {
-            $this->token = $res['data']['access_token'];
-            return true;
+        foreach ($authEndpoints as $endpoint => $prefix) {
+            $res = $this->request($endpoint, 'POST', [
+                'username' => $this->username,
+                'password' => $this->password
+            ], true);
+
+            if ($res['success'] && !empty($res['data']['access_token'])) {
+                $this->token = $res['data']['access_token'];
+                $this->apiPrefix = $prefix;
+                $this->lastError = null;
+                return true;
+            }
+
+            // If it returned 400 (Bad credentials), credentials are wrong; stop here
+            if ($res['code'] === 400 || $res['code'] === 401) {
+                $detail = $res['data']['detail'] ?? '';
+                if (stripos($detail, 'Incorrect') !== false || stripos($detail, 'password') !== false) {
+                    $this->lastError = "نام کاربری یا رمز عبور ادمین مرزبان اشتباه است. (Incorrect username or password)";
+                } else {
+                    $this->lastError = "خطای احراز هویت: {$detail}";
+                }
+                return false;
+            }
         }
 
         return false;
@@ -95,7 +160,12 @@ class MarzbanDriver implements PanelDriverInterface {
 
     public function createUser(array $payload): array {
         if (!$this->authenticate()) {
-            return ['success' => false, 'error' => 'عدم موفقیت در احراز هویت با سرور مرزبان', 'uuid' => '', 'sublink' => ''];
+            return [
+                'success' => false,
+                'error' => $this->lastError ?: 'عدم موفقیت در احراز هویت با سرور مرزبان',
+                'uuid' => '',
+                'sublink' => ''
+            ];
         }
 
         $body = [
@@ -112,7 +182,7 @@ class MarzbanDriver implements PanelDriverInterface {
             'note' => 'Provisioned via Connectix Panel'
         ];
 
-        $res = $this->request('/api/v1/user', 'POST', $body);
+        $res = $this->request($this->apiPrefix . '/user', 'POST', $body);
         if ($res['success']) {
             $subUrl = $res['data']['subscription_url'] ?? '';
             if (empty($subUrl) && !empty($res['data']['links'])) {
@@ -126,13 +196,18 @@ class MarzbanDriver implements PanelDriverInterface {
             ];
         }
 
-        $errMsg = $res['data']['detail'] ?? $res['error'] ?? 'خطا در ایجاد کاربر مرزبان';
-        return ['success' => false, 'error' => is_array($errMsg) ? json_encode($errMsg) : $errMsg, 'uuid' => '', 'sublink' => ''];
+        $errMsg = $res['data']['detail'] ?? $this->lastError ?? 'خطا در ایجاد کاربر مرزبان';
+        return [
+            'success' => false,
+            'error' => is_array($errMsg) ? json_encode($errMsg, JSON_UNESCAPED_UNICODE) : $errMsg,
+            'uuid' => '',
+            'sublink' => ''
+        ];
     }
 
     public function getUser(string $username): ?array {
         if (!$this->authenticate()) return null;
-        $res = $this->request('/api/v1/user/' . urlencode($username));
+        $res = $this->request($this->apiPrefix . '/user/' . urlencode($username));
         if ($res['success'] && !empty($res['data'])) {
             $u = $res['data'];
             return [
@@ -155,7 +230,7 @@ class MarzbanDriver implements PanelDriverInterface {
         $currentExpire = !empty($current['expire_at']) ? strtotime($current['expire_at']) : time();
         $newExpire = max($currentExpire, time()) + $addSeconds;
 
-        $res = $this->request('/api/v1/user/' . urlencode($username), 'PUT', [
+        $res = $this->request($this->apiPrefix . '/user/' . urlencode($username), 'PUT', [
             'data_limit' => $newLimit,
             'expire' => $newExpire,
             'status' => 'active'
@@ -166,13 +241,13 @@ class MarzbanDriver implements PanelDriverInterface {
 
     public function deleteUser(string $username): bool {
         if (!$this->authenticate()) return false;
-        $res = $this->request('/api/v1/user/' . urlencode($username), 'DELETE');
+        $res = $this->request($this->apiPrefix . '/user/' . urlencode($username), 'DELETE');
         return $res['success'];
     }
 
     public function toggleUserStatus(string $username, bool $active): bool {
         if (!$this->authenticate()) return false;
-        $res = $this->request('/api/v1/user/' . urlencode($username), 'PUT', [
+        $res = $this->request($this->apiPrefix . '/user/' . urlencode($username), 'PUT', [
             'status' => $active ? 'active' : 'disabled'
         ]);
         return $res['success'];
@@ -182,7 +257,7 @@ class MarzbanDriver implements PanelDriverInterface {
         if (!$this->authenticate()) {
             return ['status' => 'offline', 'users' => 0, 'cpu' => '0%', 'ram' => '0%'];
         }
-        $res = $this->request('/api/v1/system');
+        $res = $this->request($this->apiPrefix . '/system');
         if ($res['success'] && !empty($res['data'])) {
             return [
                 'status' => 'online',

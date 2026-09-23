@@ -6,6 +6,11 @@ interface PanelDriverInterface {
     public function authenticate(): bool;
 
     /**
+     * Get the last error message encountered during driver operations
+     */
+    public function getLastError(): ?string;
+
+    /**
      * Create or provision a new VPN client on the remote node
      *
      * @param array $payload ['username', 'uuid', 'traffic_limit_bytes', 'expire_timestamp', 'proxies']

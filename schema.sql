@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS `server_nodes` (
     `category_id` INT NULL DEFAULT NULL,
     `sub_domain` VARCHAR(128) NULL,
     `inbound_tag` VARCHAR(64) NULL,
-    `max_clients` INT DEFAULT 500,
+    `max_clients` INT DEFAULT 0, -- 0 = Unlimited
     `is_active` TINYINT(1) DEFAULT 1,
     `health_status` VARCHAR(32) DEFAULT 'online',
     `latency_ms` INT DEFAULT 0,
@@ -448,5 +448,5 @@ INSERT INTO `system_settings` (`setting_key`, `setting_value`) VALUES
 ('github_branch', 'main'),
 ('github_webhook_secret', 'gh_hook_sec_vpbotn_2026'),
 ('brand_name', 'Connectix VPN'),
-('current_version', '2.7.6')
+('current_version', '2.7.7')
 ON DUPLICATE KEY UPDATE `setting_value`=VALUES(`setting_value`);

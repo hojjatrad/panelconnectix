@@ -146,15 +146,27 @@ class ClientController {
 
         // Server Selection: Direct or Auto Load Balancing
         $autoSelect = (($_POST['server_id'] ?? '') === 'auto' || empty($_POST['server_id']));
+        $capacityCondition = "(s.max_clients IS NULL OR s.max_clients <= 0 OR (SELECT COUNT(*) FROM clients WHERE server_id = s.id) < s.max_clients)";
+
         if ($autoSelect) {
             $group = $plan['server_group'] ?? 'default';
             $stmtAuto = $pdo->prepare("SELECT s.*, (SELECT COUNT(*) FROM clients WHERE server_id = s.id) as client_count 
                                        FROM server_nodes s 
-                                       WHERE s.is_active = 1 AND (s.server_group = ? OR ? = 'default') 
+                                       WHERE s.is_active = 1 
+                                         AND (s.server_group = ? OR ? = 'default') 
+                                         AND {$capacityCondition}
                                        ORDER BY client_count ASC, COALESCE(s.latency_ms, 999) ASC LIMIT 1");
             $stmtAuto->execute([$group, $group]);
             $server = $stmtAuto->fetch();
             if (!$server) {
+                // Fallback to any active server with capacity
+                $server = $pdo->query("SELECT s.*, (SELECT COUNT(*) FROM clients WHERE server_id = s.id) as client_count 
+                                       FROM server_nodes s 
+                                       WHERE s.is_active = 1 AND {$capacityCondition}
+                                       ORDER BY client_count ASC LIMIT 1")->fetch();
+            }
+            if (!$server) {
+                // Last resort fallback
                 $server = $pdo->query("SELECT * FROM server_nodes WHERE is_active = 1 ORDER BY id ASC LIMIT 1")->fetch();
             }
             if ($server) {
@@ -167,6 +179,14 @@ class ClientController {
             $stmtServer = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ? AND is_active = 1");
             $stmtServer->execute([$serverId]);
             $server = $stmtServer->fetch();
+
+            if ($server && !empty($server['max_clients']) && (int)$server['max_clients'] > 0) {
+                $currentClients = (int)$pdo->query("SELECT COUNT(*) FROM clients WHERE server_id = " . (int)$server['id'])->fetchColumn();
+                if ($currentClients >= (int)$server['max_clients']) {
+                    Helpers::flash('error', "ظرفیت سرور انتخاب شده ({$server['name']}) تکمیل شده است ({$currentClients}/{$server['max_clients']} کلاینت). لطفاً سرور دیگری انتخاب نمایید یا در بخش سرورها سقف ظرفیت آن را روی 0 (نامحدود) تنظیم فرمایید.");
+                    Helpers::redirect('clients/create');
+                }
+            }
         }
 
         if (!$server) {

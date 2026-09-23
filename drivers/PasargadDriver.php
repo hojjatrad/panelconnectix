@@ -4,7 +4,12 @@ require_once __DIR__ . '/PanelDriverInterface.php';
 class PasargadDriver implements PanelDriverInterface {
     private string $baseUrl;
     private ?string $apiToken;
+    private ?string $lastError = null;
     private int $timeout = 10;
+
+    public function getLastError(): ?string {
+        return $this->lastError;
+    }
 
     public function __construct(string $baseUrl, ?string $username = null, ?string $password = null, ?string $apiToken = null) {
         $this->baseUrl = rtrim($baseUrl, '/');

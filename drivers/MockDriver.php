@@ -5,6 +5,12 @@ class MockDriver implements PanelDriverInterface {
     private string $baseUrl;
     private string $domain;
 
+    private ?string $lastError = null;
+
+    public function getLastError(): ?string {
+        return $this->lastError;
+    }
+
     public function __construct(string $baseUrl, ?string $username = null, ?string $password = null, ?string $token = null) {
         $this->baseUrl = $baseUrl;
         $this->domain = parse_url($baseUrl, PHP_URL_HOST) ?: 'node.connectix.space';

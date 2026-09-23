@@ -132,7 +132,7 @@ require __DIR__ . '/../layout/header.php';
             </div>
 
             <div class="flex items-center justify-between text-xs pt-2 border-t border-slate-800">
-                <span class="text-slate-400 font-mono text-[11px]">حداکثر ظرفیت: <?= $s['max_clients'] ?> کلاینت</span>
+                <span class="text-slate-400 font-mono text-[11px]">حداکثر ظرفیت: <?= (empty($s['max_clients']) || (int)$s['max_clients'] <= 0) ? '<span class="text-emerald-400 font-sans font-bold">نامحدود (∞)</span>' : (number_format((int)$s['max_clients']) . ' کلاینت') ?></span>
                 
                 <div class="flex items-center gap-1.5">
                     <button onclick="pingSingleServer(<?= $s['id'] ?>)" title="تست پینگ و زمان پاسخگویی" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded-lg text-xs font-medium border border-slate-700 transition-colors flex items-center gap-1">
@@ -236,7 +236,8 @@ require __DIR__ . '/../layout/header.php';
                 </div>
                 <div>
                     <label class="block text-slate-300 mb-1 font-semibold">حداکثر ظرفیت کاربر</label>
-                    <input type="number" name="max_clients" value="500" min="1" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
+                    <input type="number" name="max_clients" value="0" min="0" placeholder="0 = نامحدود" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
+                    <span class="text-[10px] text-slate-400 mt-0.5 block">عدد 0 یعنی ظرفیت نامحدود (∞)</span>
                 </div>
             </div>
 
@@ -315,7 +316,8 @@ require __DIR__ . '/../layout/header.php';
                 </div>
                 <div>
                     <label class="block text-slate-300 mb-1 font-semibold">حداکثر ظرفیت کاربر</label>
-                    <input type="number" name="max_clients" id="edit_server_max_clients" min="1" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
+                    <input type="number" name="max_clients" id="edit_server_max_clients" min="0" placeholder="0 = نامحدود" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
+                    <span class="text-[10px] text-slate-400 mt-0.5 block">عدد 0 یعنی ظرفیت نامحدود (∞)</span>
                 </div>
             </div>
 
@@ -348,7 +350,7 @@ require __DIR__ . '/../layout/header.php';
         document.getElementById('edit_server_api_url').value = s.api_url;
         document.getElementById('edit_server_api_username').value = s.api_username || '';
         document.getElementById('edit_server_sub_domain').value = s.sub_domain || '';
-        document.getElementById('edit_server_max_clients').value = s.max_clients || 500;
+        document.getElementById('edit_server_max_clients').value = (s.max_clients !== null && s.max_clients !== undefined) ? s.max_clients : 0;
 
         document.getElementById('editServerModal').classList.remove('hidden');
         document.getElementById('editServerModal').classList.add('flex');
@@ -407,12 +409,26 @@ require __DIR__ . '/../layout/header.php';
         fetch('<?= Helpers::url('servers/test') ?>?id=' + id)
             .then(res => res.json())
             .then(data => {
-                alert(data.message + '\nکاربران فعال: ' + (data.stats ? data.stats.users : '۰'));
+                if (data.success) {
+                    let msg = '✅ ' + data.message;
+                    if (data.stats && data.stats.users !== undefined) {
+                        msg += '\n• تعداد کاربران نود: ' + data.stats.users;
+                    }
+                    if (data.stats && data.stats.cpu) {
+                        msg += '\n• پردازنده (CPU): ' + data.stats.cpu;
+                    }
+                    if (data.stats && data.stats.ram) {
+                        msg += '\n• مصرف رم: ' + data.stats.ram;
+                    }
+                    alert(msg);
+                } else {
+                    alert('❌ خطا در برقراری ارتباط با سرور:\n' + (data.error || data.message));
+                }
                 btn.innerHTML = original;
                 btn.disabled = false;
             })
             .catch(err => {
-                alert('خطا در تست: ' + err);
+                alert('خطای سیستمی در ارتباط با کنترلر: ' + err);
                 btn.innerHTML = original;
                 btn.disabled = false;
             });
@@ -464,7 +480,7 @@ require __DIR__ . '/../layout/header.php';
                 <select name="to_server_id" required class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white">
                     <option value="">-- انتخاب سرور مقصد --</option>
                     <?php foreach ($servers as $s): ?>
-                        <option value="<?= $s['id'] ?>"><?= htmlspecialchars($s['name']) ?> (ظرفیت: <?= $s['max_clients'] ?>)</option>
+                        <option value="<?= $s['id'] ?>"><?= htmlspecialchars($s['name']) ?> (ظرفیت: <?= (empty($s['max_clients']) || (int)$s['max_clients'] <= 0) ? 'نامحدود ∞' : number_format($s['max_clients']) ?>)</option>
                     <?php endforeach; ?>
                 </select>
             </div>

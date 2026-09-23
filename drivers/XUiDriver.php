@@ -6,7 +6,12 @@ class XUiDriver implements PanelDriverInterface {
     private ?string $username;
     private ?string $password;
     private string $cookieFile;
+    private ?string $lastError = null;
     private int $timeout = 10;
+
+    public function getLastError(): ?string {
+        return $this->lastError;
+    }
 
     public function __construct(string $baseUrl, ?string $username, ?string $password) {
         $this->baseUrl = rtrim($baseUrl, '/');

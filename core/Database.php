@@ -472,7 +472,7 @@ CREATE TABLE IF NOT EXISTS server_nodes (
     server_group TEXT NOT NULL DEFAULT 'default', -- 'default', 'economic', 'iran_access', 'vip'
     sub_domain TEXT,
     inbound_tag TEXT,
-    max_clients INTEGER DEFAULT 500,
+    max_clients INTEGER DEFAULT 0, -- 0 = Unlimited
     is_active INTEGER DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );

@@ -196,26 +196,41 @@ class Provisioner {
     public static function findBestServer(string $clusterGroup = 'default', ?PDO $pdo = null): ?array {
         if (!$pdo) $pdo = Database::getConnection();
 
-        // 1. Try healthy active servers for this group with lowest latency
-        $stmt = $pdo->prepare("SELECT * FROM server_nodes 
-                               WHERE is_active = 1 
-                                 AND (health_status = 'online' OR health_status IS NULL)
-                                 AND (server_group = ? OR server_group = 'default')
-                               ORDER BY latency_ms ASC, id ASC LIMIT 1");
-        $stmt->execute([$clusterGroup]);
+        // Condition for capacity: unlimited (max_clients <= 0 or null) OR current clients < max_clients
+        $capacityCondition = "(s.max_clients IS NULL OR s.max_clients <= 0 OR (SELECT COUNT(*) FROM clients WHERE server_id = s.id) < s.max_clients)";
+
+        // 1. Try healthy active servers for this group with lowest latency & available capacity
+        $stmt = $pdo->prepare("SELECT s.*, (SELECT COUNT(*) FROM clients WHERE server_id = s.id) as client_count 
+                               FROM server_nodes s 
+                               WHERE s.is_active = 1 
+                                 AND (s.health_status = 'online' OR s.health_status IS NULL)
+                                 AND (s.server_group = ? OR ? = 'default')
+                                 AND {$capacityCondition}
+                               ORDER BY client_count ASC, COALESCE(s.latency_ms, 999) ASC LIMIT 1");
+        $stmt->execute([$clusterGroup, $clusterGroup]);
         $server = $stmt->fetch();
 
-        // 2. Fallback to any online server
+        // 2. Fallback to any online server with capacity
         if (!$server) {
-            $server = $pdo->query("SELECT * FROM server_nodes 
-                                  WHERE is_active = 1 
-                                    AND (health_status != 'offline' OR health_status IS NULL)
-                                  ORDER BY latency_ms ASC, id ASC LIMIT 1")->fetch();
+            $server = $pdo->query("SELECT s.*, (SELECT COUNT(*) FROM clients WHERE server_id = s.id) as client_count 
+                                  FROM server_nodes s 
+                                  WHERE s.is_active = 1 
+                                    AND (s.health_status != 'offline' OR s.health_status IS NULL)
+                                    AND {$capacityCondition}
+                                  ORDER BY client_count ASC, COALESCE(s.latency_ms, 999) ASC LIMIT 1")->fetch();
         }
 
-        // 3. Last resort fallback: any active server
+        // 3. Last resort fallback: any active server with capacity
         if (!$server) {
-            $server = $pdo->query("SELECT * FROM server_nodes WHERE is_active = 1 LIMIT 1")->fetch();
+            $server = $pdo->query("SELECT s.* FROM server_nodes s 
+                                  WHERE s.is_active = 1 
+                                    AND {$capacityCondition} 
+                                  ORDER BY s.id ASC LIMIT 1")->fetch();
+        }
+
+        // 4. Absolute fallback if all servers are technically full
+        if (!$server) {
+            $server = $pdo->query("SELECT * FROM server_nodes WHERE is_active = 1 ORDER BY id ASC LIMIT 1")->fetch();
         }
 
         return $server ?: null;
