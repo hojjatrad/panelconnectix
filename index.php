@@ -220,6 +220,7 @@ $router->post('servers/store', [ServerController::class, 'store']);
 $router->post('servers/update', [ServerController::class, 'update']);
 $router->post('servers/migrate', [ServerController::class, 'migrateClients']);
 $router->post('servers/delete', [ServerController::class, 'delete']);
+$router->post('servers/clear-all', [ServerController::class, 'clearAll']);
 $router->get('servers/test', [ServerController::class, 'testConnection']);
 $router->get('servers/ping', [ServerController::class, 'ping']);
 $router->get('servers/sync', [ServerController::class, 'syncNow']);

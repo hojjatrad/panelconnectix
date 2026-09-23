@@ -39,6 +39,16 @@ require __DIR__ . '/../layout/header.php';
             <i class="fa-solid fa-plus"></i>
             <span>افزودن سرور جدید</span>
         </button>
+
+        <?php if (!empty($servers)): ?>
+        <form method="POST" action="<?= Helpers::url('servers/clear-all') ?>" class="m-0" onsubmit="return confirm('⚠️ اخطار بسیار مهم:\nآیا از خام‌سازی و پاکسازی تمامی سرورها اطمینان دارید؟\nکلیه سرورهای قبلی حذف خواهند شد تا بتوانید سرورهای اختصاصی خود را تعریف کنید.');">
+            <?= Helpers::csrfField() ?>
+            <button type="submit" class="px-3 py-2 bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 border border-rose-500/30 text-xs font-bold rounded-xl transition-all shadow-sm flex items-center gap-1.5" title="پاکسازی تمامی سرورها جهت معرفی سرور جدید">
+                <i class="fa-solid fa-trash-can text-[11px]"></i>
+                <span>خام‌سازی سرورها</span>
+            </button>
+        </form>
+        <?php endif; ?>
     </div>
 </div>
 

@@ -50,19 +50,38 @@ class Referral {
      */
     public static function getStats(int $userId): array {
         $pdo = Database::getConnection();
-        $code = $pdo->query("SELECT referral_code FROM users WHERE id = {$userId}")->fetchColumn();
-        if (empty($code)) {
-            $code = 'REF' . strtoupper(substr(md5('user' . $userId), 0, 6));
-            $pdo->exec("UPDATE users SET referral_code = '{$code}' WHERE id = {$userId}");
+        Database::ensureExtendedTablesExist($pdo);
+
+        try {
+            $code = $pdo->query("SELECT referral_code FROM users WHERE id = {$userId}")->fetchColumn();
+        } catch (Throwable $e) {
+            Database::safeAddColumn($pdo, 'users', 'referral_code', 'VARCHAR(32) NULL');
+            Database::safeAddColumn($pdo, 'users', 'referred_by', 'INT NULL DEFAULT NULL');
+            $code = null;
         }
 
-        $totalInvited = (int)$pdo->query("SELECT COUNT(*) FROM users WHERE referred_by = {$userId}")->fetchColumn();
-        $totalCommission = (int)$pdo->query("SELECT COALESCE(SUM(commission_amount), 0) FROM referrals WHERE referrer_id = {$userId}")->fetchColumn();
-        $recentReferrals = $pdo->query("SELECT r.*, u.username as referred_username 
-                                        FROM referrals r 
-                                        LEFT JOIN users u ON r.referred_id = u.id 
-                                        WHERE r.referrer_id = {$userId} 
-                                        ORDER BY r.id DESC LIMIT 10")->fetchAll(PDO::FETCH_ASSOC);
+        if (empty($code)) {
+            $code = 'REF' . strtoupper(substr(md5('user' . $userId), 0, 6));
+            try {
+                $pdo->exec("UPDATE users SET referral_code = '{$code}' WHERE id = {$userId}");
+            } catch (Throwable $e) {}
+        }
+
+        $totalInvited = 0;
+        try {
+            $totalInvited = (int)$pdo->query("SELECT COUNT(*) FROM users WHERE referred_by = {$userId}")->fetchColumn();
+        } catch (Throwable $e) {}
+
+        $totalCommission = 0;
+        $recentReferrals = [];
+        try {
+            $totalCommission = (int)$pdo->query("SELECT COALESCE(SUM(commission_amount), 0) FROM referrals WHERE referrer_id = {$userId}")->fetchColumn();
+            $recentReferrals = $pdo->query("SELECT r.*, u.username as referred_username 
+                                            FROM referrals r 
+                                            LEFT JOIN users u ON r.referred_id = u.id 
+                                            WHERE r.referrer_id = {$userId} 
+                                            ORDER BY r.id DESC LIMIT 10")->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Throwable $e) {}
 
         return [
             'referral_code' => $code,

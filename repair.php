@@ -1,6 +1,6 @@
 <?php
 /**
- * Connectix Panel - Emergency Self-Healing & Diagnostic Utility (v2.7.5)
+ * Connectix Panel - Emergency Self-Healing & Diagnostic Utility (v2.7.6)
  * Language: Persian (Farsi) - RTL
  * Purpose: Automatically repair .htaccess, verify database connection,
  * migrate missing tables/columns, fix permissions, and restore panel functionality.
@@ -98,6 +98,26 @@ if ($hasConfig) {
             $adminMsg = 'کاربر مدیر پیش‌فرض (admin / رمز: admin123) بازیابی و ساخته شد.';
         } else {
             $adminMsg = "حساب مدیر ارشد موجود است ({$adminUser['username']}).";
+        }
+
+        // Check clear_servers action
+        if (isset($_GET['clear_servers']) && $_GET['clear_servers'] == '1') {
+            try {
+                if ($driver === 'mysql') {
+                    $pdo->exec("SET FOREIGN_KEY_CHECKS=0");
+                    $pdo->exec("UPDATE plans SET server_id = NULL");
+                    $pdo->exec("UPDATE clients SET server_id = NULL");
+                    $pdo->exec("DELETE FROM server_nodes");
+                    $pdo->exec("SET FOREIGN_KEY_CHECKS=1");
+                } else {
+                    $pdo->exec("PRAGMA foreign_keys = OFF");
+                    $pdo->exec("UPDATE plans SET server_id = NULL");
+                    $pdo->exec("UPDATE clients SET server_id = NULL");
+                    $pdo->exec("DELETE FROM server_nodes");
+                    $pdo->exec("PRAGMA foreign_keys = ON");
+                }
+                $adminMsg .= ' [سرورها به طور کامل پاکسازی و خام شدند.]';
+            } catch (Throwable $e) {}
         }
 
         $stepResults['db'] = [
@@ -369,6 +389,13 @@ foreach ($stepResults as $r) {
                     <span>ترمیم مجدد فایل‌ها</span>
                 </a>
             </div>
+
+            <div>
+                <a href="repair.php?clear_servers=1" onclick="return confirm('⚠️ آیا از خام‌سازی و پاکسازی کامل تمامی سرورها اطمینان دارید؟');" class="w-full py-2.5 bg-rose-950/40 hover:bg-rose-900/50 text-rose-300 font-bold rounded-xl text-xs transition border border-rose-800/50 flex items-center justify-center gap-1.5">
+                    <i class="fa-solid fa-trash-can"></i>
+                    <span>خام‌سازی و پاکسازی کامل سرورها (جهت معرفی سرور اختصاصی)</span>
+                </a>
+            </div>
         </div>
 
         <!-- Emergency SQL Backup Restore Card -->
@@ -389,7 +416,7 @@ foreach ($stepResults as $r) {
         </div>
 
         <div class="text-[11px] text-center text-slate-500 pt-2 border-t border-slate-800/80">
-            نسخه پایدار و ترمیم‌شده سامانه: <span class="font-mono text-purple-400 font-bold">v2.7.5</span>
+            نسخه پایدار و ترمیم‌شده سامانه: <span class="font-mono text-purple-400 font-bold">v2.7.6</span>
         </div>
 
     </div>

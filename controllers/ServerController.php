@@ -111,6 +111,37 @@ class ServerController {
         Helpers::redirect('servers');
     }
 
+    public function clearAll(): void {
+        Auth::requireAdmin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
+            Helpers::redirect('servers');
+        }
+
+        $pdo = Database::getConnection();
+        try {
+            $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+            if ($driver === 'mysql') {
+                $pdo->exec("SET FOREIGN_KEY_CHECKS=0");
+                $pdo->exec("UPDATE plans SET server_id = NULL");
+                $pdo->exec("UPDATE clients SET server_id = NULL");
+                $pdo->exec("DELETE FROM server_nodes");
+                $pdo->exec("SET FOREIGN_KEY_CHECKS=1");
+            } else {
+                $pdo->exec("PRAGMA foreign_keys = OFF");
+                $pdo->exec("UPDATE plans SET server_id = NULL");
+                $pdo->exec("UPDATE clients SET server_id = NULL");
+                $pdo->exec("DELETE FROM server_nodes");
+                $pdo->exec("PRAGMA foreign_keys = ON");
+            }
+            Helpers::logActivity('servers_clear_all', 'خام‌سازی و پاکسازی کامل جدول سرورها توسط مدیر', 'server');
+            Helpers::flash('success', 'تمامی سرورهای قبلی با موفقیت پاکسازی و بخش سرورها کاملاً خام شد. اکنون می‌توانید سرورهای اختصاصی خود را متصل فرمایید.');
+        } catch (Throwable $e) {
+            Helpers::flash('error', 'خطا در خام‌سازی سرورها: ' . $e->getMessage());
+        }
+        Helpers::redirect('servers');
+    }
+
     public function delete(): void {
         Auth::requireAdmin();
         if (!Helpers::verifyCsrf()) {

@@ -385,16 +385,16 @@ class Database {
             } catch (Throwable $e) {}
 
             // 5. Ensure Referrals Table & Columns
-            $isMysql = (self::$dbType === 'mysql');
+            $isMysql = ($driver === 'mysql');
             $refTableSql = $isMysql
-                ? "CREATE TABLE IF NOT EXISTS referrals (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    referrer_id INT NOT NULL,
-                    referred_id INT NOT NULL,
-                    order_id INT NULL,
-                    commission_amount BIGINT DEFAULT 0,
-                    status VARCHAR(32) DEFAULT 'completed',
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                ? "CREATE TABLE IF NOT EXISTS `referrals` (
+                    `id` INT AUTO_INCREMENT PRIMARY KEY,
+                    `referrer_id` INT NOT NULL,
+                    `referred_id` INT NOT NULL,
+                    `order_id` INT NULL,
+                    `commission_amount` BIGINT DEFAULT 0,
+                    `status` VARCHAR(32) DEFAULT 'completed',
+                    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
                 : "CREATE TABLE IF NOT EXISTS referrals (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
