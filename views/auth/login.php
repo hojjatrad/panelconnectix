@@ -41,32 +41,61 @@ $flash = Helpers::getFlash();
         <form action="<?= Helpers::url('login') ?>" method="POST" class="space-y-5">
             <?= Helpers::csrfField() ?>
 
-            <div>
-                <label class="block text-xs font-semibold text-slate-300 mb-2">نام کاربری</label>
-                <div class="relative">
-                    <span class="absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400">
-                        <i class="fa-solid fa-user text-sm"></i>
-                    </span>
-                    <input type="text" name="username" required dir="ltr" placeholder="admin / novinvpn"
-                           class="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-2.5 pr-10 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all text-sm font-mono">
+            <?php if (isset($_GET['step']) && $_GET['step'] === '2fa'): ?>
+                <div class="p-3 bg-purple-950/40 border border-purple-800/40 rounded-xl text-xs text-purple-200 text-center">
+                    <i class="fa-solid fa-shield-halved text-purple-400 text-lg mb-1 block"></i>
+                    <span>ورود دوعاملی برای این حساب فعال است. لطفاً کد ۶ رقمی اپلیکیشن خود را وارد کنید:</span>
                 </div>
-            </div>
 
-            <div>
-                <label class="block text-xs font-semibold text-slate-300 mb-2">رمز عبور</label>
-                <div class="relative">
-                    <span class="absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400">
-                        <i class="fa-solid fa-lock text-sm"></i>
-                    </span>
-                    <input type="password" name="password" required dir="ltr" placeholder="••••••••"
-                           class="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-2.5 pr-10 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all text-sm font-mono">
+                <input type="hidden" name="username" value="<?= htmlspecialchars($_SESSION['2fa_pending_username'] ?? '') ?>">
+                <input type="hidden" name="password" value="<?= htmlspecialchars($_SESSION['2fa_pending_password'] ?? '') ?>">
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-2">کد تأیید ۶ رقمی (Authenticator Code)</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400">
+                            <i class="fa-solid fa-mobile-screen-button text-sm"></i>
+                        </span>
+                        <input type="text" name="two_factor_code" required autofocus maxlength="6" pattern="[0-9]{6}" placeholder="123456" dir="ltr"
+                               class="w-full bg-slate-800/80 border border-purple-500 rounded-xl px-4 py-2.5 pr-10 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 text-center tracking-widest text-lg font-mono">
+                    </div>
                 </div>
-            </div>
 
-            <button type="submit" class="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-purple-900/40 text-sm flex items-center justify-center gap-2">
-                <span>ورود به پنل کاربری</span>
-                <i class="fa-solid fa-arrow-left text-xs"></i>
-            </button>
+                <button type="submit" class="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-purple-900/40 text-sm flex items-center justify-center gap-2">
+                    <span>تأیید کد و ورود</span>
+                    <i class="fa-solid fa-arrow-left text-xs"></i>
+                </button>
+                <div class="text-center pt-2">
+                    <a href="<?= Helpers::url('login') ?>" class="text-[11px] text-slate-400 hover:text-white">بازگشت به فرم ورود عادی</a>
+                </div>
+            <?php else: ?>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-2">نام کاربری</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400">
+                            <i class="fa-solid fa-user text-sm"></i>
+                        </span>
+                        <input type="text" name="username" required dir="ltr" placeholder="admin / novinvpn"
+                               class="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-2.5 pr-10 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all text-sm font-mono">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-2">رمز عبور</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400">
+                            <i class="fa-solid fa-lock text-sm"></i>
+                        </span>
+                        <input type="password" name="password" required dir="ltr" placeholder="••••••••"
+                               class="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-2.5 pr-10 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all text-sm font-mono">
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-purple-900/40 text-sm flex items-center justify-center gap-2">
+                    <span>ورود به پنل کاربری</span>
+                    <i class="fa-solid fa-arrow-left text-xs"></i>
+                </button>
+            <?php endif; ?>
         </form>
 
         <!-- Demo Account Helper Box -->

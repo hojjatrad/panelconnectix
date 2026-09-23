@@ -251,10 +251,11 @@ $router->get('reseller/orders', [ResellerPortalController::class, 'orders']);
 $router->post('reseller/orders/approve', [ResellerPortalController::class, 'approveOrder']);
 $router->post('reseller/orders/reject', [ResellerPortalController::class, 'rejectOrder']);
 
-// Billing & Prepaid Wallet
+// Billing & Prepaid Wallet & Referrals
 $router->get('billing', [BillingController::class, 'index']);
 $router->post('billing/topup', [BillingController::class, 'topup']);
 $router->post('billing/gateways', [BillingController::class, 'updateGateways']);
+$router->get('settings/referrals', [BillingController::class, 'referrals']);
 
 // White-Label Settings & Metadata
 $router->get('settings/metadata', [MetadataController::class, 'index']);
@@ -269,10 +270,55 @@ $router->post('categories/store', [CategoryController::class, 'store']);
 $router->post('categories/update', [CategoryController::class, 'update']);
 $router->post('categories/delete', [CategoryController::class, 'delete']);
 
-// Profile & Security
+// Profile & Security & 2FA
 $router->get('profile', [ProfileController::class, 'show']);
 $router->post('profile/password', [ProfileController::class, 'updatePassword']);
 $router->post('profile/regenerate-token', [ProfileController::class, 'regenerateToken']);
+$router->post('profile/2fa/enable', [ProfileController::class, 'enable2fa']);
+$router->post('profile/2fa/disable', [ProfileController::class, 'disable2fa']);
+
+// Backup & Cloud Export
+$router->get('settings/backup', function() {
+    Auth::requireAdmin();
+    require_once __DIR__ . '/core/Backup.php';
+    $b = Backup::createBackupFile();
+    if ($b['success'] && file_exists($b['path'])) {
+        header('Content-Type: application/octet-stream');
+        header('Content-Disposition: attachment; filename="' . $b['filename'] . '"');
+        header('Content-Length: ' . filesize($b['path']));
+        readfile($b['path']);
+        @unlink($b['path']);
+        exit;
+    }
+    Helpers::flash('error', 'خطا در ایجاد فایل پشتیبان.');
+    Helpers::redirect('settings/metadata');
+});
+$router->post('settings/backup/telegram', function() {
+    Auth::requireAdmin();
+    if (!Helpers::verifyCsrf()) {
+        Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
+        Helpers::redirect('settings/metadata');
+    }
+    require_once __DIR__ . '/core/Backup.php';
+    $res = Backup::sendBackupToTelegram();
+    if ($res['success']) {
+        Helpers::flash('success', $res['message']);
+    } else {
+        Helpers::flash('error', $res['message']);
+    }
+    Helpers::redirect('settings/metadata');
+});
+$router->get('settings/backup-telegram', function() {
+    Auth::requireAdmin();
+    require_once __DIR__ . '/core/Backup.php';
+    $res = Backup::sendBackupToTelegram();
+    if ($res['success']) {
+        Helpers::flash('success', $res['message']);
+    } else {
+        Helpers::flash('error', $res['message']);
+    }
+    Helpers::redirect('settings/metadata');
+});
 
 // Telegram Bot Management & Webhook
 $router->get('settings/bot', [TelegramBotController::class, 'manage']);

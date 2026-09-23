@@ -4,6 +4,7 @@ require_once __DIR__ . '/../core/Database.php';
 require_once __DIR__ . '/../core/Helpers.php';
 require_once __DIR__ . '/../core/Setting.php';
 require_once __DIR__ . '/../core/TelegramBot.php';
+require_once __DIR__ . '/../core/Retention.php';
 require_once __DIR__ . '/../drivers/DriverFactory.php';
 require_once __DIR__ . '/../controllers/ServerController.php';
 
@@ -40,6 +41,14 @@ try {
     echo "[Server Health] Checked " . count($healthResults) . " nodes | Online: {$onlineServers}" . $eol;
 } catch (Throwable $e) {
     echo "[Server Health Error] " . $e->getMessage() . $eol;
+}
+
+// 2. Automated Smart Retention & Low-Traffic/Expiry Telegram Alerts
+try {
+    $alertRes = Retention::processAlerts();
+    echo "[Smart Retention] Sent {$alertRes['alerts_sent']} warnings | Failovers: {$alertRes['failovers']}" . $eol;
+} catch (Throwable $e) {
+    echo "[Smart Retention Error] " . $e->getMessage() . $eol;
 }
 
 // Fetch active clients and their servers

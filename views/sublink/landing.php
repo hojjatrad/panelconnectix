@@ -12,7 +12,11 @@ $passwordVal = !empty($client['password']) ? $client['password'] : '123456';
 <html lang="fa" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="<?= $brandName ?>">
     <title><?= $brandName ?> | وضعیت و اطلاعات اشتراک</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -177,6 +181,16 @@ $passwordVal = !empty($client['password']) ? $client['password'] : '123456';
                 <a href="sing-box://import-remote-profile?url=<?= urlencode($subUrl) ?>" class="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700 text-cyan-300 flex items-center justify-center gap-2 transition-colors">
                     <i class="fa-solid fa-box"></i>
                     <span>ورود به Sing-box</span>
+                </a>
+
+                <a href="shadowrocket://add/sub://<?= base64_encode($subUrl) ?>?title=<?= urlencode($brandName) ?>" class="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700 text-amber-300 flex items-center justify-center gap-2 transition-colors">
+                    <i class="fa-solid fa-rocket"></i>
+                    <span>Shadowrocket</span>
+                </a>
+
+                <a href="clash://install-config?url=<?= urlencode($subUrl) ?>" class="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700 text-indigo-300 flex items-center justify-center gap-2 transition-colors">
+                    <i class="fa-solid fa-cat"></i>
+                    <span>ورود به Clash</span>
                 </a>
             </div>
         </div>

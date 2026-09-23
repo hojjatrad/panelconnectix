@@ -29,6 +29,14 @@ class BillingController {
         require __DIR__ . '/../views/billing/index.php';
     }
 
+    public function referrals(): void {
+        Auth::requireLogin();
+        require_once __DIR__ . '/../core/Referral.php';
+        $userId = Auth::id();
+        $stats = Referral::getStats($userId);
+        require __DIR__ . '/../views/settings/referrals.php';
+    }
+
     public function updateGateways(): void {
         Auth::requireAdmin();
         if (!Helpers::verifyCsrf()) {

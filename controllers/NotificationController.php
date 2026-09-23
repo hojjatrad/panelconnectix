@@ -21,6 +21,8 @@ class NotificationController {
         $title = trim($_POST['title'] ?? '');
         $message = trim($_POST['message'] ?? '');
         $target = trim($_POST['target_role'] ?? 'all');
+        $segment = trim($_POST['target_segment'] ?? 'all');
+        $cluster = trim($_POST['target_cluster'] ?? '');
         $userId = Auth::id();
 
         if (empty($title) || empty($message)) {
@@ -36,9 +38,29 @@ class NotificationController {
         if (!empty($_POST['send_telegram'])) {
             require_once __DIR__ . '/../core/TelegramBot.php';
             try {
-                $tgUsers = $pdo->query("SELECT DISTINCT user_tg_id FROM bot_orders WHERE user_tg_id IS NOT NULL UNION SELECT tg_id FROM bot_sessions")->fetchAll(PDO::FETCH_COLUMN);
-                $broadcastMsg = "📢 <b>اطلاعیه مهم: {$title}</b>\n\n{$message}";
-                foreach ($tgUsers as $tgId) {
+                $tgIds = [];
+                if ($segment === 'expired') {
+                    // Only expired users
+                    $tgIds = $pdo->query("SELECT DISTINCT telegram_chat_id FROM clients WHERE status = 'expired' AND telegram_chat_id IS NOT NULL 
+                                          UNION 
+                                          SELECT DISTINCT bo.user_tg_id FROM bot_orders bo JOIN clients c ON bo.client_id = c.id WHERE c.status = 'expired' AND bo.user_tg_id IS NOT NULL")->fetchAll(PDO::FETCH_COLUMN);
+                } elseif ($segment === 'active') {
+                    // Only active users
+                    $tgIds = $pdo->query("SELECT DISTINCT telegram_chat_id FROM clients WHERE status = 'active' AND telegram_chat_id IS NOT NULL 
+                                          UNION 
+                                          SELECT DISTINCT bo.user_tg_id FROM bot_orders bo JOIN clients c ON bo.client_id = c.id WHERE c.status = 'active' AND bo.user_tg_id IS NOT NULL")->fetchAll(PDO::FETCH_COLUMN);
+                } elseif ($segment === 'cluster' && !empty($cluster)) {
+                    // Users on a specific server cluster
+                    $stmtClust = $pdo->prepare("SELECT DISTINCT c.telegram_chat_id FROM clients c JOIN server_nodes s ON c.server_id = s.id WHERE s.server_group = ? AND c.telegram_chat_id IS NOT NULL");
+                    $stmtClust->execute([$cluster]);
+                    $tgIds = $stmtClust->fetchAll(PDO::FETCH_COLUMN);
+                } else {
+                    // All bot users
+                    $tgIds = $pdo->query("SELECT DISTINCT telegram_id FROM bot_users UNION SELECT DISTINCT user_tg_id FROM bot_orders WHERE user_tg_id IS NOT NULL UNION SELECT DISTINCT tg_id FROM bot_sessions")->fetchAll(PDO::FETCH_COLUMN);
+                }
+
+                $broadcastMsg = "📢 <b>{$title}</b>\n\n{$message}";
+                foreach ($tgIds as $tgId) {
                     if (!empty($tgId)) {
                         TelegramBot::sendMessage($broadcastMsg, (string)$tgId);
                         $broadcastCount++;
@@ -48,9 +70,9 @@ class NotificationController {
         }
 
         if ($broadcastCount > 0) {
-            Helpers::flash('success', "اطلاعیه با موفقیت ثبت و برای {$broadcastCount} کاربر ربات تلگرام ارسال شد.");
+            Helpers::flash('success', "اطلاعیه با موفقیت ثبت و به صورت تفکیک‌شده برای {$broadcastCount} کاربر ربات ارسال گردید.");
         } else {
-            Helpers::flash('success', 'اطلاعیه همگانی با موفقیت ارسال شد.');
+            Helpers::flash('success', 'اطلاعیه با موفقیت در تابلوی اعلانات ثبت شد.');
         }
         Helpers::redirect('notifications');
     }

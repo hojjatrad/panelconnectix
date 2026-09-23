@@ -9,20 +9,32 @@ class Auth {
         }
     }
 
-    public static function login(string $username, string $password): bool {
+    public static function login(string $username, string $password, ?string $twoFactorCode = null): array {
         self::init();
         $pdo = Database::getConnection();
         $stmt = $pdo->prepare("SELECT * FROM users WHERE username = ? AND status = 'active' LIMIT 1");
         $stmt->execute([$username]);
-        $user = $stmt->fetch();
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if ($user && password_verify($password, $user['password_hash'])) {
-            $_SESSION['user_id'] = $user['id'];
-            $_SESSION['username'] = $user['username'];
-            $_SESSION['role'] = $user['role'];
-            return true;
+        if (!$user || !password_verify($password, $user['password_hash'])) {
+            return ['success' => false, 'reason' => 'invalid_credentials'];
         }
-        return false;
+
+        // Check 2FA
+        if (!empty($user['two_factor_enabled'])) {
+            require_once __DIR__ . '/TwoFactor.php';
+            if (empty($twoFactorCode)) {
+                return ['success' => false, 'reason' => 'requires_2fa', 'user_id' => $user['id']];
+            }
+            if (!TwoFactor::verifyCode($user['two_factor_secret'] ?? '', $twoFactorCode)) {
+                return ['success' => false, 'reason' => 'invalid_2fa'];
+            }
+        }
+
+        $_SESSION['user_id'] = $user['id'];
+        $_SESSION['username'] = $user['username'];
+        $_SESSION['role'] = $user['role'];
+        return ['success' => true, 'user' => $user];
     }
 
     public static function check(): bool {

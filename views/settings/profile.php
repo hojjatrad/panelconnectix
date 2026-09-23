@@ -113,6 +113,65 @@ $walletFormatted = Helpers::formatMoney($currentUser['wallet_balance'] ?? 0);
 
     </div>
 
+    <!-- Card 3: Two-Factor Authentication (Google Authenticator) -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+            <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-shield-halved text-emerald-400"></i>
+                <span>ورود دوعاملی پیشرفته (Google Authenticator 2FA)</span>
+            </h2>
+            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold <?= !empty($currentUser['two_factor_enabled']) ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-800 text-slate-400 border border-slate-700' ?>">
+                <?= !empty($currentUser['two_factor_enabled']) ? 'فعال و ایمن' : 'غیرفعال' ?>
+            </span>
+        </div>
+
+        <?php if (!empty($currentUser['two_factor_enabled'])): ?>
+            <div class="p-4 bg-emerald-950/40 border border-emerald-800/40 rounded-xl space-y-3 text-xs">
+                <div class="flex items-center gap-2 text-emerald-300 font-bold">
+                    <i class="fa-solid fa-circle-check text-base"></i>
+                    <span>حساب شما توسط کد موقت دوعاملی (TOTP) محافظت می‌شود.</span>
+                </div>
+                <p class="text-slate-300 text-[11px] leading-relaxed">
+                    در هر بار ورود به پنل، علاوه بر رمز عبور، کد ۶ رقمی اپلیکیشن Google Authenticator یا Microsoft Authenticator مورد نیاز خواهد بود.
+                </p>
+
+                <form method="POST" action="<?= Helpers::url('profile/2fa/disable') ?>" onsubmit="return confirm('آیا از غیرفعال‌سازی ورود دوعاملی اطمینان دارید؟');" class="pt-2 flex items-center gap-3">
+                    <?= Helpers::csrfField() ?>
+                    <input type="password" name="password" required placeholder="رمز عبور فعلی خود جهت تأیید" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white">
+                    <button type="submit" class="px-4 py-1.5 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 rounded-xl text-xs font-bold transition">
+                        غیرفعال‌سازی 2FA
+                    </button>
+                </form>
+            </div>
+        <?php else: ?>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5 items-center">
+                <!-- QR Code Box -->
+                <div class="bg-white p-3 rounded-2xl flex flex-col items-center justify-center shadow-lg w-fit mx-auto md:mx-0">
+                    <img src="<?= $qrUrl ?>" alt="2FA QR Code" class="w-36 h-36">
+                    <span class="text-[9px] text-slate-700 font-bold mt-1 font-mono">اسکن با اپلیکیشن</span>
+                </div>
+
+                <!-- Setup Instructions & Manual Key -->
+                <div class="md:col-span-2 space-y-3 text-xs">
+                    <p class="text-slate-300 leading-relaxed text-[11px]">
+                        ۱. بارکد مقابل را با اپلیکیشن <strong>Google Authenticator</strong> اسکن کنید.<br>
+                        ۲. کلید متنی زیر را در صورت عدم اسکن بارکد وارد کنید:<br>
+                        <code class="mt-1 inline-block bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 text-cyan-300 font-mono font-bold select-all tracking-widest"><?= htmlspecialchars($pendingSecret ?? '') ?></code>
+                    </p>
+
+                    <form method="POST" action="<?= Helpers::url('profile/2fa/enable') ?>" class="flex items-center gap-2 pt-2">
+                        <?= Helpers::csrfField() ?>
+                        <input type="text" name="code" required maxlength="6" pattern="[0-9]{6}" placeholder="کد ۶ رقمی اپلیکیشن (مثال: 123456)" dir="ltr" class="bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-white font-mono text-center tracking-widest text-sm focus:border-purple-500">
+                        <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition shadow-md flex items-center gap-1.5 shrink-0">
+                            <i class="fa-solid fa-check"></i>
+                            <span>تأیید و فعال‌سازی</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        <?php endif; ?>
+    </div>
+
 </div>
 
 <?php require __DIR__ . '/../layout/footer.php'; ?>

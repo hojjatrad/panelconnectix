@@ -44,6 +44,21 @@ require __DIR__ . '/../layout/header.php';
 
 <!-- Server Nodes Grid -->
 <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+    <?php if (empty($servers)): ?>
+        <div class="col-span-1 md:col-span-2 bg-slate-900/60 border border-dashed border-slate-800 rounded-3xl p-12 text-center space-y-4">
+            <div class="w-16 h-16 rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mx-auto flex items-center justify-center text-3xl shadow-lg">
+                <i class="fa-solid fa-server"></i>
+            </div>
+            <h3 class="text-base font-bold text-white">بخش سرورها خام و آماده معرفی نودهای شماست</h3>
+            <p class="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+                کلیه سرورهای آزمایشی پیش‌فرض پاکسازی شدند. اکنون می‌توانید با خیال راحت سرورهای واقعی خود را با هسته‌های مرزبان (Marzban)، پاسارگاد (Pasargad) یا ۳x-ui اضافه کنید و تست‌های نهایی را انجام دهید.
+            </p>
+            <button onclick="openNewServerModal()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition shadow-lg shadow-emerald-900/30 inline-flex items-center gap-2">
+                <i class="fa-solid fa-plus"></i>
+                <span>افزودن اولین سرور</span>
+            </button>
+        </div>
+    <?php else: ?>
     <?php foreach ($servers as $s): 
         $stat = $serverStats[$s['id']] ?? ['status' => 'unknown'];
     ?>
@@ -141,6 +156,7 @@ require __DIR__ . '/../layout/header.php';
             </div>
         </div>
     <?php endforeach; ?>
+    <?php endif; ?>
 </div>
 
 <!-- Modal to add Server -->

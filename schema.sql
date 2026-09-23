@@ -396,13 +396,8 @@ INSERT INTO `categories` (`id`, `name`, `slug`, `type`, `icon`, `badge_color`, `
 (5, 'مخصوص بازی و گیمینگ (Gaming)', 'gaming', 'both', 'fa-gamepad', 'cyan', 'سرورهای تونل‌شده بدون نوسان و کمترین زمان پاسخگویی', 5, 1)
 ON DUPLICATE KEY UPDATE `name`=VALUES(`name`);
 
--- Seed Default Server Nodes
-INSERT INTO `server_nodes` (`id`, `name`, `driver`, `api_url`, `server_group`, `sub_domain`, `is_active`) VALUES 
-(1, 'سرور فنلاند کلاود (Marzban Core)', 'mock', 'https://fi.marzban.example.com:8000', 'default', 'fi.connectix.space', 1),
-(2, 'سرور آلمان VIP (Pasargad Core)', 'mock', 'https://de.pasargad.example.com', 'vip', 'de-vip.connectix.space', 1),
-(3, 'سرور ملی ایران اکسس (3x-ui Core)', 'mock', 'https://ir.node.example.com:2053', 'iran_access', 'ir.connectix.space', 1),
-(4, 'سرور هلند اقتصادی (Economic Node)', 'mock', 'https://nl.node.example.com', 'economic', 'nl.connectix.space', 1)
-ON DUPLICATE KEY UPDATE `name`=VALUES(`name`);
+-- Server Nodes are left empty by default so admin can introduce real nodes
+-- INSERT INTO `server_nodes` ...
 
 -- Seed Default Plans
 INSERT INTO `plans` (`id`, `title`, `traffic_gb`, `duration_days`, `base_price`, `reseller_price`, `server_group`, `is_free`, `is_active`) VALUES 
@@ -453,5 +448,5 @@ INSERT INTO `system_settings` (`setting_key`, `setting_value`) VALUES
 ('github_branch', 'main'),
 ('github_webhook_secret', 'gh_hook_sec_vpbotn_2026'),
 ('brand_name', 'Connectix VPN'),
-('current_version', '2.7.4')
+('current_version', '2.7.5')
 ON DUPLICATE KEY UPDATE `setting_value`=VALUES(`setting_value`);

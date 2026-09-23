@@ -63,11 +63,36 @@ require __DIR__ . '/../layout/header.php';
                 <textarea name="message" rows="4" required placeholder="متن پیام خود را بنویسید..." class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white"></textarea>
             </div>
 
-            <div class="flex items-center gap-2 p-3 bg-slate-950/60 rounded-xl border border-slate-800">
-                <input type="checkbox" name="send_telegram" value="1" id="sendTgCheck" class="rounded bg-slate-800 border-slate-700 text-purple-600 focus:ring-0">
-                <label for="sendTgCheck" class="text-[11px] text-slate-300 cursor-pointer">
-                    ارسال همگانی این پیام به تمام کاربران در ربات تلگرام 🤖
-                </label>
+            <div class="space-y-3 p-3 bg-slate-950/60 rounded-xl border border-slate-800">
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" name="send_telegram" value="1" id="sendTgCheck" onchange="document.getElementById('segmentOptions').classList.toggle('hidden', !this.checked)" class="rounded bg-slate-800 border-slate-700 text-purple-600 focus:ring-0">
+                    <label for="sendTgCheck" class="text-[11px] text-slate-300 font-bold cursor-pointer">
+                        ارسال به کاربران ربات تلگرام 🤖
+                    </label>
+                </div>
+
+                <div id="segmentOptions" class="hidden space-y-2 pt-2 border-t border-slate-800">
+                    <div>
+                        <label class="block text-[10px] text-slate-400 mb-1 font-semibold">مخاطبین هدف (بخش‌بندی هوشمند):</label>
+                        <select name="target_segment" onchange="document.getElementById('clusterSelectBox').classList.toggle('hidden', this.value !== 'cluster')" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white text-[11px]">
+                            <option value="all">🌐 کلیه کاربران ربات</option>
+                            <option value="active">🟢 فقط کاربران دارای اشتراک فعال</option>
+                            <option value="expired">🔴 فقط کاربران منقضی‌شده (پیشنهاد تخفیف بازگشت)</option>
+                            <option value="cluster">🖥 مشترکین یک خوشه سرور خاص</option>
+                        </select>
+                    </div>
+
+                    <div id="clusterSelectBox" class="hidden">
+                        <label class="block text-[10px] text-slate-400 mb-1 font-semibold">انتخاب خوشه سرور:</label>
+                        <select name="target_cluster" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white text-[11px]">
+                            <option value="default">پیش‌فرض بین‌الملل (Default)</option>
+                            <option value="vip">سرورهای VIP و پرسرعت</option>
+                            <option value="economic">سرورهای اقتصادی</option>
+                            <option value="iran_access">ایران اکسس (ملی)</option>
+                            <option value="gaming">گیمینگ و بازی</option>
+                        </select>
+                    </div>
+                </div>
             </div>
 
             <button type="submit" class="w-full py-2.5 bg-yellow-600 hover:bg-yellow-700 text-white font-bold rounded-xl shadow-md mt-2">

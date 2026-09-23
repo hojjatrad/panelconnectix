@@ -384,6 +384,58 @@ class Database {
                 }
             } catch (Throwable $e) {}
 
+            // 5. Ensure Referrals Table & Columns
+            $isMysql = (self::$dbType === 'mysql');
+            $refTableSql = $isMysql
+                ? "CREATE TABLE IF NOT EXISTS referrals (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    referrer_id INT NOT NULL,
+                    referred_id INT NOT NULL,
+                    order_id INT NULL,
+                    commission_amount BIGINT DEFAULT 0,
+                    status VARCHAR(32) DEFAULT 'completed',
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+                : "CREATE TABLE IF NOT EXISTS referrals (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    referrer_id INTEGER NOT NULL,
+                    referred_id INTEGER NOT NULL,
+                    order_id INTEGER NULL,
+                    commission_amount INTEGER DEFAULT 0,
+                    status TEXT DEFAULT 'completed',
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                );";
+            $pdo->exec($refTableSql);
+
+            // Columns for Users
+            $userCols = [
+                'two_factor_secret' => 'VARCHAR(64) NULL',
+                'two_factor_enabled' => 'TINYINT(1) DEFAULT 0',
+                'referral_code' => 'VARCHAR(32) NULL',
+                'referred_by' => 'INT NULL DEFAULT NULL'
+            ];
+            foreach ($userCols as $c => $d) {
+                self::safeAddColumn($pdo, 'users', $c, $d);
+            }
+
+            // Columns for Transactions
+            $txCols = [
+                'receipt_image' => 'VARCHAR(255) NULL',
+                'ocr_data' => 'TEXT NULL'
+            ];
+            foreach ($txCols as $c => $d) {
+                self::safeAddColumn($pdo, 'transactions', $c, $d);
+            }
+
+            // Ensure Default Referral Codes for users
+            try {
+                $usersWithoutRef = $pdo->query("SELECT id, username FROM users WHERE referral_code IS NULL OR referral_code = ''")->fetchAll(PDO::FETCH_ASSOC);
+                foreach ($usersWithoutRef as $u) {
+                    $code = 'REF' . strtoupper(substr(md5($u['username'] . $u['id']), 0, 6));
+                    $pdo->exec("UPDATE users SET referral_code = '{$code}' WHERE id = {$u['id']}");
+                }
+            } catch (Throwable $e) {}
+
         } catch (Throwable $e) {
             // Safe failover
         }
