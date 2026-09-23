@@ -214,6 +214,19 @@ class Database {
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )");
 
+            $pdo->exec("CREATE TABLE IF NOT EXISTS categories (
+                id $autoInc,
+                name VARCHAR(128) NOT NULL,
+                slug VARCHAR(64) UNIQUE NOT NULL,
+                type VARCHAR(32) DEFAULT 'both',
+                icon VARCHAR(64) DEFAULT 'fa-server',
+                badge_color VARCHAR(32) DEFAULT 'purple',
+                description TEXT NULL,
+                sort_order INT DEFAULT 0,
+                is_active TINYINT(1) DEFAULT 1,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )");
+
             $pdo->exec("CREATE TABLE IF NOT EXISTS activity_logs (
                 id $autoInc,
                 user_id INT NULL,
@@ -285,7 +298,8 @@ class Database {
                 'health_status' => "VARCHAR(32) DEFAULT 'online'",
                 'latency_ms' => 'INT DEFAULT 0',
                 'last_checked_at' => 'DATETIME NULL',
-                'error_message' => 'TEXT NULL'
+                'error_message' => 'TEXT NULL',
+                'category_id' => 'INT NULL DEFAULT NULL'
             ];
             foreach ($serverCols as $c => $d) {
                 self::safeAddColumn($pdo, 'server_nodes', $c, $d);
@@ -295,11 +309,30 @@ class Database {
                 'show_in_bot' => 'TINYINT(1) DEFAULT 1',
                 'category' => "VARCHAR(64) DEFAULT '۱ ماهه'",
                 'ip_limit' => 'INT DEFAULT 2',
-                'server_id' => 'INT NULL DEFAULT NULL'
+                'server_id' => 'INT NULL DEFAULT NULL',
+                'category_id' => 'INT NULL DEFAULT NULL'
             ];
             foreach ($planCols as $c => $d) {
                 self::safeAddColumn($pdo, 'plans', $c, $d);
             }
+
+            // Seed Default Categories if empty
+            try {
+                $catCount = (int)$pdo->query("SELECT COUNT(*) FROM categories")->fetchColumn();
+                if ($catCount === 0) {
+                    $defaultCats = [
+                        ['پیش‌فرض (استاندارد)', 'default', 'both', 'fa-globe', 'purple', 'خوشه سرورها و پلن‌های استاندارد بین‌الملل', 1],
+                        ['سرورهای VIP و پرسرعت', 'vip', 'both', 'fa-crown', 'amber', 'سرورهای بهینه‌شده با پهنای باند اختصاصی و پینگ پایین', 2],
+                        ['سرورهای اقتصادی (Economic)', 'economic', 'both', 'fa-tag', 'blue', 'پلن‌های باصرفه و اقتصادی جهت وب‌گردی روزمره', 3],
+                        ['ایران اکسس (ملی و نامحدود)', 'iran_access', 'both', 'fa-shield-halved', 'emerald', 'سرورهای با دسترسی به سایت‌های داخلی و ترافیک نامحدود', 4],
+                        ['مخصوص بازی و گیمینگ (Gaming)', 'gaming', 'both', 'fa-gamepad', 'cyan', 'سرورهای تونل‌شده بدون نوسان و کمترین زمان پاسخگویی', 5],
+                    ];
+                    $stmtCat = $pdo->prepare("INSERT INTO categories (name, slug, type, icon, badge_color, description, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                    foreach ($defaultCats as $dc) {
+                        $stmtCat->execute($dc);
+                    }
+                }
+            } catch (Throwable $e) {}
 
             // 3. Seed Default App Guides if empty
             try {
@@ -520,5 +553,63 @@ SQL;
         $pdo->exec("INSERT OR IGNORE INTO notifications (title, message, target_role, created_by) VALUES 
             ('بهینه‌سازی سرورهای آلمان و فنلاند', 'کلیه تانل‌های سرور فنلاند و آلمان به پروتکل‌های ضد فیلتر جدید مجهز شدند. سرعت و پایداری در بالاترین سطح قرار دارد.', 'all', 1)
         ");
+    }
+
+    /**
+     * Restore database tables and records from SQL backup content
+     */
+    public static function restoreFromSql(string $sqlContent): array {
+        $pdo = self::getConnection();
+        $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+        
+        $sqlLines = explode("\n", $sqlContent);
+        $cleanSql = '';
+        foreach ($sqlLines as $line) {
+            $trimmed = trim($line);
+            if (str_starts_with($trimmed, '--') || str_starts_with($trimmed, '#') || str_starts_with($trimmed, '/*')) {
+                continue;
+            }
+            $cleanSql .= $line . "\n";
+        }
+        
+        $statements = array_filter(array_map('trim', explode(';', $cleanSql)));
+        if (empty($statements)) {
+            return ['success' => false, 'error' => 'هیچ دستور SQL معتبری در فایل بکاپ یافت نشد.'];
+        }
+
+        $executed = 0;
+        $failed = 0;
+        
+        if ($driver === 'mysql') {
+            try { $pdo->exec("SET FOREIGN_KEY_CHECKS = 0;"); } catch (Throwable $e) {}
+        } else {
+            try { $pdo->exec("PRAGMA foreign_keys = OFF;"); } catch (Throwable $e) {}
+        }
+
+        foreach ($statements as $stmt) {
+            if (empty($stmt)) continue;
+            try {
+                $pdo->exec($stmt);
+                $executed++;
+            } catch (Throwable $e) {
+                $failed++;
+            }
+        }
+
+        if ($driver === 'mysql') {
+            try { $pdo->exec("SET FOREIGN_KEY_CHECKS = 1;"); } catch (Throwable $e) {}
+        } else {
+            try { $pdo->exec("PRAGMA foreign_keys = ON;"); } catch (Throwable $e) {}
+        }
+
+        // Re-run schema assurance in case new auxiliary columns are needed
+        self::ensureExtendedTablesExist($pdo);
+
+        return [
+            'success' => true,
+            'executed' => $executed,
+            'failed' => $failed,
+            'total' => count($statements)
+        ];
     }
 }

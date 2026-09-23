@@ -39,7 +39,22 @@ CREATE TABLE IF NOT EXISTS `users` (
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 2. Server Nodes Table (Supports Marzban, Pasargad, 3x-ui, and Mock)
+-- 2. Categories / Clusters Table (Locations & Groups)
+CREATE TABLE IF NOT EXISTS `categories` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `name` VARCHAR(128) NOT NULL,
+    `slug` VARCHAR(64) UNIQUE NOT NULL,
+    `type` VARCHAR(32) NOT NULL DEFAULT 'both' COMMENT 'server, plan, or both',
+    `icon` VARCHAR(64) DEFAULT 'fa-server',
+    `badge_color` VARCHAR(32) DEFAULT 'purple',
+    `description` TEXT NULL,
+    `sort_order` INT DEFAULT 0,
+    `is_active` TINYINT(1) DEFAULT 1,
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX `idx_cat_slug` (`slug`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 3. Server Nodes Table (Supports Marzban, Pasargad, 3x-ui, and Mock)
 CREATE TABLE IF NOT EXISTS `server_nodes` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `name` VARCHAR(128) NOT NULL,
@@ -49,6 +64,7 @@ CREATE TABLE IF NOT EXISTS `server_nodes` (
     `api_password` VARCHAR(255) NULL,
     `api_token` TEXT NULL,
     `server_group` VARCHAR(64) NOT NULL DEFAULT 'default',
+    `category_id` INT NULL DEFAULT NULL,
     `sub_domain` VARCHAR(128) NULL,
     `inbound_tag` VARCHAR(64) NULL,
     `max_clients` INT DEFAULT 500,
@@ -57,10 +73,11 @@ CREATE TABLE IF NOT EXISTS `server_nodes` (
     `latency_ms` INT DEFAULT 0,
     `last_checked_at` DATETIME NULL,
     `error_message` TEXT NULL,
-    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX `idx_server_cat` (`category_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 3. Plans Table
+-- 4. Plans Table
 CREATE TABLE IF NOT EXISTS `plans` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `title` VARCHAR(128) NOT NULL,
@@ -70,6 +87,7 @@ CREATE TABLE IF NOT EXISTS `plans` (
     `reseller_price` BIGINT NOT NULL,
     `server_group` VARCHAR(64) NOT NULL DEFAULT 'default',
     `server_id` INT NULL DEFAULT NULL,
+    `category_id` INT NULL DEFAULT NULL,
     `category` VARCHAR(64) NOT NULL DEFAULT '۱ ماهه',
     `show_in_bot` TINYINT(1) DEFAULT 1,
     `ip_limit` INT DEFAULT 2,
@@ -77,7 +95,8 @@ CREATE TABLE IF NOT EXISTS `plans` (
     `is_active` TINYINT(1) DEFAULT 1,
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
     INDEX `idx_plans_server` (`server_id`),
-    INDEX `idx_plans_group` (`server_group`)
+    INDEX `idx_plans_group` (`server_group`),
+    INDEX `idx_plans_cat` (`category_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 4. Clients Table
@@ -368,6 +387,15 @@ CREATE TABLE IF NOT EXISTS `reseller_applications` (
 
 SET FOREIGN_KEY_CHECKS = 1;
 
+-- Seed Default Categories / Clusters
+INSERT INTO `categories` (`id`, `name`, `slug`, `type`, `icon`, `badge_color`, `description`, `sort_order`, `is_active`) VALUES
+(1, 'پیش‌فرض (استاندارد)', 'default', 'both', 'fa-globe', 'purple', 'خوشه سرورها و پلن‌های استاندارد بین‌الملل', 1, 1),
+(2, 'سرورهای VIP و پرسرعت', 'vip', 'both', 'fa-crown', 'amber', 'سرورهای بهینه‌شده با پهنای باند اختصاصی و پینگ پایین', 2, 1),
+(3, 'سرورهای اقتصادی (Economic)', 'economic', 'both', 'fa-tag', 'blue', 'پلن‌های باصرفه و اقتصادی جهت وب‌گردی روزمره', 3, 1),
+(4, 'ایران اکسس (ملی و نامحدود)', 'iran_access', 'both', 'fa-shield-halved', 'emerald', 'سرورهای با دسترسی به سایت‌های داخلی و ترافیک نامحدود', 4, 1),
+(5, 'مخصوص بازی و گیمینگ (Gaming)', 'gaming', 'both', 'fa-gamepad', 'cyan', 'سرورهای تونل‌شده بدون نوسان و کمترین زمان پاسخگویی', 5, 1)
+ON DUPLICATE KEY UPDATE `name`=VALUES(`name`);
+
 -- Seed Default Server Nodes
 INSERT INTO `server_nodes` (`id`, `name`, `driver`, `api_url`, `server_group`, `sub_domain`, `is_active`) VALUES 
 (1, 'سرور فنلاند کلاود (Marzban Core)', 'mock', 'https://fi.marzban.example.com:8000', 'default', 'fi.connectix.space', 1),
@@ -425,5 +453,5 @@ INSERT INTO `system_settings` (`setting_key`, `setting_value`) VALUES
 ('github_branch', 'main'),
 ('github_webhook_secret', 'gh_hook_sec_vpbotn_2026'),
 ('brand_name', 'Connectix VPN'),
-('current_version', '2.6.2')
+('current_version', '2.7.0')
 ON DUPLICATE KEY UPDATE `setting_value`=VALUES(`setting_value`);

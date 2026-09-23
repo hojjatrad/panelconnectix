@@ -287,7 +287,14 @@ class Provisioner {
         }
 
         $hours = (int)Setting::get('trial_duration_hours', 24);
-        $trafficGb = (int)Setting::get('trial_traffic_gb', 1);
+        if ($hours <= 0) $hours = 24;
+
+        // Support MB or GB (If trial_traffic_mb is set, use it; otherwise fallback to trial_traffic_gb * 1024)
+        $trafficMb = (int)Setting::get('trial_traffic_mb', 0);
+        if ($trafficMb <= 0) {
+            $trafficGb = (int)Setting::get('trial_traffic_gb', 1);
+            $trafficMb = $trafficGb > 0 ? $trafficGb * 1024 : 500;
+        }
 
         // Check if user already got a trial today
         $today = date('Y-m-d 00:00:00');
@@ -309,7 +316,7 @@ class Provisioner {
         $password = substr(bin2hex(random_bytes(4)), 0, 8);
         $uuid = Helpers::generateUUID();
         $subToken = Helpers::generateToken(24);
-        $trafficBytes = $trafficGb * 1024 * 1024 * 1024;
+        $trafficBytes = (int)$trafficMb * 1024 * 1024;
         $expireAt = date('Y-m-d H:i:s', strtotime("+{$hours} hours"));
 
         // Provision on remote node

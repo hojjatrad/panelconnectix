@@ -117,6 +117,11 @@ try {
                 <span>سرورها و نودها</span>
             </a>
 
+            <a href="<?= Helpers::url('categories') ?>" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors hover:bg-slate-800 hover:text-white <?= str_contains($_SERVER['REQUEST_URI'] ?? '', 'categories') ? 'bg-slate-800/90 text-white font-semibold shadow-sm' : 'text-slate-400' ?>">
+                <i class="fa-solid fa-layer-group w-5 text-center text-purple-400"></i>
+                <span>دسته‌بندی و خوشه‌ها</span>
+            </a>
+
             <?php
             $headerPendingApps = 0;
             try {

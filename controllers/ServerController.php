@@ -8,9 +8,15 @@ class ServerController {
     public function index(): void {
         Auth::requireAdmin();
         $pdo = Database::getConnection();
-        $servers = $pdo->query("SELECT s.*, 
+        Database::ensureExtendedTablesExist($pdo);
+
+        $servers = $pdo->query("SELECT s.*, c.name as category_name, c.badge_color as category_color, c.icon as category_icon,
                                 (SELECT COUNT(*) FROM clients WHERE server_id = s.id) as client_count 
-                                FROM server_nodes s ORDER BY s.id ASC")->fetchAll();
+                                FROM server_nodes s 
+                                LEFT JOIN categories c ON (s.category_id = c.id OR (s.category_id IS NULL AND s.server_group = c.slug))
+                                ORDER BY s.id ASC")->fetchAll();
+
+        $categories = $pdo->query("SELECT * FROM categories WHERE is_active = 1 AND type IN ('server', 'both') ORDER BY sort_order ASC, id ASC")->fetchAll();
 
         // Query live status for each server
         $serverStats = [];
@@ -40,6 +46,7 @@ class ServerController {
         $password = trim($_POST['api_password'] ?? '');
         $token = trim($_POST['api_token'] ?? '');
         $serverGroup = trim($_POST['server_group'] ?? 'default');
+        $categoryId = !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null;
         $subDomain = trim($_POST['sub_domain'] ?? '');
         $maxClients = (int)($_POST['max_clients'] ?? 500);
 
@@ -49,9 +56,14 @@ class ServerController {
         }
 
         $pdo = Database::getConnection();
-        $stmt = $pdo->prepare("INSERT INTO server_nodes (name, driver, api_url, api_username, api_password, api_token, server_group, sub_domain, max_clients) 
-                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->execute([$name, $driver, $apiUrl, $username, $password, $token, $serverGroup, $subDomain, $maxClients]);
+        if ($categoryId) {
+            $catSlug = $pdo->query("SELECT slug FROM categories WHERE id = " . $categoryId)->fetchColumn();
+            if ($catSlug) $serverGroup = $catSlug;
+        }
+
+        $stmt = $pdo->prepare("INSERT INTO server_nodes (name, driver, api_url, api_username, api_password, api_token, server_group, category_id, sub_domain, max_clients) 
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$name, $driver, $apiUrl, $username, $password, $token, $serverGroup, $categoryId, $subDomain, $maxClients]);
 
         Helpers::flash('success', 'سرور جدید با موفقیت به سامانه افزوده شد.');
         Helpers::redirect('servers');
@@ -72,6 +84,7 @@ class ServerController {
         $password = trim($_POST['api_password'] ?? '');
         $token = trim($_POST['api_token'] ?? '');
         $serverGroup = trim($_POST['server_group'] ?? 'default');
+        $categoryId = !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null;
         $subDomain = trim($_POST['sub_domain'] ?? '');
         $maxClients = (int)($_POST['max_clients'] ?? 500);
 
@@ -81,12 +94,17 @@ class ServerController {
         }
 
         $pdo = Database::getConnection();
+        if ($categoryId) {
+            $catSlug = $pdo->query("SELECT slug FROM categories WHERE id = " . $categoryId)->fetchColumn();
+            if ($catSlug) $serverGroup = $catSlug;
+        }
+
         if (!empty($password)) {
-            $stmt = $pdo->prepare("UPDATE server_nodes SET name = ?, driver = ?, api_url = ?, api_username = ?, api_password = ?, api_token = ?, server_group = ?, sub_domain = ?, max_clients = ? WHERE id = ?");
-            $stmt->execute([$name, $driver, $apiUrl, $username, $password, $token, $serverGroup, $subDomain, $maxClients, $id]);
+            $stmt = $pdo->prepare("UPDATE server_nodes SET name = ?, driver = ?, api_url = ?, api_username = ?, api_password = ?, api_token = ?, server_group = ?, category_id = ?, sub_domain = ?, max_clients = ? WHERE id = ?");
+            $stmt->execute([$name, $driver, $apiUrl, $username, $password, $token, $serverGroup, $categoryId, $subDomain, $maxClients, $id]);
         } else {
-            $stmt = $pdo->prepare("UPDATE server_nodes SET name = ?, driver = ?, api_url = ?, api_username = ?, api_token = ?, server_group = ?, sub_domain = ?, max_clients = ? WHERE id = ?");
-            $stmt->execute([$name, $driver, $apiUrl, $username, $token, $serverGroup, $subDomain, $maxClients, $id]);
+            $stmt = $pdo->prepare("UPDATE server_nodes SET name = ?, driver = ?, api_url = ?, api_username = ?, api_token = ?, server_group = ?, category_id = ?, sub_domain = ?, max_clients = ? WHERE id = ?");
+            $stmt->execute([$name, $driver, $apiUrl, $username, $token, $serverGroup, $categoryId, $subDomain, $maxClients, $id]);
         }
 
         Helpers::flash('success', "تنظیمات سرور '{$name}' با موفقیت به‌روزرسانی شد.");

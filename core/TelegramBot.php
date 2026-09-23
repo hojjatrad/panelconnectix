@@ -272,4 +272,35 @@ class TelegramBot {
         $res = self::request('deleteWebhook', ['drop_pending_updates' => false], $customToken);
         return $res ?: ['ok' => false, 'description' => 'خطا در حذف وبهوک'];
     }
+
+    public static function getFile(string $fileId, ?string $customToken = null): ?array {
+        $token = !empty($customToken) ? trim($customToken) : self::getToken();
+        $res = self::request('getFile', ['file_id' => $fileId], $token);
+        if ($res && isset($res['ok']) && $res['ok'] === true) {
+            return $res['result'] ?? null;
+        }
+        return null;
+    }
+
+    public static function downloadFile(string $telegramFilePath, ?string $customToken = null): ?string {
+        $token = !empty($customToken) ? trim($customToken) : self::getToken();
+        if (empty($token) || empty($telegramFilePath)) {
+            return null;
+        }
+        $url = "https://api.telegram.org/file/bot{$token}/{$telegramFilePath}";
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 60,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => false
+        ]);
+        $content = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        if ($httpCode === 200 && $content !== false) {
+            return $content;
+        }
+        return null;
+    }
 }

@@ -54,6 +54,7 @@ require_once __DIR__ . '/controllers/UpdateController.php';
 require_once __DIR__ . '/controllers/TicketController.php';
 require_once __DIR__ . '/controllers/AppGuideController.php';
 require_once __DIR__ . '/controllers/CouponController.php';
+require_once __DIR__ . '/controllers/CategoryController.php';
 require_once __DIR__ . '/core/Updater.php';
 
 $router = new Router();
@@ -142,6 +143,13 @@ $router->get('settings/metadata', [MetadataController::class, 'index']);
 $router->post('settings/metadata', [MetadataController::class, 'update']);
 $router->get('settings/backup', [MetadataController::class, 'backup']);
 $router->get('settings/backup-telegram', [MetadataController::class, 'backupTelegram']);
+$router->post('settings/restore', [MetadataController::class, 'restore']);
+
+// Dynamic Clusters & Categories Management
+$router->get('categories', [CategoryController::class, 'index']);
+$router->post('categories/store', [CategoryController::class, 'store']);
+$router->post('categories/update', [CategoryController::class, 'update']);
+$router->post('categories/delete', [CategoryController::class, 'delete']);
 
 // Profile & Security
 $router->get('profile', [ProfileController::class, 'show']);

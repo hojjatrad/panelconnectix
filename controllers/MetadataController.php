@@ -76,33 +76,39 @@ class MetadataController {
         echo "-- ====================================================\n";
         echo "-- Connectix System Full Database Backup\n";
         echo "-- Generated on: " . date('Y-m-d H:i:s') . "\n";
+        echo "-- Version: " . Updater::CURRENT_VERSION . "\n";
         echo "-- ====================================================\n\n";
+        echo "SET FOREIGN_KEY_CHECKS = 0;\n\n";
 
-        $tables = ['users', 'server_nodes', 'plans', 'clients', 'reserved_plans', 'transactions', 'branding_metadata', 'notifications', 'system_settings', 'bot_orders', 'bot_sessions'];
+        $tables = [
+            'categories', 'users', 'server_nodes', 'plans', 'clients', 
+            'reserved_plans', 'transactions', 'branding_metadata', 'notifications', 
+            'system_settings', 'bot_orders', 'bot_sessions', 'bot_users', 
+            'reseller_plans', 'reseller_applications', 'trial_logs', 'crypto_payments', 
+            'app_guides', 'coupons', 'tickets', 'ticket_messages', 'activity_logs'
+        ];
 
         foreach ($tables as $t) {
             try {
-                $rows = $pdo->query("SELECT * FROM {$t}")->fetchAll();
+                $rows = $pdo->query("SELECT * FROM `{$t}`")->fetchAll();
                 if (!empty($rows)) {
-                    echo "-- Table: {$t} (" . count($rows) . " rows)\n";
+                    echo "-- Table: `{$t}` (" . count($rows) . " rows)\n";
                     foreach ($rows as $row) {
                         $cols = array_keys($row);
                         $colList = '`' . implode('`, `', $cols) . '`';
                         $vals = [];
                         foreach ($row as $v) {
-                            if ($v === null) {
-                                $vals[] = 'NULL';
-                            } else {
-                                $vals[] = $pdo->quote((string)$v);
-                            }
+                            $vals[] = ($v === null) ? 'NULL' : $pdo->quote((string)$v);
                         }
                         $valList = implode(', ', $vals);
-                        echo "INSERT INTO `{$t}` ({$colList}) VALUES ({$valList});\n";
+                        echo "REPLACE INTO `{$t}` ({$colList}) VALUES ({$valList});\n";
                     }
                     echo "\n";
                 }
             } catch (Throwable $e) {}
         }
+
+        echo "SET FOREIGN_KEY_CHECKS = 1;\n";
         exit;
     }
 
@@ -117,28 +123,37 @@ class MetadataController {
         fwrite($handle, "-- ====================================================\n");
         fwrite($handle, "-- Connectix System Full Database Backup\n");
         fwrite($handle, "-- Generated on: " . date('Y-m-d H:i:s') . "\n");
+        fwrite($handle, "-- Version: " . Updater::CURRENT_VERSION . "\n");
         fwrite($handle, "-- ====================================================\n\n");
+        fwrite($handle, "SET FOREIGN_KEY_CHECKS = 0;\n\n");
 
-        $tables = ['users', 'server_nodes', 'plans', 'clients', 'reserved_plans', 'transactions', 'branding_metadata', 'notifications', 'system_settings', 'bot_orders', 'bot_sessions', 'activity_logs'];
+        $tables = [
+            'categories', 'users', 'server_nodes', 'plans', 'clients', 
+            'reserved_plans', 'transactions', 'branding_metadata', 'notifications', 
+            'system_settings', 'bot_orders', 'bot_sessions', 'bot_users', 
+            'reseller_plans', 'reseller_applications', 'trial_logs', 'crypto_payments', 
+            'app_guides', 'coupons', 'tickets', 'ticket_messages', 'activity_logs'
+        ];
 
         foreach ($tables as $t) {
             try {
-                $rows = $pdo->query("SELECT * FROM {$t}")->fetchAll();
+                $rows = $pdo->query("SELECT * FROM `{$t}`")->fetchAll();
                 if (!empty($rows)) {
-                    fwrite($handle, "-- Table: {$t} (" . count($rows) . " rows)\n");
+                    fwrite($handle, "-- Table: `{$t}` (" . count($rows) . " rows)\n");
                     foreach ($rows as $row) {
                         $cols = array_keys($row);
                         $colList = '`' . implode('`, `', $cols) . '`';
                         $vals = [];
                         foreach ($row as $v) {
-                            $vals[] = $v === null ? 'NULL' : $pdo->quote((string)$v);
+                            $vals[] = ($v === null) ? 'NULL' : $pdo->quote((string)$v);
                         }
-                        fwrite($handle, "INSERT INTO `{$t}` ({$colList}) VALUES (" . implode(', ', $vals) . ");\n");
+                        fwrite($handle, "REPLACE INTO `{$t}` ({$colList}) VALUES (" . implode(', ', $vals) . ");\n");
                     }
                     fwrite($handle, "\n");
                 }
             } catch (Throwable $e) {}
         }
+        fwrite($handle, "SET FOREIGN_KEY_CHECKS = 1;\n");
         fclose($handle);
 
         require_once __DIR__ . '/../core/TelegramBot.php';
@@ -146,12 +161,48 @@ class MetadataController {
         $sent = TelegramBot::sendDocument($tempPath, $caption);
         @unlink($tempPath);
 
-        Helpers::logActivity('backup_telegram', 'تولید و درخواست ارسال فایل پشتیبان به تلگرام', 'system');
+        Helpers::logActivity('backup_telegram', 'تولید و ارسال فایل پشتیبان کامل به تلگرام', 'system');
 
         if ($sent) {
-            Helpers::flash('success', 'فایل پشتیبان کامل دیتابیس با موفقیت به تلگرام ادمین ارسال شد!');
+            Helpers::flash('success', 'فایل پشتیبان کامل ۲۲ جدول دیتابیس با موفقیت به تلگرام ارسال شد!');
         } else {
             Helpers::flash('info', 'فایل پشتیبان تولید شد (در صورت عدم دریافت، توکن ربات و Chat ID ادمین را در تنظیمات ربات بررسی نمایید).');
+        }
+
+        Helpers::redirect('settings/metadata');
+    }
+
+    public function restore(): void {
+        Auth::requireAdmin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
+            Helpers::redirect('settings/metadata');
+        }
+
+        if (empty($_FILES['backup_file']['tmp_name']) || $_FILES['backup_file']['error'] !== UPLOAD_ERR_OK) {
+            Helpers::flash('error', 'لطفاً یک فایل معتبر بکاپ با پسوند .sql انتخاب فرمایید.');
+            Helpers::redirect('settings/metadata');
+        }
+
+        $file = $_FILES['backup_file'];
+        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        if ($ext !== 'sql') {
+            Helpers::flash('error', 'فرمت فایل ارسالی نامعتبر است. فقط فایل‌های .sql پشتیبانی می‌شوند.');
+            Helpers::redirect('settings/metadata');
+        }
+
+        $sqlContent = file_get_contents($file['tmp_name']);
+        if (empty($sqlContent)) {
+            Helpers::flash('error', 'فایل ارسالی خالی است.');
+            Helpers::redirect('settings/metadata');
+        }
+
+        $result = Database::restoreFromSql($sqlContent);
+        if ($result['success']) {
+            Helpers::logActivity('backup_restore', "بازگردانی پایگاه داده از فایل {$file['name']} با موفقیت انجام شد ({$result['executed']} دستور اجرا شد)", 'system');
+            Helpers::flash('success', "پایگاه داده با موفقیت بازگردانی شد! ({$result['executed']} دستور با موفقیت اعمال گردید)");
+        } else {
+            Helpers::flash('error', 'خطا در بازگردانی فایل: ' . ($result['error'] ?? 'خطای ناشناخته'));
         }
 
         Helpers::redirect('settings/metadata');

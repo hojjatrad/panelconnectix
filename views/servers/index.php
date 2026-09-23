@@ -86,8 +86,18 @@ require __DIR__ . '/../layout/header.php';
                     <span class="font-bold text-purple-300"><?= $s['client_count'] ?? 0 ?> اکانت</span>
                 </div>
                 <div>
-                    <span class="text-[10px] text-slate-400 block mb-0.5">گروه کلاستر</span>
-                    <span class="font-bold text-cyan-300 font-mono text-[11px]"><?= $s['server_group'] ?></span>
+                    <span class="text-[10px] text-slate-400 block mb-0.5">دسته‌بندی (کلاستر)</span>
+                    <span class="inline-flex items-center gap-1 font-bold font-mono text-[11px] <?= match($s['category_color'] ?? 'purple') {
+                        'amber' => 'text-amber-400',
+                        'blue' => 'text-blue-400',
+                        'emerald', 'green' => 'text-emerald-400',
+                        'cyan' => 'text-cyan-400',
+                        'rose', 'red' => 'text-rose-400',
+                        default => 'text-purple-300'
+                    } ?>">
+                        <i class="fa-solid <?= htmlspecialchars($s['category_icon'] ?: 'fa-server') ?> text-[10px]"></i>
+                        <span><?= htmlspecialchars($s['category_name'] ?: $s['server_group']) ?></span>
+                    </span>
                 </div>
             </div>
 
@@ -159,12 +169,15 @@ require __DIR__ . '/../layout/header.php';
                     </select>
                 </div>
                 <div>
-                    <label class="block text-slate-300 mb-1 font-semibold">گروه سرور (کلاستر)</label>
-                    <select name="server_group" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white">
-                        <option value="default">عادی (Default)</option>
-                        <option value="economic">اقتصادی (Economic)</option>
-                        <option value="iran_access">ایران اکسس (Iran Access)</option>
-                        <option value="vip">تجاری VIP (Business Class)</option>
+                    <label class="block text-slate-300 mb-1 font-semibold">دسته‌بندی (کلاستر) *</label>
+                    <select name="category_id" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white">
+                        <?php if (!empty($categories)): ?>
+                            <?php foreach ($categories as $cat): ?>
+                                <option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['name']) ?> (<?= htmlspecialchars($cat['slug']) ?>)</option>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <option value="">پیش‌فرض (Default)</option>
+                        <?php endif; ?>
                     </select>
                 </div>
             </div>
@@ -235,12 +248,15 @@ require __DIR__ . '/../layout/header.php';
                     </select>
                 </div>
                 <div>
-                    <label class="block text-slate-300 mb-1 font-semibold">گروه سرور (کلاستر)</label>
-                    <select name="server_group" id="edit_server_group" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white">
-                        <option value="default">عادی (Default)</option>
-                        <option value="economic">اقتصادی (Economic)</option>
-                        <option value="iran_access">ایران اکسس (Iran Access)</option>
-                        <option value="vip">تجاری VIP (Business Class)</option>
+                    <label class="block text-slate-300 mb-1 font-semibold">دسته‌بندی (کلاستر) *</label>
+                    <select name="category_id" id="edit_server_category_id" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white">
+                        <?php if (!empty($categories)): ?>
+                            <?php foreach ($categories as $cat): ?>
+                                <option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['name']) ?> (<?= htmlspecialchars($cat['slug']) ?>)</option>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <option value="">پیش‌فرض (Default)</option>
+                        <?php endif; ?>
                     </select>
                 </div>
             </div>
@@ -295,7 +311,9 @@ require __DIR__ . '/../layout/header.php';
         document.getElementById('edit_server_id').value = s.id;
         document.getElementById('edit_server_name').value = s.name;
         document.getElementById('edit_server_driver').value = s.driver;
-        document.getElementById('edit_server_group').value = s.server_group;
+        if (document.getElementById('edit_server_category_id')) {
+            document.getElementById('edit_server_category_id').value = s.category_id || (s.server_group === 'vip' ? 2 : (s.server_group === 'economic' ? 3 : (s.server_group === 'iran_access' ? 4 : 1)));
+        }
         document.getElementById('edit_server_api_url').value = s.api_url;
         document.getElementById('edit_server_api_username').value = s.api_username || '';
         document.getElementById('edit_server_sub_domain').value = s.sub_domain || '';

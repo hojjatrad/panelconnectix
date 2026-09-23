@@ -41,6 +41,7 @@ $cryptoTonRate = $settings['crypto_ton_rate'] ?? '380000';
 $trialEnabled = ($settings['trial_enabled'] ?? '1') === '1';
 $trialHours = $settings['trial_duration_hours'] ?? '24';
 $trialGb = $settings['trial_traffic_gb'] ?? '1';
+$trialMb = $settings['trial_traffic_mb'] ?? '0';
 $referralEnabled = ($settings['referral_enabled'] ?? '1') === '1';
 $referralPercent = $settings['referral_commission_percent'] ?? '10';
 
@@ -151,305 +152,330 @@ $isWebhookSet = !empty($webhookInfo['result']['url'] ?? '');
             <form method="POST" action="<?= Helpers::url('settings/bot') ?>" class="space-y-4">
                 <?= Helpers::csrfField() ?>
 
-                <!-- Bot Status Toggle -->
-                <div class="flex items-center justify-between p-3 bg-slate-950/60 rounded-xl border border-slate-800/80">
-                    <div>
-                        <div class="text-xs font-bold text-white">فعال بودن ربات تلگرام</div>
-                        <div class="text-[11px] text-slate-400">پاسخگویی به خریداران در تلگرام</div>
-                    </div>
-                    <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" name="telegram_bot_active" value="1" class="sr-only peer" <?= $botActive ? 'checked' : '' ?>>
-                        <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-                    </label>
+                <!-- Tab Navigation Buttons -->
+                <div class="grid grid-cols-4 gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
+                    <button type="button" onclick="switchBotTab('core')" id="tabBtn-core" class="py-2 px-1 rounded-lg font-bold text-center transition bg-purple-600 text-white shadow text-[11px] truncate">
+                        🤖 پایه
+                    </button>
+                    <button type="button" onclick="switchBotTab('payment')" id="tabBtn-payment" class="py-2 px-1 rounded-lg font-medium text-center transition text-slate-400 hover:text-white text-[11px] truncate">
+                        💳 مالی
+                    </button>
+                    <button type="button" onclick="switchBotTab('growth')" id="tabBtn-growth" class="py-2 px-1 rounded-lg font-medium text-center transition text-slate-400 hover:text-white text-[11px] truncate">
+                        🎁 تست
+                    </button>
+                    <button type="button" onclick="switchBotTab('ui')" id="tabBtn-ui" class="py-2 px-1 rounded-lg font-medium text-center transition text-slate-400 hover:text-white text-[11px] truncate">
+                        ⌨️ دکمه‌ها
+                    </button>
                 </div>
 
-                <!-- Bot Token -->
-                <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1.5">توکن ربات تلگرام (Bot Token)</label>
-                    <input type="text" name="telegram_bot_token" value="<?= htmlspecialchars($botToken) ?>" placeholder="مثال: 7123456789:AAHk..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-purple-500 font-mono text-left" dir="ltr">
-                    <p class="text-[10px] text-slate-500 mt-1">از طریق @BotFather در تلگرام دریافت می‌شود.</p>
-                </div>
-
-                <!-- Bot Username -->
-                <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1.5">یوزرنیم ربات تلگرام</label>
-                    <div class="relative">
-                        <input type="text" name="telegram_bot_username" value="<?= htmlspecialchars($botUsername) ?>" placeholder="MyVpnBot" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-purple-500 font-mono text-left pl-8" dir="ltr">
-                        <span class="absolute left-3 top-2.5 text-xs text-slate-500">@</span>
-                    </div>
-                </div>
-
-                <!-- Admin Telegram Chat ID -->
-                <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1.5">شناسه عددی تلگرام مدیر (Admin Chat ID)</label>
-                    <input type="text" name="telegram_admin_id" value="<?= htmlspecialchars($adminId) ?>" placeholder="مثال: 123456789" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-purple-500 font-mono text-left" dir="ltr">
-                    <p class="text-[10px] text-slate-500 mt-1">ارسال مستقیم فیش‌ها و اعلانات فوری به پیوی مدیر (از ربات @userinfobot دریافت کنید).</p>
-                </div>
-
-                <!-- Force Join Channel -->
-                <div class="pt-3 border-t border-slate-800/80 space-y-2">
-                    <div class="text-xs font-bold text-amber-400 flex items-center gap-1.5">
-                        <i class="fa-solid fa-bullhorn"></i>
-                        <span>عضویت اجباری در کانال (Force Join)</span>
-                    </div>
-                    <div>
-                        <label class="block text-[11px] font-medium text-slate-400 mb-1">آیدی عمومی یا عددی کانال تلگرام</label>
-                        <input type="text" name="bot_force_join_channel" value="<?= htmlspecialchars($forceJoinChannel) ?>" placeholder="@MyChannel یا -1001234567890" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-amber-500 font-mono text-left" dir="ltr">
-                        <p class="text-[10px] text-slate-500 mt-0.5">در صورت تنظیم، کاربر قبل از دسترسی به هرگونه دکمه موظف به عضویت در کانال است. ربات باید ادمین کانال باشد.</p>
-                    </div>
-                </div>
-
-                <!-- Supergroup Forum Topics Section -->
-                <div class="pt-3 border-t border-slate-800/80 space-y-3">
-                    <div class="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
-                        <i class="fa-solid fa-layer-group"></i>
-                        <span>سوپرگروه لاگ و تاپیک‌های انجمن (Forum Topics)</span>
-                    </div>
-                    <p class="text-[10px] text-slate-400">تفکیک خودکار گزارش خریدها، بکاپ‌های دیتابیس، هشدار نودها، کاربران و تراکنش‌های تتری در تاپیک‌های تلگرام.</p>
-
-                    <div>
-                        <label class="block text-[11px] font-medium text-slate-400 mb-1">شناسه عددی سوپرگروه لاگ (Supergroup ID)</label>
-                        <div class="flex items-center gap-2">
-                            <input type="text" id="botLogChannelInput" name="bot_log_channel" value="<?= htmlspecialchars($logSupergroup) ?>" placeholder="-1001234567890" class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono text-left" dir="ltr">
-                            <button type="button" onclick="autoCreateForumTopics()" id="btnAutoTopics" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[11px] font-bold transition flex items-center gap-1.5 shrink-0 shadow">
-                                <i class="fa-solid fa-wand-magic-sparkles"></i>
-                                <span>ایجاد خودکار تاپیک‌ها</span>
-                            </button>
-                        </div>
-                        <span id="topicAutoStatus" class="text-[10px] text-slate-500 mt-1 block"></span>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-2 text-[11px]">
+                <!-- TAB 1: Core Configuration -->
+                <div id="tabContent-core" class="space-y-4">
+                    <!-- Bot Status Toggle -->
+                    <div class="flex items-center justify-between p-3 bg-slate-950/60 rounded-xl border border-slate-800/80">
                         <div>
-                            <label class="block text-[10px] text-slate-400 mb-1">🛒 تاپیک خریدها (Thread ID)</label>
-                            <input type="text" id="topicSalesInput" name="bot_topic_sales" value="<?= htmlspecialchars($topicSales) ?>" placeholder="شناسه عددی تاپیک" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono text-center" dir="ltr">
-                        </div>
-                        <div>
-                            <label class="block text-[10px] text-slate-400 mb-1">💾 تاپیک بکاپ دیتابیس</label>
-                            <input type="text" id="topicBackupInput" name="bot_topic_backup" value="<?= htmlspecialchars($topicBackup) ?>" placeholder="شناسه عددی تاپیک" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono text-center" dir="ltr">
-                        </div>
-                        <div>
-                            <label class="block text-[10px] text-slate-400 mb-1">⚡️ تاپیک سلامت سرورها</label>
-                            <input type="text" id="topicServersInput" name="bot_topic_servers" value="<?= htmlspecialchars($topicServers) ?>" placeholder="شناسه عددی تاپیک" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono text-center" dir="ltr">
-                        </div>
-                        <div>
-                            <label class="block text-[10px] text-slate-400 mb-1">👥 تاپیک کاربران و نمایندگی</label>
-                            <input type="text" id="topicUsersInput" name="bot_topic_users" value="<?= htmlspecialchars($topicUsers) ?>" placeholder="شناسه عددی تاپیک" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono text-center" dir="ltr">
-                        </div>
-                        <div class="col-span-2">
-                            <label class="block text-[10px] text-slate-400 mb-1">🪙 تاپیک پرداخت‌های ارزی تتر (USDT)</label>
-                            <input type="text" id="topicCryptoInput" name="bot_topic_crypto" value="<?= htmlspecialchars($topicCrypto) ?>" placeholder="شناسه عددی تاپیک" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono text-center" dir="ltr">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Custom Button Labels Section -->
-                <div class="pt-3 border-t border-slate-800/80 space-y-3">
-                    <div class="text-xs font-bold text-sky-400 flex items-center gap-1.5">
-                        <i class="fa-solid fa-keyboard"></i>
-                        <span>شخصی‌سازی عناوین دکمه‌های ربات (۲ ستونه ریسپانسیو)</span>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-2">
-                        <div>
-                            <label class="block text-[10px] text-slate-400 mb-1">دکمه خرید</label>
-                            <input type="text" name="btn_buy_text" value="<?= htmlspecialchars($btnBuyText) ?>" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500 text-center">
-                        </div>
-                        <div>
-                            <label class="block text-[10px] text-slate-400 mb-1">دکمه تمدید</label>
-                            <input type="text" name="btn_renew_text" value="<?= htmlspecialchars($btnRenewText) ?>" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500 text-center">
-                        </div>
-                        <div>
-                            <label class="block text-[10px] text-slate-400 mb-1">دکمه حساب‌های من</label>
-                            <input type="text" name="btn_my_accounts_text" value="<?= htmlspecialchars($btnMyAccText) ?>" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500 text-center">
-                        </div>
-                        <div>
-                            <label class="block text-[10px] text-slate-400 mb-1">دکمه تست رایگان</label>
-                            <input type="text" name="btn_trial_text" value="<?= htmlspecialchars($btnTrialText) ?>" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500 text-center">
-                        </div>
-                        <div>
-                            <label class="block text-[10px] text-slate-400 mb-1">دکمه کسب درآمد</label>
-                            <input type="text" name="btn_referral_text" value="<?= htmlspecialchars($btnRefText) ?>" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500 text-center">
-                        </div>
-                        <div>
-                            <label class="block text-[10px] text-slate-400 mb-1">دکمه دانلود و آموزش</label>
-                            <input type="text" name="btn_apps_text" value="<?= htmlspecialchars($btnAppsText) ?>" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500 text-center">
-                        </div>
-                        <div>
-                            <label class="block text-[10px] text-slate-400 mb-1">دکمه پشتیبانی</label>
-                            <input type="text" name="btn_support_text" value="<?= htmlspecialchars($btnSupportText) ?>" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500 text-center">
-                        </div>
-                        <div>
-                            <label class="block text-[10px] text-slate-400 mb-1">دکمه اخذ نمایندگی</label>
-                            <input type="text" name="btn_reseller_text" value="<?= htmlspecialchars($btnResellerText) ?>" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500 text-center">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Bot Welcome Text -->
-                <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1.5">متن پیام شروع ربات (Welcome Message)</label>
-                    <textarea name="bot_welcome_text" rows="2" placeholder="به ربات رسمی خوش آمدید..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-purple-500"><?= htmlspecialchars($settings['bot_welcome_text'] ?? '') ?></textarea>
-                    <p class="text-[10px] text-slate-500 mt-0.5">در صورت خالی بودن، متن پیش‌فرض سیستم نمایش داده می‌شود.</p>
-                </div>
-
-                <!-- Card to Card Section -->
-                <div class="pt-3 border-t border-slate-800/80 space-y-3">
-                    <div class="text-xs font-bold text-purple-300 flex items-center gap-1.5">
-                        <i class="fa-solid fa-credit-card"></i>
-                        <span>اطلاعات کارت جهت واریز مشتری</span>
-                    </div>
-
-                    <div>
-                        <label class="block text-[11px] font-medium text-slate-400 mb-1">شماره کارت ۱۶ رقمی</label>
-                        <input type="text" name="card_number" value="<?= htmlspecialchars($cardNumber) ?>" placeholder="۶۰۳۷-xxxx-xxxx-xxxx" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-purple-500 font-mono text-center tracking-widest" dir="ltr">
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-2">
-                        <div>
-                            <label class="block text-[11px] font-medium text-slate-400 mb-1">نام دارنده حساب</label>
-                            <input type="text" name="card_holder" value="<?= htmlspecialchars($cardHolder) ?>" placeholder="نام صاحب کارت" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500">
-                        </div>
-                        <div>
-                            <label class="block text-[11px] font-medium text-slate-400 mb-1">نام بانک</label>
-                            <input type="text" name="card_bank_name" value="<?= htmlspecialchars($cardBank) ?>" placeholder="مثلاً بانک ملی" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500">
-                        </div>
-                    </div>
-
-                    <div>
-                        <label class="block text-[11px] font-medium text-slate-400 mb-1">شماره شبا یا توضیحات پرداخت (اختیاری)</label>
-                        <input type="text" name="card_sheba" value="<?= htmlspecialchars($settings['card_sheba'] ?? '') ?>" placeholder="IR... یا انتقال با فیش" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-purple-500 font-mono text-left" dir="ltr">
-                    </div>
-
-                    <div>
-                        <label class="block text-[11px] font-medium text-slate-400 mb-1">آیدی پشتیبانی تلگرام</label>
-                        <input type="text" name="support_telegram" value="<?= htmlspecialchars($supportTg) ?>" placeholder="@Support_ID" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-purple-500 font-mono text-left" dir="ltr">
-                    </div>
-                </div>
-
-                <!-- Online Payment Gateway Section -->
-                <div class="pt-3 border-t border-slate-800/80 space-y-3">
-                    <div class="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
-                        <i class="fa-solid fa-globe"></i>
-                        <span>درگاه پرداخت آنلاین (اختیاری)</span>
-                    </div>
-
-                    <div>
-                        <label class="block text-[11px] font-medium text-slate-400 mb-1">روش پرداخت</label>
-                        <select name="payment_gateway" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
-                            <option value="card" <?= $paymentGw === 'card' ? 'selected' : '' ?>>کارت به کارت دستی (تایید فیش)</option>
-                            <option value="zarinpal" <?= $paymentGw === 'zarinpal' ? 'selected' : '' ?>>زرین‌پال (درگاه ریالی)</option>
-                            <option value="nextpay" <?= $paymentGw === 'nextpay' ? 'selected' : '' ?>>نکست‌پی (NextPay)</option>
-                            <option value="nowpayments" <?= $paymentGw === 'nowpayments' ? 'selected' : '' ?>>NOWPayments (درگاه کریپتو)</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="block text-[11px] font-medium text-slate-400 mb-1">مرچنت زرین‌پال</label>
-                        <input type="text" name="zarinpal_merchant" value="<?= htmlspecialchars($zarinMerchant) ?>" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono text-left" dir="ltr">
-                    </div>
-
-                    <div>
-                        <label class="block text-[11px] font-medium text-slate-400 mb-1">کلید API نکست‌پی</label>
-                        <input type="text" name="nextpay_apikey" value="<?= htmlspecialchars($nextpayKey) ?>" placeholder="api_key_..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono text-left" dir="ltr">
-                    </div>
-
-                    <div>
-                        <label class="block text-[11px] font-medium text-slate-400 mb-1">کلید API درگاه NOWPayments</label>
-                        <input type="text" name="nowpayments_apikey" value="<?= htmlspecialchars($nowpaymentsKey) ?>" placeholder="API Key..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono text-left" dir="ltr">
-                    </div>
-                </div>
-
-                <!-- Cryptocurrency / USDT TRC20 Section -->
-                <div class="pt-3 border-t border-slate-800/80 space-y-3">
-                    <div class="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
-                        <i class="fa-solid fa-coins"></i>
-                        <span>پرداخت مستقیم با تتر (USDT - TRC20)</span>
-                    </div>
-
-                    <div>
-                        <label class="block text-[11px] font-medium text-slate-400 mb-1">آدرس ولت تتر مدیر (شبکه TRC-20)</label>
-                        <input type="text" name="crypto_usdt_trc20_address" value="<?= htmlspecialchars($cryptoUsdtWallet) ?>" placeholder="مثال: TLa5xxxx..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono text-left" dir="ltr">
-                        <span class="text-[10px] text-slate-500 mt-0.5 block">در صورت تکمیل، دکمه پرداخت تتر همراه با محاسبه خودکار نرخ ارز در پیش‌فاکتور مشتری فعال خواهد شد.</span>
-                    </div>
-
-                    <div>
-                        <label class="block text-[11px] font-medium text-slate-400 mb-1">نرخ برابری هر تتر به تومان</label>
-                        <input type="number" name="crypto_usdt_rate" value="<?= htmlspecialchars($cryptoUsdtRate) ?>" placeholder="مثلاً 98000" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono text-center">
-                    </div>
-                </div>
-
-                <!-- Cryptocurrency / TON Network Section -->
-                <div class="pt-3 border-t border-slate-800/80 space-y-3">
-                    <div class="text-xs font-bold text-cyan-400 flex items-center gap-1.5">
-                        <i class="fa-solid fa-gem"></i>
-                        <span>پرداخت کریپتو با ارز تلگرام (TON - The Open Network)</span>
-                    </div>
-
-                    <div>
-                        <label class="block text-[11px] font-medium text-slate-400 mb-1">آدرس کیف پول شبکه TON (Tonkeeper / Wallet)</label>
-                        <input type="text" name="crypto_ton_wallet_address" value="<?= htmlspecialchars($cryptoTonWallet) ?>" placeholder="مثال: EQD4FPq-PRDieyQKkKZjmNu49pKypDryHyRMvzkBhzsJw6-h یا UQ..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono text-left" dir="ltr">
-                        <span class="text-[10px] text-slate-500 mt-0.5 block">در صورت تکمیل، دکمه پرداخت TON به پیش‌فاکتور افزوده شده و لینک پرداخت مستقیم اپلیکیشن‌های Tonkeeper و ولت تلگرام با شناسه سفارش تولید می‌گردد.</span>
-                    </div>
-
-                    <div>
-                        <label class="block text-[11px] font-medium text-slate-400 mb-1">نرخ برابری هر TON به تومان</label>
-                        <input type="number" name="crypto_ton_rate" value="<?= htmlspecialchars($cryptoTonRate) ?>" placeholder="مثلاً 380000" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono text-center">
-                    </div>
-                </div>
-
-                <!-- Free Trial Section -->
-                <div class="pt-3 border-t border-slate-800/80 space-y-3">
-                    <div class="flex items-center justify-between">
-                        <div class="text-xs font-bold text-amber-300 flex items-center gap-1.5">
-                            <i class="fa-solid fa-gift"></i>
-                            <span>تست رایگان خودکار (Free Trial)</span>
+                            <div class="text-xs font-bold text-white">فعال بودن ربات تلگرام</div>
+                            <div class="text-[11px] text-slate-400">پاسخگویی به خریداران در تلگرام</div>
                         </div>
                         <label class="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" name="trial_enabled" value="1" class="sr-only peer" <?= $trialEnabled ? 'checked' : '' ?>>
-                            <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
+                            <input type="checkbox" name="telegram_bot_active" value="1" class="sr-only peer" <?= $botActive ? 'checked' : '' ?>>
+                            <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
                         </label>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-2">
-                        <div>
-                            <label class="block text-[11px] font-medium text-slate-400 mb-1">مدت زمان (ساعت)</label>
-                            <input type="number" name="trial_duration_hours" value="<?= htmlspecialchars($trialHours) ?>" min="1" max="168" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500 font-mono text-center">
-                        </div>
-                        <div>
-                            <label class="block text-[11px] font-medium text-slate-400 mb-1">حجم تست (گیگابایت)</label>
-                            <input type="number" name="trial_traffic_gb" value="<?= htmlspecialchars($trialGb) ?>" min="1" max="50" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500 font-mono text-center">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Referral Program Section -->
-                <div class="pt-3 border-t border-slate-800/80 space-y-3">
-                    <div class="flex items-center justify-between">
-                        <div class="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
-                            <i class="fa-solid fa-users-rays"></i>
-                            <span>سامانه زیرمجموعه‌گیری و بازاریابی (Referral)</span>
-                        </div>
-                        <label class="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" name="referral_enabled" value="1" class="sr-only peer" <?= $referralEnabled ? 'checked' : '' ?>>
-                            <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-600"></div>
-                        </label>
-                    </div>
-
+                    <!-- Bot Token -->
                     <div>
-                        <label class="block text-[11px] font-medium text-slate-400 mb-1">درصد پورسانت معرف از هر خرید</label>
+                        <label class="block text-xs font-medium text-slate-300 mb-1.5">توکن ربات تلگرام (Bot Token)</label>
+                        <input type="text" name="telegram_bot_token" value="<?= htmlspecialchars($botToken) ?>" placeholder="مثال: 7123456789:AAHk..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-purple-500 font-mono text-left" dir="ltr">
+                        <p class="text-[10px] text-slate-500 mt-1">از طریق @BotFather در تلگرام دریافت می‌شود.</p>
+                    </div>
+
+                    <!-- Bot Username -->
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1.5">یوزرنیم ربات تلگرام</label>
                         <div class="relative">
-                            <input type="number" name="referral_commission_percent" value="<?= htmlspecialchars($referralPercent) ?>" min="0" max="50" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono text-center">
-                            <span class="absolute left-3 top-2 text-xs text-slate-400 font-bold">%</span>
+                            <input type="text" name="telegram_bot_username" value="<?= htmlspecialchars($botUsername) ?>" placeholder="MyVpnBot" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-purple-500 font-mono text-left pl-8" dir="ltr">
+                            <span class="absolute left-3 top-2.5 text-xs text-slate-500">@</span>
                         </div>
-                        <span class="text-[10px] text-slate-500 mt-0.5 block">به ازای هر خرید توسط زیرمجموعه، این درصد به صورت شارژ نقدی به کیف‌پول معرف اضافه می‌شود.</span>
+                    </div>
+
+                    <!-- Admin Telegram Chat ID -->
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1.5">شناسه عددی تلگرام مدیر (Admin Chat ID)</label>
+                        <input type="text" name="telegram_admin_id" value="<?= htmlspecialchars($adminId) ?>" placeholder="مثال: 123456789" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-purple-500 font-mono text-left" dir="ltr">
+                        <p class="text-[10px] text-slate-500 mt-1">ارسال مستقیم فیش‌ها، فایل‌های بکاپ و اعلانات فوری به پیوی مدیر (ربات @userinfobot).</p>
+                    </div>
+
+                    <!-- Bot Welcome Text -->
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1.5">متن پیام شروع ربات (Welcome Message)</label>
+                        <textarea name="bot_welcome_text" rows="2" placeholder="به ربات رسمی خوش آمدید..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-purple-500"><?= htmlspecialchars($settings['bot_welcome_text'] ?? '') ?></textarea>
+                    </div>
+
+                    <!-- Force Join Channel -->
+                    <div class="pt-3 border-t border-slate-800/80 space-y-2">
+                        <div class="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                            <i class="fa-solid fa-bullhorn"></i>
+                            <span>عضویت اجباری در کانال (Force Join)</span>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-medium text-slate-400 mb-1">آیدی عمومی یا عددی کانال تلگرام</label>
+                            <input type="text" name="bot_force_join_channel" value="<?= htmlspecialchars($forceJoinChannel) ?>" placeholder="@MyChannel یا -1001234567890" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-amber-500 font-mono text-left" dir="ltr">
+                            <p class="text-[10px] text-slate-500 mt-0.5">در صورت تنظیم، کاربر قبل از دسترسی موظف به عضویت است. ربات باید ادمین کانال باشد.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 2: Payments & Gateways -->
+                <div id="tabContent-payment" class="space-y-4 hidden">
+                    <!-- Card to Card Section -->
+                    <div class="space-y-3">
+                        <div class="text-xs font-bold text-purple-300 flex items-center gap-1.5">
+                            <i class="fa-solid fa-credit-card"></i>
+                            <span>اطلاعات کارت جهت واریز مشتری</span>
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] font-medium text-slate-400 mb-1">شماره کارت ۱۶ رقمی</label>
+                            <input type="text" name="card_number" value="<?= htmlspecialchars($cardNumber) ?>" placeholder="۶۰۳۷-xxxx-xxxx-xxxx" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-purple-500 font-mono text-center tracking-widest" dir="ltr">
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[11px] font-medium text-slate-400 mb-1">نام دارنده حساب</label>
+                                <input type="text" name="card_holder" value="<?= htmlspecialchars($cardHolder) ?>" placeholder="نام صاحب کارت" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-medium text-slate-400 mb-1">نام بانک</label>
+                                <input type="text" name="card_bank_name" value="<?= htmlspecialchars($cardBank) ?>" placeholder="بانک ملی" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] font-medium text-slate-400 mb-1">شماره شبا (اختیاری)</label>
+                            <input type="text" name="card_sheba" value="<?= htmlspecialchars($settings['card_sheba'] ?? '') ?>" placeholder="IR..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-purple-500 font-mono text-left" dir="ltr">
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] font-medium text-slate-400 mb-1">آیدی پشتیبانی تلگرام</label>
+                            <input type="text" name="support_telegram" value="<?= htmlspecialchars($supportTg) ?>" placeholder="@Support_ID" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-purple-500 font-mono text-left" dir="ltr">
+                        </div>
+                    </div>
+
+                    <!-- Online Payment Gateway Section -->
+                    <div class="pt-3 border-t border-slate-800/80 space-y-3">
+                        <div class="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
+                            <i class="fa-solid fa-globe"></i>
+                            <span>درگاه پرداخت آنلاین</span>
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] font-medium text-slate-400 mb-1">روش پرداخت</label>
+                            <select name="payment_gateway" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
+                                <option value="card" <?= $paymentGw === 'card' ? 'selected' : '' ?>>کارت به کارت دستی (تایید فیش)</option>
+                                <option value="zarinpal" <?= $paymentGw === 'zarinpal' ? 'selected' : '' ?>>زرین‌پال (درگاه ریالی)</option>
+                                <option value="nextpay" <?= $paymentGw === 'nextpay' ? 'selected' : '' ?>>نکست‌پی (NextPay)</option>
+                                <option value="nowpayments" <?= $paymentGw === 'nowpayments' ? 'selected' : '' ?>>NOWPayments (درگاه کریپتو)</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] font-medium text-slate-400 mb-1">مرچنت زرین‌پال</label>
+                            <input type="text" name="zarinpal_merchant" value="<?= htmlspecialchars($zarinMerchant) ?>" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono text-left" dir="ltr">
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[10px] text-slate-400 mb-1">API Key نکست‌پی</label>
+                                <input type="text" name="nextpay_apikey" value="<?= htmlspecialchars($nextpayKey) ?>" placeholder="api_key_..." class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white font-mono text-left" dir="ltr">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-slate-400 mb-1">API Key درگاه NOWPayments</label>
+                                <input type="text" name="nowpayments_apikey" value="<?= htmlspecialchars($nowpaymentsKey) ?>" placeholder="NOWPayments Key..." class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white font-mono text-left" dir="ltr">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Cryptocurrency USDT TRC20 & TON Section -->
+                    <div class="pt-3 border-t border-slate-800/80 space-y-3">
+                        <div class="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                            <i class="fa-solid fa-coins"></i>
+                            <span>پرداخت کریپتو مستقیم (USDT TRC-20 و شبکه TON)</span>
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] font-medium text-slate-400 mb-1">آدرس ولت تتر (TRC-20)</label>
+                            <input type="text" name="crypto_usdt_trc20_address" value="<?= htmlspecialchars($cryptoUsdtWallet) ?>" placeholder="TLa5xxxx..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono text-left" dir="ltr">
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[10px] text-slate-400 mb-1">نرخ هر تتر (تومان)</label>
+                                <input type="number" name="crypto_usdt_rate" value="<?= htmlspecialchars($cryptoUsdtRate) ?>" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white font-mono text-center">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-slate-400 mb-1">نرخ هر TON (تومان)</label>
+                                <input type="number" name="crypto_ton_rate" value="<?= htmlspecialchars($cryptoTonRate) ?>" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white font-mono text-center">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] font-medium text-slate-400 mb-1">آدرس ولت TON (Tonkeeper / Wallet)</label>
+                            <input type="text" name="crypto_ton_wallet_address" value="<?= htmlspecialchars($cryptoTonWallet) ?>" placeholder="EQD4FPq-PRDieyQKkKZjmNu49pKypDryHyRMvzkBhzsJw6-h" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono text-left" dir="ltr">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 3: Growth, Free Trial & Referral -->
+                <div id="tabContent-growth" class="space-y-4 hidden">
+                    <!-- Free Trial Section -->
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between">
+                            <div class="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                                <i class="fa-solid fa-gift"></i>
+                                <span>تست رایگان خودکار (Free Trial)</span>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" name="trial_enabled" value="1" class="sr-only peer" <?= $trialEnabled ? 'checked' : '' ?>>
+                                <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
+                            </label>
+                        </div>
+
+                        <div class="grid grid-cols-3 gap-2">
+                            <div>
+                                <label class="block text-[10px] font-medium text-slate-400 mb-1">مدت زمان (ساعت)</label>
+                                <input type="number" name="trial_duration_hours" value="<?= htmlspecialchars($trialHours) ?>" min="1" max="720" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-2 py-2 text-xs text-white focus:outline-none focus:border-amber-500 font-mono text-center">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-medium text-slate-400 mb-1">حجم به مگابایت (MB)</label>
+                                <input type="number" name="trial_traffic_mb" value="<?= htmlspecialchars($trialMb) ?>" min="0" placeholder="مثلاً 500" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-2 py-2 text-xs text-white focus:outline-none focus:border-amber-500 font-mono text-center">
+                                <span class="text-[9px] text-amber-400 block text-center mt-0.5">اولویت اصلی</span>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-medium text-slate-400 mb-1">حجم به گیگ (GB)</label>
+                                <input type="number" name="trial_traffic_gb" value="<?= htmlspecialchars($trialGb) ?>" min="1" max="50" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-2 py-2 text-xs text-white focus:outline-none focus:border-amber-500 font-mono text-center">
+                                <span class="text-[9px] text-slate-500 block text-center mt-0.5">در صورت ۰ بودن MB</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Referral Program Section -->
+                    <div class="pt-3 border-t border-slate-800/80 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <div class="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
+                                <i class="fa-solid fa-users-rays"></i>
+                                <span>سامانه زیرمجموعه‌گیری و بازاریابی (Referral)</span>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" name="referral_enabled" value="1" class="sr-only peer" <?= $referralEnabled ? 'checked' : '' ?>>
+                                <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-600"></div>
+                            </label>
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] font-medium text-slate-400 mb-1">درصد پورسانت معرف از هر خرید</label>
+                            <div class="relative">
+                                <input type="number" name="referral_commission_percent" value="<?= htmlspecialchars($referralPercent) ?>" min="0" max="50" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono text-center">
+                                <span class="absolute left-3 top-2 text-xs text-slate-400 font-bold">%</span>
+                            </div>
+                            <span class="text-[10px] text-slate-500 mt-0.5 block">به ازای هر خرید توسط زیرمجموعه، این درصد به عنوان شارژ نقدی به کیف‌پول معرف اضافه می‌شود.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 4: UI Customization & Supergroup Topics -->
+                <div id="tabContent-ui" class="space-y-4 hidden">
+                    <!-- Supergroup Forum Topics Section -->
+                    <div class="space-y-3">
+                        <div class="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                            <i class="fa-solid fa-layer-group"></i>
+                            <span>سوپرگروه لاگ و تاپیک‌های انجمن (Forum Topics)</span>
+                        </div>
+                        <p class="text-[10px] text-slate-400">تفکیک گزارش خریدها، بکاپ‌ها، سلامت سرورها و تراکنش‌ها در تاپیک‌های اختصاصی تلگرام.</p>
+
+                        <div>
+                            <label class="block text-[11px] font-medium text-slate-400 mb-1">شناسه عددی سوپرگروه لاگ (Supergroup ID)</label>
+                            <div class="flex items-center gap-2">
+                                <input type="text" id="botLogChannelInput" name="bot_log_channel" value="<?= htmlspecialchars($logSupergroup) ?>" placeholder="-1001234567890" class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono text-left" dir="ltr">
+                                <button type="button" onclick="autoCreateForumTopics()" id="btnAutoTopics" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[11px] font-bold transition flex items-center gap-1.5 shrink-0 shadow">
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                                    <span>ساخت خودکار تاپیک‌ها</span>
+                                </button>
+                            </div>
+                            <span id="topicAutoStatus" class="text-[10px] text-slate-500 mt-1 block"></span>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2 text-[11px]">
+                            <div>
+                                <label class="block text-[10px] text-slate-400 mb-1">🛒 تاپیک خریدها (Thread ID)</label>
+                                <input type="text" id="topicSalesInput" name="bot_topic_sales" value="<?= htmlspecialchars($topicSales) ?>" placeholder="شناسه تاپیک" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white font-mono text-center" dir="ltr">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-slate-400 mb-1">💾 تاپیک بکاپ دیتابیس</label>
+                                <input type="text" id="topicBackupInput" name="bot_topic_backup" value="<?= htmlspecialchars($topicBackup) ?>" placeholder="شناسه تاپیک" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white font-mono text-center" dir="ltr">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-slate-400 mb-1">⚡️ تاپیک سلامت سرورها</label>
+                                <input type="text" id="topicServersInput" name="bot_topic_servers" value="<?= htmlspecialchars($topicServers) ?>" placeholder="شناسه تاپیک" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white font-mono text-center" dir="ltr">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-slate-400 mb-1">👥 تاپیک کاربران و نمایندگی</label>
+                                <input type="text" id="topicUsersInput" name="bot_topic_users" value="<?= htmlspecialchars($topicUsers) ?>" placeholder="شناسه تاپیک" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white font-mono text-center" dir="ltr">
+                            </div>
+                            <div class="col-span-2">
+                                <label class="block text-[10px] text-slate-400 mb-1">🪙 تاپیک پرداخت‌های کریپتو (USDT/TON)</label>
+                                <input type="text" id="topicCryptoInput" name="bot_topic_crypto" value="<?= htmlspecialchars($topicCrypto) ?>" placeholder="شناسه تاپیک" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white font-mono text-center" dir="ltr">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Custom Button Labels Section -->
+                    <div class="pt-3 border-t border-slate-800/80 space-y-3">
+                        <div class="text-xs font-bold text-sky-400 flex items-center gap-1.5">
+                            <i class="fa-solid fa-keyboard"></i>
+                            <span>شخصی‌سازی عناوین دکمه‌های ربات</span>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[10px] text-slate-400 mb-1">دکمه خرید</label>
+                                <input type="text" name="btn_buy_text" value="<?= htmlspecialchars($btnBuyText) ?>" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white text-center">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-slate-400 mb-1">دکمه تمدید</label>
+                                <input type="text" name="btn_renew_text" value="<?= htmlspecialchars($btnRenewText) ?>" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white text-center">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-slate-400 mb-1">دکمه حساب‌های من</label>
+                                <input type="text" name="btn_my_accounts_text" value="<?= htmlspecialchars($btnMyAccText) ?>" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white text-center">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-slate-400 mb-1">دکمه تست رایگان</label>
+                                <input type="text" name="btn_trial_text" value="<?= htmlspecialchars($btnTrialText) ?>" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white text-center">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-slate-400 mb-1">دکمه کسب درآمد</label>
+                                <input type="text" name="btn_referral_text" value="<?= htmlspecialchars($btnRefText) ?>" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white text-center">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-slate-400 mb-1">دکمه دانلود و آموزش</label>
+                                <input type="text" name="btn_apps_text" value="<?= htmlspecialchars($btnAppsText) ?>" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white text-center">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-slate-400 mb-1">دکمه پشتیبانی</label>
+                                <input type="text" name="btn_support_text" value="<?= htmlspecialchars($btnSupportText) ?>" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white text-center">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-slate-400 mb-1">دکمه اخذ نمایندگی</label>
+                                <input type="text" name="btn_reseller_text" value="<?= htmlspecialchars($btnResellerText) ?>" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white text-center">
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 <div class="pt-3">
                     <button type="submit" class="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs shadow-lg shadow-purple-600/30 transition flex items-center justify-center gap-2">
                         <i class="fa-solid fa-floppy-disk"></i>
-                        <span>ذخیره کلیه تنظیمات</span>
+                        <span>ذخیره کلیه تنظیمات ربات</span>
                     </button>
                 </div>
             </form>
@@ -562,6 +588,23 @@ $isWebhookSet = !empty($webhookInfo['result']['url'] ?? '');
 </div>
 
 <script>
+function switchBotTab(tab) {
+    const tabs = ['core', 'payment', 'growth', 'ui'];
+    tabs.forEach(t => {
+        const pane = document.getElementById('tabContent-' + t);
+        const btn = document.getElementById('tabBtn-' + t);
+        if (pane && btn) {
+            if (t === tab) {
+                pane.classList.remove('hidden');
+                btn.className = 'py-2 px-1 rounded-lg font-bold text-center transition bg-purple-600 text-white shadow text-[11px] truncate';
+            } else {
+                pane.classList.add('hidden');
+                btn.className = 'py-2 px-1 rounded-lg font-medium text-center transition text-slate-400 hover:text-white text-[11px] truncate';
+            }
+        }
+    });
+}
+
 function autoCreateForumTopics() {
     const btn = document.getElementById('btnAutoTopics');
     const status = document.getElementById('topicAutoStatus');

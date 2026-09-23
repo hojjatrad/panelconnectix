@@ -145,6 +145,30 @@ require __DIR__ . '/../layout/header.php';
                     </a>
                 </div>
             </div>
+
+            <!-- Database Restore Card -->
+            <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-sm space-y-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-amber-600/20 text-amber-400 flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                    </div>
+                    <div>
+                        <h4 class="text-xs font-bold text-white">بازگردانی پایگاه داده (Restore Database)</h4>
+                        <p class="text-[11px] text-slate-400">آپلود و بازیابی فایل پشتیبان SQL با بررسی و امنیت کامل</p>
+                    </div>
+                </div>
+
+                <form action="<?= Helpers::url('settings/restore') ?>" method="POST" enctype="multipart/form-data" class="space-y-3" onsubmit="return confirm('⚠️ هشدار مهم:\nبا بازگردانی فایل، اطلاعات و ساختار جداول با نسخه بکاپ هماهنگ خواهند شد.\nآیا از ادامه عملیات بازگردانی اطمینان دارید؟');">
+                    <?= Helpers::csrfField() ?>
+                    <div>
+                        <input type="file" name="backup_file" required accept=".sql" class="w-full text-xs text-slate-400 file:mr-0 file:ml-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-amber-300 hover:file:bg-slate-700 bg-slate-950/80 p-1.5 rounded-xl border border-slate-800">
+                    </div>
+                    <button type="submit" class="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs text-center transition flex items-center justify-center gap-2 shadow-lg shadow-amber-900/30">
+                        <i class="fa-solid fa-rotate-left"></i>
+                        <span>بارگذاری و بازگردانی فایل پشتیبان</span>
+                    </button>
+                </form>
+            </div>
             <?php endif; ?>
         </div>
     </div>

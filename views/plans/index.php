@@ -89,16 +89,21 @@ if (empty($categories)) $categories = ['۱ ماهه', '۲ ماهه', '۳ ماه�
                             <span class="font-bold text-purple-300 font-mono"><?= ($p['ip_limit'] ?? 2) > 0 ? ($p['ip_limit'] ?? 2) . ' دستگاه' : 'نامحدود' ?></span>
                         </div>
                         <div class="flex justify-between text-slate-400">
-                            <span>نود اختصاصی / کلاستر:</span>
+                            <span>خوشه / سرور:</span>
                             <?php if (!empty($p['server_name'])): ?>
                                 <span class="font-bold text-purple-300 text-[11px] flex items-center gap-1 font-mono" title="<?= htmlspecialchars($p['server_subdomain'] ?? '') ?>">
                                     <i class="fa-solid fa-server text-[9px] text-purple-400"></i>
-                                    <?= htmlspecialchars($p['server_name']) ?> (<?= strtoupper($p['server_driver'] ?? '') ?>)
+                                    <?= htmlspecialchars($p['server_name']) ?>
+                                </span>
+                            <?php elseif (!empty($p['cluster_name'])): ?>
+                                <span class="font-bold text-cyan-300 text-[11px] flex items-center gap-1 font-mono">
+                                    <i class="fa-solid <?= htmlspecialchars($p['cluster_icon'] ?: 'fa-globe') ?> text-[9px]"></i>
+                                    <?= htmlspecialchars($p['cluster_name']) ?>
                                 </span>
                             <?php else: ?>
                                 <span class="text-cyan-400 text-[11px] flex items-center gap-1 font-mono">
                                     <i class="fa-solid fa-network-wired text-[9px]"></i>
-                                    کلاستر هوشمند (<?= strtoupper($p['server_group']) ?>)
+                                    کلاستر (<?= strtoupper($p['server_group']) ?>)
                                 </span>
                             <?php endif; ?>
                         </div>
@@ -199,12 +204,15 @@ if (empty($categories)) $categories = ['۱ ماهه', '۲ ماهه', '۳ ماه�
                 </div>
 
                 <div>
-                    <label class="block text-slate-300 mb-1 font-semibold">گروه سرور مجاز</label>
-                    <select name="server_group" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white">
-                        <option value="default">عادی (Default)</option>
-                        <option value="economic">اقتصادی (Economic)</option>
-                        <option value="iran_access">ایران اکسس (Iran Access)</option>
-                        <option value="vip">تجاری VIP (Business Class)</option>
+                    <label class="block text-slate-300 mb-1 font-semibold">دسته‌بندی خوشه سرور *</label>
+                    <select name="category_id" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white">
+                        <?php if (!empty($dbCategories)): ?>
+                            <?php foreach ($dbCategories as $cat): ?>
+                                <option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['name']) ?> (<?= htmlspecialchars($cat['slug']) ?>)</option>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <option value="">عادی (Default)</option>
+                        <?php endif; ?>
                     </select>
                 </div>
 
@@ -296,12 +304,15 @@ if (empty($categories)) $categories = ['۱ ماهه', '۲ ماهه', '۳ ماه�
                 </div>
 
                 <div>
-                    <label class="block text-slate-300 mb-1 font-semibold">گروه سرور مجاز</label>
-                    <select name="server_group" id="edit_server_group" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white">
-                        <option value="default">عادی (Default)</option>
-                        <option value="economic">اقتصادی (Economic)</option>
-                        <option value="iran_access">ایران اکسس (Iran Access)</option>
-                        <option value="vip">تجاری VIP (Business Class)</option>
+                    <label class="block text-slate-300 mb-1 font-semibold">دسته‌بندی خوشه سرور *</label>
+                    <select name="category_id" id="edit_category_id" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white">
+                        <?php if (!empty($dbCategories)): ?>
+                            <?php foreach ($dbCategories as $cat): ?>
+                                <option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['name']) ?> (<?= htmlspecialchars($cat['slug']) ?>)</option>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <option value="">عادی (Default)</option>
+                        <?php endif; ?>
                     </select>
                 </div>
 
@@ -381,7 +392,9 @@ if (empty($categories)) $categories = ['۱ ماهه', '۲ ماهه', '۳ ماه�
         document.getElementById('edit_id').value = p.id;
         document.getElementById('edit_title').value = p.title;
         document.getElementById('edit_category').value = p.category || '۱ ماهه';
-        document.getElementById('edit_server_group').value = p.server_group || 'default';
+        if (document.getElementById('edit_category_id')) {
+            document.getElementById('edit_category_id').value = p.category_id || (p.server_group === 'vip' ? 2 : (p.server_group === 'economic' ? 3 : (p.server_group === 'iran_access' ? 4 : 1)));
+        }
         document.getElementById('edit_server_id').value = p.server_id || '';
         document.getElementById('edit_traffic_gb').value = p.traffic_gb;
         document.getElementById('edit_duration_days').value = p.duration_days;

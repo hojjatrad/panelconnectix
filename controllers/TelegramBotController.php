@@ -319,6 +319,70 @@ class TelegramBotController {
             return;
         }
 
+        // Database Backup Restore Confirmation
+        if ($data === 'confirm_db_restore') {
+            $session = self::getSession($pdo, $fromId);
+            $ctx = self::getContext($pdo);
+            if ($session && $session['step'] === 'confirm_sql_restore') {
+                $fileInfo = $session['data'] ?? [];
+                $fileId = $fileInfo['file_id'] ?? '';
+                $fileName = $fileInfo['file_name'] ?? 'backup.sql';
+
+                TelegramBot::answerCallbackQuery($cbId, 'درحال دانلود و اجرای فایل دیتابیس...', false);
+                if ($messageId) {
+                    TelegramBot::editMessageText("⏳ <b>درحال پردازش و بازگردانی دیتابیس...</b>\nلطفاً چند ثانیه شکیبا باشید.", $chatId, $messageId, null, $ctx['bot_token']);
+                }
+
+                $tgFile = TelegramBot::getFile($fileId, $ctx['bot_token']);
+                if ($tgFile && !empty($tgFile['file_path'])) {
+                    $sqlContent = TelegramBot::downloadFile($tgFile['file_path'], $ctx['bot_token']);
+                    if (!empty($sqlContent)) {
+                        $restoreResult = Database::restoreFromSql($sqlContent);
+                        self::clearSession($pdo, $fromId);
+
+                        if ($restoreResult['success']) {
+                            Helpers::logActivity('backup_restore_tg', "بازگردانی دیتابیس از تلگرام ({$fileName}) با موفقیت انجام شد ({$restoreResult['executed']} کوئری)", 'system');
+                            $successMsg = "🎉 <b>بازگردانی پایگاه داده با موفقیت کامل انجام شد!</b>\n\n"
+                                        . "📄 فایل: <code>{$fileName}</code>\n"
+                                        . "⚡️ تعداد دستورات موفق: <b>{$restoreResult['executed']}</b> کوئری\n"
+                                        . "🕒 تاریخ و ساعت: " . date('Y-m-d H:i:s');
+                            if ($messageId) {
+                                TelegramBot::editMessageText($successMsg, $chatId, $messageId, self::getMainMenuInlineKeyboard($pdo, $fromId), $ctx['bot_token']);
+                            } else {
+                                TelegramBot::sendMessage($successMsg, $chatId, self::getMainMenuInlineKeyboard($pdo, $fromId), $ctx['bot_token']);
+                            }
+                        } else {
+                            $errMsg = "❌ <b>خطا در بازگردانی دیتابیس:</b>\n" . htmlspecialchars($restoreResult['error'] ?? 'خطای ناشناخته');
+                            if ($messageId) {
+                                TelegramBot::editMessageText($errMsg, $chatId, $messageId, self::getMainMenuInlineKeyboard($pdo, $fromId), $ctx['bot_token']);
+                            } else {
+                                TelegramBot::sendMessage($errMsg, $chatId, self::getMainMenuInlineKeyboard($pdo, $fromId), $ctx['bot_token']);
+                            }
+                        }
+                    } else {
+                        self::clearSession($pdo, $fromId);
+                        TelegramBot::sendMessage("❌ خطا در دانلود فایل پشتیبان از سرور تلگرام.", $chatId, null, $ctx['bot_token']);
+                    }
+                } else {
+                    self::clearSession($pdo, $fromId);
+                    TelegramBot::sendMessage("❌ دسترسی به اطلاعات فایل تلگرام مقدور نبود.", $chatId, null, $ctx['bot_token']);
+                }
+            } else {
+                TelegramBot::answerCallbackQuery($cbId, 'درخواست منقضی شده است.', true);
+            }
+            return;
+        }
+
+        if ($data === 'cancel_db_restore') {
+            $ctx = self::getContext($pdo);
+            self::clearSession($pdo, $fromId);
+            TelegramBot::answerCallbackQuery($cbId, 'عملیات لغو شد.', false);
+            if ($messageId) {
+                TelegramBot::editMessageText("❌ عملیات بازگردانی دیتابیس لغو شد.", $chatId, $messageId, self::getMainMenuInlineKeyboard($pdo, $fromId), $ctx['bot_token']);
+            }
+            return;
+        }
+
         // Before executing other actions, verify channel membership if enabled
         if (!self::checkForceJoin($pdo, $chatId, $fromId)) {
             TelegramBot::answerCallbackQuery($cbId, '⚠️ عضویت در کانال جهت استفاده از ربات الزامی است.', true);
@@ -895,6 +959,48 @@ class TelegramBotController {
         if ($session && str_starts_with($session['step'], 'reseller_apply_')) {
             self::handleResellerApplicationStep($pdo, $chatId, $fromId, $text, $session, $msg['from'] ?? []);
             return;
+        }
+
+        // Document Upload (SQL Database Restore from Admin)
+        if (isset($msg['document']) && is_array($msg['document'])) {
+            $doc = $msg['document'];
+            $fileName = $doc['file_name'] ?? '';
+            $fileId = $doc['file_id'] ?? '';
+            $ctx = self::getContext($pdo);
+            $adminId = (string)($ctx['admin_chat_id'] ?? Setting::get('telegram_admin_id', ''));
+
+            $isAdmin = (!empty($adminId) && ($fromId === $adminId || $chatId === $adminId));
+            $isSql = str_ends_with(strtolower($fileName), '.sql');
+
+            if ($isAdmin && $isSql) {
+                self::setSession($pdo, $fromId, 'confirm_sql_restore', [
+                    'file_id' => $fileId,
+                    'file_name' => $fileName,
+                    'file_size' => $doc['file_size'] ?? 0
+                ]);
+
+                $fileSizeKb = round(($doc['file_size'] ?? 0) / 1024, 1);
+                $confirmMsg = "⚠️ <b>درخواست بازگردانی پایگاه داده (Database Restore)</b>\n\n"
+                            . "📄 فایل: <code>{$fileName}</code> ({$fileSizeKb} KB)\n"
+                            . "👤 هویت: مدیریت سیستم تایید گردید.\n\n"
+                            . "آیا مایلید تمام داده‌ها و تنظیمات با این فایل پشتیبان هماهنگ و بازگردانی شوند؟\n"
+                            . "<i>نکته: رکوردهای موجود با رکوردهای این فایل بازنویسی و ادغام خواهند شد.</i>";
+
+                $keyboard = [
+                    'inline_keyboard' => [
+                        [
+                            ['text' => '✅ تایید و بازگردانی دیتابیس', 'callback_data' => 'confirm_db_restore'],
+                            ['text' => '❌ لغو عملیات', 'callback_data' => 'cancel_db_restore']
+                        ]
+                    ]
+                ];
+
+                TelegramBot::sendMessage($confirmMsg, $chatId, $keyboard, $ctx['bot_token']);
+                return;
+            } elseif ($isSql && !$isAdmin) {
+                TelegramBot::sendMessage("⛔️ شما دسترسی لازم جهت بازگردانی دیتابیس را ندارید.", $chatId, null, $ctx['bot_token']);
+                return;
+            }
         }
 
         // Photo Upload: Receipt
@@ -1931,6 +2037,7 @@ class TelegramBotController {
         Setting::set('trial_enabled', isset($_POST['trial_enabled']) ? '1' : '0');
         Setting::set('trial_duration_hours', (string)(int)($_POST['trial_duration_hours'] ?? 24));
         Setting::set('trial_traffic_gb', (string)(int)($_POST['trial_traffic_gb'] ?? 1));
+        Setting::set('trial_traffic_mb', (string)(int)($_POST['trial_traffic_mb'] ?? 0));
 
         // Feature 4: Referral / Affiliate Settings
         Setting::set('referral_enabled', isset($_POST['referral_enabled']) ? '1' : '0');
