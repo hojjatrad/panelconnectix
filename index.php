@@ -239,6 +239,7 @@ $router->post('resellers/update-discount', [ResellerController::class, 'updateDi
 $router->post('resellers/reset-password', [ResellerController::class, 'resetPassword']);
 $router->post('resellers/delete', [ResellerController::class, 'delete']);
 $router->get('resellers/clients', [ResellerController::class, 'clients']);
+$router->get('resellers/backup', [ResellerController::class, 'backupAction']);
 $router->get('resellers/applications', [ResellerController::class, 'applications']);
 $router->post('resellers/applications/approve', [ResellerController::class, 'approveApplication']);
 $router->post('resellers/applications/reject', [ResellerController::class, 'rejectApplication']);

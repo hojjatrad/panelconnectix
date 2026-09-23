@@ -176,12 +176,14 @@ class ResellerController {
         if ($discount < 0) $discount = 0;
         if ($discount > 100) $discount = 100;
 
-        $pdo = Database::getConnection();
-        $stmt = $pdo->prepare("UPDATE users SET discount_percent = ? WHERE id = ? AND role = 'reseller'");
-        $stmt->execute([$discount, $userId]);
+        $autoTier = isset($_POST['auto_tier_enabled']) ? 1 : 0;
 
-        Helpers::logActivity('reseller_discount', "تغییر درصد تخفیف نماینده {$userId} به {$discount}٪", 'reseller', (string)$userId);
-        Helpers::flash('success', "درصد تخفیف نماینده با موفقیت به {$discount}٪ تغییر یافت.");
+        $pdo = Database::getConnection();
+        $stmt = $pdo->prepare("UPDATE users SET discount_percent = ?, auto_tier_enabled = ? WHERE id = ? AND role = 'reseller'");
+        $stmt->execute([$discount, $autoTier, $userId]);
+
+        Helpers::logActivity('reseller_discount', "تنظیم درصد تخفیف نماینده {$userId} به {$discount}٪ (ارتقای خودکار: " . ($autoTier ? 'فعال' : 'غیرفعال') . ")", 'reseller', (string)$userId);
+        Helpers::flash('success', "درصد تخفیف نماینده با موفقیت به {$discount}٪ تنظیم و ذخیره شد.");
         Helpers::redirect('resellers');
     }
 
@@ -440,5 +442,69 @@ class ResellerController {
         }
 
         Helpers::redirect('resellers/applications');
+    }
+
+    public function backupAction(): void {
+        Auth::requireAdmin();
+        $resellerId = (int)($_GET['id'] ?? 0);
+        if ($resellerId <= 0) {
+            Helpers::flash('error', 'شناسه نماینده نامعتبر است.');
+            Helpers::redirect('resellers');
+        }
+
+        $pdo = Database::getConnection();
+        $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ? AND role = 'reseller'");
+        $stmt->execute([$resellerId]);
+        $reseller = $stmt->fetch();
+        if (!$reseller) {
+            Helpers::flash('error', 'نماینده مورد نظر یافت نشد.');
+            Helpers::redirect('resellers');
+        }
+
+        $clients = $pdo->prepare("SELECT * FROM clients WHERE reseller_id = ?");
+        $clients->execute([$resellerId]);
+        $clientRows = $clients->fetchAll();
+
+        $trans = $pdo->prepare("SELECT * FROM transactions WHERE user_id = ?");
+        $trans->execute([$resellerId]);
+        $tranRows = $trans->fetchAll();
+
+        $backupData = [
+            'version' => Updater::CURRENT_VERSION,
+            'timestamp' => time(),
+            'reseller' => [
+                'id' => $reseller['id'],
+                'username' => $reseller['username'],
+                'wallet_balance' => $reseller['wallet_balance'],
+                'discount_percent' => $reseller['discount_percent'],
+                'auto_tier_enabled' => $reseller['auto_tier_enabled']
+            ],
+            'clients_count' => count($clientRows),
+            'clients' => $clientRows,
+            'transactions_count' => count($tranRows),
+            'transactions' => $tranRows
+        ];
+
+        $json = json_encode($backupData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        $filename = "backup_reseller_{$reseller['username']}_" . date('Y-m-d_H-i') . ".json";
+        $tempPath = sys_get_temp_dir() . '/' . $filename;
+        file_put_contents($tempPath, $json);
+
+        $caption = "🤖 <b>بکاپ ربات و پنل نماینده: {$reseller['username']}</b>\n\n"
+            . "👥 <b>تعداد کلاینت‌ها:</b> " . count($clientRows) . " کاربر\n"
+            . "💳 <b>تراکنش‌ها:</b> " . count($tranRows) . " تراکنش\n"
+            . "💰 <b>موجودی کیف پول:</b> " . number_format($reseller['wallet_balance']) . " تومان\n"
+            . "📅 <b>تاریخ پشتیبان:</b> " . date('Y-m-d H:i:s');
+
+        TelegramBot::sendTopicLog('backup_reseller', $caption, null, $tempPath);
+        
+        Helpers::logActivity('reseller_backup', "تولید بکاپ اختصاصی نماینده {$reseller['username']} و ارسال به تاپیک تلگرام", 'reseller', (string)$resellerId);
+
+        // Offer direct JSON download
+        header('Content-Type: application/json; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        echo $json;
+        @unlink($tempPath);
+        exit;
     }
 }

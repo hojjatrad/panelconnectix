@@ -100,7 +100,7 @@ $pendingCount = $pendingAppsCount ?? 0;
                             <?php endif; ?>
                         </td>
                         <td class="p-3.5 whitespace-nowrap">
-                            <button onclick="openDiscountModal(<?= $r['id'] ?>, '<?= htmlspecialchars($r['username']) ?>', <?= (int)$tier['discount'] ?>)" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30 transition text-xs group" title="کلیک برای ویرایش درصد تخفیف (موثر: <?= $tier['discount'] ?>٪)">
+                            <button onclick="openDiscountModal(<?= $r['id'] ?>, '<?= htmlspecialchars($r['username']) ?>', <?= (int)$r['discount_percent'] ?>, <?= (int)($r['auto_tier_enabled'] ?? 1) ?>)" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30 transition text-xs group" title="کلیک برای ویرایش درصد تخفیف (تخفیف پایه: <?= $r['discount_percent'] ?>٪ / موثر: <?= $tier['discount'] ?>٪)">
                                 <span><?= $tier['discount'] ?>%</span>
                                 <i class="fa-solid fa-pen text-[9px] text-purple-400 group-hover:scale-125 transition-transform"></i>
                             </button>
@@ -133,6 +133,9 @@ $pendingCount = $pendingAppsCount ?? 0;
                                 <button onclick="copyResellerDetails('<?= htmlspecialchars($r['username']) ?>', '<?= htmlspecialchars($r['brand_name']) ?>', '<?= htmlspecialchars($r['panel_password_display'] ?? '') ?>')" class="w-8 h-8 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 transition flex items-center justify-center text-xs" title="کپی پیام آماده حاوی آدرس پنل و مشخصات برای ارسال به نماینده">
                                     <i class="fa-solid fa-share-nodes"></i>
                                 </button>
+                                <a href="<?= Helpers::url('resellers/backup?id=' . $r['id']) ?>" class="w-8 h-8 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 transition flex items-center justify-center text-xs" title="دانلود و ارسال بکاپ این نماینده به تاپیک تلگرام">
+                                    <i class="fa-solid fa-cloud-arrow-down"></i>
+                                </a>
                                 <button onclick="openDeleteResellerModal(<?= $r['id'] ?>, '<?= htmlspecialchars($r['username']) ?>', <?= (int)$r['client_count'] ?>, '<?= Helpers::formatMoney($r['wallet_balance']) ?>')" class="w-8 h-8 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition flex items-center justify-center text-xs" title="حذف حساب این نماینده">
                                     <i class="fa-solid fa-trash"></i>
                                 </button>
@@ -233,6 +236,18 @@ $pendingCount = $pendingAppsCount ?? 0;
                 <span class="text-[10px] text-slate-400 mt-1 block">این درصد به صورت خودکار هنگام صدور اشتراک توسط نماینده یا در خریدهای ربات تلگرام اختصاصی او از قیمت پایه کسر می‌گردد.</span>
             </div>
 
+            <!-- Auto Tiering Switch -->
+            <div class="p-3 bg-slate-800/60 rounded-xl border border-slate-700/60 flex items-center justify-between">
+                <div>
+                    <strong class="text-white block font-medium">سیستم ارتقای خودکار پلکانی (Auto-Tiering)</strong>
+                    <span class="text-[10px] text-slate-400">در صورت فعال بودن، با افزایش تعداد کاربران نماینده درصد تخفیف او به سطوح نقره‌ای (۲۵٪)، طلایی (۳۵٪) یا الماس (۴۵٪) ارتقا می‌یابد.</span>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" name="auto_tier_enabled" id="discountAutoTier" value="1" class="sr-only peer">
+                    <div class="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                </label>
+            </div>
+
             <div>
                 <label class="block text-slate-400 mb-1.5 font-medium text-[11px]">انتخاب سریع تخفیف‌های متداول:</label>
                 <div class="grid grid-cols-4 gap-1.5">
@@ -329,10 +344,11 @@ function closeCreditLimitModal() {
     document.getElementById('creditLimitModal').classList.add('hidden');
 }
 
-function openDiscountModal(id, username, discount) {
+function openDiscountModal(id, username, discount, autoTier) {
     document.getElementById('discountUserId').value = id;
     document.getElementById('discountUsername').innerText = username;
     document.getElementById('discountPercentInput').value = discount || 0;
+    document.getElementById('discountAutoTier').checked = (parseInt(autoTier) === 1);
     document.getElementById('discountModal').classList.remove('hidden');
     document.getElementById('discountModal').classList.add('flex');
 }

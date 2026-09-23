@@ -158,7 +158,10 @@ class MetadataController {
 
         require_once __DIR__ . '/../core/TelegramBot.php';
         $caption = "📦 <b>پشتیبان‌گیری کامل پایگاه داده دیتابیس</b>\n📅 تاریخ: " . date('Y-m-d H:i:s') . "\n🛡 سیستم امنیتی Connectix Panel";
-        $sent = TelegramBot::sendDocument($tempPath, $caption);
+        $sent = TelegramBot::sendTopicLog('backup_all', $caption, null, $tempPath);
+        if (!$sent) {
+            $sent = TelegramBot::sendDocument($tempPath, $caption);
+        }
         @unlink($tempPath);
 
         Helpers::logActivity('backup_telegram', 'تولید و ارسال فایل پشتیبان کامل به تلگرام', 'system');

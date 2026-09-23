@@ -280,17 +280,18 @@ class Provisioner {
             $tier = 'silver';
             $title = 'نقره‌ای';
             $badge = '🥈';
-            $tierDiscount = 25;
+            $tierDiscount = max(25, $baseDiscount);
             $nextTarget = '۲۵ کلاینت فعال یا ۵ میلیون تومان خرید برای سطح طلایی (۳۵٪ تخفیف)';
         } else {
             $tier = 'bronze';
             $title = 'برنزی';
             $badge = '🥉';
-            $tierDiscount = 15;
+            $tierDiscount = $baseDiscount; // Bronze keeps the admin's exact custom discount!
             $nextTarget = '۱۰ کلاینت فعال یا ۲ میلیون تومان خرید برای سطح نقره‌ای (۲۵٪ تخفیف)';
         }
 
-        $effectiveDiscount = $autoTier ? max($baseDiscount, $tierDiscount) : $baseDiscount;
+        // If auto_tier_enabled is 1, apply tier promotions; otherwise strictly enforce base discount!
+        $effectiveDiscount = ($autoTier === 1) ? max($baseDiscount, $tierDiscount) : $baseDiscount;
 
         return [
             'tier' => $tier,

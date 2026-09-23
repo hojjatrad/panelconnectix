@@ -2261,13 +2261,12 @@ class TelegramBotController {
         // Feature: Force Join Channel
         Setting::set('bot_force_join_channel', trim($_POST['bot_force_join_channel'] ?? ''));
 
-        // Feature: Forum Supergroup & Topic Thread IDs
+        // Feature: Forum Supergroup & 11 Specialized Topic Thread IDs
         Setting::set('bot_log_channel', trim($_POST['bot_log_channel'] ?? ''));
-        Setting::set('bot_topic_sales', trim($_POST['bot_topic_sales'] ?? ''));
-        Setting::set('bot_topic_backup', trim($_POST['bot_topic_backup'] ?? ''));
-        Setting::set('bot_topic_servers', trim($_POST['bot_topic_servers'] ?? ''));
-        Setting::set('bot_topic_users', trim($_POST['bot_topic_users'] ?? ''));
-        Setting::set('bot_topic_crypto', trim($_POST['bot_topic_crypto'] ?? ''));
+        $allTopicKeys = ['nightly', 'backup_reseller', 'backup_all', 'notifications', 'services', 'sales', 'finance', 'trials', 'general', 'commissions', 'errors'];
+        foreach ($allTopicKeys as $tk) {
+            Setting::set("bot_topic_{$tk}", trim($_POST["bot_topic_{$tk}"] ?? ''));
+        }
 
         // Feature: Custom Button Labels
         Setting::set('btn_buy_text', trim($_POST['btn_buy_text'] ?? '🛒 خرید اشتراک'));
@@ -2328,11 +2327,17 @@ class TelegramBotController {
         }
 
         $topicsToCreate = [
-            'sales' => ['name' => '🛒 گزارش خریدها و فاکتورها', 'color' => 7322096],
-            'backup' => ['name' => '💾 نسخه پشتیبان دیتابیس (Backup)', 'color' => 16766590],
-            'servers' => ['name' => '⚡️ سلامت سرورها و فیل‌اور', 'color' => 16747520],
-            'users' => ['name' => '👥 کاربران و درخواست نمایندگی', 'color' => 5793266],
-            'crypto' => ['name' => '🪙 پرداخت‌های ارزی تتر (USDT)', 'color' => 9367492],
+            'nightly' => ['name' => '🌙 گزارش شبانه', 'color' => 7322096, 'desc' => 'آمار کارکرد روزانه، مصرف کل ترافیک و درآمد ۲۴ ساعته'],
+            'backup_reseller' => ['name' => '🤖 بکاپ ربات نماینده', 'color' => 16766590, 'desc' => 'نسخه‌های پشتیبان و تنظیمات دیتابیس اختصاصی ربات‌های نمایندگان'],
+            'backup_all' => ['name' => '💾 بکاپ تمام ربات', 'color' => 53380, 'desc' => 'فایل‌های بکاپ کامل دیتابیس، سرورها و کل پنل'],
+            'notifications' => ['name' => '📢 گزارش اطلاع‌رسانی‌ها', 'color' => 13341393, 'desc' => 'پیام‌های ارسالی همگانی و اعلانات مهم به کاربران'],
+            'services' => ['name' => '🛍 گزارش خرید خدمات', 'color' => 16747520, 'desc' => 'خرید بسته‌های سروری، ارتقای کلاسترها و تغییرات پلن‌ها'],
+            'sales' => ['name' => '🛒 گزارش‌های خرید', 'color' => 5793266, 'desc' => 'سفارشات جدید و پیش‌فاکتورها'],
+            'finance' => ['name' => '💳 گزارش‌های مالی', 'color' => 9367492, 'desc' => 'واریزی کارت‌به‌کارت، پرداخت‌های تتر، شارژ کیف پول'],
+            'trials' => ['name' => '🎁 گزارشات اکانت تست', 'color' => 16775294, 'desc' => 'درخواست‌ها و صدور آنی اکانت‌های تست رایگان'],
+            'general' => ['name' => '📊 سایر گزارشات', 'color' => 10066329, 'desc' => 'لاگ‌های متفرقه سیستم و رویدادهای عمومی'],
+            'commissions' => ['name' => '🤝 گزارشات پورسانت', 'color' => 65438, 'desc' => 'پاداش بازاریابی و کمیسیون زیرنمایندگان'],
+            'errors' => ['name' => '⚠️ گزارش خطاها', 'color' => 16711680, 'desc' => 'خطاهای ارتباط با نود سرورها، فیل‌اور و سیستم'],
         ];
 
         $results = [];
@@ -2350,8 +2355,8 @@ class TelegramBotController {
             }
 
             $res = TelegramBot::createForumTopic($logChat, $conf['name'], $conf['color']);
-            if ($res && isset($res['message_thread_id'])) {
-                $threadId = (int)$res['message_thread_id'];
+            if ($res !== null) {
+                $threadId = (int)$res;
                 Setting::set("bot_topic_{$key}", (string)$threadId);
                 $results[$key] = [
                     'name' => $conf['name'],
@@ -2361,7 +2366,7 @@ class TelegramBotController {
                 $createdCount++;
 
                 TelegramBot::sendMessage(
-                    "📌 <b>موضوع ایجاد شد: {$conf['name']}</b>\nاین تاپیک اختصاصی جهت دریافت اعلانات خودکار سامانه کانکتیکس فعال گردید.",
+                    "📌 <b>موضوع اختصاصی فعال شد: {$conf['name']}</b>\nاین تاپیک جهت دریافت گزارشات: {$conf['desc']} فعال گردید.",
                     $logChat,
                     null,
                     null,

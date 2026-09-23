@@ -404,27 +404,28 @@ $isWebhookSet = !empty($webhookInfo['result']['url'] ?? '');
                             <span id="topicAutoStatus" class="text-[10px] text-slate-500 mt-1 block"></span>
                         </div>
 
-                        <div class="grid grid-cols-2 gap-2 text-[11px]">
-                            <div>
-                                <label class="block text-[10px] text-slate-400 mb-1">🛒 تاپیک خریدها (Thread ID)</label>
-                                <input type="text" id="topicSalesInput" name="bot_topic_sales" value="<?= htmlspecialchars($topicSales) ?>" placeholder="شناسه تاپیک" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white font-mono text-center" dir="ltr">
-                            </div>
-                            <div>
-                                <label class="block text-[10px] text-slate-400 mb-1">💾 تاپیک بکاپ دیتابیس</label>
-                                <input type="text" id="topicBackupInput" name="bot_topic_backup" value="<?= htmlspecialchars($topicBackup) ?>" placeholder="شناسه تاپیک" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white font-mono text-center" dir="ltr">
-                            </div>
-                            <div>
-                                <label class="block text-[10px] text-slate-400 mb-1">⚡️ تاپیک سلامت سرورها</label>
-                                <input type="text" id="topicServersInput" name="bot_topic_servers" value="<?= htmlspecialchars($topicServers) ?>" placeholder="شناسه تاپیک" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white font-mono text-center" dir="ltr">
-                            </div>
-                            <div>
-                                <label class="block text-[10px] text-slate-400 mb-1">👥 تاپیک کاربران و نمایندگی</label>
-                                <input type="text" id="topicUsersInput" name="bot_topic_users" value="<?= htmlspecialchars($topicUsers) ?>" placeholder="شناسه تاپیک" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white font-mono text-center" dir="ltr">
-                            </div>
-                            <div class="col-span-2">
-                                <label class="block text-[10px] text-slate-400 mb-1">🪙 تاپیک پرداخت‌های کریپتو (USDT/TON)</label>
-                                <input type="text" id="topicCryptoInput" name="bot_topic_crypto" value="<?= htmlspecialchars($topicCrypto) ?>" placeholder="شناسه تاپیک" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white font-mono text-center" dir="ltr">
-                            </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px]">
+                            <?php 
+                            $topicsConfig = [
+                                'nightly' => ['title' => '🌙 گزارش شبانه (Nightly)', 'id' => $settings['bot_topic_nightly'] ?? ''],
+                                'backup_reseller' => ['title' => '🤖 بکاپ ربات نماینده (Reseller Backup)', 'id' => $settings['bot_topic_backup_reseller'] ?? ''],
+                                'backup_all' => ['title' => '💾 بکاپ تمام ربات (Full Backup)', 'id' => $settings['bot_topic_backup_all'] ?? ''],
+                                'notifications' => ['title' => '📢 گزارش اطلاع‌رسانی‌ها (Broadcasts)', 'id' => $settings['bot_topic_notifications'] ?? ''],
+                                'services' => ['title' => '🛍 گزارش خرید خدمات (Services)', 'id' => $settings['bot_topic_services'] ?? ''],
+                                'sales' => ['title' => '🛒 گزارش‌های خرید (Orders)', 'id' => $settings['bot_topic_sales'] ?? ''],
+                                'finance' => ['title' => '💳 گزارش‌های مالی (Financial)', 'id' => $settings['bot_topic_finance'] ?? ''],
+                                'trials' => ['title' => '🎁 گزارشات اکانت تست (Trials)', 'id' => $settings['bot_topic_trials'] ?? ''],
+                                'general' => ['title' => '📊 سایر گزارشات (General)', 'id' => $settings['bot_topic_general'] ?? ''],
+                                'commissions' => ['title' => '🤝 گزارشات پورسانت (Commissions)', 'id' => $settings['bot_topic_commissions'] ?? ''],
+                                'errors' => ['title' => '⚠️ گزارش خطاها (Errors)', 'id' => $settings['bot_topic_errors'] ?? ''],
+                            ];
+                            foreach ($topicsConfig as $tKey => $tData):
+                            ?>
+                                <div>
+                                    <label class="block text-[10px] text-slate-400 mb-1"><?= $tData['title'] ?></label>
+                                    <input type="text" id="topic_<?= $tKey ?>" name="bot_topic_<?= $tKey ?>" value="<?= htmlspecialchars($tData['id']) ?>" placeholder="شناسه عددی تاپیک" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white font-mono text-center" dir="ltr">
+                                </div>
+                            <?php endforeach; ?>
                         </div>
                     </div>
 
@@ -632,20 +633,11 @@ function autoCreateForumTopics() {
         btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> <span>ایجاد خودکار تاپیک‌ها</span>';
         
         if (data.results) {
-            if (data.results.sales && data.results.sales.thread_id) {
-                document.getElementById('topicSalesInput').value = data.results.sales.thread_id;
-            }
-            if (data.results.backup && data.results.backup.thread_id) {
-                document.getElementById('topicBackupInput').value = data.results.backup.thread_id;
-            }
-            if (data.results.servers && data.results.servers.thread_id) {
-                document.getElementById('topicServersInput').value = data.results.servers.thread_id;
-            }
-            if (data.results.users && data.results.users.thread_id) {
-                document.getElementById('topicUsersInput').value = data.results.users.thread_id;
-            }
-            if (data.results.crypto && data.results.crypto.thread_id) {
-                document.getElementById('topicCryptoInput').value = data.results.crypto.thread_id;
+            for (let k in data.results) {
+                if (data.results[k] && data.results[k].thread_id) {
+                    let inp = document.getElementById('topic_' + k);
+                    if (inp) inp.value = data.results[k].thread_id;
+                }
             }
         }
 

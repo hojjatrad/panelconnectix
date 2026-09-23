@@ -163,6 +163,57 @@ class TelegramBot {
     }
 
     /**
+     * Resolve forum topic thread ID for any category among the 11 specialized topics
+     */
+    public static function getTopicThreadId(string $category): ?int {
+        $key = match(strtolower(trim($category))) {
+            'nightly' => 'nightly',
+            'backup_reseller' => 'backup_reseller',
+            'backup', 'backup_all' => 'backup_all',
+            'notifications', 'broadcast' => 'notifications',
+            'services' => 'services',
+            'sales' => 'sales',
+            'finance', 'crypto' => 'finance',
+            'trials', 'trial' => 'trials',
+            'commissions', 'commission' => 'commissions',
+            'errors', 'error', 'servers' => 'errors',
+            default => 'general'
+        };
+
+        $id = (int)Setting::get("bot_topic_{$key}", 0);
+        if ($id > 0) return $id;
+
+        // Fallback to legacy keys if configured
+        $legacyKey = match($key) {
+            'sales' => 'topic_sales_id',
+            'backup_all' => 'topic_backup_id',
+            'errors' => 'topic_servers_id',
+            'finance' => 'topic_crypto_id',
+            default => 'topic_general_id'
+        };
+        $legacyId = (int)Setting::get($legacyKey, 0);
+        return $legacyId > 0 ? $legacyId : null;
+    }
+
+    /**
+     * Send structured report to a specific Forum Topic by topic key
+     */
+    public static function sendTopicLog(string $topicKey, string $message, ?array $keyboard = null, ?string $documentPath = null, ?string $photoUrl = null, ?string $customToken = null): bool {
+        $logChat = trim(Setting::get('bot_log_channel', Setting::get('telegram_log_channel_id', Setting::get('telegram_admin_id', ''))));
+        if (empty($logChat)) return false;
+
+        $threadId = self::getTopicThreadId($topicKey);
+
+        if (!empty($documentPath) && file_exists($documentPath)) {
+            return self::sendDocument($documentPath, $message, $logChat, $customToken, $threadId);
+        }
+        if (!empty($photoUrl)) {
+            return self::sendPhoto($photoUrl, $message, $logChat, $keyboard, $customToken, $threadId);
+        }
+        return (bool)self::sendMessage($message, $logChat, $keyboard, $customToken, $threadId);
+    }
+
+    /**
      * Check if user is member of mandatory channel/group (Force Join)
      */
     public static function getChatMember(string $chatId, string $userId, ?string $customToken = null): ?array {
@@ -181,45 +232,14 @@ class TelegramBot {
      * Send report routed to dedicated topic in log channel
      */
     public static function sendCategorizedReport(string $category, string $text, $replyMarkup = null, ?string $customToken = null): bool {
-        $logChannel = Setting::get('telegram_log_channel_id');
-        $targetChat = !empty($logChannel) ? $logChannel : self::getAdminChatId();
-        
-        $threadId = null;
-        if (!empty($logChannel)) {
-            $topicKey = match($category) {
-                'sales' => 'topic_sales_id',
-                'backup' => 'topic_backup_id',
-                'servers' => 'topic_servers_id',
-                'users', 'reseller' => 'topic_users_id',
-                'crypto' => 'topic_crypto_id',
-                default => 'topic_general_id'
-            };
-            $savedId = (int)Setting::get($topicKey, '0');
-            if ($savedId > 0) {
-                $threadId = $savedId;
-            }
-        }
-
-        return self::sendMessage($text, $targetChat, $replyMarkup, $customToken, $threadId);
+        return self::sendTopicLog($category, $text, is_array($replyMarkup) ? $replyMarkup : null, null, null, $customToken);
     }
 
     /**
      * Send backup file routed to backup topic in log channel
      */
     public static function sendCategorizedDocument(string $category, string $filePath, string $caption = '', ?string $customToken = null): bool {
-        $logChannel = Setting::get('telegram_log_channel_id');
-        $targetChat = !empty($logChannel) ? $logChannel : self::getAdminChatId();
-
-        $threadId = null;
-        if (!empty($logChannel)) {
-            $topicKey = ($category === 'backup') ? 'topic_backup_id' : 'topic_general_id';
-            $savedId = (int)Setting::get($topicKey, '0');
-            if ($savedId > 0) {
-                $threadId = $savedId;
-            }
-        }
-
-        return self::sendDocument($filePath, $caption, $targetChat, $customToken, $threadId);
+        return self::sendTopicLog($category, $caption, null, $filePath, null, $customToken);
     }
 
     public static function editMessageText(string $text, string $chatId, int $messageId, $replyMarkup = null, ?string $customToken = null): bool {
