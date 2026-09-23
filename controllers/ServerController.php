@@ -247,6 +247,72 @@ class ServerController {
         }
     }
 
+    public function testRawConnection(): void {
+        Auth::requireAdmin();
+        $driverType = trim($_POST['driver'] ?? $_GET['driver'] ?? 'marzban');
+        $apiUrl = trim($_POST['api_url'] ?? $_GET['api_url'] ?? '');
+        $username = trim($_POST['api_username'] ?? $_GET['api_username'] ?? '');
+        $password = trim($_POST['api_password'] ?? $_GET['api_password'] ?? '');
+        $token = trim($_POST['api_token'] ?? $_GET['api_token'] ?? '');
+
+        if (empty($apiUrl)) {
+            Helpers::jsonResponse(['success' => false, 'message' => 'لطفاً ابتدا آدرس سرور (URL) را وارد نمایید.']);
+        }
+
+        $dummy = [
+            'name' => 'Testing Node',
+            'driver' => $driverType,
+            'api_url' => $apiUrl,
+            'api_username' => $username,
+            'api_password' => $password,
+            'api_token' => $token
+        ];
+
+        try {
+            $driver = DriverFactory::create($dummy);
+            $auth = $driver->authenticate();
+            $stats = $driver->getNodeStats();
+            $lastErr = method_exists($driver, 'getLastError') ? $driver->getLastError() : null;
+
+            if ($auth) {
+                Helpers::jsonResponse([
+                    'success' => true,
+                    'driver' => $driverType,
+                    'message' => "اتصال و احراز هویت با درایور {$driverType} با موفقیت تایید شد!",
+                    'stats' => $stats
+                ]);
+            }
+
+            // Intelligent Fallback: If user selected pasargad but node is Marzban or vice-versa, test the counterpart
+            $altDriver = ($driverType === 'pasargad') ? 'marzban' : (($driverType === 'marzban') ? 'pasargad' : null);
+            if ($altDriver) {
+                $dummy['driver'] = $altDriver;
+                $altDriverInstance = DriverFactory::create($dummy);
+                if ($altDriverInstance->authenticate()) {
+                    $altStats = $altDriverInstance->getNodeStats();
+                    Helpers::jsonResponse([
+                        'success' => true,
+                        'driver' => $altDriver,
+                        'suggest_switch' => true,
+                        'message' => "اتصال با درایور '{$altDriver}' با موفقیت برقرار شد! (تغییر خودکار درایور به {$altDriver})",
+                        'stats' => $altStats
+                    ]);
+                }
+            }
+
+            Helpers::jsonResponse([
+                'success' => false,
+                'message' => $lastErr ?: 'احراز هویت با مشخصات وارد شده ناموفق بود. لطفاً آدرس، نام کاربری و رمز عبور را بررسی نمایید.',
+                'error' => $lastErr
+            ]);
+        } catch (Throwable $e) {
+            Helpers::jsonResponse([
+                'success' => false,
+                'message' => 'خطای سیستمی: ' . $e->getMessage()
+            ]);
+        }
+    }
+
     public function syncNow(): void {
         Auth::requireAdmin();
         $pdo = Database::getConnection();

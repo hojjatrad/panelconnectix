@@ -28,7 +28,13 @@ class Router {
         
         // Support ?route=path or clean REQUEST_URI
         if (!empty($_GET['route'])) {
-            $uri = trim($_GET['route'], '/');
+            $raw = $_GET['route'];
+            $parts = explode('?', $raw, 2);
+            $uri = trim($parts[0], '/');
+            if (isset($parts[1])) {
+                parse_str($parts[1], $parsedParams);
+                $_GET = array_merge($_GET, $parsedParams);
+            }
         } else {
             $parsed = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?? '';
             $scriptDir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? ''));
@@ -68,6 +74,22 @@ class Router {
 
         // 404 handler
         http_response_code(404);
+
+        $isJsonExpected = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest')
+            || (isset($_SERVER['HTTP_ACCEPT']) && str_contains($_SERVER['HTTP_ACCEPT'], 'application/json'))
+            || (str_starts_with($uri, 'api/') || str_contains($uri, '/test') || str_contains($uri, '/ping'));
+
+        if ($isJsonExpected) {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode([
+                'success' => false,
+                'status' => 'offline',
+                'error' => "مسیر وب‌سرویس یافت نشد (404 Not Found: {$uri})",
+                'message' => "مسیر وب‌سرویس یافت نشد (404 Not Found: {$uri})"
+            ], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+
         echo "<div style='font-family:sans-serif; text-align:center; padding:50px; background:#0f172a; color:#fff;'>";
         echo "<h2>صفحه مورد نظر یافت نشد (404)</h2>";
         echo "<p>مسیر درخواستی در سامانه وجود ندارد.</p>";

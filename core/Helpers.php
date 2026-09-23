@@ -7,13 +7,23 @@ class Helpers {
         return ($scriptDir === '/' || $scriptDir === '.') ? '' : rtrim($scriptDir, '/');
     }
 
-    public static function url(string $path = ''): string {
+    public static function url(string $path = '', array $params = []): string {
         $base = self::basePath();
         $cleanPath = ltrim($path, '/');
+        $qs = !empty($params) ? http_build_query($params) : '';
+
         if (isset($_GET['route'])) {
-            return ($base === '' ? '' : $base) . '/index.php?route=' . $cleanPath;
+            $url = ($base === '' ? '' : $base) . '/index.php?route=' . $cleanPath;
+            if (!empty($qs)) {
+                $url .= '&' . $qs;
+            }
+            return $url;
         }
-        return ($base === '' ? '' : $base) . '/' . $cleanPath;
+        $url = ($base === '' ? '' : $base) . '/' . $cleanPath;
+        if (!empty($qs)) {
+            $url .= '?' . $qs;
+        }
+        return $url;
     }
 
     public static function fullUrl(string $path = ''): string {

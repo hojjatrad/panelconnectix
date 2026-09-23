@@ -241,9 +241,18 @@ require __DIR__ . '/../layout/header.php';
                 </div>
             </div>
 
-            <button type="submit" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition-all shadow-md mt-2">
-                اتصال و ذخیره سرور
-            </button>
+            <div class="pt-1">
+                <div id="new_test_result" class="hidden mb-3 p-3 rounded-xl text-xs transition-all"></div>
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="testRawInModal('new')" id="btn_test_new" class="w-1/2 py-2.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 font-bold rounded-xl text-xs border border-cyan-800/40 transition-all flex items-center justify-center gap-1.5 shadow">
+                        <i class="fa-solid fa-bolt-lightning text-cyan-400"></i>
+                        <span>تست زنده اتصال نود</span>
+                    </button>
+                    <button type="submit" class="w-1/2 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition-all shadow-md">
+                        اتصال و ذخیره سرور
+                    </button>
+                </div>
+            </div>
         </form>
     </div>
 </div>
@@ -321,9 +330,18 @@ require __DIR__ . '/../layout/header.php';
                 </div>
             </div>
 
-            <button type="submit" class="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs transition-all shadow-md mt-2">
-                ذخیره تغییرات سرور
-            </button>
+            <div class="pt-1">
+                <div id="edit_test_result" class="hidden mb-3 p-3 rounded-xl text-xs transition-all"></div>
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="testRawInModal('edit')" id="btn_test_edit" class="w-1/2 py-2.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 font-bold rounded-xl text-xs border border-cyan-800/40 transition-all flex items-center justify-center gap-1.5 shadow">
+                        <i class="fa-solid fa-bolt-lightning text-cyan-400"></i>
+                        <span>تست زنده اتصال نود</span>
+                    </button>
+                    <button type="submit" class="w-1/2 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs transition-all shadow-md">
+                        ذخیره تغییرات سرور
+                    </button>
+                </div>
+            </div>
         </form>
     </div>
 </div>
@@ -331,7 +349,20 @@ require __DIR__ . '/../layout/header.php';
 <script>
     const serverIds = <?= json_encode(array_column($servers, 'id')) ?>;
 
+    function buildUrl(endpoint, params) {
+        let url = endpoint;
+        const entries = Object.entries(params);
+        if (!entries.length) return url;
+        const qs = entries.map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v)).join('&');
+        return url + (url.includes('?') ? '&' : '?') + qs;
+    }
+
     function openNewServerModal() {
+        const resBox = document.getElementById('new_test_result');
+        if (resBox) {
+            resBox.className = 'hidden mb-3 p-3 rounded-xl text-xs';
+            resBox.innerHTML = '';
+        }
         document.getElementById('newServerModal').classList.remove('hidden');
         document.getElementById('newServerModal').classList.add('flex');
     }
@@ -341,6 +372,11 @@ require __DIR__ . '/../layout/header.php';
     }
 
     function openEditServerModal(s) {
+        const resBox = document.getElementById('edit_test_result');
+        if (resBox) {
+            resBox.className = 'hidden mb-3 p-3 rounded-xl text-xs';
+            resBox.innerHTML = '';
+        }
         document.getElementById('edit_server_id').value = s.id;
         document.getElementById('edit_server_name').value = s.name;
         document.getElementById('edit_server_driver').value = s.driver;
@@ -368,7 +404,9 @@ require __DIR__ . '/../layout/header.php';
         badge.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-[10px]"></i>';
         badge.className = 'px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-slate-800 text-cyan-400 border border-slate-700';
 
-        fetch('<?= Helpers::url('servers/ping') ?>?id=' + id)
+        fetch(buildUrl('<?= Helpers::url('servers/ping') ?>', {id: id}), {
+            headers: {'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json'}
+        })
             .then(r => r.json())
             .then(data => {
                 if (data.success && data.latency !== null) {
@@ -406,7 +444,9 @@ require __DIR__ . '/../layout/header.php';
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> بررسی...';
         btn.disabled = true;
 
-        fetch('<?= Helpers::url('servers/test') ?>?id=' + id)
+        fetch(buildUrl('<?= Helpers::url('servers/test') ?>', {id: id}), {
+            headers: {'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json'}
+        })
             .then(res => res.json())
             .then(data => {
                 if (data.success) {
@@ -432,6 +472,104 @@ require __DIR__ . '/../layout/header.php';
                 btn.innerHTML = original;
                 btn.disabled = false;
             });
+    }
+
+    function testRawInModal(mode) {
+        const isNew = (mode === 'new');
+        const modal = document.getElementById(isNew ? 'newServerModal' : 'editServerModal');
+        const form = modal.querySelector('form');
+        const resultBox = document.getElementById(isNew ? 'new_test_result' : 'edit_test_result');
+        const btn = document.getElementById(isNew ? 'btn_test_new' : 'btn_test_edit');
+
+        const driverEl = form.querySelector('[name="driver"]');
+        const urlEl = form.querySelector('[name="api_url"]');
+        const userEl = form.querySelector('[name="api_username"]');
+        const passEl = form.querySelector('[name="api_password"]');
+        const tokenEl = form.querySelector('[name="api_token"]');
+
+        const driver = driverEl ? driverEl.value : 'marzban';
+        const apiUrl = urlEl ? urlEl.value.trim() : '';
+        const username = userEl ? userEl.value.trim() : '';
+        const password = passEl ? passEl.value.trim() : '';
+        const token = tokenEl ? tokenEl.value.trim() : '';
+
+        if (!apiUrl) {
+            resultBox.className = 'mb-3 p-3 rounded-xl text-xs bg-rose-950/70 border border-rose-800/60 text-rose-300';
+            resultBox.innerHTML = '<i class="fa-solid fa-circle-exclamation ml-1 text-rose-400"></i> لطفاً ابتدا فیلد آدرس سرور (API URL) را وارد فرمایید.';
+            resultBox.classList.remove('hidden');
+            return;
+        }
+
+        const origBtn = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-cyan-300"></i> در حال ارزیابی...';
+        btn.disabled = true;
+
+        resultBox.className = 'mb-3 p-3 rounded-xl text-xs bg-slate-800/90 border border-slate-700 text-slate-300 flex items-center gap-2';
+        resultBox.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-cyan-400 text-sm shrink-0"></i> <span>در حال ارسال درخواست احراز هویت به نود و بررسی پاسخ...</span>';
+        resultBox.classList.remove('hidden');
+
+        const formData = new FormData();
+        formData.append('driver', driver);
+        formData.append('api_url', apiUrl);
+        formData.append('api_username', username);
+        formData.append('api_password', password);
+        formData.append('api_token', token);
+        formData.append('csrf_token', '<?= Helpers::csrfToken() ?>');
+
+        fetch('<?= Helpers::url('servers/test-raw') ?>', {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            },
+            body: formData
+        })
+        .then(r => r.json())
+        .then(data => {
+            btn.innerHTML = origBtn;
+            btn.disabled = false;
+
+            if (data.success) {
+                let html = '<div class="flex items-start gap-2">';
+                html += '<i class="fa-solid fa-circle-check text-emerald-400 text-base shrink-0 mt-0.5"></i>';
+                html += '<div>';
+                html += '<b class="text-emerald-300 block mb-1">' + (data.message || 'اتصال با موفقیت تایید شد!') + '</b>';
+                if (data.stats) {
+                    html += '<div class="text-[11px] text-slate-300 leading-relaxed font-mono opacity-90">';
+                    if (data.stats.version) html += '• هسته نود: <span class="text-white">' + data.stats.version + '</span><br>';
+                    if (data.stats.users !== undefined) html += '• تعداد کاربران ثبت‌شده: <span class="text-emerald-300 font-bold">' + data.stats.users + '</span><br>';
+                    if (data.stats.cpu) html += '• پردازنده (CPU): <span class="text-cyan-300">' + data.stats.cpu + '</span> | رم: <span class="text-purple-300">' + (data.stats.ram || '-') + '</span>';
+                    html += '</div>';
+                }
+                if (data.suggest_switch && driverEl) {
+                    driverEl.value = data.driver;
+                    html += '<div class="mt-2 p-1.5 bg-emerald-900/80 border border-emerald-700/60 rounded-lg text-[11px] text-emerald-200">';
+                    html += '💡 توجه: نوع درایور به صورت خودکار روی «<b>' + (data.driver === 'marzban' ? 'مرزبان (Marzban)' : 'پاسارگاد (Pasargad)') + '</b>» تنظیم شد.';
+                    html += '</div>';
+                }
+                html += '</div></div>';
+
+                resultBox.className = 'mb-3 p-3.5 rounded-xl text-xs bg-emerald-950/70 border border-emerald-600/50 text-emerald-300';
+                resultBox.innerHTML = html;
+            } else {
+                let errMsg = data.error || data.message || 'خطای نامشخص در احراز هویت با سرور';
+                let html = '<div class="flex items-start gap-2">';
+                html += '<i class="fa-solid fa-circle-xmark text-rose-400 text-base shrink-0 mt-0.5"></i>';
+                html += '<div>';
+                html += '<b class="text-rose-300 block mb-1">عدم موفقیت در احراز هویت یا اتصال:</b>';
+                html += '<span class="text-slate-300 text-[11px] leading-relaxed block">' + errMsg + '</span>';
+                html += '</div></div>';
+
+                resultBox.className = 'mb-3 p-3.5 rounded-xl text-xs bg-rose-950/70 border border-rose-700/60 text-rose-300';
+                resultBox.innerHTML = html;
+            }
+        })
+        .catch(err => {
+            btn.innerHTML = origBtn;
+            btn.disabled = false;
+            resultBox.className = 'mb-3 p-3.5 rounded-xl text-xs bg-rose-950/70 border border-rose-700/60 text-rose-300';
+            resultBox.innerHTML = '<div class="flex items-center gap-2"><i class="fa-solid fa-triangle-exclamation text-rose-400 text-base shrink-0"></i><span>خطا در پاسخ کنترلر: ' + err.message + '</span></div>';
+        });
     }
 
     function openMigrateModal() {
