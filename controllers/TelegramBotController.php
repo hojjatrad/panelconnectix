@@ -846,10 +846,70 @@ class TelegramBotController {
     private static function processMessage(PDO $pdo, array $msg): void {
         $chatId = (string)($msg['chat']['id'] ?? '');
         $fromId = (string)($msg['from']['id'] ?? $chatId);
+        $chatType = $msg['chat']['type'] ?? 'private';
         $text = trim($msg['text'] ?? '');
         $session = self::getSession($pdo, $fromId);
 
-        // Record User in Database
+        // Check if message originated from a group or supergroup
+        $isGroup = ($chatType === 'group' || $chatType === 'supergroup' || str_starts_with($chatId, '-'));
+
+        // Handle Group/Supergroup Security & Keyboard Isolation
+        if ($isGroup) {
+            $ctx = self::getContext($pdo);
+            $botToken = $ctx['bot_token'];
+            $botUser = $ctx['bot_username'] ?: Setting::get('telegram_bot_username', 'ConnectixBot');
+
+            // 1. Explicit command to remove stuck bottom keyboard from group
+            if (in_array($text, ['/clean', '/cleankeyboard', '/remove_keyboard', '/clear', 'حذف کیبورد', 'پاکسازی کیبورد', 'پاکسازی'])) {
+                TelegramBot::sendMessage("🧹 <b>کیبورد ربات با موفقیت از این گروه برداشته شد.</b>\nدیگر دکمه‌های ربات در پایین این گروه نمایش داده نخواهند شد.", $chatId, ['remove_keyboard' => true], $botToken);
+                return;
+            }
+
+            // 2. Admin backup on-demand command
+            if ($text === '/backup' && $fromId == Setting::get('telegram_admin_id')) {
+                // allow admin backup if desired
+            }
+
+            // 3. User invoked bot or tapped an old persistent keyboard button inside group
+            $buyText = Setting::get('btn_buy_text', '🛒 خرید اشتراک');
+            $renewText = Setting::get('btn_renew_text', '🔄 تمدید اشتراک');
+            $myAccText = Setting::get('btn_my_accounts_text', '👤 حساب‌های من');
+            $trialText = Setting::get('btn_trial_text', '🎁 تست رایگان');
+            $refText = Setting::get('btn_referral_text', '🤝 کسب درآمد');
+            $appsText = Setting::get('btn_apps_text', '📱 دانلود و آموزش');
+            $supportText = Setting::get('btn_support_text', '☎️ پشتیبانی');
+            $resellerText = Setting::get('btn_reseller_text', '💼 اخذ نمایندگی');
+
+            $knownBotButtons = [
+                $buyText, $renewText, $myAccText, $trialText, $refText, $appsText, $supportText, $resellerText,
+                '🛒 خرید اشتراک جدید', '🛒 خرید اشتراک', '🔄 تمدید اشتراک', '👤 حساب‌های من', '🎁 تست رایگان',
+                '🎁 دریافت تست رایگان', '/test', 'تست رایگان', '🤝 زیرمجموعه‌گیری و درآمد', '🤝 کسب درآمد',
+                '📱 دانلود نرم‌افزارها', '☎️ پشتیبانی تلگرام', '💼 اخذ نمایندگی', '🔐 ورود به پنل وب',
+                '🔗 ورود و اتصال حساب', 'پنل', 'ورود به پنل', '/panel', '/login'
+            ];
+
+            if (str_starts_with($text, '/start') || str_starts_with($text, '/menu') || in_array($text, $knownBotButtons)) {
+                $redirectKb = [
+                    'inline_keyboard' => [
+                        [['text' => '🚀 ورود به ربات در گفتگوی خصوصی (PV)', 'url' => "https://t.me/{$botUser}?start=group"]]
+                    ]
+                ];
+                // Immediately remove keyboard from group and guide user to private chat
+                TelegramBot::sendMessage(
+                    "👋 <b>کاربر گرامی</b>\n\nجهت حفظ امنیت، دریافت مشخصات اتصال و خرید اشتراک، لطفاً به گفتگوی خصوصی (PV) ربات مراجعه فرمایید.\n\n<i>(کیبورد دکمه‌ها نیز از این گروه حذف گردید)</i>",
+                    $chatId,
+                    ['remove_keyboard' => true],
+                    $botToken
+                );
+                TelegramBot::sendMessage("👇 برای ورود به چت خصوصی روی دکمه زیر کلیک کنید:", $chatId, $redirectKb, $botToken);
+                return;
+            }
+
+            // For all general group chatter between members: completely ignore and stay silent!
+            return;
+        }
+
+        // Record User in Database (Only for private chat users)
         self::recordBotUser($pdo, $msg['from'] ?? [], (int)(self::getContext($pdo)['reseller_id'] ?? 1));
 
         // Method 2: One-Click DeepLink Binding: /start bind_XXXX
@@ -1671,7 +1731,10 @@ class TelegramBotController {
         }
         if (!$edited) {
             TelegramBot::sendMessage($msg, $chatId, $inlineKb, $botToken);
-            TelegramBot::sendMessage("👇 همچنین کیبورد دسترسی سریع در پایین فعال است:", $chatId, self::getMainMenuReplyKeyboard(), $botToken);
+            // Strictly send bottom ReplyKeyboardMarkup in Private chats only (Never in Groups/Supergroups)
+            if (!str_starts_with($chatId, '-')) {
+                TelegramBot::sendMessage("👇 همچنین کیبورد دسترسی سریع در پایین فعال است:", $chatId, self::getMainMenuReplyKeyboard(), $botToken);
+            }
         }
     }
 
