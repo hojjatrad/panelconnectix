@@ -507,4 +507,48 @@ class ResellerController {
         @unlink($tempPath);
         exit;
     }
+
+    public function exportFinancial(): void {
+        Auth::requireAdmin();
+        $pdo = Database::getConnection();
+
+        $resellers = $pdo->query("SELECT u.*, 
+                                         COUNT(c.id) as client_count,
+                                         COALESCE(SUM(c.traffic_used_bytes), 0) as total_traffic_used,
+                                         COALESCE(SUM(c.traffic_limit_bytes), 0) as total_traffic_limit
+                                  FROM users u
+                                  LEFT JOIN clients c ON u.id = c.reseller_id
+                                  WHERE u.role = 'reseller'
+                                  GROUP BY u.id
+                                  ORDER BY u.id ASC")->fetchAll(PDO::FETCH_ASSOC);
+
+        $filename = "financial_report_resellers_" . date('Y-m-d_H-i') . ".csv";
+
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+
+        // Excel UTF-8 BOM
+        echo "\xEF\xBB\xBF";
+
+        $output = fopen('php://output', 'w');
+        fputcsv($output, ['شناسه', 'نام کاربری نماینده', 'موجودی کیف‌پول (تومان)', 'درصد تخفیف', 'تعداد کلاینت‌ها', 'ترافیک مصرفی کل (GB)', 'سقف اعتبار', 'ارتقای خودکار', 'تاریخ عضویت']);
+
+        foreach ($resellers as $r) {
+            $usedGb = round($r['total_traffic_used'] / (1024 * 1024 * 1024), 2);
+            fputcsv($output, [
+                $r['id'],
+                $r['username'],
+                $r['wallet_balance'],
+                $r['discount_percent'] . '%',
+                $r['client_count'],
+                $usedGb,
+                $r['credit_limit'],
+                ($r['auto_tier_enabled'] ? 'فعال' : 'غیرفعال'),
+                $r['created_at']
+            ]);
+        }
+
+        fclose($output);
+        exit;
+    }
 }

@@ -23,6 +23,11 @@ require __DIR__ . '/../layout/header.php';
             <span>خروجی اکسل</span>
         </a>
 
+        <a href="<?= Helpers::url('clients/bulk') ?>" class="px-3.5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-md flex items-center gap-2" title="تولید همزمان ۱۰ الی ۱۰۰ اکانت اشتراک">
+            <i class="fa-solid fa-layer-group"></i>
+            <span>ساخت گروهی</span>
+        </a>
+
         <a href="<?= Helpers::url('clients/create') ?>" class="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-purple-900/30 flex items-center gap-2">
             <i class="fa-solid fa-plus"></i>
             <span>ایجاد کاربر جدید</span>
@@ -160,7 +165,7 @@ require __DIR__ . '/../layout/header.php';
                     <?php else: ?>
                         <?php foreach ($clients as $c): 
                             $pct = $c['traffic_limit_bytes'] > 0 ? round(($c['traffic_used_bytes'] / $c['traffic_limit_bytes']) * 100, 1) : 0;
-                            $subUrl = Helpers::fullUrl('sub/' . $c['sub_token']);
+                            $subUrl = Helpers::subUrl($c['sub_token']);
                         ?>
                             <tr class="hover:bg-slate-800/30 transition-colors">
                                 <td class="p-3.5 text-center">

@@ -13,6 +13,10 @@ $pendingCount = $pendingAppsCount ?? 0;
     </div>
 
     <div class="flex items-center gap-2">
+        <a href="<?= Helpers::url('resellers/export-financial') ?>" class="px-3 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 text-xs font-semibold rounded-xl border border-emerald-500/30 transition flex items-center gap-1.5" title="دانلود گزارش کامل مالی و ترافیک نمایندگان در قالب اکسل">
+            <i class="fa-solid fa-file-excel text-emerald-400"></i>
+            <span>خروجی مالی (Excel)</span>
+        </a>
         <a href="<?= Helpers::url('resellers/applications') ?>" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center gap-2 relative">
             <i class="fa-solid fa-user-clock text-amber-400"></i>
             <span>درخواست‌های جدید نمایندگی</span>

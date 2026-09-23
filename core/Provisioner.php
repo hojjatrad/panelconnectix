@@ -110,7 +110,7 @@ class Provisioner {
             ]);
             $clientId = (int)$pdo->lastInsertId();
 
-            $subUrl = Helpers::fullUrl("sub/{$subToken}");
+            $subUrl = Helpers::subUrl($subToken);
 
             return [
                 'success' => true,
@@ -390,7 +390,7 @@ class Provisioner {
         $stmtLog = $pdo->prepare("INSERT INTO trial_logs (user_id, reseller_id, telegram_id, ip_address, client_id) VALUES (?, ?, ?, ?, ?)");
         $stmtLog->execute([$resellerId, $resellerId, $telegramId, $ip ?: ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'), $clientId]);
 
-        $subUrl = Helpers::fullUrl("sub/{$subToken}");
+        $subUrl = Helpers::subUrl($subToken);
 
         $trafficText = ($trafficMb >= 1024) ? (round($trafficMb / 1024, 1) . ' گیگابایت') : ($trafficMb . ' مگابایت');
 

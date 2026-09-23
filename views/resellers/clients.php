@@ -137,7 +137,7 @@ $hasReseller = !empty($reseller);
                                 </span>
                             </td>
                             <td class="p-3.5 text-center">
-                                <button onclick="copyToClipboard('<?= Helpers::fullUrl('sub/' . $c['sub_token']) ?>', this)" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[11px] border border-slate-700 transition">
+                                <button onclick="copyToClipboard('<?= Helpers::subUrl($c['sub_token']) ?>', this)" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[11px] border border-slate-700 transition">
                                     <i class="fa-solid fa-copy"></i> کپی لینک
                                 </button>
                             </td>

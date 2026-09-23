@@ -61,6 +61,11 @@ class MetadataController {
             WHERE user_id = ?");
         $stmt->execute([$brandName, $themeColor, $logoUrl, $telegram, $whatsapp, $welcome, $renewalUrl, $userId]);
 
+        if (Auth::isAdmin() && isset($_POST['sublink_custom_domain'])) {
+            require_once __DIR__ . '/../core/Setting.php';
+            Setting::set('sublink_custom_domain', trim($_POST['sublink_custom_domain']));
+        }
+
         Helpers::flash('success', 'تنظیمات برند و شخصی‌سازی ظاهر با موفقیت ذخیره شد.');
         Helpers::redirect('settings/metadata');
     }

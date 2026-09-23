@@ -126,6 +126,15 @@ class Database {
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )");
 
+            $pdo->exec("CREATE TABLE IF NOT EXISTS lucky_wheel_logs (
+                id $autoInc,
+                user_tg_id VARCHAR(64) NOT NULL,
+                reward_type VARCHAR(32) NOT NULL,
+                reward_value INT NOT NULL,
+                reward_text VARCHAR(255) NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )");
+
             $pdo->exec("CREATE TABLE IF NOT EXISTS crypto_payments (
                 id $autoInc,
                 user_id INT NULL,

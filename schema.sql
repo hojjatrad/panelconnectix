@@ -389,6 +389,17 @@ CREATE TABLE IF NOT EXISTS `reseller_applications` (
     INDEX `idx_ra_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS `lucky_wheel_logs` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `user_tg_id` VARCHAR(64) NOT NULL,
+    `reward_type` VARCHAR(32) NOT NULL,
+    `reward_value` INT NOT NULL,
+    `reward_text` VARCHAR(255) NOT NULL,
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX `idx_lw_tg` (`user_tg_id`),
+    INDEX `idx_lw_created` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- Seed Default Categories / Clusters
@@ -452,5 +463,5 @@ INSERT INTO `system_settings` (`setting_key`, `setting_value`) VALUES
 ('github_branch', 'main'),
 ('github_webhook_secret', 'gh_hook_sec_vpbotn_2026'),
 ('brand_name', 'Connectix VPN'),
-('current_version', '2.8.9')
+('current_version', '2.9.0')
 ON DUPLICATE KEY UPDATE `setting_value`=VALUES(`setting_value`);

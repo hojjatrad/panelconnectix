@@ -93,6 +93,20 @@ require __DIR__ . '/../layout/header.php';
                            class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
                 </div>
 
+                <?php if (Auth::isAdmin()): ?>
+                <div class="p-3.5 bg-slate-800/60 rounded-xl border border-indigo-500/30 space-y-2">
+                    <label class="block text-indigo-300 font-bold text-xs flex items-center gap-2">
+                        <i class="fa-solid fa-arrows-rotate text-indigo-400"></i>
+                        <span>دامنه اختصاصی ساب‌لینک ضد فیلتر (Sublink Domain Switcher)</span>
+                    </label>
+                    <p class="text-[11px] text-slate-400 leading-relaxed">
+                        در صورت فیلتر شدن دامنه اصلی پنل، کافیست دامنه جدید خود (مثلاً <code class="text-cyan-400 font-mono">sub.newdomain.com</code>) را در اینجا وارد نمایید تا کلیه لینک‌های اتصال و ساب‌لینک کاربران به دامنه جدید هدایت شوند.
+                    </p>
+                    <input type="text" name="sublink_custom_domain" value="<?= htmlspecialchars(Setting::get('sublink_custom_domain', '')) ?>" dir="ltr" placeholder="sub.newdomain.com"
+                           class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-xs">
+                </div>
+                <?php endif; ?>
+
                 <button type="submit" class="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs transition-all shadow-lg shadow-purple-900/30 mt-2">
                     ذخیره تنظیمات هویت بصری
                 </button>

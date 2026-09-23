@@ -32,6 +32,22 @@ class Helpers {
         return rtrim($proto . $host, '/') . self::url($path);
     }
 
+    /**
+     * Sublink generator with dynamic one-click domain switcher support
+     */
+    public static function subUrl(string $subToken): string {
+        require_once __DIR__ . '/Setting.php';
+        $customDomain = trim(Setting::get('sublink_custom_domain', ''));
+        if (!empty($customDomain)) {
+            $customDomain = rtrim($customDomain, '/');
+            if (!str_starts_with($customDomain, 'http://') && !str_starts_with($customDomain, 'https://')) {
+                $customDomain = 'https://' . $customDomain;
+            }
+            return "{$customDomain}/sub/{$subToken}";
+        }
+        return self::fullUrl("sub/{$subToken}");
+    }
+
     public static function fullFileUrl(string $filename): string {
         $proto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || ($_SERVER['SERVER_PORT'] ?? 80) == 443 || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https') ? 'https://' : 'http://';
         $host = $_SERVER['HTTP_HOST'] ?? 'localhost';

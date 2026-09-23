@@ -162,7 +162,7 @@ class TelegramBotController {
     }
 
     /**
-     * Main Menu Inline Keyboard with clean 2-column layout & custom labels
+     * Main Menu Inline Keyboard with dynamic toggles, 2-column pairing & Mini App support
      */
     public static function getMainMenuInlineKeyboard(?PDO $pdo = null, ?string $fromId = null): array {
         $boundCount = 0;
@@ -172,87 +172,122 @@ class TelegramBotController {
             $boundCount = (int)$stmt->fetchColumn();
         }
 
-        $buyText = Setting::get('btn_buy_text', '🛒 خرید اشتراک');
-        $renewText = Setting::get('btn_renew_text', '🔄 تمدید اشتراک');
-        $myAccText = Setting::get('btn_my_accounts_text', '👤 حساب‌های من');
-        $trialText = Setting::get('btn_trial_text', '🎁 تست رایگان');
-        $refText = Setting::get('btn_referral_text', '🤝 کسب درآمد');
-        $appsText = Setting::get('btn_apps_text', '📱 دانلود و آموزش');
-        $supportText = Setting::get('btn_support_text', '☎️ پشتیبانی');
-        $resellerText = Setting::get('btn_reseller_text', '💼 اخذ نمایندگی');
-
         $buttons = [];
 
-        if ($boundCount > 0) {
+        // 1. Telegram Mini App button (Prominent at top)
+        if (Setting::get('btn_webapp_enabled', '1') === '1') {
+            $webappUrl = Helpers::fullUrl('webapp') . ($fromId ? '?tg_id=' . $fromId : '');
+            $webappText = Setting::get('btn_webapp_text', '🚀 مینی‌اپ اختصاصی کانکتیکس (Mini App)');
             $buttons[] = [
-                ['text' => "{$myAccText} ({$boundCount})", 'callback_data' => 'menu_my_accounts'],
-                ['text' => '➕ اتصال حساب دیگر', 'callback_data' => 'menu_bind']
-            ];
-        } else {
-            $buttons[] = [
-                ['text' => '🔗 ورود و اتصال حساب', 'callback_data' => 'menu_bind'],
-                ['text' => '🔍 استعلام وضعیت', 'callback_data' => 'menu_guest_status']
+                ['text' => $webappText, 'web_app' => ['url' => $webappUrl]]
             ];
         }
 
-        $buttons[] = [
-            ['text' => $buyText, 'callback_data' => 'menu_buy'],
-            ['text' => $renewText, 'callback_data' => 'menu_renew']
-        ];
+        // 2. Account binding & fast status check
+        if (Setting::get('btn_my_accounts_enabled', '1') === '1') {
+            $myAccText = Setting::get('btn_my_accounts_text', '👤 حساب‌های من');
+            if ($boundCount > 0) {
+                $buttons[] = [
+                    ['text' => "{$myAccText} ({$boundCount})", 'callback_data' => 'menu_my_accounts'],
+                    ['text' => '➕ اتصال حساب دیگر', 'callback_data' => 'menu_bind']
+                ];
+            } else {
+                $buttons[] = [
+                    ['text' => '🔗 ورود و اتصال حساب', 'callback_data' => 'menu_bind'],
+                    ['text' => '🔍 استعلام وضعیت', 'callback_data' => 'menu_guest_status']
+                ];
+            }
+        }
 
-        $buttons[] = [
-            ['text' => $trialText, 'callback_data' => 'menu_trial'],
-            ['text' => $refText, 'callback_data' => 'menu_referral']
-        ];
+        // 3. Dynamic service buttons respecting admin toggles
+        $items = [];
+        if (Setting::get('btn_buy_enabled', '1') === '1') {
+            $items[] = ['text' => Setting::get('btn_buy_text', '🛒 خرید اشتراک'), 'callback_data' => 'menu_buy'];
+        }
+        if (Setting::get('btn_renew_enabled', '1') === '1') {
+            $items[] = ['text' => Setting::get('btn_renew_text', '🔄 تمدید اشتراک'), 'callback_data' => 'menu_renew'];
+        }
+        if (Setting::get('btn_trial_enabled', '1') === '1') {
+            $items[] = ['text' => Setting::get('btn_trial_text', '🎁 تست رایگان'), 'callback_data' => 'menu_trial'];
+        }
+        if (Setting::get('btn_wheel_enabled', '1') === '1') {
+            $items[] = ['text' => Setting::get('btn_wheel_text', '🎰 گردونه شانس و هدیه'), 'callback_data' => 'menu_wheel'];
+        }
+        if (Setting::get('btn_referral_enabled', '1') === '1') {
+            $items[] = ['text' => Setting::get('btn_referral_text', '🤝 کسب درآمد'), 'callback_data' => 'menu_referral'];
+        }
+        if (Setting::get('btn_apps_enabled', '1') === '1') {
+            $items[] = ['text' => Setting::get('btn_apps_text', '📱 دانلود و آموزش'), 'callback_data' => 'menu_apps'];
+        }
+        if (Setting::get('btn_support_enabled', '1') === '1') {
+            $items[] = ['text' => Setting::get('btn_support_text', '☎️ پشتیبانی'), 'callback_data' => 'menu_support'];
+        }
+        if (Setting::get('btn_reseller_enabled', '1') === '1') {
+            $items[] = ['text' => Setting::get('btn_reseller_text', '💼 اخذ نمایندگی'), 'callback_data' => 'menu_reseller_apply'];
+        }
+        if (Setting::get('btn_panel_login_enabled', '1') === '1') {
+            $items[] = ['text' => Setting::get('btn_panel_login_text', '🔐 ورود به پنل وب'), 'callback_data' => 'menu_panel_credentials'];
+        }
 
-        $buttons[] = [
-            ['text' => $appsText, 'callback_data' => 'menu_apps'],
-            ['text' => $supportText, 'callback_data' => 'menu_support']
-        ];
-
-        $buttons[] = [
-            ['text' => $resellerText, 'callback_data' => 'menu_reseller_apply'],
-            ['text' => '🔐 ورود به پنل وب', 'callback_data' => 'menu_panel_credentials']
-        ];
+        // Pair items into 2-column rows
+        for ($i = 0; $i < count($items); $i += 2) {
+            $row = [$items[$i]];
+            if (isset($items[$i + 1])) {
+                $row[] = $items[$i + 1];
+            }
+            $buttons[] = $row;
+        }
 
         return ['inline_keyboard' => $buttons];
     }
 
     /**
-     * Main Menu Reply Keyboard (Fixed at bottom chat input - Clean 2-column layout)
+     * Main Menu Reply Keyboard (Fixed at bottom chat input - Clean dynamic 2-column layout)
      */
     public static function getMainMenuReplyKeyboard(): array {
-        $buyText = Setting::get('btn_buy_text', '🛒 خرید اشتراک');
-        $renewText = Setting::get('btn_renew_text', '🔄 تمدید اشتراک');
-        $myAccText = Setting::get('btn_my_accounts_text', '👤 حساب‌های من');
-        $trialText = Setting::get('btn_trial_text', '🎁 تست رایگان');
-        $refText = Setting::get('btn_referral_text', '🤝 کسب درآمد');
-        $appsText = Setting::get('btn_apps_text', '📱 دانلود و آموزش');
-        $supportText = Setting::get('btn_support_text', '☎️ پشتیبانی');
-        $resellerText = Setting::get('btn_reseller_text', '💼 اخذ نمایندگی');
+        $items = [];
+        if (Setting::get('btn_buy_enabled', '1') === '1') {
+            $items[] = ['text' => Setting::get('btn_buy_text', '🛒 خرید اشتراک')];
+        }
+        if (Setting::get('btn_renew_enabled', '1') === '1') {
+            $items[] = ['text' => Setting::get('btn_renew_text', '🔄 تمدید اشتراک')];
+        }
+        if (Setting::get('btn_my_accounts_enabled', '1') === '1') {
+            $items[] = ['text' => Setting::get('btn_my_accounts_text', '👤 حساب‌های من')];
+        }
+        if (Setting::get('btn_trial_enabled', '1') === '1') {
+            $items[] = ['text' => Setting::get('btn_trial_text', '🎁 تست رایگان')];
+        }
+        if (Setting::get('btn_wheel_enabled', '1') === '1') {
+            $items[] = ['text' => Setting::get('btn_wheel_text', '🎰 گردونه شانس و هدیه')];
+        }
+        if (Setting::get('btn_referral_enabled', '1') === '1') {
+            $items[] = ['text' => Setting::get('btn_referral_text', '🤝 کسب درآمد')];
+        }
+        if (Setting::get('btn_apps_enabled', '1') === '1') {
+            $items[] = ['text' => Setting::get('btn_apps_text', '📱 دانلود و آموزش')];
+        }
+        if (Setting::get('btn_support_enabled', '1') === '1') {
+            $items[] = ['text' => Setting::get('btn_support_text', '☎️ پشتیبانی')];
+        }
+        if (Setting::get('btn_reseller_enabled', '1') === '1') {
+            $items[] = ['text' => Setting::get('btn_reseller_text', '💼 اخذ نمایندگی')];
+        }
+        if (Setting::get('btn_panel_login_enabled', '1') === '1') {
+            $items[] = ['text' => Setting::get('btn_panel_login_text', '🔐 ورود به پنل وب')];
+        }
+
+        $rows = [];
+        for ($i = 0; $i < count($items); $i += 2) {
+            $row = [$items[$i]];
+            if (isset($items[$i + 1])) {
+                $row[] = $items[$i + 1];
+            }
+            $rows[] = $row;
+        }
 
         return [
-            'keyboard' => [
-                [
-                    ['text' => $buyText],
-                    ['text' => $renewText]
-                ],
-                [
-                    ['text' => $myAccText],
-                    ['text' => $trialText]
-                ],
-                [
-                    ['text' => $refText],
-                    ['text' => $appsText]
-                ],
-                [
-                    ['text' => $supportText],
-                    ['text' => $resellerText]
-                ],
-                [
-                    ['text' => '🔐 ورود به پنل وب']
-                ]
-            ],
+            'keyboard' => $rows,
             'resize_keyboard' => true,
             'is_persistent' => true
         ];
@@ -635,6 +670,12 @@ class TelegramBotController {
             return;
         }
 
+        // Lucky Wheel & Daily Rewards
+        if ($data === 'menu_wheel') {
+            self::handleLuckyWheel($pdo, $chatId, $fromId, $messageId);
+            return;
+        }
+
         // Reseller Application Start
         if ($data === 'menu_reseller_apply') {
             self::startResellerApplication($pdo, $chatId, $fromId, $messageId);
@@ -972,6 +1013,13 @@ class TelegramBotController {
             self::handleFreeTrialRequest($pdo, $chatId, $fromId);
             return;
         }
+
+        $wheelText = Setting::get('btn_wheel_text', '🎰 گردونه شانس و هدیه');
+        if ($text === $wheelText || $text === '🎰 گردونه شانس' || $text === 'گردونه شانس' || $text === '/wheel' || $text === 'هدیه روزانه') {
+            self::handleLuckyWheel($pdo, $chatId, $fromId);
+            return;
+        }
+
         if ($text === $refText || $text === '🤝 زیرمجموعه‌گیری و درآمد' || $text === '🤝 زیرمجموعه‌گیری و درآمدزایی' || $text === '/referral' || $text === 'زیرمجموعه‌گیری') {
             self::showReferralInfo($pdo, $chatId, $fromId);
             return;
@@ -1329,7 +1377,7 @@ class TelegramBotController {
                 $used = Helpers::formatBytes($client['traffic_used_bytes']);
                 $total = Helpers::formatBytes($client['traffic_limit_bytes']);
                 $days = Helpers::daysRemaining($client['expire_at']);
-                $subUrl = Helpers::fullUrl('sub/' . $client['sub_token']);
+                $subUrl = Helpers::subUrl($client['sub_token']);
 
                 $msg = "🎉 <b>حساب با موفقیت به تلگرام متصل شد! (روش ۱)</b>\n\n"
                      . "👤 <b>نام کاربری:</b> <code>{$client['username']}</code>\n"
@@ -1399,7 +1447,7 @@ class TelegramBotController {
                 $rem = max(0, $client['traffic_limit_bytes'] - $client['traffic_used_bytes']);
                 $remStr = Helpers::formatBytes($rem);
                 $days = Helpers::daysRemaining($client['expire_at']);
-                $subUrl = Helpers::fullUrl('sub/' . $client['sub_token']);
+                $subUrl = Helpers::subUrl($client['sub_token']);
 
                 $statusFa = match($client['status']) {
                     'active' => '🟢 فعال و متصل',
@@ -1465,7 +1513,7 @@ class TelegramBotController {
         $used = Helpers::formatBytes($client['traffic_used_bytes']);
         $total = Helpers::formatBytes($client['traffic_limit_bytes']);
         $days = Helpers::daysRemaining($client['expire_at']);
-        $subUrl = Helpers::fullUrl('sub/' . $client['sub_token']);
+        $subUrl = Helpers::subUrl($client['sub_token']);
 
         $msg = "🎉 <b>اتصال خودکار به تلگرام با موفقیت انجام شد! (روش ۲ - دیپ‌لینک ۱ کلیکه)</b>\n\n"
              . "👤 <b>نام کاربری:</b> <code>{$client['username']}</code>\n"
@@ -1550,7 +1598,7 @@ class TelegramBotController {
         $rem = max(0, $c['traffic_limit_bytes'] - $c['traffic_used_bytes']);
         $remStr = Helpers::formatBytes($rem);
         $days = Helpers::daysRemaining($c['expire_at']);
-        $subUrl = Helpers::fullUrl('sub/' . $c['sub_token']);
+        $subUrl = Helpers::subUrl($c['sub_token']);
 
         $statusFa = match($c['status']) {
             'active' => '🟢 فعال و متصل',
@@ -1610,7 +1658,7 @@ class TelegramBotController {
         $ref->setAccessible(true);
         $configs = $ref->invoke($subCtrl, $client);
 
-        $subUrl = Helpers::fullUrl('sub/' . $client['sub_token']);
+        $subUrl = Helpers::subUrl($client['sub_token']);
 
         $msg = "📥 <b>کانفیگ‌های اختصاصی حساب {$client['username']}</b>\n\n"
              . "⚡️ <b>کانفیگ ضد فیلتر VLESS Reality:</b>\n<code>{$configs['vless_reality']}</code>\n\n"
@@ -2143,7 +2191,7 @@ class TelegramBotController {
             $stmtCl->execute([$order['client_id']]);
             $client = $stmtCl->fetch();
 
-            $subUrl = Helpers::fullUrl('sub/' . $client['sub_token']);
+            $subUrl = Helpers::subUrl($client['sub_token']);
             $qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=' . urlencode($subUrl);
 
             $customerMsg = "🎉 <b>تمدید اشتراک شما با موفقیت تایید و اعمال گردید!</b>\n\n"
@@ -2263,6 +2311,135 @@ class TelegramBotController {
         }
     }
 
+    /**
+     * Lucky Wheel & Daily Rewards System
+     */
+    public static function handleLuckyWheel(PDO $pdo, string $chatId, string $fromId, ?int $messageId = null): void {
+        $ctx = self::getContext($pdo);
+        $botToken = $ctx['bot_token'];
+
+        // Check if feature is enabled
+        if (Setting::get('btn_wheel_enabled', '1') !== '1') {
+            $disabledMsg = "⚠️ <b>قابلیت گردونه شانس و هدیه روزانه در حال حاضر غیرفعال است.</b>";
+            $kb = ['inline_keyboard' => [[['text' => '🔙 بازگشت به منوی اصلی', 'callback_data' => 'menu_main']]]];
+            if ($messageId) {
+                TelegramBot::editMessageText($disabledMsg, $chatId, $messageId, $kb, $botToken);
+            } else {
+                TelegramBot::sendMessage($disabledMsg, $chatId, $kb, $botToken);
+            }
+            return;
+        }
+
+        // Check last claim time
+        $stmt = $pdo->prepare("SELECT * FROM lucky_wheel_logs WHERE user_tg_id = ? ORDER BY id DESC LIMIT 1");
+        $stmt->execute([$fromId]);
+        $last = $stmt->fetch();
+
+        $now = time();
+        if ($last) {
+            $lastTime = strtotime($last['created_at']);
+            $elapsed = $now - $lastTime;
+            $cooldown = 86400; // 24 hours
+            if ($elapsed < $cooldown) {
+                $diff = $cooldown - $elapsed;
+                $hours = floor($diff / 3600);
+                $minutes = floor(($diff % 3600) / 60);
+                $waitMsg = "⏳ <b>شما هدیه روزانه امروز خود را دریافت کرده‌اید!</b>\n\n"
+                         . "🎁 آخرین جایزه: <b>{$last['reward_text']}</b>\n"
+                         . "⏰ زمان باقیمانده تا شانس بعدی:\n"
+                         . "👉 <b>{$hours} ساعت و {$minutes} دقیقه</b> دیگر\n\n"
+                         . "💡 فردا مجدداً سر بزنید تا شانس خود را امتحان فرمایید!";
+                $kb = ['inline_keyboard' => [
+                    [['text' => '🛒 خرید اشتراک پرسرعت', 'callback_data' => 'menu_buy']],
+                    [['text' => '🔙 بازگشت به منوی اصلی', 'callback_data' => 'menu_main']]
+                ]];
+                if ($messageId) {
+                    TelegramBot::editMessageText($waitMsg, $chatId, $messageId, $kb, $botToken);
+                } else {
+                    TelegramBot::sendMessage($waitMsg, $chatId, $kb, $botToken);
+                }
+                return;
+            }
+        }
+
+        // Eligible! Roll prize
+        $roll = rand(1, 100);
+        $rewardType = '';
+        $rewardVal = 0;
+        $rewardText = '';
+
+        if ($roll <= 40) {
+            // Cash to wallet (5,000 to 15,000)
+            $amounts = [5000, 8000, 10000, 15000];
+            $amount = $amounts[array_rand($amounts)];
+            $rewardType = 'wallet_credit';
+            $rewardVal = $amount;
+            $rewardText = number_format($amount) . ' تومان شارژ کیف‌پول هدیه';
+
+            $pdo->prepare("UPDATE bot_users SET referral_balance = referral_balance + ? WHERE tg_id = ?")
+                ->execute([$amount, $fromId]);
+        } elseif ($roll <= 80) {
+            // Discount Coupon 15% or 20%
+            $discountPct = (rand(1, 2) === 1) ? 15 : 20;
+            $code = 'LUCK-' . strtoupper(substr(bin2hex(random_bytes(3)), 0, 5));
+            $exp = date('Y-m-d H:i:s', time() + (48 * 3600)); // 48h
+            $rewardType = 'discount_code';
+            $rewardVal = $discountPct;
+            $rewardText = "کد تخفیف {$discountPct}٪ اختصاصی (کد: <code>{$code}</code>)";
+
+            $pdo->prepare("INSERT INTO coupons (code, discount_percent, max_uses, used_count, expire_at, is_active) VALUES (?, ?, 1, 0, ?, 1)")
+                ->execute([$code, $discountPct, $exp]);
+        } else {
+            // Big Jackpot: 25,000 Tomans wallet cash or 30% discount
+            $isCash = (rand(1, 2) === 1);
+            if ($isCash) {
+                $rewardType = 'wallet_credit';
+                $rewardVal = 25000;
+                $rewardText = "🎉 جایزه بزرگ: ۲۵,۰۰۰ تومان شارژ مستقیم کیف‌پول!";
+                $pdo->prepare("UPDATE bot_users SET referral_balance = referral_balance + 25000 WHERE tg_id = ?")
+                    ->execute([$fromId]);
+            } else {
+                $code = 'JACKPOT-' . strtoupper(substr(bin2hex(random_bytes(2)), 0, 4));
+                $exp = date('Y-m-d H:i:s', time() + (72 * 3600));
+                $rewardType = 'discount_code';
+                $rewardVal = 30;
+                $rewardText = "🎉 جایزه طلایی: کد تخفیف ۳۰٪ خرید اشتراک (کد: <code>{$code}</code>)";
+                $pdo->prepare("INSERT INTO coupons (code, discount_percent, max_uses, used_count, expire_at, is_active) VALUES (?, 30, 1, 0, ?, 1)")
+                    ->execute([$code, $exp]);
+            }
+        }
+
+        // Save log
+        $pdo->prepare("INSERT INTO lucky_wheel_logs (user_tg_id, reward_type, reward_value, reward_text) VALUES (?, ?, ?, ?)")
+            ->execute([$fromId, $rewardType, $rewardVal, $rewardText]);
+
+        $winMsg = "🎰 <b>تبریک! گردونه شانس با موفقیت چرخید!</b>\n\n"
+                . "🎁 <b>هدیه روزانه شما:</b>\n"
+                . "✨ <b>{$rewardText}</b> ✨\n\n"
+                . "💡 <i>این هدیه بلافاصله برای حساب شما منظور گردید و می‌توانید در خرید یا تمدید اشتراک‌ها از آن استفاده فرمایید.</i>\n\n"
+                . "⏰ نوبت بعدی گردونه شانس ۲۴ ساعت دیگر برای شما فعال خواهد شد.";
+
+        $kb = [
+            'inline_keyboard' => [
+                [['text' => '🛒 استفاده از هدیه و خرید اشتراک', 'callback_data' => 'menu_buy']],
+                [['text' => '🔙 بازگشت به منوی اصلی', 'callback_data' => 'menu_main']]
+            ]
+        ];
+
+        if ($messageId) {
+            TelegramBot::editMessageText($winMsg, $chatId, $messageId, $kb, $botToken);
+        } else {
+            TelegramBot::sendMessage($winMsg, $chatId, $kb, $botToken);
+        }
+
+        // Notify general topic in supergroup
+        $adminLog = "🎰 <b>دریافت هدیه گردونه شانس روزانه</b>\n\n"
+                  . "👤 <b>کاربر تلگرام:</b> <code>{$fromId}</code>\n"
+                  . "🎁 <b>جایزه:</b> {$rewardText}\n"
+                  . "⏰ <b>زمان:</b> " . Helpers::formatDate(time());
+        TelegramBot::sendTopicLog('general', $adminLog);
+    }
+
     // Session helpers
     private static function getSession(PDO $pdo, string $tgId): ?array {
         $stmt = $pdo->prepare("SELECT * FROM bot_sessions WHERE tg_id = ?");
@@ -2331,15 +2508,25 @@ class TelegramBotController {
             Setting::set("bot_topic_{$tk}", trim($_POST["bot_topic_{$tk}"] ?? ''));
         }
 
-        // Feature: Custom Button Labels
-        Setting::set('btn_buy_text', trim($_POST['btn_buy_text'] ?? '🛒 خرید اشتراک'));
-        Setting::set('btn_renew_text', trim($_POST['btn_renew_text'] ?? '🔄 تمدید اشتراک'));
-        Setting::set('btn_my_accounts_text', trim($_POST['btn_my_accounts_text'] ?? '👤 حساب‌های من'));
-        Setting::set('btn_trial_text', trim($_POST['btn_trial_text'] ?? '🎁 تست رایگان'));
-        Setting::set('btn_referral_text', trim($_POST['btn_referral_text'] ?? '🤝 کسب درآمد'));
-        Setting::set('btn_apps_text', trim($_POST['btn_apps_text'] ?? '📱 دانلود و آموزش'));
-        Setting::set('btn_support_text', trim($_POST['btn_support_text'] ?? '☎️ پشتیبانی'));
-        Setting::set('btn_reseller_text', trim($_POST['btn_reseller_text'] ?? '💼 اخذ نمایندگی'));
+        // Feature: Custom Button Labels & Visibility Toggles
+        $buttonKeys = [
+            'buy' => '🛒 خرید اشتراک',
+            'renew' => '🔄 تمدید اشتراک',
+            'my_accounts' => '👤 حساب‌های من',
+            'trial' => '🎁 تست رایگان',
+            'wheel' => '🎰 گردونه شانس و هدیه',
+            'referral' => '🤝 کسب درآمد',
+            'apps' => '📱 دانلود و آموزش',
+            'support' => '☎️ پشتیبانی',
+            'reseller' => '💼 اخذ نمایندگی',
+            'panel_login' => '🔐 ورود به پنل وب',
+            'webapp' => '🚀 مینی‌اپ تلگرام (Mini App)',
+        ];
+
+        foreach ($buttonKeys as $k => $defText) {
+            Setting::set("btn_{$k}_text", trim($_POST["btn_{$k}_text"] ?? $defText));
+            Setting::set("btn_{$k}_enabled", isset($_POST["btn_{$k}_enabled"]) ? '1' : '0');
+        }
 
         Setting::set('card_number', trim($_POST['card_number'] ?? ''));
         Setting::set('card_holder', trim($_POST['card_holder'] ?? ''));

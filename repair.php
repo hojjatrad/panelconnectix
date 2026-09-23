@@ -1,6 +1,6 @@
 <?php
 /**
- * Connectix Panel - Emergency Self-Healing & Diagnostic Utility (v2.8.9)
+ * Connectix Panel - Emergency Self-Healing & Diagnostic Utility (v2.9.0)
  * Language: Persian (Farsi) - RTL
  * Purpose: Automatically repair .htaccess, verify database connection,
  * migrate missing tables/columns, fix permissions, and restore panel functionality.

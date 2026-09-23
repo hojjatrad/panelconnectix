@@ -852,4 +852,108 @@ class ClientController {
         Helpers::flash('success', "اکانت تست {$hours} ساعته با حجم {$trafficText} و نام کاربری {$username} با موفقیت صادر گردید.");
         Helpers::redirect('clients');
     }
+
+    public function bulk(): void {
+        Auth::requireLogin();
+        $pdo = Database::getConnection();
+        $user = Auth::user();
+
+        $servers = $pdo->query("SELECT * FROM server_nodes WHERE is_active = 1")->fetchAll();
+        $plans = $pdo->query("SELECT * FROM plans WHERE is_active = 1 ORDER BY is_free ASC, base_price ASC")->fetchAll();
+        $resellers = Auth::isAdmin() ? $pdo->query("SELECT id, username FROM users WHERE role = 'reseller'")->fetchAll() : [];
+
+        require __DIR__ . '/../views/clients/bulk.php';
+    }
+
+    public function bulkStore(): void {
+        Auth::requireLogin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
+            Helpers::redirect('clients/bulk');
+        }
+
+        $pdo = Database::getConnection();
+        $userId = Auth::id();
+
+        $count = (int)($_POST['count'] ?? 10);
+        if ($count < 1) $count = 1;
+        if ($count > 100) $count = 100;
+
+        $prefix = preg_replace('/[^a-zA-Z0-9_]/', '', trim($_POST['prefix'] ?? 'user_'));
+        if (empty($prefix)) $prefix = 'user_';
+
+        $planId = (int)($_POST['plan_id'] ?? 0);
+        $serverId = (int)($_POST['server_id'] ?? 0);
+        $targetResellerId = (Auth::isAdmin() && !empty($_POST['reseller_id'])) ? (int)$_POST['reseller_id'] : $userId;
+
+        $stmtPlan = $pdo->prepare("SELECT * FROM plans WHERE id = ? AND is_active = 1");
+        $stmtPlan->execute([$planId]);
+        $plan = $stmtPlan->fetch();
+        if (!$plan) {
+            Helpers::flash('error', 'پلن انتخابی نامعتبر است.');
+            Helpers::redirect('clients/bulk');
+        }
+
+        $stmtServer = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ? AND is_active = 1");
+        $stmtServer->execute([$serverId]);
+        $server = $stmtServer->fetch();
+        if (!$server) {
+            Helpers::flash('error', 'سرور انتخابی نامعتبر است.');
+            Helpers::redirect('clients/bulk');
+        }
+
+        $trafficBytes = (int)$plan['traffic_gb'] * 1024 * 1024 * 1024;
+        $durationDays = (int)$plan['duration_days'];
+        $expireAt = date('Y-m-d H:i:s', time() + ($durationDays * 86400));
+
+        $createdAccounts = [];
+        $driver = DriverFactory::create($server);
+
+        for ($i = 1; $i <= $count; $i++) {
+            $uniqueSuffix = substr(bin2hex(random_bytes(3)), 0, 5);
+            $username = $prefix . $uniqueSuffix;
+            $password = substr(bin2hex(random_bytes(3)), 0, 6);
+            $uuid = Helpers::generateUUID();
+            $subToken = Helpers::generateToken(24);
+
+            // Remote node
+            $driver->createUser([
+                'username' => $username,
+                'password' => $password,
+                'uuid' => $uuid,
+                'sub_token' => $subToken,
+                'traffic_limit_bytes' => $trafficBytes,
+                'expire_timestamp' => strtotime($expireAt)
+            ]);
+
+            // Database insert
+            $stmtInsert = $pdo->prepare("INSERT INTO clients (reseller_id, server_id, plan_id, username, password, uuid, sub_token, traffic_limit_bytes, traffic_used_bytes, expire_at, ip_limit, max_devices, start_on_first_use, duration_days, status, custom_note) 
+                                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 2, 2, 1, ?, 'active', ?)");
+            $stmtInsert->execute([$targetResellerId, $serverId, $planId, $username, $password, $uuid, $subToken, $trafficBytes, $expireAt, $durationDays, "ساخت گروهی دسته {$count} تایی"]);
+
+            $subUrl = Helpers::subUrl($subToken);
+            $createdAccounts[] = [
+                'username' => $username,
+                'password' => $password,
+                'uuid' => $uuid,
+                'sub_url' => $subUrl,
+                'expire_at' => $expireAt,
+                'traffic_gb' => $plan['traffic_gb'],
+                'duration_days' => $durationDays
+            ];
+        }
+
+        Helpers::logActivity('bulk_create', "ایجاد موفقیت‌آمیز {$count} اکانت گروهی با پیش‌وند {$prefix}", 'client');
+        $_SESSION['bulk_created_accounts'] = $createdAccounts;
+        Helpers::redirect('clients/bulk-result');
+    }
+
+    public function bulkResult(): void {
+        Auth::requireLogin();
+        $accounts = $_SESSION['bulk_created_accounts'] ?? [];
+        if (empty($accounts)) {
+            Helpers::redirect('clients');
+        }
+        require __DIR__ . '/../views/clients/bulk_result.php';
+    }
 }

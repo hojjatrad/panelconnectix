@@ -196,6 +196,9 @@ $router->get('dashboard', [DashboardController::class, 'index']);
 // Client Management & Operations
 $router->get('clients', [ClientController::class, 'index']);
 $router->get('clients/create', [ClientController::class, 'create']);
+$router->get('clients/bulk', [ClientController::class, 'bulk']);
+$router->post('clients/bulk-store', [ClientController::class, 'bulkStore']);
+$router->get('clients/bulk-result', [ClientController::class, 'bulkResult']);
 $router->get('clients/export', [ClientController::class, 'exportCsv']);
 $router->get('clients/configs', [ClientController::class, 'getConfigs']);
 $router->post('clients/test-account', [ClientController::class, 'createTestAccount']);
@@ -240,6 +243,7 @@ $router->post('resellers/reset-password', [ResellerController::class, 'resetPass
 $router->post('resellers/delete', [ResellerController::class, 'delete']);
 $router->get('resellers/clients', [ResellerController::class, 'clients']);
 $router->get('resellers/backup', [ResellerController::class, 'backupAction']);
+$router->get('resellers/export-financial', [ResellerController::class, 'exportFinancial']);
 $router->get('resellers/applications', [ResellerController::class, 'applications']);
 $router->post('resellers/applications/approve', [ResellerController::class, 'approveApplication']);
 $router->post('resellers/applications/reject', [ResellerController::class, 'rejectApplication']);
@@ -344,6 +348,9 @@ $router->post('settings/bot/approve', [TelegramBotController::class, 'approveWeb
 $router->post('settings/bot/reject', [TelegramBotController::class, 'rejectWeb']);
 $router->get('telegram/webhook', [TelegramBotController::class, 'handleWebhook']);
 $router->post('telegram/webhook', [TelegramBotController::class, 'handleWebhook']);
+
+// Telegram Mini App (WebApp)
+$router->get('webapp', [WebappController::class, 'index']);
 
 // App Guides & Download Tutorials
 $router->get('settings/app-guides', [AppGuideController::class, 'index']);

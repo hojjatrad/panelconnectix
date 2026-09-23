@@ -429,46 +429,44 @@ $isWebhookSet = !empty($webhookInfo['result']['url'] ?? '');
                         </div>
                     </div>
 
-                    <!-- Custom Button Labels Section -->
+                    <!-- Custom Button Labels & Feature Toggles Section -->
                     <div class="pt-3 border-t border-slate-800/80 space-y-3">
-                        <div class="text-xs font-bold text-sky-400 flex items-center gap-1.5">
-                            <i class="fa-solid fa-keyboard"></i>
-                            <span>شخصی‌سازی عناوین دکمه‌های ربات</span>
+                        <div class="text-xs font-bold text-sky-400 flex items-center justify-between">
+                            <span class="flex items-center gap-1.5">
+                                <i class="fa-solid fa-toggle-on text-emerald-400"></i>
+                                <span>فعال‌سازی و شخصی‌سازی دکمه‌های ربات</span>
+                            </span>
+                            <span class="text-[10px] text-slate-400 font-normal">امکان خاموش/روشن کردن کلیدها</span>
                         </div>
 
-                        <div class="grid grid-cols-2 gap-2">
-                            <div>
-                                <label class="block text-[10px] text-slate-400 mb-1">دکمه خرید</label>
-                                <input type="text" name="btn_buy_text" value="<?= htmlspecialchars($btnBuyText) ?>" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white text-center">
-                            </div>
-                            <div>
-                                <label class="block text-[10px] text-slate-400 mb-1">دکمه تمدید</label>
-                                <input type="text" name="btn_renew_text" value="<?= htmlspecialchars($btnRenewText) ?>" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white text-center">
-                            </div>
-                            <div>
-                                <label class="block text-[10px] text-slate-400 mb-1">دکمه حساب‌های من</label>
-                                <input type="text" name="btn_my_accounts_text" value="<?= htmlspecialchars($btnMyAccText) ?>" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white text-center">
-                            </div>
-                            <div>
-                                <label class="block text-[10px] text-slate-400 mb-1">دکمه تست رایگان</label>
-                                <input type="text" name="btn_trial_text" value="<?= htmlspecialchars($btnTrialText) ?>" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white text-center">
-                            </div>
-                            <div>
-                                <label class="block text-[10px] text-slate-400 mb-1">دکمه کسب درآمد</label>
-                                <input type="text" name="btn_referral_text" value="<?= htmlspecialchars($btnRefText) ?>" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white text-center">
-                            </div>
-                            <div>
-                                <label class="block text-[10px] text-slate-400 mb-1">دکمه دانلود و آموزش</label>
-                                <input type="text" name="btn_apps_text" value="<?= htmlspecialchars($btnAppsText) ?>" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white text-center">
-                            </div>
-                            <div>
-                                <label class="block text-[10px] text-slate-400 mb-1">دکمه پشتیبانی</label>
-                                <input type="text" name="btn_support_text" value="<?= htmlspecialchars($btnSupportText) ?>" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white text-center">
-                            </div>
-                            <div>
-                                <label class="block text-[10px] text-slate-400 mb-1">دکمه اخذ نمایندگی</label>
-                                <input type="text" name="btn_reseller_text" value="<?= htmlspecialchars($btnResellerText) ?>" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white text-center">
-                            </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                            <?php
+                            $botButtonsConfig = [
+                                'buy' => ['title' => '🛒 خرید اشتراک', 'text' => $settings['btn_buy_text'] ?? '🛒 خرید اشتراک', 'enabled' => ($settings['btn_buy_enabled'] ?? '1') === '1'],
+                                'renew' => ['title' => '🔄 تمدید اشتراک', 'text' => $settings['btn_renew_text'] ?? '🔄 تمدید اشتراک', 'enabled' => ($settings['btn_renew_enabled'] ?? '1') === '1'],
+                                'my_accounts' => ['title' => '👤 حساب‌های من', 'text' => $settings['btn_my_accounts_text'] ?? '👤 حساب‌های من', 'enabled' => ($settings['btn_my_accounts_enabled'] ?? '1') === '1'],
+                                'trial' => ['title' => '🎁 تست رایگان', 'text' => $settings['btn_trial_text'] ?? '🎁 تست رایگان', 'enabled' => ($settings['btn_trial_enabled'] ?? '1') === '1'],
+                                'wheel' => ['title' => '🎰 گردونه شانس و هدیه', 'text' => $settings['btn_wheel_text'] ?? '🎰 گردونه شانس و هدیه', 'enabled' => ($settings['btn_wheel_enabled'] ?? '1') === '1'],
+                                'referral' => ['title' => '🤝 کسب درآمد', 'text' => $settings['btn_referral_text'] ?? '🤝 کسب درآمد', 'enabled' => ($settings['btn_referral_enabled'] ?? '1') === '1'],
+                                'apps' => ['title' => '📱 دانلود و آموزش', 'text' => $settings['btn_apps_text'] ?? '📱 دانلود و آموزش', 'enabled' => ($settings['btn_apps_enabled'] ?? '1') === '1'],
+                                'support' => ['title' => '☎️ پشتیبانی', 'text' => $settings['btn_support_text'] ?? '☎️ پشتیبانی', 'enabled' => ($settings['btn_support_enabled'] ?? '1') === '1'],
+                                'reseller' => ['title' => '💼 اخذ نمایندگی', 'text' => $settings['btn_reseller_text'] ?? '💼 اخذ نمایندگی', 'enabled' => ($settings['btn_reseller_enabled'] ?? '1') === '1'],
+                                'panel_login' => ['title' => '🔐 ورود به پنل وب', 'text' => $settings['btn_panel_login_text'] ?? '🔐 ورود به پنل وب', 'enabled' => ($settings['btn_panel_login_enabled'] ?? '1') === '1'],
+                                'webapp' => ['title' => '🚀 مینی‌اپ تلگرام (Mini App)', 'text' => $settings['btn_webapp_text'] ?? '🚀 مینی‌اپ اختصاصی کانکتیکس (Mini App)', 'enabled' => ($settings['btn_webapp_enabled'] ?? '1') === '1'],
+                            ];
+                            foreach ($botButtonsConfig as $bKey => $b):
+                            ?>
+                                <div class="p-2.5 bg-slate-950/80 rounded-xl border border-slate-800/80 flex flex-col gap-1.5">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-[11px] font-bold text-slate-300"><?= $b['title'] ?></span>
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" name="btn_<?= $bKey ?>_enabled" value="1" <?= $b['enabled'] ? 'checked' : '' ?> class="sr-only peer">
+                                            <div class="w-8 h-4 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-emerald-500"></div>
+                                        </label>
+                                    </div>
+                                    <input type="text" name="btn_<?= $bKey ?>_text" value="<?= htmlspecialchars($b['text']) ?>" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-xs text-white text-center">
+                                </div>
+                            <?php endforeach; ?>
                         </div>
                     </div>
                 </div>
