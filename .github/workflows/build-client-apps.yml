@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   build-android:
-    name: Build Android APK
+    name: Build Android APKs (Universal, ARM64, ARM32)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -31,34 +31,166 @@ jobs:
           flutter-version: '3.22.x'
           channel: 'stable'
 
-      - name: Prepare Flutter Project
+      - name: Prepare Flutter Project & Generate Scaffolding
         run: |
           cd client-app
           flutter create --org com.connectix.vpn --project-name connectix_vpn .
-          sed -i 's/minSdkVersion .*/minSdkVersion 21/' android/app/build.gradle 2>/dev/null || true
-          sed -i 's/flutter.minSdkVersion/21/' android/app/build.gradle 2>/dev/null || true
-          sed -i 's/minSdk = .*/minSdk = 21/' android/app/build.gradle 2>/dev/null || true
+          
+          # Generate Production Release Keystore for Android 9+ v2/v3 Signing
+          keytool -genkey -v -keystore android/app/release.keystore \
+            -alias connectix -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass connectix123 -keypass connectix123 \
+            -dname "CN=Connectix VPN, OU=Client, O=Connectix, L=Tehran, ST=Tehran, C=IR"
+
+          # Configure build.gradle with minSdk 21, multiDex, and Release Signing
+          cat << 'EOF' > android/app/build.gradle
+          plugins {
+              id "com.android.application"
+              id "kotlin-android"
+              id "dev.flutter.flutter-gradle-plugin"
+          }
+
+          android {
+              namespace = "com.connectix.vpn"
+              compileSdk = 34
+              ndkVersion = flutter.ndkVersion
+
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_1_8
+                  targetCompatibility = JavaVersion.VERSION_1_8
+              }
+
+              kotlinOptions {
+                  jvmTarget = "1.8"
+              }
+
+              defaultConfig {
+                  applicationId = "com.connectix.vpn"
+                  minSdk = 21
+                  targetSdk = 34
+                  versionCode = 1
+                  versionName = "1.0.0"
+                  multiDexEnabled = true
+                  ndk {
+                      abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86_64'
+                  }
+              }
+
+              signingConfigs {
+                  release {
+                      storeFile file('release.keystore')
+                      storePassword 'connectix123'
+                      keyAlias 'connectix'
+                      keyPassword 'connectix123'
+                      v1SigningEnabled true
+                      v2SigningEnabled true
+                  }
+              }
+
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.release
+                      minifyEnabled false
+                      shrinkResources false
+                  }
+                  debug {
+                      signingConfig signingConfigs.release
+                  }
+              }
+          }
+
+          flutter {
+              source = "../.."
+          }
+
+          dependencies {
+              implementation 'androidx.multidex:multidex:2.0.1'
+          }
+          EOF
+
+          # Ensure AndroidManifest has android:exported and network permissions
+          cat << 'EOF' > android/app/src/main/AndroidManifest.xml
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET"/>
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+              <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+              <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE"/>
+              
+              <application
+                  android:label="Connectix VPN"
+                  android:name="${applicationName}"
+                  android:icon="@mipmap/ic_launcher"
+                  android:usesCleartextTraffic="true"
+                  android:networkSecurityConfig="@xml/network_security_config">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:launchMode="singleTop"
+                      android:theme="@style/LaunchTheme"
+                      android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+                      android:hardwareAccelerated="true"
+                      android:windowSoftInputMode="adjustResize">
+                      <meta-data
+                        android:name="io.flutter.embedding.android.NormalTheme"
+                        android:resource="@style/NormalTheme"
+                        />
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN"/>
+                          <category android:name="android.intent.category.LAUNCHER"/>
+                      </intent-filter>
+                  </activity>
+                  <meta-data
+                      android:name="flutterEmbedding"
+                      android:value="2" />
+              </application>
+          </manifest>
+          EOF
+
+          mkdir -p android/app/src/main/res/xml
+          cat << 'EOF' > android/app/src/main/res/xml/network_security_config.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <network-security-config>
+              <base-config cleartextTrafficPermitted="true">
+                  <trust-anchors>
+                      <certificates src="system" />
+                      <certificates src="user" />
+                  </trust-anchors>
+              </base-config>
+          </network-security-config>
+          EOF
+
           flutter pub get
 
-      - name: Compile Release APK
+      - name: Build Universal APK (All Androids)
         run: |
           cd client-app
           flutter build apk --release
+          cp build/app/outputs/flutter-apk/app-release.apk ../Connectix-Universal.apk
 
-      - name: Rename APK
+      - name: Build Split-per-ABI APKs (ARM64 & ARM32)
         run: |
-          cp client-app/build/app/outputs/flutter-apk/app-release.apk Connectix-Android.apk
+          cd client-app
+          flutter build apk --split-per-abi --release
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk ../Connectix-ARM64-v8a.apk 2>/dev/null || true
+          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk ../Connectix-ARM32-v7a.apk 2>/dev/null || true
 
-      - name: Upload Android APK Artifact
+      - name: Upload APK Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Connectix-Android-APK
-          path: Connectix-Android.apk
+          name: Connectix-Android-APKs
+          path: |
+            Connectix-Universal.apk
+            Connectix-ARM64-v8a.apk
+            Connectix-ARM32-v7a.apk
 
-      - name: Publish APK to GitHub Release
+      - name: Publish All APKs to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v3.0.0
-          files: Connectix-Android.apk
+          files: |
+            Connectix-Universal.apk
+            Connectix-ARM64-v8a.apk
+            Connectix-ARM32-v7a.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
