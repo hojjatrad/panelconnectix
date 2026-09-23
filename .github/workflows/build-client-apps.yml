@@ -1,0 +1,77 @@
+name: Build Connectix Client Apps (Android & Windows)
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.x'
+          channel: 'stable'
+
+      - name: Prepare Flutter Project
+        run: |
+          cd client-app
+          flutter create --org com.connectix.vpn --project-name connectix_vpn .
+          flutter pub get
+
+      - name: Compile Release APK
+        run: |
+          cd client-app
+          flutter build apk --release
+
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Connectix-Android-Release-APK
+          path: client-app/build/app/outputs/flutter-apk/app-release.apk
+
+  build-windows:
+    name: Build Windows Application
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.x'
+          channel: 'stable'
+
+      - name: Enable Windows Desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Prepare Windows Project & Compile
+        run: |
+          cd client-app
+          flutter create --platforms=windows --project-name connectix_vpn .
+          flutter pub get
+          flutter build windows --release
+
+      - name: Package Windows ZIP
+        run: |
+          Compress-Archive -Path client-app\build\windows\x64\runner\Release\* -DestinationPath Connectix-Windows-x64.zip
+
+      - name: Upload Windows Archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: Connectix-Windows-x64
+          path: Connectix-Windows-x64.zip
