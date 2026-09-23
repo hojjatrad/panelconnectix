@@ -179,7 +179,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 decoration: BoxDecoration(
                   color: const Color(0xFF0F172A),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.pad(BorderSide(color: const Color(0xFF1E293B))),
+                  border: Border.all(color: const Color(0xFF1E293B)),
                 ),
                 child: Column(
                   children: [

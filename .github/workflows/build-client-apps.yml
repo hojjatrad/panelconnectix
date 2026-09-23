@@ -3,8 +3,13 @@ name: Build Connectix Client Apps (Android & Windows)
 on:
   workflow_dispatch:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
+
+permissions:
+  contents: write
 
 jobs:
   build-android:
@@ -30,6 +35,9 @@ jobs:
         run: |
           cd client-app
           flutter create --org com.connectix.vpn --project-name connectix_vpn .
+          sed -i 's/minSdkVersion .*/minSdkVersion 21/' android/app/build.gradle 2>/dev/null || true
+          sed -i 's/flutter.minSdkVersion/21/' android/app/build.gradle 2>/dev/null || true
+          sed -i 's/minSdk = .*/minSdk = 21/' android/app/build.gradle 2>/dev/null || true
           flutter pub get
 
       - name: Compile Release APK
@@ -37,41 +45,20 @@ jobs:
           cd client-app
           flutter build apk --release
 
-      - name: Upload Android APK
+      - name: Rename APK
+        run: |
+          cp client-app/build/app/outputs/flutter-apk/app-release.apk Connectix-Android.apk
+
+      - name: Upload Android APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Connectix-Android-Release-APK
-          path: client-app/build/app/outputs/flutter-apk/app-release.apk
+          name: Connectix-Android-APK
+          path: Connectix-Android.apk
 
-  build-windows:
-    name: Build Windows Application
-    runs-on: windows-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+      - name: Publish APK to GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          flutter-version: '3.22.x'
-          channel: 'stable'
-
-      - name: Enable Windows Desktop
-        run: flutter config --enable-windows-desktop
-
-      - name: Prepare Windows Project & Compile
-        run: |
-          cd client-app
-          flutter create --platforms=windows --project-name connectix_vpn .
-          flutter pub get
-          flutter build windows --release
-
-      - name: Package Windows ZIP
-        run: |
-          Compress-Archive -Path client-app\build\windows\x64\runner\Release\* -DestinationPath Connectix-Windows-x64.zip
-
-      - name: Upload Windows Archive
-        uses: actions/upload-artifact@v4
-        with:
-          name: Connectix-Windows-x64
-          path: Connectix-Windows-x64.zip
+          tag_name: v3.0.0
+          files: Connectix-Android.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
