@@ -37,6 +37,20 @@ class Auth {
         return ['success' => true, 'user' => $user];
     }
 
+    public static function loginById(int $userId): bool {
+        self::init();
+        $pdo = Database::getConnection();
+        $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ? AND status = 'active' LIMIT 1");
+        $stmt->execute([$userId]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$user) return false;
+
+        $_SESSION['user_id'] = $user['id'];
+        $_SESSION['username'] = $user['username'];
+        $_SESSION['role'] = $user['role'];
+        return true;
+    }
+
     public static function check(): bool {
         self::init();
         return !empty($_SESSION['user_id']);

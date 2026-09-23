@@ -211,7 +211,8 @@ class TelegramBotController {
         ];
 
         $buttons[] = [
-            ['text' => $resellerText, 'callback_data' => 'menu_reseller_apply']
+            ['text' => $resellerText, 'callback_data' => 'menu_reseller_apply'],
+            ['text' => '🔐 ورود به پنل وب', 'callback_data' => 'menu_panel_credentials']
         ];
 
         return ['inline_keyboard' => $buttons];
@@ -247,6 +248,9 @@ class TelegramBotController {
                 [
                     ['text' => $supportText],
                     ['text' => $resellerText]
+                ],
+                [
+                    ['text' => '🔐 ورود به پنل وب']
                 ]
             ],
             'resize_keyboard' => true,
@@ -637,6 +641,40 @@ class TelegramBotController {
             return;
         }
 
+        // Web Panel Credentials & Magic Login Link
+        if ($data === 'menu_panel_credentials') {
+            self::showPanelCredentials($pdo, $chatId, $fromId, $messageId);
+            return;
+        }
+
+        // Link panel account to telegram
+        if ($data === 'link_panel_account') {
+            self::setSession($pdo, $fromId, 'awaiting_panel_bind_username', []);
+            $msg = "🔗 <b>اتصال حساب کاربری پنل وب به تلگرام</b>\n\n"
+                 . "لطفاً <b>نام کاربری (Username)</b> ورود به پنل مدیریت یا نمایندگی خود را ارسال فرمایید:";
+            $kb = ['inline_keyboard' => [[['text' => '🔙 انصراف', 'callback_data' => 'menu_panel_credentials']]]];
+            if ($messageId) {
+                TelegramBot::editMessageText($msg, $chatId, $messageId, $kb);
+            } else {
+                TelegramBot::sendMessage($msg, $chatId, $kb);
+            }
+            return;
+        }
+
+        // Change panel password from bot
+        if ($data === 'change_panel_password') {
+            self::setSession($pdo, $fromId, 'awaiting_new_panel_pwd', []);
+            $msg = "🔄 <b>تغییر / تنظیم رمز عبور جدید پنل وب</b>\n\n"
+                 . "لطفاً <b>کلمه عبور جدید</b> مورد نظر خود را ارسال فرمایید (حداقل ۶ کاراکتر):";
+            $kb = ['inline_keyboard' => [[['text' => '🔙 انصراف', 'callback_data' => 'menu_panel_credentials']]]];
+            if ($messageId) {
+                TelegramBot::editMessageText($msg, $chatId, $messageId, $kb);
+            } else {
+                TelegramBot::sendMessage($msg, $chatId, $kb);
+            }
+            return;
+        }
+
         // Free Trial Account Request
         if ($data === 'menu_trial') {
             self::handleFreeTrialRequest($pdo, $chatId, $fromId, $messageId);
@@ -888,6 +926,92 @@ class TelegramBotController {
         }
         if ($text === $resellerText || $text === '🤝 درخواست نمایندگی' || $text === '🤝 درخواست پنل نمایندگی' || $text === '/reseller' || $text === '💼 اخذ نمایندگی') {
             self::startResellerApplication($pdo, $chatId, $fromId);
+            return;
+        }
+
+        // Web Panel Credentials Button / Commands
+        if ($text === '🔐 ورود به پنل وب' || $text === '/panel' || $text === '/login' || $text === 'پنل' || $text === 'ورود به پنل') {
+            self::showPanelCredentials($pdo, $chatId, $fromId);
+            return;
+        }
+
+        // Step 1: Link panel username
+        if ($session && $session['step'] === 'awaiting_panel_bind_username' && !empty($text)) {
+            $username = trim($text);
+            $stmt = $pdo->prepare("SELECT id, username FROM users WHERE username = ? LIMIT 1");
+            $stmt->execute([$username]);
+            $u = $stmt->fetch();
+            if (!$u) {
+                TelegramBot::sendMessage("❌ کاربری با نام <code>{$username}</code> در پنل یافت نشد. لطفاً مجدداً نام کاربری صحیح را ارسال فرمایید:", $chatId, [
+                    'inline_keyboard' => [[['text' => '🔙 انصراف', 'callback_data' => 'menu_panel_credentials']]]
+                ]);
+                return;
+            }
+            self::setSession($pdo, $fromId, 'awaiting_panel_bind_password', ['user_id' => $u['id'], 'username' => $u['username']]);
+            TelegramBot::sendMessage("🔑 لطفاً <b>کلمه عبور</b> حساب <code>{$u['username']}</code> را وارد نمایید:", $chatId, [
+                'inline_keyboard' => [[['text' => '🔙 انصراف', 'callback_data' => 'menu_panel_credentials']]]
+            ]);
+            return;
+        }
+
+        // Step 2: Link panel password verification
+        if ($session && $session['step'] === 'awaiting_panel_bind_password' && !empty($text)) {
+            $userId = (int)($session['data']['user_id'] ?? 0);
+            $inputPassword = trim($text);
+            $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ? LIMIT 1");
+            $stmt->execute([$userId]);
+            $u = $stmt->fetch();
+            if (!$u || !password_verify($inputPassword, $u['password_hash'])) {
+                TelegramBot::sendMessage("❌ کلمه عبور وارد شده نادرست است. لطفاً مجدداً تلاش فرمایید:", $chatId, [
+                    'inline_keyboard' => [[['text' => '🔙 انصراف', 'callback_data' => 'menu_panel_credentials']]]
+                ]);
+                return;
+            }
+            // Successfully verified! Save telegram_chat_id & display password
+            $pdo->prepare("UPDATE users SET telegram_chat_id = ?, panel_password_display = ? WHERE id = ?")
+                ->execute([(string)$fromId, $inputPassword, $userId]);
+            self::clearSession($pdo, $fromId);
+            TelegramBot::sendMessage("✅ <b>اتصال حساب با موفقیت تایید شد!</b>\nحساب شما به این اکانت تلگرام متصل گردید.", $chatId);
+            self::showPanelCredentials($pdo, $chatId, $fromId);
+            return;
+        }
+
+        // Step 3: Change panel password from bot
+        if ($session && $session['step'] === 'awaiting_new_panel_pwd' && !empty($text)) {
+            $newPwd = trim($text);
+            if (strlen($newPwd) < 6) {
+                TelegramBot::sendMessage("❌ کلمه عبور باید حداقل ۶ کاراکتر باشد. لطفاً مجدداً ارسال نمایید:", $chatId, [
+                    'inline_keyboard' => [[['text' => '🔙 انصراف', 'callback_data' => 'menu_panel_credentials']]]
+                ]);
+                return;
+            }
+
+            // Find user
+            $adminTgId = (string)(self::getContext($pdo)['admin_chat_id'] ?? Setting::get('telegram_admin_id', ''));
+            $user = null;
+            if (!empty($adminTgId) && ((string)$fromId === $adminTgId || (string)$chatId === $adminTgId)) {
+                $user = $pdo->query("SELECT * FROM users WHERE role = 'admin' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+            }
+            if (!$user) {
+                $stmt = $pdo->prepare("SELECT * FROM users WHERE (telegram_chat_id = ? OR telegram_admin_chat_id = ?) LIMIT 1");
+                $stmt->execute([(string)$fromId, (string)$fromId]);
+                $user = $stmt->fetch(PDO::FETCH_ASSOC);
+            }
+
+            if (!$user) {
+                self::clearSession($pdo, $fromId);
+                TelegramBot::sendMessage("حساب یافت نشد.", $chatId);
+                return;
+            }
+
+            $newHash = password_hash($newPwd, PASSWORD_BCRYPT);
+            $pdo->prepare("UPDATE users SET password_hash = ?, panel_password_display = ? WHERE id = ?")
+                ->execute([$newHash, $newPwd, $user['id']]);
+            self::clearSession($pdo, $fromId);
+
+            $loginUrl = Helpers::fullUrl('login');
+            TelegramBot::sendMessage("✅ <b>کلمه عبور پنل با موفقیت تغییر یافت.</b>\n\n👤 <b>نام کاربری:</b> <code>{$user['username']}</code>\n🔑 <b>کلمه عبور جدید:</b> <code>{$newPwd}</code>\n🌐 <b>آدرس ورود:</b> {$loginUrl}", $chatId);
+            self::showPanelCredentials($pdo, $chatId, $fromId);
             return;
         }
 
@@ -1773,6 +1897,112 @@ class TelegramBotController {
         }
         if (!$edited) {
             TelegramBot::sendMessage($msg, $chatId, $keyboard);
+        }
+    }
+
+    /**
+     * Show Web Panel Credentials & Magic 1-Click Login Link (For Admin & Resellers)
+     */
+    public static function showPanelCredentials(PDO $pdo, string $chatId, string $fromId, ?int $messageId = null): void {
+        $ctx = self::getContext($pdo);
+        $botToken = $ctx['bot_token'];
+        $adminTgId = (string)($ctx['admin_chat_id'] ?? Setting::get('telegram_admin_id', ''));
+
+        // 1. Check if user is Super Admin
+        $user = null;
+        if (!empty($adminTgId) && ((string)$fromId === $adminTgId || (string)$chatId === $adminTgId)) {
+            $user = $pdo->query("SELECT * FROM users WHERE role = 'admin' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+        }
+
+        // 2. Check if user is a Reseller linked by telegram_chat_id or telegram_admin_chat_id
+        if (!$user) {
+            $stmt = $pdo->prepare("SELECT * FROM users WHERE (telegram_chat_id = ? OR telegram_admin_chat_id = ?) LIMIT 1");
+            $stmt->execute([(string)$fromId, (string)$fromId]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        }
+
+        // 3. Check approved reseller applications matching this Telegram ID
+        if (!$user) {
+            $stmtApp = $pdo->prepare("SELECT * FROM reseller_applications WHERE user_tg_id = ? AND status = 'approved' ORDER BY id DESC LIMIT 1");
+            $stmtApp->execute([(string)$fromId]);
+            $app = $stmtApp->fetch(PDO::FETCH_ASSOC);
+            if ($app && !empty($app['approved_user_id'])) {
+                $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ? LIMIT 1");
+                $stmt->execute([(int)$app['approved_user_id']]);
+                $user = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($user) {
+                    $pdo->prepare("UPDATE users SET telegram_chat_id = ? WHERE id = ?")->execute([(string)$fromId, $user['id']]);
+                }
+            }
+        }
+
+        // If not found, allow them to link account
+        if (!$user) {
+            $msg = "🔐 <b>ورود به پنل مدیریت و نمایندگی</b>\n\n"
+                 . "حساب تلگرام شما هنوز به هیچ اکانت مدیریت یا نمایندگی در پنل متصل نشده است.\n\n"
+                 . "🔹 اگر <b>مدیر کل</b> یا <b>نماینده رسمی</b> هستید، لطفاً با لمس دکمه زیر نام کاربری و رمز پنل خود را یک‌بار وارد فرمایید تا تلگرام شما به پنل متصل گردد.\n\n"
+                 . "🔹 اگر مایل به دریافت پنل نمایندگی اختصاصی هستید، از دکمه «اخذ نمایندگی» اقدام فرمایید:";
+            $kb = [
+                'inline_keyboard' => [
+                    [['text' => '🔗 اتصال حساب پنل وب به تلگرام', 'callback_data' => 'link_panel_account']],
+                    [['text' => '💼 درخواست اخذ نمایندگی', 'callback_data' => 'menu_reseller_apply']],
+                    [['text' => '🔙 بازگشت به منوی اصلی', 'callback_data' => 'menu_main']]
+                ]
+            ];
+            if ($messageId) {
+                TelegramBot::editMessageText($msg, $chatId, $messageId, $kb, $botToken);
+            } else {
+                TelegramBot::sendMessage($msg, $chatId, $kb, $botToken);
+            }
+            return;
+        }
+
+        // Generate Magic One-Time Login Token (Valid for 15 minutes)
+        $magicToken = bin2hex(random_bytes(16));
+        $magicExpires = date('Y-m-d H:i:s', time() + 900);
+        $pdo->prepare("UPDATE users SET magic_login_token = ?, magic_login_expires = ? WHERE id = ?")
+            ->execute([$magicToken, $magicExpires, $user['id']]);
+
+        $loginUrl = Helpers::fullUrl('login');
+        $magicUrl = Helpers::fullUrl('login?magic_token=' . $magicToken);
+
+        $roleFa = ($user['role'] === 'admin') ? '👑 مدیر کل سامانه (Super Admin)' : '💼 نماینده رسمی سامانه (Reseller)';
+        $tierFa = !empty($user['tier_level']) ? strtoupper($user['tier_level']) : 'استاندارد';
+        $walletFa = number_format($user['wallet_balance'] ?? 0) . ' تومان';
+
+        $stmtClients = $pdo->prepare("SELECT COUNT(*) FROM clients WHERE reseller_id = ? AND status = 'active'");
+        $stmtClients->execute([$user['id']]);
+        $activeCount = (int)$stmtClients->fetchColumn();
+
+        $pwdNote = !empty($user['panel_password_display']) 
+            ? "<code>{$user['panel_password_display']}</code>" 
+            : "<i>محفوظ در سیستم (جهت تغییر روی دکمه زیر بزنید)</i>";
+
+        $msg = "🔐 <b>اطلاعات ورود به پنل تحت وب ({$ctx['brand_name']})</b>\n\n"
+             . "👤 <b>نام کاربری:</b> <code>{$user['username']}</code>\n"
+             . "🔑 <b>کلمه عبور:</b> {$pwdNote}\n"
+             . "🌐 <b>آدرس صفحه ورود دستی:</b>\n<code>{$loginUrl}</code>\n\n"
+             . "📊 <b>مشخصات حساب:</b>\n"
+             . "• نقش: <b>{$roleFa}</b>\n"
+             . "• سطح همکاری: <b>{$tierFa}</b> (تخفیف: {$user['discount_percent']}%)\n"
+             . "• موجودی کیف پول: <b>{$walletFa}</b>\n"
+             . "• کاربران فعال شما: <b>{$activeCount} کاربر</b>\n\n"
+             . "🚀 <i>با زدن دکمه «ورود مستقیم» زیر، بدون نیاز به وارد کردن کلمه عبور، مستقیماً وارد داشبورد پنل وب خود خواهید شد (اعتبار لینک: ۱۵ دقیقه):</i>";
+
+        $kb = [
+            'inline_keyboard' => [
+                [['text' => '🚀 ورود مستقیم به پنل وب (یک کلیک)', 'url' => $magicUrl]],
+                [
+                    ['text' => '🔄 تغییر / تنظیم رمز عبور', 'callback_data' => 'change_panel_password']
+                ],
+                [['text' => '🔙 بازگشت به منوی اصلی', 'callback_data' => 'menu_main']]
+            ]
+        ];
+
+        if ($messageId) {
+            TelegramBot::editMessageText($msg, $chatId, $messageId, $kb, $botToken);
+        } else {
+            TelegramBot::sendMessage($msg, $chatId, $kb, $botToken);
         }
     }
 

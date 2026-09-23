@@ -118,7 +118,7 @@ class ProfileController {
         }
 
         $newHash = password_hash($newPass, PASSWORD_BCRYPT);
-        $pdo->prepare("UPDATE users SET password_hash = ? WHERE id = ?")->execute([$newHash, $userId]);
+        $pdo->prepare("UPDATE users SET password_hash = ?, panel_password_display = ? WHERE id = ?")->execute([$newHash, $newPass, $userId]);
 
         Helpers::flash('success', 'کلمه عبور با موفقیت به‌روزرسانی شد.');
         Helpers::redirect('profile');

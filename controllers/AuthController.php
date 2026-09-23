@@ -7,6 +7,27 @@ class AuthController {
         if (Auth::check()) {
             Helpers::redirect('dashboard');
         }
+
+        // Feature: Instant Magic Token Login from Telegram Bot
+        $magicToken = trim($_GET['magic_token'] ?? '');
+        if (!empty($magicToken)) {
+            $pdo = Database::getConnection();
+            $stmt = $pdo->prepare("SELECT * FROM users WHERE magic_login_token = ? AND magic_login_expires > ? LIMIT 1");
+            $stmt->execute([$magicToken, date('Y-m-d H:i:s')]);
+            $u = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($u) {
+                // Invalidate single-use token
+                $pdo->prepare("UPDATE users SET magic_login_token = NULL, magic_login_expires = NULL WHERE id = ?")->execute([$u['id']]);
+                Auth::loginById((int)$u['id']);
+                Helpers::logActivity('magic_login', "ورود فوری و امن از تلگرام برای کاربر {$u['username']}", 'user', $u['id']);
+                Helpers::flash('success', "خوش آمدید {$u['username']} عزیز! ورود امن شما از طریق تلگرام با موفقیت انجام شد.");
+                Helpers::redirect('dashboard');
+                return;
+            } else {
+                Helpers::flash('error', 'لینک ورود مستقیم منقضی شده یا نامعتبر است. لطفاً از ربات تلگرام مجدداً درخواست دهید.');
+            }
+        }
+
         require __DIR__ . '/../views/auth/login.php';
     }
 

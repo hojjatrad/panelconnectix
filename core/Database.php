@@ -261,7 +261,11 @@ class Database {
                 'commission_percent' => 'INT DEFAULT 10',
                 'crypto_wallet_address' => 'VARCHAR(128) NULL',
                 'crypto_network' => "VARCHAR(32) DEFAULT 'TRC20'",
-                'total_spent' => 'BIGINT DEFAULT 0'
+                'total_spent' => 'BIGINT DEFAULT 0',
+                'telegram_chat_id' => 'VARCHAR(64) NULL',
+                'magic_login_token' => 'VARCHAR(64) NULL',
+                'magic_login_expires' => 'DATETIME NULL',
+                'panel_password_display' => 'VARCHAR(128) NULL'
             ];
             foreach ($userCols as $c => $d) {
                 self::safeAddColumn($pdo, 'users', $c, $d);

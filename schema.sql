@@ -36,6 +36,10 @@ CREATE TABLE IF NOT EXISTS `users` (
     `credit_limit` BIGINT DEFAULT 0,
     `auto_tier_enabled` TINYINT(1) DEFAULT 1,
     `tier_level` VARCHAR(32) DEFAULT 'bronze',
+    `telegram_chat_id` VARCHAR(64) NULL,
+    `magic_login_token` VARCHAR(64) NULL,
+    `magic_login_expires` DATETIME NULL,
+    `panel_password_display` VARCHAR(128) NULL,
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -448,5 +452,5 @@ INSERT INTO `system_settings` (`setting_key`, `setting_value`) VALUES
 ('github_branch', 'main'),
 ('github_webhook_secret', 'gh_hook_sec_vpbotn_2026'),
 ('brand_name', 'Connectix VPN'),
-('current_version', '2.8.3')
+('current_version', '2.8.4')
 ON DUPLICATE KEY UPDATE `setting_value`=VALUES(`setting_value`);

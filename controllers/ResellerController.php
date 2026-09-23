@@ -270,9 +270,9 @@ class ResellerController {
         $brandName = !empty($app['brand_name']) ? $app['brand_name'] : $username;
 
         $stmtUser = $pdo->prepare("INSERT INTO users 
-            (username, password_hash, role, full_name, brand_name, wallet_balance, credit_limit, discount_percent, allowed_groups, api_token, support_username) 
-            VALUES (?, ?, 'reseller', ?, ?, ?, ?, ?, 'all', ?, ?)");
-        $stmtUser->execute([$username, $passwordHash, $brandName, $brandName, $initialBalance, $creditLimit, $discount, $apiToken, $app['contact_info']]);
+            (username, password_hash, role, full_name, brand_name, wallet_balance, credit_limit, discount_percent, allowed_groups, api_token, support_username, telegram_chat_id, panel_password_display) 
+            VALUES (?, ?, 'reseller', ?, ?, ?, ?, ?, 'all', ?, ?, ?, ?)");
+        $stmtUser->execute([$username, $passwordHash, $brandName, $brandName, $initialBalance, $creditLimit, $discount, $apiToken, $app['contact_info'], $app['user_tg_id'], $tempPassword]);
         $newUserId = (int)$pdo->lastInsertId();
 
         $pdo->prepare("INSERT INTO branding_metadata (user_id, brand_name, theme_color) VALUES (?, ?, 'violet')")
