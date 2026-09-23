@@ -71,8 +71,11 @@ class PlanController {
             $category = 'عمومی';
         }
 
-        $stmt = $pdo->prepare("INSERT INTO plans (title, traffic_gb, duration_days, base_price, reseller_price, server_group, server_id, category_id, category, ip_limit, show_in_bot, is_free) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->execute([$title, $traffic, $days, $basePrice, $resellerPrice, $serverGroup, $serverId, $categoryId, $category, $ipLimit, $showInBot, $isFree]);
+        $startOnFirstUse = isset($_POST['start_on_first_use']) ? 1 : 0;
+        $maxDevices = max(1, (int)($_POST['max_devices'] ?? $ipLimit));
+
+        $stmt = $pdo->prepare("INSERT INTO plans (title, traffic_gb, duration_days, base_price, reseller_price, server_group, server_id, category_id, category, ip_limit, max_devices, start_on_first_use, show_in_bot, is_free) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$title, $traffic, $days, $basePrice, $resellerPrice, $serverGroup, $serverId, $categoryId, $category, $ipLimit, $maxDevices, $startOnFirstUse, $showInBot, $isFree]);
 
         Helpers::flash('success', 'پلن جدید با موفقیت ایجاد شد.');
         Helpers::redirect('plans');
@@ -122,8 +125,11 @@ class PlanController {
             $category = 'عمومی';
         }
 
-        $stmt = $pdo->prepare("UPDATE plans SET title = ?, traffic_gb = ?, duration_days = ?, base_price = ?, reseller_price = ?, server_group = ?, server_id = ?, category_id = ?, category = ?, ip_limit = ?, show_in_bot = ?, is_free = ? WHERE id = ?");
-        $stmt->execute([$title, $traffic, $days, $basePrice, $resellerPrice, $serverGroup, $serverId, $categoryId, $category, $ipLimit, $showInBot, $isFree, $id]);
+        $startOnFirstUse = isset($_POST['start_on_first_use']) ? 1 : 0;
+        $maxDevices = max(1, (int)($_POST['max_devices'] ?? $ipLimit));
+
+        $stmt = $pdo->prepare("UPDATE plans SET title = ?, traffic_gb = ?, duration_days = ?, base_price = ?, reseller_price = ?, server_group = ?, server_id = ?, category_id = ?, category = ?, ip_limit = ?, max_devices = ?, start_on_first_use = ?, show_in_bot = ?, is_free = ? WHERE id = ?");
+        $stmt->execute([$title, $traffic, $days, $basePrice, $resellerPrice, $serverGroup, $serverId, $categoryId, $category, $ipLimit, $maxDevices, $startOnFirstUse, $showInBot, $isFree, $id]);
 
         Helpers::flash('success', "پلن '{$title}' با موفقیت به‌روزرسانی شد.");
         Helpers::redirect('plans');

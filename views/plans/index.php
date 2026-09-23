@@ -150,6 +150,15 @@ foreach ($customPlanCats as $idx => $custCat) {
                             <span>مدت اعتبار:</span>
                             <span class="font-bold text-white font-mono"><?= $p['duration_days'] ?> روز</span>
                         </div>
+                        <?php if (!empty($p['start_on_first_use'])): ?>
+                        <div class="flex justify-between text-indigo-300 bg-indigo-950/40 p-1.5 rounded-lg border border-indigo-800/40 text-[11px]">
+                            <span>شروع محاسبه زمان:</span>
+                            <span class="font-bold flex items-center gap-1">
+                                <i class="fa-solid fa-clock-rotate-left text-[10px]"></i>
+                                از اولین اتصال
+                            </span>
+                        </div>
+                        <?php endif; ?>
                         <div class="flex justify-between text-slate-400">
                             <span>سقف اتصال همزمان:</span>
                             <span class="font-bold text-purple-300 font-mono"><?= ($p['ip_limit'] ?? 2) > 0 ? ($p['ip_limit'] ?? 2) . ' دستگاه' : 'نامحدود' ?></span>
@@ -346,6 +355,13 @@ foreach ($customPlanCats as $idx => $custCat) {
             </div>
 
             <div class="pt-2 space-y-2 border-t border-slate-800">
+                <div class="flex items-center gap-2 p-2 bg-indigo-950/40 border border-indigo-800/40 rounded-xl">
+                    <input type="checkbox" name="start_on_first_use" id="new_start_on_first_use" value="1" class="rounded bg-slate-800 border-slate-700 text-indigo-600 focus:ring-0">
+                    <label for="new_start_on_first_use" class="text-indigo-200 font-semibold text-xs cursor-pointer">
+                        🕒 فعال‌سازی از اولین اتصال (مهلت زمانی پس از اتصال اول مشتری آغاز شود)
+                    </label>
+                </div>
+
                 <div class="flex items-center gap-2">
                     <input type="checkbox" name="show_in_bot" id="new_show_in_bot" value="1" checked class="rounded bg-slate-800 border-slate-700 text-purple-600 focus:ring-0">
                     <label for="new_show_in_bot" class="text-slate-300 font-medium">نمایش برای خرید مستقیم در ربات تلگرام</label>
@@ -482,6 +498,13 @@ foreach ($customPlanCats as $idx => $custCat) {
             </div>
 
             <div class="pt-2 space-y-2 border-t border-slate-800">
+                <div class="flex items-center gap-2 p-2 bg-indigo-950/40 border border-indigo-800/40 rounded-xl">
+                    <input type="checkbox" name="start_on_first_use" id="edit_start_on_first_use" value="1" class="rounded bg-slate-800 border-slate-700 text-indigo-600 focus:ring-0">
+                    <label for="edit_start_on_first_use" class="text-indigo-200 font-semibold text-xs cursor-pointer">
+                        🕒 فعال‌سازی از اولین اتصال (مهلت زمانی پس از اتصال اول مشتری آغاز شود)
+                    </label>
+                </div>
+
                 <div class="flex items-center gap-2">
                     <input type="checkbox" name="show_in_bot" id="edit_show_in_bot" value="1" class="rounded bg-slate-800 border-slate-700 text-purple-600 focus:ring-0">
                     <label for="edit_show_in_bot" class="text-slate-300 font-medium">نمایش برای خرید مستقیم در ربات تلگرام</label>
@@ -575,6 +598,7 @@ foreach ($customPlanCats as $idx => $custCat) {
         document.getElementById('edit_reseller_price').value = p.reseller_price;
         document.getElementById('edit_show_in_bot').checked = (parseInt(p.show_in_bot ?? 1) === 1);
         document.getElementById('edit_is_free').checked = (parseInt(p.is_free ?? 0) === 1);
+        document.getElementById('edit_start_on_first_use').checked = (parseInt(p.start_on_first_use ?? 0) === 1);
 
         const modal = document.getElementById('editPlanModal');
         modal.classList.remove('hidden');

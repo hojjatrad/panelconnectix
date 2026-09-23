@@ -34,6 +34,35 @@ require __DIR__ . '/../layout/header.php';
     </div>
 </div>
 
+<!-- Reseller Tier & Business Growth Banner -->
+<div class="bg-gradient-to-r from-purple-950/60 via-slate-900 to-indigo-950/60 border border-purple-500/30 p-5 rounded-2xl shadow-sm mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div class="flex items-center gap-3.5">
+        <div class="w-12 h-12 rounded-2xl bg-purple-600/30 border border-purple-500/40 flex items-center justify-center text-2xl shadow-inner">
+            <?= $tierInfo['badge'] ?>
+        </div>
+        <div>
+            <div class="flex items-center gap-2">
+                <span class="text-xs text-slate-400">سطح شراکت و نمایندگی:</span>
+                <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                    سطح <?= $tierInfo['title'] ?> (<?= $tierInfo['discount'] ?>٪ تخفیف اختصاصی)
+                </span>
+            </div>
+            <p class="text-xs text-slate-400 mt-1"><?= htmlspecialchars($tierInfo['next_target'] ?? 'تخفیف حداکثری فعال است.') ?></p>
+        </div>
+    </div>
+
+    <div class="flex items-center gap-3 text-xs font-mono">
+        <div class="bg-slate-900/90 border border-slate-800 p-2.5 rounded-xl text-center min-w-[120px]">
+            <span class="text-[10px] text-slate-400 block font-sans">تخفیف روی هر پلن</span>
+            <span class="text-emerald-400 font-bold text-sm"><?= $tierInfo['discount'] ?>%</span>
+        </div>
+        <div class="bg-slate-900/90 border border-slate-800 p-2.5 rounded-xl text-center min-w-[120px]">
+            <span class="text-[10px] text-slate-400 block font-sans"><?= Auth::isAdmin() ? 'تخمین سود خالص' : 'ساب‌نمایندگان شما' ?></span>
+            <span class="text-amber-300 font-bold text-sm"><?= Auth::isAdmin() ? Helpers::formatMoney($netProfit) : ($subResellerCount . ' بازاریاب') ?></span>
+        </div>
+    </div>
+</div>
+
 <!-- 1. Client Metrics Grid (Connectix Style) -->
 <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
     <!-- Total Clients -->

@@ -256,7 +256,12 @@ class Database {
                 'telegram_channel' => 'VARCHAR(128) NULL',
                 'credit_limit' => 'BIGINT DEFAULT 0',
                 'auto_tier_enabled' => 'TINYINT(1) DEFAULT 1',
-                'tier_level' => "VARCHAR(32) DEFAULT 'bronze'"
+                'tier_level' => "VARCHAR(32) DEFAULT 'bronze'",
+                'parent_reseller_id' => 'INT NULL DEFAULT NULL',
+                'commission_percent' => 'INT DEFAULT 10',
+                'crypto_wallet_address' => 'VARCHAR(128) NULL',
+                'crypto_network' => "VARCHAR(32) DEFAULT 'TRC20'",
+                'total_spent' => 'BIGINT DEFAULT 0'
             ];
             foreach ($userCols as $c => $d) {
                 self::safeAddColumn($pdo, 'users', $c, $d);
@@ -288,6 +293,10 @@ class Database {
                 'alert_final_sent' => 'TINYINT(1) DEFAULT 0',
                 'telegram_chat_id' => 'VARCHAR(64) NULL',
                 'ip_limit' => 'INT DEFAULT 2',
+                'max_devices' => 'INT DEFAULT 2',
+                'start_on_first_use' => 'TINYINT(1) DEFAULT 0',
+                'first_connected_at' => 'DATETIME NULL',
+                'duration_days' => 'INT DEFAULT 30',
                 'custom_note' => 'TEXT NULL'
             ];
             foreach ($clientCols as $c => $d) {
@@ -309,6 +318,8 @@ class Database {
                 'show_in_bot' => 'TINYINT(1) DEFAULT 1',
                 'category' => "VARCHAR(64) DEFAULT '۱ ماهه'",
                 'ip_limit' => 'INT DEFAULT 2',
+                'max_devices' => 'INT DEFAULT 2',
+                'start_on_first_use' => 'TINYINT(1) DEFAULT 0',
                 'server_id' => 'INT NULL DEFAULT NULL',
                 'category_id' => 'INT NULL DEFAULT NULL'
             ];
@@ -421,7 +432,11 @@ class Database {
             // Columns for Transactions
             $txCols = [
                 'receipt_image' => 'VARCHAR(255) NULL',
-                'ocr_data' => 'TEXT NULL'
+                'ocr_data' => 'TEXT NULL',
+                'payment_method' => "VARCHAR(32) DEFAULT 'manual'",
+                'txid' => 'VARCHAR(128) NULL',
+                'crypto_amount' => 'VARCHAR(32) NULL',
+                'crypto_currency' => 'VARCHAR(16) NULL'
             ];
             foreach ($txCols as $c => $d) {
                 self::safeAddColumn($pdo, 'transactions', $c, $d);

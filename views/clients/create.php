@@ -96,6 +96,14 @@ require __DIR__ . '/../layout/header.php';
                 </div>
             </div>
 
+            <!-- First-Connect Activation Option -->
+            <div class="p-3 bg-indigo-950/40 border border-indigo-800/40 rounded-xl flex items-center gap-3">
+                <input type="checkbox" name="start_on_first_use" id="start_on_first_use" value="1" class="rounded bg-slate-800 border-slate-700 text-indigo-600 focus:ring-0">
+                <label for="start_on_first_use" class="text-xs text-indigo-200 font-semibold cursor-pointer select-none">
+                    🕒 فعال‌سازی با اولین اتصال (زمان انقضا دقیقاً پس از اتصال اول مشتری آغاز شود)
+                </label>
+            </div>
+
             <!-- Live Cost Summary Box -->
             <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-4 space-y-2 text-xs">
                 <div class="flex justify-between items-center text-slate-400">

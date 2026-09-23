@@ -328,4 +328,142 @@ class ResellerPortalController {
 
         Helpers::redirect('reseller/orders');
     }
+
+    /**
+     * Sub-Resellers Management
+     */
+    public function subResellers(): void {
+        $userId = self::checkResellerAccess();
+        $pdo = Database::getConnection();
+
+        $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
+        $stmt->execute([$userId]);
+        $currentReseller = $stmt->fetch();
+
+        $stmtSubs = $pdo->prepare("SELECT u.*, 
+                                   (SELECT COUNT(*) FROM clients WHERE reseller_id = u.id) as client_count,
+                                   (SELECT COALESCE(SUM(ABS(amount)), 0) FROM transactions WHERE user_id = u.id AND amount < 0) as total_sales
+                                   FROM users u 
+                                   WHERE u.parent_reseller_id = ? 
+                                   ORDER BY u.id DESC");
+        $stmtSubs->execute([$userId]);
+        $subResellers = $stmtSubs->fetchAll(PDO::FETCH_ASSOC);
+
+        require __DIR__ . '/../views/reseller/sub_resellers.php';
+    }
+
+    public function storeSubReseller(): void {
+        $userId = self::checkResellerAccess();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
+            Helpers::redirect('reseller/sub-resellers');
+        }
+
+        $username = trim($_POST['username'] ?? '');
+        $password = trim($_POST['password'] ?? '');
+        $fullName = trim($_POST['full_name'] ?? '');
+        $initialBalance = max(0, (int)($_POST['initial_balance'] ?? 0));
+        $commissionPercent = max(0, min(50, (int)($_POST['commission_percent'] ?? 10)));
+
+        if (empty($username) || empty($password)) {
+            Helpers::flash('error', 'نام کاربری و کلمه عبور الزامی هستند.');
+            Helpers::redirect('reseller/sub-resellers');
+        }
+
+        $pdo = Database::getConnection();
+
+        // Check if username already exists
+        $stmtCheck = $pdo->prepare("SELECT COUNT(*) FROM users WHERE username = ?");
+        $stmtCheck->execute([$username]);
+        if ($stmtCheck->fetchColumn() > 0) {
+            Helpers::flash('error', 'این نام کاربری قبلاً در سامانه ثبت شده است.');
+            Helpers::redirect('reseller/sub-resellers');
+        }
+
+        // Check parent reseller balance if initial balance is specified
+        $parent = $pdo->query("SELECT wallet_balance FROM users WHERE id = $userId")->fetch(PDO::FETCH_ASSOC);
+        if ($initialBalance > 0 && ($parent['wallet_balance'] < $initialBalance)) {
+            Helpers::flash('error', 'موجودی کیف پول شما جهت تخصیص اعتبار اولیه به ساب‌نماینده کافی نیست.');
+            Helpers::redirect('reseller/sub-resellers');
+        }
+
+        $pdo->beginTransaction();
+        try {
+            $passHash = password_hash($password, PASSWORD_BCRYPT);
+            $refCode = 'SUB' . strtoupper(substr(md5($username . time()), 0, 6));
+
+            $stmt = $pdo->prepare("INSERT INTO users (username, password_hash, full_name, role, wallet_balance, parent_reseller_id, commission_percent, referral_code) 
+                                   VALUES (?, ?, ?, 'reseller', ?, ?, ?, ?)");
+            $stmt->execute([$username, $passHash, $fullName, $initialBalance, $userId, $commissionPercent, $refCode]);
+
+            if ($initialBalance > 0) {
+                // Deduct from parent
+                $pdo->prepare("UPDATE users SET wallet_balance = wallet_balance - ? WHERE id = ?")->execute([$initialBalance, $userId]);
+                $pdo->prepare("INSERT INTO transactions (user_id, amount, balance_after, description, reference_id, status) VALUES (?, ?, (SELECT wallet_balance FROM users WHERE id = ?), ?, ?, 'paid')")
+                    ->execute([$userId, -$initialBalance, $userId, "تخصیص اعتبار اولیه به ساب‌نماینده {$username}", "SUB-INIT-" . rand(100000, 999999)]);
+            }
+
+            $pdo->commit();
+            Helpers::flash('success', "ساب‌نماینده جدید '{$username}' با موفقیت تعریف شد.");
+        } catch (Throwable $e) {
+            $pdo->rollBack();
+            Helpers::flash('error', 'خطا در ثبت ساب‌نماینده: ' . $e->getMessage());
+        }
+
+        Helpers::redirect('reseller/sub-resellers');
+    }
+
+    public function transferCredit(): void {
+        $userId = self::checkResellerAccess();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
+            Helpers::redirect('reseller/sub-resellers');
+        }
+
+        $subId = (int)($_POST['sub_id'] ?? 0);
+        $amount = (int)($_POST['amount'] ?? 0);
+
+        if ($subId <= 0 || $amount <= 0) {
+            Helpers::flash('error', 'مبلغ انتقال یا ساب‌نماینده نامعتبر است.');
+            Helpers::redirect('reseller/sub-resellers');
+        }
+
+        $pdo = Database::getConnection();
+
+        // Verify sub belongs to parent
+        $stmtSub = $pdo->prepare("SELECT * FROM users WHERE id = ? AND parent_reseller_id = ?");
+        $stmtSub->execute([$subId, $userId]);
+        $sub = $stmtSub->fetch(PDO::FETCH_ASSOC);
+
+        if (!$sub) {
+            Helpers::flash('error', 'ساب‌نماینده یافت نشد.');
+            Helpers::redirect('reseller/sub-resellers');
+        }
+
+        $parent = $pdo->query("SELECT wallet_balance FROM users WHERE id = $userId")->fetch(PDO::FETCH_ASSOC);
+        if ($parent['wallet_balance'] < $amount) {
+            Helpers::flash('error', 'موجودی کیف پول شما کافی نیست.');
+            Helpers::redirect('reseller/sub-resellers');
+        }
+
+        $pdo->beginTransaction();
+        try {
+            $pdo->prepare("UPDATE users SET wallet_balance = wallet_balance - ? WHERE id = ?")->execute([$amount, $userId]);
+            $pdo->prepare("UPDATE users SET wallet_balance = wallet_balance + ? WHERE id = ?")->execute([$amount, $subId]);
+
+            $refId = "TX-SUB-" . rand(100000, 999999);
+            $pdo->prepare("INSERT INTO transactions (user_id, amount, balance_after, description, reference_id, status) VALUES (?, ?, (SELECT wallet_balance FROM users WHERE id = ?), ?, ?, 'paid')")
+                ->execute([$userId, -$amount, $userId, "انتقال اعتبار به ساب‌نماینده {$sub['username']}", $refId]);
+            $pdo->prepare("INSERT INTO transactions (user_id, amount, balance_after, description, reference_id, status) VALUES (?, ?, (SELECT wallet_balance FROM users WHERE id = ?), ?, ?, 'paid')")
+                ->execute([$subId, $amount, $subId, "دریافت شارژ از نماینده ارشد", $refId]);
+
+            $pdo->commit();
+            Helpers::flash('success', "مبلغ " . Helpers::formatMoney($amount) . " با موفقیت به ساب‌نماینده {$sub['username']} منتقل شد.");
+        } catch (Throwable $e) {
+            $pdo->rollBack();
+            Helpers::flash('error', 'خطا در انتقال اعتبار: ' . $e->getMessage());
+        }
+
+        Helpers::redirect('reseller/sub-resellers');
+    }
 }

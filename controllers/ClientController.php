@@ -233,6 +233,19 @@ class ClientController {
             Helpers::redirect('clients/create');
         }
 
+        // First-Connect Calculation & Status
+        $startOnFirstUse = !empty($plan['start_on_first_use']) || !empty($_POST['start_on_first_use']);
+        $durationDays = (int)($plan['duration_days'] ?? 30);
+        $maxDevices = max(1, (int)($plan['max_devices'] ?? $ipLimit ?? 2));
+
+        if ($startOnFirstUse) {
+            $expireAt = null;
+            $clientStatus = 'waiting_connect';
+        } else {
+            $expireAt = date('Y-m-d H:i:s', time() + ($durationDays * 86400));
+            $clientStatus = 'active';
+        }
+
         // 2. Atomic Database Transaction
         try {
             $pdo->beginTransaction();
@@ -251,10 +264,22 @@ class ClientController {
                 $stmtTrans->execute([$userId, -$cost, $newBalance, $desc, $refId]);
             }
 
+            // Credit commission to Parent Reseller if this user is a Sub-Reseller
+            if (!empty($user['parent_reseller_id']) && $cost > 0) {
+                $parentId = (int)$user['parent_reseller_id'];
+                $commPercent = (int)($user['commission_percent'] ?: 10);
+                $commAmount = (int)round(($cost * $commPercent) / 100);
+                if ($commAmount > 0) {
+                    $pdo->prepare("UPDATE users SET wallet_balance = wallet_balance + ? WHERE id = ?")->execute([$commAmount, $parentId]);
+                    $pdo->prepare("INSERT INTO transactions (user_id, amount, balance_after, type, description, reference_id, status) VALUES (?, ?, (SELECT wallet_balance FROM users WHERE id = ?), 'commission', ?, ?, 'completed')")
+                        ->execute([$parentId, $commAmount, $parentId, "پورسانت {$commPercent}٪ از خرید ساب‌نماینده ({$user['username']}) بابت {$username}", "COMM-" . rand(100000, 999999)]);
+                }
+            }
+
             // Insert Client
-            $stmtInsert = $pdo->prepare("INSERT INTO clients (reseller_id, server_id, plan_id, username, password, uuid, sub_token, traffic_limit_bytes, traffic_used_bytes, expire_at, ip_limit, status, custom_note) 
-                                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, 'active', ?)");
-            $stmtInsert->execute([$userId, $serverId, $planId, $username, $password, $uuid, $subToken, $trafficBytes, $expireAt, $ipLimit, $customNote]);
+            $stmtInsert = $pdo->prepare("INSERT INTO clients (reseller_id, server_id, plan_id, username, password, uuid, sub_token, traffic_limit_bytes, traffic_used_bytes, expire_at, ip_limit, max_devices, start_on_first_use, duration_days, status, custom_note) 
+                                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)");
+            $stmtInsert->execute([$userId, $serverId, $planId, $username, $password, $uuid, $subToken, $trafficBytes, $expireAt, $ipLimit, $maxDevices, $startOnFirstUse ? 1 : 0, $durationDays, $clientStatus, $customNote]);
             $newClientId = $pdo->lastInsertId();
 
             $pdo->commit();

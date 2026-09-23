@@ -9,7 +9,7 @@ class SublinkController {
 
         // 1. Fetch Client, Server, and Reseller Branding
         $stmt = $pdo->prepare("SELECT c.*, 
-                                      s.name as server_name, s.sub_domain, s.driver as server_driver,
+                                      s.name as server_name, s.sub_domain, s.driver as server_driver, s.api_url,
                                       COALESCE(u.brand_name, b.brand_name, 'Connectix VPN') as brand_name, 
                                       COALESCE(u.theme_color, b.theme_color, 'violet') as theme_color, 
                                       COALESCE(u.logo_url, b.logo_url) as logo_url, 
@@ -33,12 +33,53 @@ class SublinkController {
             die("<h2 style='text-align:center;margin-top:50px;color:#f43f5e;font-family:sans-serif;'>اشتراک یافت نشد یا منقضی گردیده است.</h2>");
         }
 
-        // 2. Reserved Plan Auto-Activation Logic
+        // 2. Detect if Client is a VPN App (User-Agent check or format param)
+        $userAgent = strtolower($_SERVER['HTTP_USER_AGENT'] ?? '');
+        $isApp = isset($_GET['app']) || 
+                 str_contains($userAgent, 'v2ray') || 
+                 str_contains($userAgent, 'sing-box') || 
+                 str_contains($userAgent, 'clash') || 
+                 str_contains($userAgent, 'streisand') || 
+                 str_contains($userAgent, 'shadowrocket') ||
+                 str_contains($userAgent, 'hiddify') ||
+                 str_contains($userAgent, 'v2box') ||
+                 str_contains($userAgent, 'curl');
+
+        // 3. First-Connect Activation (محاسبه زمان انقضا دقیقاً از اولین اتصال واقعی)
+        if (!empty($client['start_on_first_use']) && empty($client['first_connected_at'])) {
+            if ($isApp || isset($_GET['activate']) || $client['traffic_used_bytes'] > 0) {
+                $days = (int)($client['duration_days'] ?? 30);
+                if ($days <= 0) $days = 30;
+                $newExpire = date('Y-m-d H:i:s', time() + ($days * 86400));
+
+                $pdo->prepare("UPDATE clients SET 
+                    first_connected_at = CURRENT_TIMESTAMP, 
+                    expire_at = ?, 
+                    status = 'active' 
+                    WHERE id = ?")->execute([$newExpire, $client['id']]);
+
+                $client['first_connected_at'] = date('Y-m-d H:i:s');
+                $client['expire_at'] = $newExpire;
+                $client['status'] = 'active';
+
+                // Synchronize expiration with remote node if applicable
+                if (!empty($client['server_id'])) {
+                    try {
+                        $server = $pdo->query("SELECT * FROM server_nodes WHERE id = " . (int)$client['server_id'])->fetch();
+                        if ($server) {
+                            $driver = DriverFactory::create($server);
+                            $driver->extendUser($client['username'], 0, $days * 86400);
+                        }
+                    } catch (Throwable $e) {}
+                }
+            }
+        }
+
+        // 4. Reserved Plan Auto-Activation Logic
         $isTrafficExhausted = ($client['traffic_used_bytes'] >= $client['traffic_limit_bytes']);
         $isTimeExpired = (!empty($client['expire_at']) && strtotime($client['expire_at']) <= time());
 
         if (($isTrafficExhausted || $isTimeExpired) && !empty($client['reserved_id'])) {
-            // Apply reserved plan automatically!
             $addBytes = $client['reserved_gb'] * 1024 * 1024 * 1024;
             $newExpire = date('Y-m-d H:i:s', time() + ($client['reserved_days'] * 86400));
 
@@ -55,7 +96,6 @@ class SublinkController {
 
                 $pdo->commit();
 
-                // Reload fresh client data
                 $client['traffic_limit_bytes'] += $addBytes;
                 $client['expire_at'] = $newExpire;
                 $client['status'] = 'active';
@@ -65,21 +105,11 @@ class SublinkController {
             }
         }
 
-        // 3. Update last connected timestamp
+        // 5. Update last connected timestamp
         $pdo->prepare("UPDATE clients SET last_connected_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$client['id']]);
 
-        // 4. Generate Connection Configs
+        // 6. Generate Connection Configs with Operator-Specific Routing
         $configs = $this->buildConfigs($client);
-
-        // 5. Detect if Client is a VPN App (User-Agent check or format param)
-        $userAgent = strtolower($_SERVER['HTTP_USER_AGENT'] ?? '');
-        $isApp = isset($_GET['app']) || 
-                 str_contains($userAgent, 'v2ray') || 
-                 str_contains($userAgent, 'sing-box') || 
-                 str_contains($userAgent, 'clash') || 
-                 str_contains($userAgent, 'streisand') || 
-                 str_contains($userAgent, 'shadowrocket') ||
-                 str_contains($userAgent, 'curl');
 
         if ($isApp && !isset($_GET['web'])) {
             $this->outputRawSubscription($client, $configs);
@@ -91,19 +121,22 @@ class SublinkController {
     private function buildConfigs(array $client): array {
         $uuid = $client['uuid'];
         $username = $client['username'];
-        $brand = !empty($client['brand_name']) ? $client['brand_name'] : 'Connectix';
-        $domain = !empty($client['sub_domain']) ? $client['sub_domain'] : 'fi.connectix.space';
+        $brand = !empty($client['brand_name']) ? preg_replace('/[^\p{L}\p{N}_-]/u', '', str_replace(' ', '_', $client['brand_name'])) : 'Connectix';
+        $domain = !empty($client['sub_domain']) ? $client['sub_domain'] : parse_url($client['api_url'] ?? '', PHP_URL_HOST) ?: 'fi.connectix.space';
 
-        // 1. VLESS Reality (High Speed & Anti-Filtering)
-        $vlessReality = "vless://{$uuid}@{$domain}:443?encryption=none&security=reality&sni={$domain}&fp=chrome&pbk=mock_pbk_connectix_anti_filter&sid=123456&type=tcp&headerType=none#{$brand}-Reality-{$username}";
+        // 1. همراه اول (MCI) - VLESS Reality TLS (کمترین پینگ و دور زدن فیلترینگ شدید همراه اول)
+        $mciReality = "vless://{$uuid}@{$domain}:443?encryption=none&security=reality&sni={$domain}&fp=chrome&pbk=mock_pbk_connectix_anti_filter&sid=123456&type=tcp&headerType=none#{$brand}-همراه_اول-MCI-{$username}";
 
-        // 2. VLESS WebSocket CDN
-        $vlessWs = "vless://{$uuid}@{$domain}:80?encryption=none&security=none&type=ws&host={$domain}&path=%2Fvless-ws#{$brand}-CDN-{$username}";
+        // 2. ایرانسل (Irancell) - WebSocket CDN Cloudflare (مسیر پایدار بدون قطعی ایرانسل)
+        $irancellCdn = "vless://{$uuid}@{$domain}:80?encryption=none&security=none&type=ws&host={$domain}&path=%2Fvless-ws#{$brand}-ایرانسل-MTN-{$username}";
 
-        // 3. VMess TCP
+        // 3. رایتل و شاتل‌موبایل (Rightel) - Trojan TLS
+        $rightelTrojan = "trojan://{$uuid}@{$domain}:443?security=tls&sni={$domain}&type=tcp#{$brand}-رایتل-Rightel-{$username}";
+
+        // 4. اینترنت خانگی و مخابرات (Wi-Fi / ADSL / FTTH) - VMess WebSocket
         $vmessObj = [
             'v' => '2',
-            'ps' => "{$brand}-VMess-{$username}",
+            'ps' => "{$brand}-مخابرات_وای‌فای-WiFi-{$username}",
             'add' => $domain,
             'port' => '443',
             'id' => $uuid,
@@ -114,21 +147,22 @@ class SublinkController {
             'path' => '/vmess',
             'tls' => 'tls'
         ];
-        $vmess = "vmess://" . base64_encode(json_encode($vmessObj));
+        $wifiVmess = "vmess://" . base64_encode(json_encode($vmessObj));
 
-        // 4. Trojan TLS
-        $trojan = "trojan://{$uuid}@{$domain}:443?security=tls&sni={$domain}&type=tcp#{$brand}-Trojan-{$username}";
+        // 5. سرور اختصاصی بازی و استریمینگ (Ultra Gaming Low-Ping)
+        $gamingFast = "vless://{$uuid}@{$domain}:443?encryption=none&security=reality&sni={$domain}&fp=chrome&pbk=mock_pbk_connectix_anti_filter&sid=987654&type=grpc&serviceName=gaming-grpc#{$brand}-گیمینگ_پینگ_پایین-Gaming-{$username}";
 
         return [
-            'vless_reality' => $vlessReality,
-            'vless_ws' => $vlessWs,
-            'vmess' => $vmess,
-            'trojan' => $trojan
+            'mci_reality' => $mciReality,
+            'irancell_cdn' => $irancellCdn,
+            'rightel_trojan' => $rightelTrojan,
+            'wifi_vmess' => $wifiVmess,
+            'gaming_fast' => $gamingFast
         ];
     }
 
     private function outputRawSubscription(array $client, array $configs): void {
-        $raw = implode("\n", $configs);
+        $raw = implode("\n", array_values($configs));
         $encoded = base64_encode($raw);
 
         // Standard subscription userinfo headers

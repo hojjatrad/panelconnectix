@@ -47,6 +47,7 @@ require __DIR__ . '/../layout/header.php';
             <select name="status" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-purple-500">
                 <option value="">همه وضعیت‌ها</option>
                 <option value="active" <?= ($_GET['status'] ?? '') === 'active' ? 'selected' : '' ?>>فعال (Active)</option>
+                <option value="waiting_connect" <?= ($_GET['status'] ?? '') === 'waiting_connect' ? 'selected' : '' ?>>در انتظار اولین اتصال</option>
                 <option value="expired" <?= ($_GET['status'] ?? '') === 'expired' ? 'selected' : '' ?>>منقضی (Expired)</option>
                 <option value="disabled" <?= ($_GET['status'] ?? '') === 'disabled' ? 'selected' : '' ?>>معلق (Disabled)</option>
                 <option value="never_connected" <?= ($_GET['status'] ?? '') === 'never_connected' ? 'selected' : '' ?>>هرگز متصل نشده</option>
@@ -217,9 +218,10 @@ require __DIR__ . '/../layout/header.php';
                                 </td>
 
                                 <td class="p-3.5">
-                                    <span class="inline-block px-2 py-0.5 rounded text-[10px] font-semibold <?= $c['status'] === 'active' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : ($c['status'] === 'expired' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 'bg-slate-800 text-slate-400') ?>">
+                                    <span class="inline-block px-2 py-0.5 rounded text-[10px] font-semibold <?= $c['status'] === 'active' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : ($c['status'] === 'waiting_connect' ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30' : ($c['status'] === 'expired' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 'bg-slate-800 text-slate-400')) ?>">
                                         <?= match($c['status']) {
                                             'active' => 'فعال',
+                                            'waiting_connect' => 'در انتظار اتصال اول',
                                             'expired' => 'منقضی',
                                             'disabled' => 'غیرفعال',
                                             'never_connected' => 'عدم اتصال',

@@ -54,7 +54,33 @@ class DashboardController {
         // 5. Recent System Announcements
         $announcements = $pdo->query("SELECT * FROM notifications ORDER BY id DESC LIMIT 3")->fetchAll();
 
-        // 6. Chart Data (Monthly Sales Simulation from transactions)
+        // 6. Reseller Tier & Progress
+        require_once __DIR__ . '/../core/Provisioner.php';
+        $tierInfo = Provisioner::getResellerTier($userId);
+
+        // 7. Net Profit & Sales Analytics
+        $totalIncome = (int)$pdo->query("SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE amount > 0 AND $transWhere")->fetchColumn();
+        $netProfit = max(0, (int)round($totalSpent * 0.45)); // Estimated profit margin
+
+        // 8. Top Resellers (for admin overview)
+        $topResellers = [];
+        if ($isAdmin) {
+            $topResellers = $pdo->query("SELECT u.id, u.username, u.full_name, u.wallet_balance,
+                                                (SELECT COUNT(*) FROM clients WHERE reseller_id = u.id) as client_count
+                                         FROM users u 
+                                         WHERE u.role = 'reseller' 
+                                         ORDER BY client_count DESC LIMIT 5")->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        // 9. Sub-Resellers count (if reseller)
+        $subResellerCount = 0;
+        if (!$isAdmin) {
+            $stmtSubCount = $pdo->prepare("SELECT COUNT(*) FROM users WHERE parent_reseller_id = ?");
+            $stmtSubCount->execute([$userId]);
+            $subResellerCount = (int)$stmtSubCount->fetchColumn();
+        }
+
+        // 10. Chart Data (Monthly Sales Simulation from transactions)
         $chartMonths = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'];
         $chartData = [12, 19, 25, 38, 45, 62, 78, 95, 110, 135, 160, 219];
 

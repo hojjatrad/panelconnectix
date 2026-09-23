@@ -253,6 +253,9 @@ $router->post('reseller/plans', [ResellerPortalController::class, 'savePlans']);
 $router->get('reseller/orders', [ResellerPortalController::class, 'orders']);
 $router->post('reseller/orders/approve', [ResellerPortalController::class, 'approveOrder']);
 $router->post('reseller/orders/reject', [ResellerPortalController::class, 'rejectOrder']);
+$router->get('reseller/sub-resellers', [ResellerPortalController::class, 'subResellers']);
+$router->post('reseller/sub-resellers/store', [ResellerPortalController::class, 'storeSubReseller']);
+$router->post('reseller/sub-resellers/transfer', [ResellerPortalController::class, 'transferCredit']);
 
 // Billing & Prepaid Wallet & Referrals
 $router->get('billing', [BillingController::class, 'index']);

@@ -256,26 +256,38 @@ class Provisioner {
         $stmtCount->execute([$resellerId]);
         $clientCount = (int)$stmtCount->fetchColumn();
 
-        if ($clientCount >= 100) {
+        // Total Spent / Top-up calculation
+        $totalSpent = (int)($user['total_spent'] ?? 0);
+        if ($totalSpent === 0) {
+            $stmtSpent = $pdo->prepare("SELECT COALESCE(SUM(ABS(amount)), 0) FROM transactions WHERE user_id = ? AND amount < 0");
+            $stmtSpent->execute([$resellerId]);
+            $totalSpent = (int)$stmtSpent->fetchColumn();
+        }
+
+        if ($clientCount >= 50 || $totalSpent >= 10000000) {
             $tier = 'diamond';
             $title = 'الماس';
             $badge = '💎';
             $tierDiscount = 45;
-        } elseif ($clientCount >= 50) {
+            $nextTarget = 'شما در بالاترین سطح نمایندگی (الماس) قرار دارید';
+        } elseif ($clientCount >= 25 || $totalSpent >= 5000000) {
             $tier = 'gold';
             $title = 'طلایی';
             $badge = '🥇';
             $tierDiscount = 35;
-        } elseif ($clientCount >= 20) {
+            $nextTarget = '۵۰ کلاینت فعال یا ۱۰ میلیون تومان خرید برای سطح الماس (۴۵٪ تخفیف)';
+        } elseif ($clientCount >= 10 || $totalSpent >= 2000000) {
             $tier = 'silver';
             $title = 'نقره‌ای';
             $badge = '🥈';
             $tierDiscount = 25;
+            $nextTarget = '۲۵ کلاینت فعال یا ۵ میلیون تومان خرید برای سطح طلایی (۳۵٪ تخفیف)';
         } else {
             $tier = 'bronze';
             $title = 'برنزی';
             $badge = '🥉';
             $tierDiscount = 15;
+            $nextTarget = '۱۰ کلاینت فعال یا ۲ میلیون تومان خرید برای سطح نقره‌ای (۲۵٪ تخفیف)';
         }
 
         $effectiveDiscount = $autoTier ? max($baseDiscount, $tierDiscount) : $baseDiscount;
@@ -286,7 +298,10 @@ class Provisioner {
             'badge' => $badge,
             'discount' => $effectiveDiscount,
             'base_discount' => $baseDiscount,
+            'tier_discount' => $tierDiscount,
             'client_count' => $clientCount,
+            'total_spent' => $totalSpent,
+            'next_target' => $nextTarget,
             'auto_tier' => $autoTier
         ];
     }

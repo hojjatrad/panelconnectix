@@ -75,6 +75,19 @@ foreach ($clients as $c) {
             $c['traffic_used_bytes'] = $usedBytes;
         }
 
+        // 0. First-Connect Activation Check (فعال‌سازی هوشمند با شروع اولین اتصال واقعی)
+        if (!empty($c['start_on_first_use']) && empty($c['first_connected_at']) && ($c['traffic_used_bytes'] > 0 || ($remoteData && !empty($remoteData['online'])))) {
+            $days = (int)($c['duration_days'] ?? 30);
+            if ($days <= 0) $days = 30;
+            $newExpire = date('Y-m-d H:i:s', time() + ($days * 86400));
+            $pdo->prepare("UPDATE clients SET first_connected_at = CURRENT_TIMESTAMP, expire_at = ?, status = 'active' WHERE id = ?")->execute([$newExpire, $c['id']]);
+            $c['first_connected_at'] = date('Y-m-d H:i:s');
+            $c['expire_at'] = $newExpire;
+            $c['status'] = 'active';
+            $driver->extendUser($c['username'], 0, $days * 86400);
+            echo "[First Use Activated] Client {$c['username']} started {$days}-day validity." . $eol;
+        }
+
         // Target Telegram Chat ID (from client table or previous bot orders)
         $targetTg = $c['telegram_chat_id'] ?? null;
         if (empty($targetTg)) {

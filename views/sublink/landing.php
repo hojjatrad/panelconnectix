@@ -7,6 +7,18 @@ $brandName = htmlspecialchars($client['brand_name'] ?? 'Connectix VPN');
 $subUrl = Helpers::fullUrl('sub/' . $client['sub_token']);
 $botUsername = !empty($client['reseller_bot_username']) ? $client['reseller_bot_username'] : Setting::get('telegram_bot_username', '');
 $passwordVal = !empty($client['password']) ? $client['password'] : '123456';
+
+// Expiry & Renewal Calculation
+$isExpiringSoon = false;
+$remDays = 999;
+if (!empty($client['expire_at'])) {
+    $diff = strtotime($client['expire_at']) - time();
+    $remDays = floor($diff / 86400);
+    if ($diff <= 3 * 86400 && $diff > 0) $isExpiringSoon = true;
+}
+$isExpired = ($client['status'] === 'expired' || (!empty($client['expire_at']) && strtotime($client['expire_at']) <= time()) || ($totalBytes > 0 && $remBytes <= 0));
+$isLowTraffic = ($totalBytes > 0 && ($remBytes <= 2 * 1024 * 1024 * 1024 || $pct >= 90));
+$renewalLink = !empty($client['renewal_url']) ? $client['renewal_url'] : (!empty($client['telegram_support']) ? 'https://t.me/' . ltrim($client['telegram_support'], '@') : null);
 ?>
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
@@ -44,6 +56,48 @@ $passwordVal = !empty($client['password']) ? $client['password'] : '123456';
             <h1 class="text-xl font-black text-white"><?= $brandName ?></h1>
             <p class="text-xs text-slate-400 mt-1"><?= htmlspecialchars($client['welcome_message'] ?? 'سرویس امن و بدون محدودیت اینترنت آزاد') ?></p>
         </div>
+
+        <?php if ($isExpired): ?>
+            <!-- Expired Subscription Warning Banner -->
+            <div class="p-4 bg-rose-950/80 border border-rose-600/70 rounded-2xl text-xs text-rose-200 space-y-2.5">
+                <div class="flex items-center gap-2 font-bold text-rose-300">
+                    <i class="fa-solid fa-triangle-exclamation text-base text-rose-400"></i>
+                    <span>اشتراک شما منقضی یا حجم آن تمام شده است!</span>
+                </div>
+                <p class="text-[11px] text-slate-300 leading-relaxed">جهت اتصال مجدد و جلوگیری از قطع دائم سرویس، لطفاً همین حالا نسبت به تمدید یا رزرو پلن اقدام فرمایید.</p>
+                <?php if (!empty($renewalLink)): ?>
+                    <a href="<?= htmlspecialchars($renewalLink) ?>" target="_blank" class="w-full py-2.5 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg transition">
+                        <i class="fa-solid fa-arrows-rotate"></i>
+                        <span>تمدید آنی اشتراک (کلیک کنید)</span>
+                    </a>
+                <?php endif; ?>
+            </div>
+        <?php elseif ($isExpiringSoon || $isLowTraffic): ?>
+            <!-- Expiring Soon / Low Traffic Warning Banner -->
+            <div class="p-3.5 bg-amber-950/70 border border-amber-600/60 rounded-2xl text-xs text-amber-200 space-y-2">
+                <div class="flex items-center gap-2 font-bold text-amber-300">
+                    <i class="fa-solid fa-clock-rotate-left text-amber-400"></i>
+                    <span>اعتبار این اشتراک رو به پایان است! (<?= $remDays ?> روز / <?= Helpers::formatBytes($remBytes) ?> باقیمانده)</span>
+                </div>
+                <?php if (!empty($renewalLink)): ?>
+                    <a href="<?= htmlspecialchars($renewalLink) ?>" target="_blank" class="w-full py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition">
+                        <i class="fa-solid fa-cart-shopping"></i>
+                        <span>رزرو بسته و تمدید زودهنگام</span>
+                    </a>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
+
+        <?php if (!empty($client['start_on_first_use']) && empty($client['first_connected_at'])): ?>
+            <!-- First Connection Activation Notice -->
+            <div class="p-3.5 bg-indigo-950/70 border border-indigo-600/60 rounded-2xl text-xs text-indigo-200 flex items-center gap-3">
+                <i class="fa-solid fa-hourglass-start text-indigo-400 text-xl shrink-0"></i>
+                <div class="space-y-0.5">
+                    <strong class="block text-indigo-300 font-bold">🕒 فعال‌سازی با اولین اتصال (First-Use)</strong>
+                    <span class="text-[11px] text-slate-300 leading-relaxed">مهلت زمانی این اشتراک هنوز شروع نشده است و دقیقاً پس از اتصال اول فعال خواهد شد.</span>
+                </div>
+            </div>
+        <?php endif; ?>
 
         <!-- Account Status Card -->
         <div class="bg-slate-950/70 border border-slate-800/90 rounded-2xl p-5 space-y-4">
@@ -192,6 +246,11 @@ $passwordVal = !empty($client['password']) ? $client['password'] : '123456';
                     <i class="fa-solid fa-cat"></i>
                     <span>ورود به Clash</span>
                 </a>
+
+                <a href="v2box://install-sub?url=<?= urlencode($subUrl) ?>" class="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700 text-teal-300 flex items-center justify-center gap-2 transition-colors">
+                    <i class="fa-solid fa-cube"></i>
+                    <span>ورود به V2Box</span>
+                </a>
             </div>
         </div>
 
@@ -200,17 +259,22 @@ $passwordVal = !empty($client['password']) ? $client['password'] : '123456';
             <button type="button" onclick="document.getElementById('fallbackConfigsBox').classList.toggle('hidden')" class="w-full flex items-center justify-between text-xs font-bold text-slate-300 hover:text-white transition">
                 <span class="flex items-center gap-2">
                     <i class="fa-solid fa-network-wired text-purple-400"></i>
-                    <span>کانفیگ‌های مجزا و مسیرهای پشتیبان (Multi-Inbound)</span>
+                    <span>مسیرهای تفکیک‌شده اپراتورها و کانفیگ‌های مجزا</span>
                 </span>
                 <i class="fa-solid fa-chevron-down text-[10px] text-slate-500"></i>
             </button>
 
             <div id="fallbackConfigsBox" class="hidden space-y-2.5 pt-2 border-t border-slate-800/80">
                 <p class="text-[11px] text-slate-400 leading-relaxed">
-                    در صورتی که نرم‌افزار شما از ساب‌لینک خودکار پشتیبانی نمی‌کند، می‌توانید هر یک از مسیرهای زیر را به تفکیک کپی و وارد کنید:
+                    مسیرهای اختصاصی بهینه‌شده برای هر اپراتور (می‌توانید هر یک را به صورت دستی کپی و در اپلیکیشن خود وارد نمایید):
                 </p>
                 <?php 
                 $protoLabels = [
+                    'mci_reality' => ['title' => '📱 مخصوص همراه اول (MCI Reality)', 'color' => 'text-purple-400'],
+                    'irancell_cdn' => ['title' => '📱 مخصوص ایرانسل (MTN CDN Cloudflare)', 'color' => 'text-amber-400'],
+                    'rightel_trojan' => ['title' => '📱 مخصوص رایتل و شاتل (Rightel Trojan)', 'color' => 'text-emerald-400'],
+                    'wifi_vmess' => ['title' => '🌐 مخصوص اینترنت خانگی و مخابرات (Wi-Fi / ADSL)', 'color' => 'text-cyan-400'],
+                    'gaming_fast' => ['title' => '⚡️ گیمینگ و پینگ پایین (Gaming Ultra Ping)', 'color' => 'text-rose-400'],
                     'vless_reality' => ['title' => '⚡️ VLESS Reality (مستقیم پرسرعت)', 'color' => 'text-purple-400'],
                     'vless_ws' => ['title' => '🛡 VLESS CDN (ضد فیلتر شبکه ملی)', 'color' => 'text-cyan-400'],
                     'trojan' => ['title' => '🔒 Trojan TLS (پایدار برای iOS و مک)', 'color' => 'text-emerald-400'],
