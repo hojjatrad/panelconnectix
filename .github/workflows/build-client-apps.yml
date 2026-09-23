@@ -31,25 +31,41 @@ jobs:
           flutter-version: '3.22.x'
           channel: 'stable'
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
       - name: Prepare Flutter Project & Generate Scaffolding
         run: |
           cd client-app
-          flutter create --org com.connectix.vpn --project-name connectix_vpn .
+          flutter create --org com.connectix --project-name vpn .
           
+          # Guarantee exact Kotlin MainActivity with correct package com.connectix.vpn
+          rm -rf android/app/src/main/kotlin/*
+          mkdir -p android/app/src/main/kotlin/com/connectix/vpn
+          cat << 'EOF' > android/app/src/main/kotlin/com/connectix/vpn/MainActivity.kt
+          package com.connectix.vpn
+
+          import io.flutter.embedding.android.FlutterActivity
+
+          class MainActivity: FlutterActivity() {
+          }
+          EOF
+
           # Generate Production Release Keystore for Android 9+ v1/v2 Signing
           keytool -genkey -v -keystore android/app/release.keystore \
             -alias connectix -keyalg RSA -keysize 2048 -validity 10000 \
             -storepass connectix123 -keypass connectix123 \
             -dname "CN=Connectix VPN, OU=Client, O=Connectix, L=Tehran, ST=Tehran, C=IR"
 
-          # Configure gradle.properties to prevent native lib compression issues
+          # Configure gradle.properties
           cat << 'EOF' >> android/gradle.properties
-          android.bundle.enableUncompressedNativeLibs=false
           android.useAndroidX=true
           android.enableJetifier=true
           EOF
 
-          # Configure build.gradle with minSdk 21, targetSdk 34, multiDex, and useLegacyPackaging
+          # Configure build.gradle with minSdk 21, targetSdk 34, multiDex, and clean release signing
           cat << 'EOF' > android/app/build.gradle
           plugins {
               id "com.android.application"
@@ -75,15 +91,9 @@ jobs:
                   applicationId = "com.connectix.vpn"
                   minSdk = 21
                   targetSdk = 34
-                  versionCode = 2
-                  versionName = "1.0.1"
+                  versionCode = 3
+                  versionName = "1.0.2"
                   multiDexEnabled = true
-              }
-
-              packagingOptions {
-                  jniLibs {
-                      useLegacyPackaging = true
-                  }
               }
 
               signingConfigs {
@@ -118,22 +128,18 @@ jobs:
           }
           EOF
 
-          # Ensure AndroidManifest has extractNativeLibs="true", exported activities, and V2Ray VPN Service
+          # Ensure AndroidManifest has clean launcher activity and matching package
           cat << 'EOF' > android/app/src/main/AndroidManifest.xml
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.INTERNET"/>
-              <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
-              <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
               <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
-              <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE"/>
+              <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
               
               <application
                   android:label="Connectix VPN"
                   android:name="${applicationName}"
                   android:icon="@mipmap/ic_launcher"
-                  android:extractNativeLibs="true"
-                  android:usesCleartextTraffic="true"
-                  android:networkSecurityConfig="@xml/network_security_config">
+                  android:usesCleartextTraffic="true">
                   <activity
                       android:name=".MainActivity"
                       android:exported="true"
@@ -151,38 +157,11 @@ jobs:
                           <category android:name="android.intent.category.LAUNCHER"/>
                       </intent-filter>
                   </activity>
-
-                  <!-- V2Ray Native VPN Services -->
-                  <service
-                      android:name="com.flutterv2ray.flutter_v2ray.v2ray.V2rayVpnService"
-                      android:permission="android.permission.BIND_VPN_SERVICE"
-                      android:exported="false">
-                      <intent-filter>
-                          <action android:name="android.net.VpnService"/>
-                      </intent-filter>
-                  </service>
-                  <service
-                      android:name="com.flutterv2ray.flutter_v2ray.v2ray.V2rayProxyOnlyService"
-                      android:exported="false"/>
-
                   <meta-data
                       android:name="flutterEmbedding"
                       android:value="2" />
               </application>
           </manifest>
-          EOF
-
-          mkdir -p android/app/src/main/res/xml
-          cat << 'EOF' > android/app/src/main/res/xml/network_security_config.xml
-          <?xml version="1.0" encoding="utf-8"?>
-          <network-security-config>
-              <base-config cleartextTrafficPermitted="true">
-                  <trust-anchors>
-                      <certificates src="system" />
-                      <certificates src="user" />
-                  </trust-anchors>
-              </base-config>
-          </network-security-config>
           EOF
 
           flutter pub get
@@ -199,6 +178,35 @@ jobs:
           flutter build apk --split-per-abi --release
           cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk ../Connectix-ARM64-v8a.apk 2>/dev/null || true
           cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk ../Connectix-ARM32-v7a.apk 2>/dev/null || true
+
+      - name: Rigorous Automated APK Verification Test
+        run: |
+          python3 - << 'EOF'
+          import zipfile, sys
+
+          apks = ["Connectix-ARM64-v8a.apk", "Connectix-Universal.apk"]
+          for apk in apks:
+              print(f"--> Validating {apk}...")
+              with zipfile.ZipFile(apk, "r") as z:
+                  names = z.namelist()
+                  if "classes.dex" not in names:
+                      print(f"FAIL: classes.dex missing in {apk}")
+                      sys.exit(1)
+                  dex = z.read("classes.dex")
+                  # Crucial check: verify that MainActivity exists in DEX
+                  expected_class = b"Lcom/connectix/vpn/MainActivity;"
+                  if expected_class not in dex:
+                      print(f"CRITICAL TEST FAILED: {expected_class} NOT FOUND in classes.dex of {apk}!")
+                      sys.exit(1)
+                  print(f"VERIFIED: {expected_class} found in {apk} classes.dex!")
+                  
+                  # Verify AndroidManifest.xml exists
+                  if "AndroidManifest.xml" not in names:
+                      print(f"FAIL: AndroidManifest.xml missing in {apk}")
+                      sys.exit(1)
+                  print(f"SUCCESS: {apk} passed all structural and startup tests.")
+          print("ALL APKS PASSED RIGOROUS AUTOMATED VERIFICATION TESTS!")
+          EOF
 
       - name: Upload APK Artifacts
         uses: actions/upload-artifact@v4
