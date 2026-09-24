@@ -48,6 +48,7 @@ class ServerController {
         $serverGroup = trim($_POST['server_group'] ?? 'default');
         $categoryId = !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null;
         $subDomain = trim($_POST['sub_domain'] ?? '');
+        $sampleUsername = trim($_POST['sample_username'] ?? '');
         $maxClients = (int)($_POST['max_clients'] ?? 500);
         $configTemplate = trim($_POST['config_template'] ?? '');
         $selectedInbounds = !empty($_POST['selected_inbounds']) 
@@ -64,6 +65,18 @@ class ServerController {
             $driver = self::detectDriverType($apiUrl, $username, $password, $token, $name);
         }
 
+        // Auto-detect sub_domain (CDN) if empty or invalid
+        if (empty($subDomain) || str_contains($subDomain, 'montago-shop.ir')) {
+            $subDomain = self::autoDetectSubDomain($apiUrl, $sampleUsername, [
+                'name' => $name,
+                'driver' => $driver,
+                'api_url' => $apiUrl,
+                'api_username' => $username,
+                'api_password' => $password,
+                'api_token' => $token
+            ]);
+        }
+
         $pdo = Database::getConnection();
         if ($categoryId) {
             $catSlug = $pdo->query("SELECT slug FROM categories WHERE id = " . $categoryId)->fetchColumn();
@@ -74,7 +87,7 @@ class ServerController {
                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([$name, $driver, $apiUrl, $username, $password, $token, $serverGroup, $categoryId, $subDomain, $maxClients, $configTemplate, $selectedInbounds]);
 
-        Helpers::flash('success', "سرور جدید با موفقیت و تشخیص خودکار نوع پنل ({$driver}) افزوده شد.");
+        Helpers::flash('success', "سرور جدید با موفقیت و تشخیص خودکار نوع پنل ({$driver}) و دامنه CDN ({$subDomain}) افزوده شد.");
         Helpers::redirect('servers');
     }
 
@@ -95,6 +108,7 @@ class ServerController {
         $serverGroup = trim($_POST['server_group'] ?? 'default');
         $categoryId = !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null;
         $subDomain = trim($_POST['sub_domain'] ?? '');
+        $sampleUsername = trim($_POST['sample_username'] ?? '');
         $maxClients = (int)($_POST['max_clients'] ?? 500);
         $configTemplate = trim($_POST['config_template'] ?? '');
         $selectedInbounds = !empty($_POST['selected_inbounds']) 
@@ -109,6 +123,19 @@ class ServerController {
         // Auto-detect driver if set to auto
         if ($driver === 'auto' || empty($driver)) {
             $driver = self::detectDriverType($apiUrl, $username, $password, $token, $name);
+        }
+
+        // Auto-detect sub_domain (CDN) if empty or invalid
+        if (empty($subDomain) || str_contains($subDomain, 'montago-shop.ir')) {
+            $subDomain = self::autoDetectSubDomain($apiUrl, $sampleUsername, [
+                'id' => $id,
+                'name' => $name,
+                'driver' => $driver,
+                'api_url' => $apiUrl,
+                'api_username' => $username,
+                'api_password' => $password,
+                'api_token' => $token
+            ]);
         }
 
         $pdo = Database::getConnection();
@@ -127,6 +154,34 @@ class ServerController {
 
         Helpers::flash('success', "تنظیمات سرور '{$name}' با موفقیت به‌روزرسانی شد.");
         Helpers::redirect('servers');
+    }
+
+    public static function autoDetectSubDomain(string $apiUrl, ?string $sampleUsername = null, array $nodeData = []): string {
+        // 1. If sample user provided and node data has credentials, check if user's subscription link has host
+        if (!empty($sampleUsername) && !empty($nodeData)) {
+            try {
+                $driver = DriverFactory::create($nodeData);
+                if ($driver->authenticate()) {
+                    $u = $driver->getUser($sampleUsername);
+                    if ($u && !empty($u['subscription_url'])) {
+                        $p = parse_url($u['subscription_url']);
+                        if (!empty($p['host']) && !str_contains($p['host'], 'montago-shop.ir')) {
+                            $port = !empty($p['port']) ? (':' . $p['port']) : '';
+                            return $p['host'] . $port;
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {}
+        }
+
+        // 2. Fallback to API URL host + port
+        $p = parse_url($apiUrl);
+        if (!empty($p['host'])) {
+            $port = !empty($p['port']) ? (':' . $p['port']) : '';
+            return $p['host'] . $port;
+        }
+
+        return '';
     }
 
     public function clearAll(): void {

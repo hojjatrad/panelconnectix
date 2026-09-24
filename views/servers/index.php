@@ -2,6 +2,18 @@
 require __DIR__ . '/../layout/header.php';
 ?>
 
+<style>
+.modal-overlay {
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+}
+.modal-scroll-body {
+    max-height: calc(88vh - 130px);
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+}
+</style>
+
 <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/80 border border-slate-800 p-5 rounded-2xl shadow-sm">
     <div>
         <h2 class="text-lg font-bold text-white flex items-center gap-2">
@@ -178,243 +190,279 @@ require __DIR__ . '/../layout/header.php';
 </div>
 
 <!-- Modal to add Server -->
-<div id="newServerModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto modal-overlay">
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl relative my-auto max-h-[88vh] overflow-y-auto modal-box">
-        <button onclick="closeNewServerModal()" class="absolute top-4 left-4 text-slate-400 hover:text-white">
-            <i class="fa-solid fa-xmark text-lg"></i>
-        </button>
-
-        <h3 class="text-base font-bold text-white mb-4 flex items-center gap-2">
-            <i class="fa-solid fa-plus-circle text-emerald-400"></i>
-            <span>اتصال سرور و نود جدید</span>
-        </h3>
-
-        <form action="<?= Helpers::url('servers/store') ?>" method="POST" class="space-y-4 text-xs">
-            <?= Helpers::csrfField() ?>
-
-            <div>
-                <label class="block text-slate-300 mb-1 font-semibold">عنوان سرور *</label>
-                <input type="text" name="name" required placeholder="مثلاً: سرور آلمان هتزنر شماره ۱" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white">
-            </div>
-
-            <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label class="block text-slate-300 mb-1 font-semibold">هسته و نوع پنل *</label>
-                    <select name="driver" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
-                        <option value="auto" selected>✨ تشخیص ۱۰۰٪ خودکار (Auto: پاسارگاد / مرزبان / 3X-UI)</option>
-                        <option value="pasargad">Pasargad (پاسارگاد)</option>
-                        <option value="marzban">Marzban (مرزبان)</option>
-                        <option value="3xui">3x-ui / X-UI</option>
-                        <option value="mock">Mock Node (شبیه‌ساز تستی)</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-slate-300 mb-1 font-semibold">دسته‌بندی (کلاستر) *</label>
-                    <select name="category_id" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white">
-                        <?php if (!empty($categories)): ?>
-                            <?php foreach ($categories as $cat): ?>
-                                <option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['name']) ?> (<?= htmlspecialchars($cat['slug']) ?>)</option>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <option value="">پیش‌فرض (Default)</option>
-                        <?php endif; ?>
-                    </select>
-                </div>
-            </div>
-
-            <div>
-                <label class="block text-slate-300 mb-1 font-semibold">آدرس API سرور (با پورت و پروتکل) *</label>
-                <input type="url" name="api_url" required dir="ltr" placeholder="https://vpn.example.com:8000" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
-            </div>
-
-            <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label class="block text-slate-300 mb-1 font-semibold">نام کاربری / ادمین</label>
-                    <input type="text" name="api_username" dir="ltr" placeholder="admin" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
-                </div>
-                <div>
-                    <label class="block text-slate-300 mb-1 font-semibold">رمز عبور / Secret</label>
-                    <input type="password" name="api_password" dir="ltr" placeholder="••••••••" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
-                </div>
-            </div>
-
-            <div>
-                <label class="block text-slate-300 mb-1 font-semibold flex items-center justify-between">
-                    <span class="flex items-center gap-1.5">
-                        <i class="fa-solid fa-user-check text-purple-400"></i>
-                        <span>نام کاربری نمونه در سرور (استایل میرزاپرو - اختیاری)</span>
-                    </span>
-                    <span class="text-[10px] text-purple-300 font-normal">استخراج مستقیم اینباندها و دامنه ساب</span>
-                </label>
-                <input type="text" name="sample_username" dir="ltr" placeholder="مثلاً: test یا هر کاربر فعال موجود در سرور" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-xs">
-                <span class="text-[10px] text-slate-400 mt-0.5 block">مانند ربات میرزاپرو، در صورت وارد کردن یک یوزر فعال، سیستم پروتکل‌ها، اینباندها و دامنه سابسکریپشن زنده را مستقیماً از روی آن کاربر می‌خواند.</span>
-            </div>
-
-            <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label class="block text-slate-300 mb-1 font-semibold">دامنه سابسکریپشن / پورت ساب‌لینک</label>
-                    <input type="text" name="sub_domain" dir="ltr" placeholder="sub.speedur.org:2096" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
-                    <span class="text-[10px] text-slate-400 mt-0.5 block">مثال: sub.speedur.org:2096 (در صورت خالی بودن، از آدرس API استفاده می‌شود)</span>
-                </div>
-                <div>
-                    <label class="block text-slate-300 mb-1 font-semibold">حداکثر ظرفیت کاربر</label>
-                    <input type="number" name="max_clients" value="0" min="0" placeholder="0 = نامحدود" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
-                    <span class="text-[10px] text-slate-400 mt-0.5 block">عدد 0 یعنی ظرفیت نامحدود (∞)</span>
-                </div>
-            </div>
-
-            <div>
-                <label class="block text-slate-300 mb-1 font-semibold flex items-center justify-between">
-                    <span>الگوی کانفیگ اختصاصی سرور (VLESS Reality / Trojan)</span>
-                    <span class="text-[10px] text-cyan-400 font-normal">اختیاری - پشتیبانی از {uuid}</span>
-                </label>
-                <textarea name="config_template" rows="2" dir="ltr" placeholder="اختیاری - در صورت تمایل می‌توانید الگوی دستی وارد کنید یا از دکمه استخراج خودکار زیر استفاده فرمایید" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-[11px] leading-relaxed"></textarea>
-                <span class="text-[10px] text-slate-400 mt-0.5 block">اگر خالی بماند، سیستم به صورت کاملاً خودکار لینک‌های بومی مرزبان را بدون واسطه تحویل می‌دهد.</span>
-            </div>
-
-            <!-- MirzaPro-Style Inbound Discovery & Real Live Sample Link Preview -->
-            <div class="space-y-2 pt-1 border-t border-slate-800/80">
-                <button type="button" onclick="detectInboundsAndSample('new')" id="btn_detect_new" class="w-full py-2.5 bg-gradient-to-r from-purple-900/40 via-indigo-900/40 to-slate-800 hover:from-purple-800/50 hover:to-indigo-800/50 text-purple-200 border border-purple-500/40 font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-2 shadow">
-                    <i class="fa-solid fa-satellite-dish text-purple-400"></i>
-                    <span>📡 شناسایی خودکار اینباندها و دریافت نمونه لینک زنده (مانند میرزا پرو)</span>
+<div id="newServerModal" class="fixed inset-0 bg-black/85 backdrop-blur-md hidden z-50 overflow-y-auto modal-overlay" style="-webkit-overflow-scrolling: touch;">
+    <div class="min-h-full w-full flex items-center justify-center p-2 sm:p-4 md:py-6">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full shadow-2xl relative my-auto flex flex-col max-h-[90vh] overflow-hidden modal-box">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between p-4 sm:p-5 border-b border-slate-800 bg-slate-900 shrink-0">
+                <h3 class="text-base font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-plus-circle text-emerald-400"></i>
+                    <span>اتصال سرور و نود جدید</span>
+                </h3>
+                <button type="button" onclick="closeNewServerModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
                 </button>
-                <div id="inbounds_container_new" class="hidden space-y-3 p-3.5 bg-slate-950/90 border border-purple-900/40 rounded-xl text-xs"></div>
             </div>
 
-            <div class="pt-1">
-                <div id="new_test_result" class="hidden mb-3 p-3 rounded-xl text-xs transition-all"></div>
-                <div class="flex items-center gap-2">
-                    <button type="button" onclick="testRawInModal('new')" id="btn_test_new" class="w-1/2 py-2.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 font-bold rounded-xl text-xs border border-cyan-800/40 transition-all flex items-center justify-center gap-1.5 shadow">
+            <!-- Modal Scrollable Body -->
+            <form action="<?= Helpers::url('servers/store') ?>" method="POST" id="newServerForm" class="flex flex-col flex-1 overflow-hidden">
+                <?= Helpers::csrfField() ?>
+
+                <div class="overflow-y-auto p-4 sm:p-5 space-y-4 text-xs flex-1 overscroll-contain modal-scroll-body" style="scrollbar-width: thin; scrollbar-color: #8b5cf6 #1e293b;">
+                    <div>
+                        <label class="block text-slate-300 mb-1 font-semibold">عنوان سرور *</label>
+                        <input type="text" name="name" required placeholder="مثلاً: سرور آلمان هتزنر شماره ۱" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-slate-300 mb-1 font-semibold">هسته و نوع پنل *</label>
+                            <select name="driver" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
+                                <option value="auto" selected>✨ تشخیص ۱۰۰٪ خودکار (پاسارگاد / مرزبان / 3X-UI)</option>
+                                <option value="pasargad">Pasargad (پاسارگاد)</option>
+                                <option value="marzban">Marzban (مرزبان)</option>
+                                <option value="3xui">3x-ui / X-UI</option>
+                                <option value="mock">Mock Node (شبیه‌ساز تستی)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-slate-300 mb-1 font-semibold">دسته‌بندی (کلاستر) *</label>
+                            <select name="category_id" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white">
+                                <?php if (!empty($categories)): ?>
+                                    <?php foreach ($categories as $cat): ?>
+                                        <option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['name']) ?> (<?= htmlspecialchars($cat['slug']) ?>)</option>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <option value="">پیش‌فرض (Default)</option>
+                                <?php endif; ?>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-slate-300 mb-1 font-semibold">آدرس API سرور (با پورت و پروتکل) *</label>
+                        <input type="url" name="api_url" required dir="ltr" oninput="autoFillCdn(this, 'new')" placeholder="https://vpn.example.com:8000" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-slate-300 mb-1 font-semibold">نام کاربری / ادمین</label>
+                            <input type="text" name="api_username" dir="ltr" placeholder="admin" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
+                        </div>
+                        <div>
+                            <label class="block text-slate-300 mb-1 font-semibold">رمز عبور / Secret</label>
+                            <input type="password" name="api_password" dir="ltr" placeholder="••••••••" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
+                        </div>
+                    </div>
+
+                    <!-- MirzaPro-Style Smart Inbound & CDN Discovery Card -->
+                    <div class="p-3.5 bg-gradient-to-br from-purple-950/50 via-slate-900 to-indigo-950/40 border border-purple-500/50 rounded-2xl space-y-2.5 shadow-lg">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-white flex items-center gap-1.5 text-xs">
+                                <i class="fa-solid fa-wand-magic-sparkles text-purple-400"></i>
+                                <span>تنظیم ۱۰۰٪ خودکار اینباندها و CDN (استایل میرزاپرو)</span>
+                            </span>
+                            <span class="text-[10px] text-emerald-300 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800 font-bold">هوشمند</span>
+                        </div>
+
+                        <div>
+                            <label class="block text-slate-300 mb-1 font-semibold text-[11px]">
+                                نام کاربری یک کاربر فعال در سرور (مانند میرزاپرو)
+                            </label>
+                            <div class="flex gap-2">
+                                <input type="text" name="sample_username" dir="ltr" placeholder="مثلاً: test یا هر اکانت فعال در پنل" class="w-full bg-slate-950 border border-purple-700/60 rounded-xl px-3 py-2 text-white font-mono text-xs focus:border-purple-400">
+                                <button type="button" onclick="detectInboundsAndSample('new')" id="btn_detect_new" class="shrink-0 px-3.5 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl text-xs transition shadow-lg shadow-purple-900/40 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-bolt"></i>
+                                    <span>استخراج خودکار</span>
+                                </button>
+                            </div>
+                            <p class="text-[10px] text-purple-200/80 mt-1 leading-relaxed">
+                                با زدن دکمه استخراج، سیستم نوع پنل (پاسارگاد/مرزبان)، کلیه اینباندهای فعال سرور و دامنه CDN را مستقیماً از روی کانفیگ‌های این کاربر می‌خواند و فرم را خودکار پر می‌کند.
+                            </p>
+                        </div>
+
+                        <div id="inbounds_container_new" class="hidden space-y-3 p-3.5 bg-slate-950/90 border border-purple-900/40 rounded-xl text-xs"></div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-slate-300 mb-1 font-semibold flex items-center justify-between">
+                                <span>دامنه CDN / ساب‌لینک</span>
+                                <span class="text-[10px] text-emerald-400 font-normal">خودکار تکمیل می‌شود</span>
+                            </label>
+                            <input type="text" name="sub_domain" dir="ltr" placeholder="خودکار تکمیل می‌شود" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
+                            <span class="text-[10px] text-slate-400 mt-0.5 block">در صورت خالی بودن، به صورت هوشمند از آدرس سرور تکمیل می‌شود.</span>
+                        </div>
+                        <div>
+                            <label class="block text-slate-300 mb-1 font-semibold">حداکثر ظرفیت کاربر</label>
+                            <input type="number" name="max_clients" value="0" min="0" placeholder="0 = نامحدود" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
+                            <span class="text-[10px] text-slate-400 mt-0.5 block">عدد 0 یعنی ظرفیت نامحدود (∞)</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-slate-300 mb-1 font-semibold flex items-center justify-between">
+                            <span>الگوی کانفیگ اختصاصی سرور (VLESS Reality / Trojan)</span>
+                            <span class="text-[10px] text-cyan-400 font-normal">اختیاری - پشتیبانی از {uuid}</span>
+                        </label>
+                        <textarea name="config_template" rows="2" dir="ltr" placeholder="اختیاری - با دکمه استخراج خودکار بالا تکمیل می‌گردد" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-[11px] leading-relaxed"></textarea>
+                    </div>
+
+                    <div id="new_test_result" class="hidden p-3 rounded-xl text-xs transition-all"></div>
+                </div>
+
+                <!-- Modal Sticky Footer (Always Visible at bottom) -->
+                <div class="p-4 border-t border-slate-800 bg-slate-900 shrink-0 flex items-center gap-2">
+                    <button type="button" onclick="testRawInModal('new')" id="btn_test_new" class="w-1/2 py-3 bg-slate-800 hover:bg-slate-700 text-cyan-300 font-bold rounded-xl text-xs border border-cyan-800/40 transition flex items-center justify-center gap-1.5 shadow">
                         <i class="fa-solid fa-bolt-lightning text-cyan-400"></i>
-                        <span>تست زنده اتصال نود</span>
+                        <span>تست زنده اتصال</span>
                     </button>
-                    <button type="submit" class="w-1/2 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition-all shadow-md">
-                        اتصال و ذخیره سرور
+                    <button type="submit" class="w-1/2 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition shadow-lg shadow-emerald-900/40 flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-check"></i>
+                        <span>اتصال و ذخیره سرور</span>
                     </button>
                 </div>
-            </div>
-        </form>
+            </form>
+        </div>
     </div>
 </div>
 
 <!-- Modal to edit Server -->
-<div id="editServerModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto modal-overlay">
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl relative my-auto max-h-[88vh] overflow-y-auto modal-box">
-        <button onclick="closeEditServerModal()" class="absolute top-4 left-4 text-slate-400 hover:text-white">
-            <i class="fa-solid fa-xmark text-lg"></i>
-        </button>
-
-        <h3 class="text-base font-bold text-white mb-4 flex items-center gap-2">
-            <i class="fa-solid fa-pen-to-square text-amber-400"></i>
-            <span>ویرایش اطلاعات سرور</span>
-        </h3>
-
-        <form action="<?= Helpers::url('servers/update') ?>" method="POST" class="space-y-4 text-xs">
-            <?= Helpers::csrfField() ?>
-            <input type="hidden" name="id" id="edit_server_id">
-
-            <div>
-                <label class="block text-slate-300 mb-1 font-semibold">عنوان سرور *</label>
-                <input type="text" name="name" id="edit_server_name" required class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white">
-            </div>
-
-            <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label class="block text-slate-300 mb-1 font-semibold">هسته و نوع پنل *</label>
-                    <select name="driver" id="edit_server_driver" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
-                        <option value="auto">✨ تشخیص ۱۰۰٪ خودکار (پاسارگاد / مرزبان / 3X-UI)</option>
-                        <option value="pasargad">Pasargad (پاسارگاد)</option>
-                        <option value="marzban">Marzban (مرزبان)</option>
-                        <option value="3xui">3x-ui / X-UI</option>
-                        <option value="mock">Mock Node (شبیه‌ساز تستی)</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-slate-300 mb-1 font-semibold">دسته‌بندی (کلاستر) *</label>
-                    <select name="category_id" id="edit_server_category_id" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white">
-                        <?php if (!empty($categories)): ?>
-                            <?php foreach ($categories as $cat): ?>
-                                <option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['name']) ?> (<?= htmlspecialchars($cat['slug']) ?>)</option>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <option value="">پیش‌فرض (Default)</option>
-                        <?php endif; ?>
-                    </select>
-                </div>
-            </div>
-
-            <div>
-                <label class="block text-slate-300 mb-1 font-semibold">آدرس API سرور *</label>
-                <input type="url" name="api_url" id="edit_server_api_url" required dir="ltr" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
-            </div>
-
-            <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label class="block text-slate-300 mb-1 font-semibold">نام کاربری ادمین</label>
-                    <input type="text" name="api_username" id="edit_server_api_username" dir="ltr" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
-                </div>
-                <div>
-                    <label class="block text-slate-300 mb-1 font-semibold">رمز عبور (خالی بگذارید تا تغییر نکند)</label>
-                    <input type="password" name="api_password" dir="ltr" placeholder="••••••••" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
-                </div>
-            </div>
-
-            <div>
-                <label class="block text-slate-300 mb-1 font-semibold flex items-center justify-between">
-                    <span class="flex items-center gap-1.5">
-                        <i class="fa-solid fa-user-check text-purple-400"></i>
-                        <span>نام کاربری نمونه در سرور (استایل میرزاپرو - اختیاری)</span>
-                    </span>
-                    <span class="text-[10px] text-purple-300 font-normal">استخراج مستقیم اینباندها و دامنه ساب</span>
-                </label>
-                <input type="text" name="sample_username" dir="ltr" placeholder="مثلاً: test یا هر کاربر فعال موجود در سرور" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-xs">
-                <span class="text-[10px] text-slate-400 mt-0.5 block">در صورت تمایل، با وارد کردن نام یک کاربر موجود در پنل پاسارگاد/مرزبان، کانفیگ‌ها و اینباندهای آن مستقیماً استخراج می‌گردد.</span>
-            </div>
-
-            <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label class="block text-slate-300 mb-1 font-semibold">دامنه سابسکریپشن / پورت ساب‌لینک</label>
-                    <input type="text" name="sub_domain" id="edit_server_sub_domain" dir="ltr" placeholder="sub.speedur.org:2096" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
-                    <span class="text-[10px] text-slate-400 mt-0.5 block">مثال: sub.speedur.org:2096 (در صورت خالی بودن، از آدرس API استفاده می‌شود)</span>
-                </div>
-                <div>
-                    <label class="block text-slate-300 mb-1 font-semibold">حداکثر ظرفیت کاربر</label>
-                    <input type="number" name="max_clients" id="edit_server_max_clients" min="0" placeholder="0 = نامحدود" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
-                    <span class="text-[10px] text-slate-400 mt-0.5 block">عدد 0 یعنی ظرفیت نامحدود (∞)</span>
-                </div>
-            </div>
-
-            <div>
-                <label class="block text-slate-300 mb-1 font-semibold flex items-center justify-between">
-                    <span>الگوی کانفیگ اختصاصی سرور (VLESS Reality / Trojan)</span>
-                    <span class="text-[10px] text-cyan-400 font-normal">اختیاری - پشتیبانی از {uuid}</span>
-                </label>
-                <textarea name="config_template" id="edit_server_config_template" rows="2" dir="ltr" placeholder="اختیاری - در صورت تمایل می‌توانید الگوی دستی وارد کنید یا از دکمه استخراج خودکار زیر استفاده فرمایید" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-[11px] leading-relaxed"></textarea>
-                <span class="text-[10px] text-slate-400 mt-0.5 block">اگر خالی بماند، سیستم به صورت کاملاً خودکار لینک‌های بومی مرزبان را بدون واسطه تحویل می‌دهد.</span>
-            </div>
-
-            <!-- MirzaPro-Style Inbound Discovery & Real Live Sample Link Preview -->
-            <div class="space-y-2 pt-1 border-t border-slate-800/80">
-                <button type="button" onclick="detectInboundsAndSample('edit')" id="btn_detect_edit" class="w-full py-2.5 bg-gradient-to-r from-purple-900/40 via-indigo-900/40 to-slate-800 hover:from-purple-800/50 hover:to-indigo-800/50 text-purple-200 border border-purple-500/40 font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-2 shadow">
-                    <i class="fa-solid fa-satellite-dish text-purple-400"></i>
-                    <span>📡 شناسایی خودکار اینباندها و دریافت نمونه لینک زنده (مانند میرزا پرو)</span>
+<div id="editServerModal" class="fixed inset-0 bg-black/85 backdrop-blur-md hidden z-50 overflow-y-auto modal-overlay" style="-webkit-overflow-scrolling: touch;">
+    <div class="min-h-full w-full flex items-center justify-center p-2 sm:p-4 md:py-6">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full shadow-2xl relative my-auto flex flex-col max-h-[90vh] overflow-hidden modal-box">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between p-4 sm:p-5 border-b border-slate-800 bg-slate-900 shrink-0">
+                <h3 class="text-base font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-pen-to-square text-amber-400"></i>
+                    <span>ویرایش اطلاعات سرور</span>
+                </h3>
+                <button type="button" onclick="closeEditServerModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
                 </button>
-                <div id="inbounds_container_edit" class="hidden space-y-3 p-3.5 bg-slate-950/90 border border-purple-900/40 rounded-xl text-xs"></div>
             </div>
 
-            <div class="pt-1">
-                <div id="edit_test_result" class="hidden mb-3 p-3 rounded-xl text-xs transition-all"></div>
-                <div class="flex items-center gap-2">
-                    <button type="button" onclick="testRawInModal('edit')" id="btn_test_edit" class="w-1/2 py-2.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 font-bold rounded-xl text-xs border border-cyan-800/40 transition-all flex items-center justify-center gap-1.5 shadow">
+            <!-- Modal Scrollable Body -->
+            <form action="<?= Helpers::url('servers/update') ?>" method="POST" id="editServerForm" class="flex flex-col flex-1 overflow-hidden">
+                <?= Helpers::csrfField() ?>
+                <input type="hidden" name="id" id="edit_server_id">
+
+                <div class="overflow-y-auto p-4 sm:p-5 space-y-4 text-xs flex-1 overscroll-contain modal-scroll-body" style="scrollbar-width: thin; scrollbar-color: #8b5cf6 #1e293b;">
+                    <div>
+                        <label class="block text-slate-300 mb-1 font-semibold">عنوان سرور *</label>
+                        <input type="text" name="name" id="edit_server_name" required class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-slate-300 mb-1 font-semibold">هسته و نوع پنل *</label>
+                            <select name="driver" id="edit_server_driver" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
+                                <option value="auto">✨ تشخیص ۱۰۰٪ خودکار (پاسارگاد / مرزبان / 3X-UI)</option>
+                                <option value="pasargad">Pasargad (پاسارگاد)</option>
+                                <option value="marzban">Marzban (مرزبان)</option>
+                                <option value="3xui">3x-ui / X-UI</option>
+                                <option value="mock">Mock Node (شبیه‌ساز تستی)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-slate-300 mb-1 font-semibold">دسته‌بندی (کلاستر) *</label>
+                            <select name="category_id" id="edit_server_category_id" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white">
+                                <?php if (!empty($categories)): ?>
+                                    <?php foreach ($categories as $cat): ?>
+                                        <option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['name']) ?> (<?= htmlspecialchars($cat['slug']) ?>)</option>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <option value="">پیش‌فرض (Default)</option>
+                                <?php endif; ?>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-slate-300 mb-1 font-semibold">آدرس API سرور *</label>
+                        <input type="url" name="api_url" id="edit_server_api_url" required dir="ltr" oninput="autoFillCdn(this, 'edit')" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-slate-300 mb-1 font-semibold">نام کاربری ادمین</label>
+                            <input type="text" name="api_username" id="edit_server_api_username" dir="ltr" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
+                        </div>
+                        <div>
+                            <label class="block text-slate-300 mb-1 font-semibold">رمز عبور (خالی بگذارید تا تغییر نکند)</label>
+                            <input type="password" name="api_password" dir="ltr" placeholder="••••••••" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
+                        </div>
+                    </div>
+
+                    <!-- MirzaPro-Style Smart Inbound & CDN Discovery Card -->
+                    <div class="p-3.5 bg-gradient-to-br from-purple-950/50 via-slate-900 to-indigo-950/40 border border-purple-500/50 rounded-2xl space-y-2.5 shadow-lg">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-white flex items-center gap-1.5 text-xs">
+                                <i class="fa-solid fa-wand-magic-sparkles text-purple-400"></i>
+                                <span>تنظیم ۱۰۰٪ خودکار اینباندها و CDN (استایل میرزاپرو)</span>
+                            </span>
+                            <span class="text-[10px] text-emerald-300 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800 font-bold">هوشمند</span>
+                        </div>
+
+                        <div>
+                            <label class="block text-slate-300 mb-1 font-semibold text-[11px]">
+                                نام کاربری یک کاربر فعال در سرور (مانند میرزاپرو)
+                            </label>
+                            <div class="flex gap-2">
+                                <input type="text" name="sample_username" id="edit_sample_username" dir="ltr" placeholder="مثلاً: test یا هر اکانت فعال در پنل" class="w-full bg-slate-950 border border-purple-700/60 rounded-xl px-3 py-2 text-white font-mono text-xs focus:border-purple-400">
+                                <button type="button" onclick="detectInboundsAndSample('edit')" id="btn_detect_edit" class="shrink-0 px-3.5 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl text-xs transition shadow-lg shadow-purple-900/40 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-bolt"></i>
+                                    <span>استخراج خودکار</span>
+                                </button>
+                            </div>
+                            <p class="text-[10px] text-purple-200/80 mt-1 leading-relaxed">
+                                با زدن دکمه استخراج، سیستم نوع پنل (پاسارگاد/مرزبان)، کلیه اینباندهای فعال سرور و دامنه CDN را مستقیماً از روی کانفیگ‌های این کاربر می‌خواند و فرم را خودکار پر می‌کند.
+                            </p>
+                        </div>
+
+                        <div id="inbounds_container_edit" class="hidden space-y-3 p-3.5 bg-slate-950/90 border border-purple-900/40 rounded-xl text-xs"></div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-slate-300 mb-1 font-semibold flex items-center justify-between">
+                                <span>دامنه CDN / ساب‌لینک</span>
+                                <span class="text-[10px] text-emerald-400 font-normal">خودکار تکمیل می‌شود</span>
+                            </label>
+                            <input type="text" name="sub_domain" id="edit_server_sub_domain" dir="ltr" placeholder="خودکار تکمیل می‌شود" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
+                            <span class="text-[10px] text-slate-400 mt-0.5 block">در صورت خالی بودن، به صورت هوشمند از آدرس سرور تکمیل می‌شود.</span>
+                        </div>
+                        <div>
+                            <label class="block text-slate-300 mb-1 font-semibold">حداکثر ظرفیت کاربر</label>
+                            <input type="number" name="max_clients" id="edit_server_max_clients" min="0" placeholder="0 = نامحدود" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
+                            <span class="text-[10px] text-slate-400 mt-0.5 block">عدد 0 یعنی ظرفیت نامحدود (∞)</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-slate-300 mb-1 font-semibold flex items-center justify-between">
+                            <span>الگوی کانفیگ اختصاصی سرور (VLESS Reality / Trojan)</span>
+                            <span class="text-[10px] text-cyan-400 font-normal">اختیاری - پشتیبانی از {uuid}</span>
+                        </label>
+                        <textarea name="config_template" id="edit_server_config_template" rows="2" dir="ltr" placeholder="اختیاری - با دکمه استخراج خودکار بالا تکمیل می‌گردد" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-[11px] leading-relaxed"></textarea>
+                    </div>
+
+                    <div id="edit_test_result" class="hidden p-3 rounded-xl text-xs transition-all"></div>
+                </div>
+
+                <!-- Modal Sticky Footer (Always Visible at bottom) -->
+                <div class="p-4 border-t border-slate-800 bg-slate-900 shrink-0 flex items-center gap-2">
+                    <button type="button" onclick="testRawInModal('edit')" id="btn_test_edit" class="w-1/2 py-3 bg-slate-800 hover:bg-slate-700 text-cyan-300 font-bold rounded-xl text-xs border border-cyan-800/40 transition flex items-center justify-center gap-1.5 shadow">
                         <i class="fa-solid fa-bolt-lightning text-cyan-400"></i>
-                        <span>تست زنده اتصال نود</span>
+                        <span>تست زنده اتصال</span>
                     </button>
-                    <button type="submit" class="w-1/2 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs transition-all shadow-md">
-                        ذخیره تغییرات سرور
+                    <button type="submit" class="w-1/2 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition shadow-lg shadow-emerald-900/40 flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-check"></i>
+                        <span>ذخیره تغییرات سرور</span>
                     </button>
                 </div>
-            </div>
-        </form>
+            </form>
+        </div>
     </div>
 </div>
 
@@ -647,6 +695,20 @@ require __DIR__ . '/../layout/header.php';
         });
     }
 
+    function autoFillCdn(el, mode) {
+        try {
+            const val = el.value.trim();
+            if (!val) return;
+            const u = new URL(val);
+            const modal = document.getElementById(mode === 'new' ? 'newServerModal' : 'editServerModal');
+            if (!modal) return;
+            const subInput = modal.querySelector('input[name="sub_domain"]');
+            if (subInput && (!subInput.value || subInput.value.includes('montago-shop.ir'))) {
+                subInput.value = u.host;
+            }
+        } catch(e) {}
+    }
+
     async function detectInboundsAndSample(mode) {
         const isNew = (mode === 'new');
         const modal = document.getElementById(isNew ? 'newServerModal' : 'editServerModal');
@@ -659,7 +721,7 @@ require __DIR__ . '/../layout/header.php';
         detectBtn.disabled = true;
         detectBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-purple-400"></i> در حال اتصال به سرور و استخراج نمونه لینک...';
         container.classList.remove('hidden');
-        container.innerHTML = '<div class="text-center py-4 text-slate-400"><i class="fa-solid fa-circle-notch fa-spin text-xl text-purple-400 block mb-2"></i> در حال احراز هویت با وب‌سرویس و ایجاد کلاینت تستی موقت جهت استخراج نمونه ساب‌لینک...</div>';
+        container.innerHTML = '<div class="text-center py-4 text-slate-400"><i class="fa-solid fa-circle-notch fa-spin text-xl text-purple-400 block mb-2"></i> در حال احراز هویت با وب‌سرویس و دریافت نمونه لینک‌ها...</div>';
 
         const formData = new FormData(form);
 
@@ -683,10 +745,16 @@ require __DIR__ . '/../layout/header.php';
                 driverSelect.value = data.detected_driver;
             }
 
-            // Auto-fill extracted sub_domain if empty
+            // Auto-fill extracted sub_domain
             const subInput = form.querySelector('input[name="sub_domain"]');
-            if (subInput && data.extracted_sub_domain && !subInput.value) {
+            if (subInput && data.extracted_sub_domain) {
                 subInput.value = data.extracted_sub_domain;
+            }
+
+            // Auto-fill config template if empty
+            const templateTextarea = form.querySelector('textarea[name="config_template"]');
+            if (templateTextarea && !templateTextarea.value && data.sample && data.sample.vless_link) {
+                templateTextarea.value = data.sample.vless_link.replace(/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/, '{uuid}');
             }
 
             let html = `

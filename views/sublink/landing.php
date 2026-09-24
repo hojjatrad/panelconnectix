@@ -271,26 +271,18 @@ $renewalLink = !empty($client['renewal_url']) ? $client['renewal_url'] : (!empty
 
             <div id="fallbackConfigsBox" class="hidden space-y-2.5 pt-2 border-t border-slate-800/80">
                 <p class="text-[11px] text-slate-400 leading-relaxed">
-                    مسیرهای اختصاصی بهینه‌شده برای هر اپراتور (می‌توانید هر یک را به صورت دستی کپی و در اپلیکیشن خود وارد نمایید):
+                    کانکشن‌های دریافتی از سرور نود (می‌توانید هر یک را به صورت دستی کپی و در کلاینت خود وارد نمایید):
                 </p>
                 <?php 
-                $protoLabels = [
-                    'mci_reality' => ['title' => '📱 مخصوص همراه اول (MCI Reality)', 'color' => 'text-purple-400'],
-                    'irancell_cdn' => ['title' => '📱 مخصوص ایرانسل (MTN CDN Cloudflare)', 'color' => 'text-amber-400'],
-                    'rightel_trojan' => ['title' => '📱 مخصوص رایتل و شاتل (Rightel Trojan)', 'color' => 'text-emerald-400'],
-                    'wifi_vmess' => ['title' => '🌐 مخصوص اینترنت خانگی و مخابرات (Wi-Fi / ADSL)', 'color' => 'text-cyan-400'],
-                    'gaming_fast' => ['title' => '⚡️ گیمینگ و پینگ پایین (Gaming Ultra Ping)', 'color' => 'text-rose-400'],
-                    'vless_reality' => ['title' => '⚡️ VLESS Reality (مستقیم پرسرعت)', 'color' => 'text-purple-400'],
-                    'vless_ws' => ['title' => '🛡 VLESS CDN (ضد فیلتر شبکه ملی)', 'color' => 'text-cyan-400'],
-                    'trojan' => ['title' => '🔒 Trojan TLS (پایدار برای iOS و مک)', 'color' => 'text-emerald-400'],
-                    'vmess' => ['title' => '🚀 VMess WS (سازگار با کلیه اوپراتورها)', 'color' => 'text-amber-400'],
-                ];
                 foreach ($configs as $k => $cfg): 
-                    $info = $protoLabels[$k] ?? ['title' => strtoupper($k), 'color' => 'text-white'];
+                    $parsed = parse_url($cfg);
+                    $proto = strtoupper($parsed['scheme'] ?? 'CONFIG');
+                    $remark = !empty($parsed['fragment']) ? urldecode($parsed['fragment']) : ($proto . ' - سرور اختصاصی ' . (is_numeric($k) ? ($k + 1) : $k));
+                    $color = ($proto === 'VLESS') ? 'text-purple-400' : (($proto === 'VMESS') ? 'text-amber-400' : (($proto === 'TROJAN') ? 'text-emerald-400' : 'text-cyan-400'));
                 ?>
                     <div class="bg-slate-900/90 border border-slate-800 p-2.5 rounded-xl space-y-1">
                         <div class="flex items-center justify-between">
-                            <span class="text-[11px] font-bold <?= $info['color'] ?>"><?= $info['title'] ?></span>
+                            <span class="text-[11px] font-bold <?= $color ?>"><?= htmlspecialchars($remark) ?></span>
                             <button onclick="copyRaw('<?= htmlspecialchars($cfg) ?>', this)" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-purple-600 text-[10px] text-slate-300 hover:text-white transition">
                                 <i class="fa-regular fa-copy ml-1"></i> کپی
                             </button>
