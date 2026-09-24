@@ -59,6 +59,7 @@ function logStep($msg, $type = 'info') {
 }
 
 logStep("شروع فرآیند به‌روزرسانی...", 'info');
+logStep("پوشه نصب: " . __DIR__, 'info');
 
 // 0. Auto-Fix .htaccess and disable OPcache to force immediate reload
 $cleanHtaccess = "<IfModule mod_rewrite.c>\n    RewriteEngine On\n    RewriteCond %{REQUEST_FILENAME} !-f\n    RewriteCond %{REQUEST_FILENAME} !-d\n    RewriteRule ^(.*)$ index.php [QSA,L]\n</IfModule>\n";
@@ -233,6 +234,7 @@ foreach ($rootFiles as $rf) {
         $written = @file_put_contents($tgt, $data);
         if ($written !== false && $written > 0) {
             $copiedFiles++;
+            $copyLog[] = $rootFile;
         } else {
             logStep("خطا در نوشتن فایل ریشه: {$rootFile}", 'warn');
         }
@@ -245,6 +247,7 @@ if (function_exists('opcache_reset')) @opcache_reset();
 if (function_exists('clearstatcache')) @clearstatcache(true);
 
 logStep("تعداد {$copiedFiles} فایل با موفقیت روی هاست جایگزین شدند.", 'success');
+logStep("فایل‌های ریشه کپی‌شده: " . implode(', ', $copyLog), 'info');
 
 // Send Notification to Telegram Supergroup Reports Topic
 $tgNotice = false;
