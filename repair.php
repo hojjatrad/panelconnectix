@@ -190,7 +190,15 @@ if ($hasConfig) {
         require_once __DIR__ . '/core/Database.php';
         $pdo = Database::getConnection();
         $dbOk = true;
-        
+
+        if (isset($_GET['dump_clients'])) {
+            header('Content-Type: application/json; charset=utf-8');
+            $rows = $pdo->query("SELECT id, name, driver, config_template, sub_domain FROM server_nodes")->fetchAll(PDO::FETCH_ASSOC);
+            $clients = $pdo->query("SELECT id, username, server_id, sub_token, node_sublink, traffic_limit_bytes, traffic_used_bytes, expire_at, status FROM clients ORDER BY id DESC LIMIT 10")->fetchAll(PDO::FETCH_ASSOC);
+            echo json_encode(['servers' => $rows, 'clients' => $clients], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
         // Run full migrations
         Database::ensureExtendedTablesExist($pdo);
 
