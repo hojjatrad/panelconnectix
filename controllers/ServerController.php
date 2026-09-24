@@ -40,7 +40,7 @@ class ServerController {
         }
 
         $name = trim($_POST['name'] ?? '');
-        $driver = trim($_POST['driver'] ?? 'marzban');
+        $driver = trim($_POST['driver'] ?? 'auto');
         $apiUrl = trim($_POST['api_url'] ?? '');
         $username = trim($_POST['api_username'] ?? '');
         $password = trim($_POST['api_password'] ?? '');
@@ -59,6 +59,11 @@ class ServerController {
             Helpers::redirect('servers');
         }
 
+        // Auto-detect driver if set to auto or unknown
+        if ($driver === 'auto' || empty($driver)) {
+            $driver = self::detectDriverType($apiUrl, $username, $password, $token, $name);
+        }
+
         $pdo = Database::getConnection();
         if ($categoryId) {
             $catSlug = $pdo->query("SELECT slug FROM categories WHERE id = " . $categoryId)->fetchColumn();
@@ -69,7 +74,7 @@ class ServerController {
                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([$name, $driver, $apiUrl, $username, $password, $token, $serverGroup, $categoryId, $subDomain, $maxClients, $configTemplate, $selectedInbounds]);
 
-        Helpers::flash('success', 'سرور جدید با موفقیت به سامانه افزوده شد.');
+        Helpers::flash('success', "سرور جدید با موفقیت و تشخیص خودکار نوع پنل ({$driver}) افزوده شد.");
         Helpers::redirect('servers');
     }
 
@@ -82,7 +87,7 @@ class ServerController {
 
         $id = (int)($_POST['id'] ?? 0);
         $name = trim($_POST['name'] ?? '');
-        $driver = trim($_POST['driver'] ?? 'marzban');
+        $driver = trim($_POST['driver'] ?? 'auto');
         $apiUrl = trim($_POST['api_url'] ?? '');
         $username = trim($_POST['api_username'] ?? '');
         $password = trim($_POST['api_password'] ?? '');
@@ -99,6 +104,11 @@ class ServerController {
         if ($id <= 0 || empty($name) || empty($apiUrl)) {
             Helpers::flash('error', 'اطلاعات ارسالی سرور ناقص است.');
             Helpers::redirect('servers');
+        }
+
+        // Auto-detect driver if set to auto
+        if ($driver === 'auto' || empty($driver)) {
+            $driver = self::detectDriverType($apiUrl, $username, $password, $token, $name);
         }
 
         $pdo = Database::getConnection();
@@ -380,9 +390,68 @@ class ServerController {
         }
     }
 
+    public static function detectDriverType(string $apiUrl, string $username, string $password, string $token = '', string $name = ''): string {
+        $nameLower = mb_strtolower($name, 'UTF-8');
+        if (str_contains($nameLower, 'پاسارگاد') || str_contains($nameLower, 'pasargad') || str_contains($nameLower, 'pasarguard')) {
+            return 'pasargad';
+        }
+
+        if (str_contains($nameLower, 'x-ui') || str_contains($nameLower, 'xui') || str_contains($apiUrl, ':2053') || str_contains($apiUrl, ':54321')) {
+            return 'xui';
+        }
+
+        // Probe live endpoints
+        try {
+            $psg = DriverFactory::create([
+                'driver' => 'pasargad',
+                'api_url' => $apiUrl,
+                'api_username' => $username,
+                'api_password' => $password,
+                'api_token' => $token
+            ]);
+            if ($psg->authenticate()) {
+                return 'pasargad';
+            }
+        } catch (Throwable $e) {}
+
+        try {
+            $mzb = DriverFactory::create([
+                'driver' => 'marzban',
+                'api_url' => $apiUrl,
+                'api_username' => $username,
+                'api_password' => $password,
+                'api_token' => $token
+            ]);
+            if ($mzb->authenticate()) {
+                return 'marzban';
+            }
+        } catch (Throwable $e) {}
+
+        try {
+            $xui = DriverFactory::create([
+                'driver' => 'xui',
+                'api_url' => $apiUrl,
+                'api_username' => $username,
+                'api_password' => $password,
+                'api_token' => $token
+            ]);
+            if ($xui->authenticate()) {
+                return 'xui';
+            }
+        } catch (Throwable $e) {}
+
+        $port = parse_url($apiUrl, PHP_URL_PORT);
+        if ($port == 2096 || $port == 2083 || $port == 2087) {
+            return 'pasargad';
+        }
+
+        return 'marzban';
+    }
+
     public function fetchInboundsAndSample(): void {
         Auth::requireAdmin();
         $serverId = (int)($_POST['server_id'] ?? $_GET['server_id'] ?? 0);
+        $sampleUsername = trim($_POST['sample_username'] ?? $_GET['sample_username'] ?? '');
         $pdo = Database::getConnection();
 
         $server = null;
@@ -394,12 +463,13 @@ class ServerController {
 
         if (!$server) {
             $server = [
-                'name' => 'Raw Test Node',
-                'driver' => trim($_POST['driver'] ?? $_GET['driver'] ?? 'marzban'),
+                'name' => trim($_POST['name'] ?? 'Raw Test Node'),
+                'driver' => trim($_POST['driver'] ?? $_GET['driver'] ?? 'auto'),
                 'api_url' => trim($_POST['api_url'] ?? $_GET['api_url'] ?? ''),
                 'api_username' => trim($_POST['api_username'] ?? $_GET['api_username'] ?? ''),
                 'api_password' => trim($_POST['api_password'] ?? $_GET['api_password'] ?? ''),
-                'api_token' => trim($_POST['api_token'] ?? $_GET['api_token'] ?? '')
+                'api_token' => trim($_POST['api_token'] ?? $_GET['api_token'] ?? ''),
+                'sub_domain' => trim($_POST['sub_domain'] ?? $_GET['sub_domain'] ?? '')
             ];
         }
 
@@ -408,10 +478,22 @@ class ServerController {
         }
 
         try {
+            $driverType = $server['driver'] ?? 'auto';
+            if ($driverType === 'auto' || empty($driverType)) {
+                $driverType = self::detectDriverType($server['api_url'], $server['api_username'], $server['api_password'], $server['api_token'] ?? '', $server['name'] ?? '');
+                $server['driver'] = $driverType;
+            }
+
             $driver = DriverFactory::create($server);
             if (!$driver->authenticate()) {
-                $lastErr = method_exists($driver, 'getLastError') ? $driver->getLastError() : 'عدم توانایی در احراز هویت با سرور';
-                Helpers::jsonResponse(['success' => false, 'message' => $lastErr, 'error' => $lastErr]);
+                $altDriver = ($driverType === 'pasargad') ? 'marzban' : 'pasargad';
+                $server['driver'] = $altDriver;
+                $driver = DriverFactory::create($server);
+                if (!$driver->authenticate()) {
+                    $lastErr = method_exists($driver, 'getLastError') ? $driver->getLastError() : 'عدم توانایی در احراز هویت با سرور';
+                    Helpers::jsonResponse(['success' => false, 'message' => $lastErr, 'error' => $lastErr]);
+                }
+                $driverType = $altDriver;
             }
 
             // 1. Fetch detailed inbounds from server (tag, proto, network, tls, port)
@@ -419,29 +501,92 @@ class ServerController {
                 ? $driver->getDetailedInbounds() 
                 : [];
 
-            // 2. Provision temporary sample user to fetch real native Marzban subscription & config
-            $testUser = 'mirza_' . substr(bin2hex(random_bytes(3)), 0, 6);
-            $cRes = $driver->createUser([
-                'username' => $testUser,
-                'uuid' => Helpers::generateUUID(),
-                'traffic_limit_bytes' => 1073741824, // 1GB
-                'expire_timestamp' => time() + 86400 // 1 day
-            ]);
-
             $sampleData = null;
-            if ($cRes['success']) {
-                $sampleData = [
-                    'sublink' => $cRes['sublink'] ?? '',
-                    'vless_link' => $cRes['vless_link'] ?? '',
-                    'links' => $cRes['links'] ?? []
-                ];
-                // Clean up test user immediately
-                $driver->deleteUser($testUser);
+            $extractedDomain = '';
+
+            // 2. If MirzaPro-style sample username is provided, query it directly!
+            if (!empty($sampleUsername)) {
+                $existingUser = $driver->getUser($sampleUsername);
+                if ($existingUser) {
+                    $sublink = $existingUser['subscription_url'] ?? '';
+                    $links = $existingUser['links'] ?? [];
+                    
+                    if (!empty($sublink)) {
+                        $parts = parse_url($sublink);
+                        if (!empty($parts['host'])) {
+                            $scheme = $parts['scheme'] ?? 'https';
+                            $port = !empty($parts['port']) ? (':' . $parts['port']) : '';
+                            $extractedDomain = "{$scheme}://{$parts['host']}{$port}";
+                        }
+                    }
+
+                    $sampleData = [
+                        'sublink' => $sublink,
+                        'vless_link' => $links[0] ?? '',
+                        'links' => $links,
+                        'extracted_sub_domain' => $extractedDomain,
+                        'source' => "مستقیماً از کاربر موجود '{$sampleUsername}' در سرور (استایل میرزاپرو)"
+                    ];
+                }
             }
+
+            // 3. Fallback: provision temporary test user if no sample user provided or not found
+            if (!$sampleData) {
+                $testUser = 'mirza_' . substr(bin2hex(random_bytes(3)), 0, 6);
+                $cRes = $driver->createUser([
+                    'username' => $testUser,
+                    'uuid' => Helpers::generateUUID(),
+                    'traffic_limit_bytes' => 1073741824, // 1GB
+                    'expire_timestamp' => time() + 86400 // 1 day
+                ]);
+
+                if ($cRes['success']) {
+                    $sublink = $cRes['sublink'] ?? '';
+                    $links = $cRes['links'] ?? [];
+                    if (!empty($sublink)) {
+                        $parts = parse_url($sublink);
+                        if (!empty($parts['host'])) {
+                            $scheme = $parts['scheme'] ?? 'https';
+                            $port = !empty($parts['port']) ? (':' . $parts['port']) : '';
+                            $extractedDomain = "{$scheme}://{$parts['host']}{$port}";
+                        }
+                    }
+                    $sampleData = [
+                        'sublink' => $sublink,
+                        'vless_link' => $cRes['vless_link'] ?? ($links[0] ?? ''),
+                        'links' => $links,
+                        'extracted_sub_domain' => $extractedDomain,
+                        'source' => 'ایجاد کاربر تستی موقت خودکار'
+                    ];
+                    // Clean up test user immediately
+                    $driver->deleteUser($testUser);
+                }
+            }
+
+            // Auto-update server in database if server_id was supplied
+            if ($serverId > 0) {
+                $updFields = ['driver = ?'];
+                $updValues = [$driverType];
+                if (!empty($extractedDomain)) {
+                    $updFields[] = 'sub_domain = COALESCE(NULLIF(sub_domain, ""), ?)';
+                    $updValues[] = $extractedDomain;
+                }
+                $updValues[] = $serverId;
+                $pdo->prepare("UPDATE server_nodes SET " . implode(', ', $updFields) . " WHERE id = ?")->execute($updValues);
+            }
+
+            $driverLabel = match($driverType) {
+                'pasargad' => 'پاسارگاد (PasarGuard)',
+                'xui' => '3X-UI',
+                default => 'مرزبان (Marzban)'
+            };
 
             Helpers::jsonResponse([
                 'success' => true,
-                'message' => 'اینباندهای سرور و نمونه لینک‌های مستقیم با موفقیت استخراج گردیدند.',
+                'message' => "نوع پنل ({$driverLabel}) و اینباندها با موفقیت شناسایی شدند.",
+                'detected_driver' => $driverType,
+                'detected_driver_label' => $driverLabel,
+                'extracted_sub_domain' => $extractedDomain,
                 'inbounds' => $inbounds,
                 'sample' => $sampleData
             ]);

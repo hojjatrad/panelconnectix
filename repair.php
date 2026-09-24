@@ -12,7 +12,7 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
 // Direct Zero-Dependency One-Click Restoration Hook
-if (isset($_GET['restore_files']) && $_GET['restore_files'] === '1') {
+if (isset($_GET['update_from_git']) || (isset($_GET['restore_files']) && $_GET['restore_files'] === '1')) {
     if (file_exists(__DIR__ . '/quick_update.php')) {
         require __DIR__ . '/quick_update.php';
         exit;
@@ -203,88 +203,103 @@ if ($hasConfig) {
         // Diagnostic API for testing live servers
         if (isset($_GET['diag_server'])) {
             header('Content-Type: application/json; charset=utf-8');
-            require_once __DIR__ . '/drivers/DriverFactory.php';
-            require_once __DIR__ . '/core/Helpers.php';
-            $nodes = $pdo->query("SELECT id, name, driver, api_url, api_username, is_active, health_status, server_group, config_template FROM server_nodes")->fetchAll(PDO::FETCH_ASSOC);
-            $results = [];
-            foreach ($nodes as $n) {
-                $full = $pdo->query("SELECT * FROM server_nodes WHERE id = " . (int)$n['id'])->fetch(PDO::FETCH_ASSOC);
-                $driverInst = DriverFactory::create($full);
-                $auth = $driverInst->authenticate();
-                $err = method_exists($driverInst, 'getLastError') ? $driverInst->getLastError() : null;
-                $inbounds = method_exists($driverInst, 'getInbounds') ? $driverInst->getInbounds() : [];
-                $detailedInbounds = method_exists($driverInst, 'getDetailedInbounds') ? $driverInst->getDetailedInbounds() : [];
+            try {
+                require_once __DIR__ . '/drivers/DriverFactory.php';
+                require_once __DIR__ . '/core/Helpers.php';
+                require_once __DIR__ . '/controllers/ServerController.php';
 
-                $rawInboundsDiag = [];
-                if (method_exists($driverInst, 'request')) {
-                    foreach (['/api/inbounds', '/api/v1/inbounds', '/api/hosts', '/api/system'] as $testEp) {
-                        $epRes = $driverInst->request($testEp);
-                        $rawInboundsDiag[$testEp] = [
-                            'code' => $epRes['code'] ?? null,
-                            'success' => $epRes['success'] ?? false,
-                            'data' => $epRes['data'] ?? null
-                        ];
-                    }
-                }
+                $nodes = $pdo->query("SELECT id, name, driver, api_url, api_username, is_active, health_status, server_group, sub_domain, config_template FROM server_nodes")->fetchAll(PDO::FETCH_ASSOC);
+                $results = [];
+                foreach ($nodes as $n) {
+                    $full = $pdo->query("SELECT * FROM server_nodes WHERE id = " . (int)$n['id'])->fetch(PDO::FETCH_ASSOC);
+                    
+                    // Run auto-detection
+                    $detectedDriver = ServerController::detectDriverType($full['api_url'] ?? '', $full['api_username'] ?? '', $full['api_password'] ?? '', $full['api_token'] ?? '', $full['name'] ?? '');
 
-                $sampleLink = null;
-                if ($auth) {
-                    $testUser = 'diag_' . substr(bin2hex(random_bytes(3)), 0, 6);
-                    $cRes = $driverInst->createUser([
-                        'username' => $testUser,
-                        'uuid' => Helpers::generateUUID(),
-                        'traffic_limit_bytes' => 1073741824,
-                        'expire_timestamp' => time() + 86400
-                    ]);
-                    if ($cRes['success']) {
-                        $sub = $cRes['sublink'] ?? null;
-                        $curlOrig = null;
-                        $curlRewritten = null;
-                        if (!empty($sub)) {
-                            $testCurl = function($url) {
-                                $ch = curl_init($url);
-                                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                                curl_setopt($ch, CURLOPT_TIMEOUT, 5);
-                                curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-                                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-                                curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-                                curl_setopt($ch, CURLOPT_USERAGENT, 'v2rayNG/1.8.5');
-                                $body = curl_exec($ch);
-                                $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                                $err = curl_error($ch);
-                                curl_close($ch);
-                                return ['code' => $code, 'error' => $err, 'len' => strlen((string)$body), 'preview' => substr((string)$body, 0, 100)];
-                            };
-                            $curlOrig = $testCurl($sub);
-                            if (str_contains($sub, 'gga1.montago-shop.ir')) {
-                                $rewritten = str_replace('https://gga1.montago-shop.ir', rtrim($full['api_url'], '/'), $sub);
-                                $curlRewritten = $testCurl($rewritten);
-                            }
+                    $driverInst = DriverFactory::create($full);
+                    $auth = $driverInst->authenticate();
+                    $err = method_exists($driverInst, 'getLastError') ? $driverInst->getLastError() : null;
+                    $inbounds = method_exists($driverInst, 'getInbounds') ? $driverInst->getInbounds() : [];
+                    $detailedInbounds = method_exists($driverInst, 'getDetailedInbounds') ? $driverInst->getDetailedInbounds() : [];
+
+                    $rawInboundsDiag = [];
+                    if (method_exists($driverInst, 'request')) {
+                        foreach (['/api/inbounds', '/api/v1/inbounds', '/api/hosts', '/api/system'] as $testEp) {
+                            $epRes = $driverInst->request($testEp);
+                            $rawInboundsDiag[$testEp] = [
+                                'code' => $epRes['code'] ?? null,
+                                'success' => $epRes['success'] ?? false,
+                                'data' => $epRes['data'] ?? null
+                            ];
                         }
-
-                        $sampleLink = [
-                            'sublink' => $sub,
-                            'links' => $cRes['links'] ?? [],
-                            'vless_link' => $cRes['vless_link'] ?? null,
-                            'sublink_curl_test' => $curlOrig,
-                            'sublink_rewritten_test' => $curlRewritten
-                        ];
-                        $driverInst->deleteUser($testUser);
-                    } else {
-                        $sampleLink = ['error' => $cRes['error'] ?? 'failed'];
                     }
+
+                    $sampleLink = null;
+                    if ($auth) {
+                        $testUser = 'diag_' . substr(bin2hex(random_bytes(3)), 0, 6);
+                        $cRes = $driverInst->createUser([
+                            'username' => $testUser,
+                            'uuid' => Helpers::generateUUID(),
+                            'traffic_limit_bytes' => 1073741824,
+                            'expire_timestamp' => time() + 86400
+                        ]);
+                        if ($cRes['success']) {
+                            $sub = $cRes['sublink'] ?? null;
+                            $curlOrig = null;
+                            $curlRewritten = null;
+                            if (!empty($sub)) {
+                                $testCurl = function($url) {
+                                    $ch = curl_init($url);
+                                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                                    curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+                                    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                                    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                                    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+                                    curl_setopt($ch, CURLOPT_USERAGENT, 'v2rayNG/1.8.5');
+                                    $body = curl_exec($ch);
+                                    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                                    $err = curl_error($ch);
+                                    curl_close($ch);
+                                    return ['code' => $code, 'error' => $err, 'len' => strlen((string)$body), 'preview' => substr((string)$body, 0, 100)];
+                                };
+                                $curlOrig = $testCurl($sub);
+                                if (!empty($sub) && str_contains((string)$sub, 'gga1.montago-shop.ir')) {
+                                    $rewritten = str_replace('https://gga1.montago-shop.ir', rtrim($full['api_url'], '/'), (string)$sub);
+                                    $curlRewritten = $testCurl($rewritten);
+                                }
+                            }
+
+                            $sampleLink = [
+                                'sublink' => $sub,
+                                'links' => $cRes['links'] ?? [],
+                                'vless_link' => $cRes['vless_link'] ?? null,
+                                'sublink_curl_test' => $curlOrig,
+                                'sublink_rewritten_test' => $curlRewritten
+                            ];
+                            $driverInst->deleteUser($testUser);
+                        } else {
+                            $sampleLink = ['error' => $cRes['error'] ?? 'failed'];
+                        }
+                    }
+                    $results[] = [
+                        'node' => $n,
+                        'detected_driver' => $detectedDriver,
+                        'auth' => $auth,
+                        'error' => $err,
+                        'inbounds' => $inbounds,
+                        'detailed_inbounds' => $detailedInbounds,
+                        'raw_inbounds_endpoints' => $rawInboundsDiag,
+                        'sample' => $sampleLink
+                    ];
                 }
-                $results[] = [
-                    'node' => $n,
-                    'auth' => $auth,
-                    'error' => $err,
-                    'inbounds' => $inbounds,
-                    'detailed_inbounds' => $detailedInbounds,
-                    'raw_inbounds_endpoints' => $rawInboundsDiag,
-                    'sample' => $sampleLink
-                ];
+                echo json_encode($results, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+            } catch (Throwable $diagErr) {
+                echo json_encode([
+                    'error' => $diagErr->getMessage(),
+                    'file' => $diagErr->getFile(),
+                    'line' => $diagErr->getLine()
+                ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
             }
-            echo json_encode($results, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
             exit;
         }
 

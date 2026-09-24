@@ -201,8 +201,9 @@ require __DIR__ . '/../layout/header.php';
                 <div>
                     <label class="block text-slate-300 mb-1 font-semibold">هسته و نوع پنل *</label>
                     <select name="driver" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
-                        <option value="marzban">Marzban (مرزبان)</option>
+                        <option value="auto" selected>✨ تشخیص ۱۰۰٪ خودکار (Auto: پاسارگاد / مرزبان / 3X-UI)</option>
                         <option value="pasargad">Pasargad (پاسارگاد)</option>
+                        <option value="marzban">Marzban (مرزبان)</option>
                         <option value="3xui">3x-ui / X-UI</option>
                         <option value="mock">Mock Node (شبیه‌ساز تستی)</option>
                     </select>
@@ -235,6 +236,18 @@ require __DIR__ . '/../layout/header.php';
                     <label class="block text-slate-300 mb-1 font-semibold">رمز عبور / Secret</label>
                     <input type="password" name="api_password" dir="ltr" placeholder="••••••••" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
                 </div>
+            </div>
+
+            <div>
+                <label class="block text-slate-300 mb-1 font-semibold flex items-center justify-between">
+                    <span class="flex items-center gap-1.5">
+                        <i class="fa-solid fa-user-check text-purple-400"></i>
+                        <span>نام کاربری نمونه در سرور (استایل میرزاپرو - اختیاری)</span>
+                    </span>
+                    <span class="text-[10px] text-purple-300 font-normal">استخراج مستقیم اینباندها و دامنه ساب</span>
+                </label>
+                <input type="text" name="sample_username" dir="ltr" placeholder="مثلاً: test یا هر کاربر فعال موجود در سرور" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-xs">
+                <span class="text-[10px] text-slate-400 mt-0.5 block">مانند ربات میرزاپرو، در صورت وارد کردن یک یوزر فعال، سیستم پروتکل‌ها، اینباندها و دامنه سابسکریپشن زنده را مستقیماً از روی آن کاربر می‌خواند.</span>
             </div>
 
             <div class="grid grid-cols-2 gap-3">
@@ -309,8 +322,9 @@ require __DIR__ . '/../layout/header.php';
                 <div>
                     <label class="block text-slate-300 mb-1 font-semibold">هسته و نوع پنل *</label>
                     <select name="driver" id="edit_server_driver" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
-                        <option value="marzban">Marzban (مرزبان)</option>
+                        <option value="auto">✨ تشخیص ۱۰۰٪ خودکار (پاسارگاد / مرزبان / 3X-UI)</option>
                         <option value="pasargad">Pasargad (پاسارگاد)</option>
+                        <option value="marzban">Marzban (مرزبان)</option>
                         <option value="3xui">3x-ui / X-UI</option>
                         <option value="mock">Mock Node (شبیه‌ساز تستی)</option>
                     </select>
@@ -343,6 +357,18 @@ require __DIR__ . '/../layout/header.php';
                     <label class="block text-slate-300 mb-1 font-semibold">رمز عبور (خالی بگذارید تا تغییر نکند)</label>
                     <input type="password" name="api_password" dir="ltr" placeholder="••••••••" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
                 </div>
+            </div>
+
+            <div>
+                <label class="block text-slate-300 mb-1 font-semibold flex items-center justify-between">
+                    <span class="flex items-center gap-1.5">
+                        <i class="fa-solid fa-user-check text-purple-400"></i>
+                        <span>نام کاربری نمونه در سرور (استایل میرزاپرو - اختیاری)</span>
+                    </span>
+                    <span class="text-[10px] text-purple-300 font-normal">استخراج مستقیم اینباندها و دامنه ساب</span>
+                </label>
+                <input type="text" name="sample_username" dir="ltr" placeholder="مثلاً: test یا هر کاربر فعال موجود در سرور" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-xs">
+                <span class="text-[10px] text-slate-400 mt-0.5 block">در صورت تمایل، با وارد کردن نام یک کاربر موجود در پنل پاسارگاد/مرزبان، کانفیگ‌ها و اینباندهای آن مستقیماً استخراج می‌گردد.</span>
             </div>
 
             <div class="grid grid-cols-2 gap-3">
@@ -651,13 +677,36 @@ require __DIR__ . '/../layout/header.php';
                 return;
             }
 
+            // Auto-fill detected driver
+            const driverSelect = form.querySelector('select[name="driver"]');
+            if (driverSelect && data.detected_driver) {
+                driverSelect.value = data.detected_driver;
+            }
+
+            // Auto-fill extracted sub_domain if empty
+            const subInput = form.querySelector('input[name="sub_domain"]');
+            if (subInput && data.extracted_sub_domain && !subInput.value) {
+                subInput.value = data.extracted_sub_domain;
+            }
+
             let html = `
+                <div class="p-3 bg-purple-950/60 border border-purple-800 rounded-xl space-y-1.5 mb-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-white flex items-center gap-1.5">
+                            <i class="fa-solid fa-wand-magic-sparkles text-purple-400"></i>
+                            <span>تشخیص خودکار نوع پنل:</span>
+                            <span class="text-emerald-400 font-mono font-bold">${data.detected_driver_label || data.detected_driver}</span>
+                        </span>
+                        <span class="text-[10px] text-purple-300 bg-purple-900/60 px-2 py-0.5 rounded border border-purple-700">${(data.inbounds || []).length} اینباند فعال</span>
+                    </div>
+                    ${data.sample && data.sample.source ? `<div class="text-[10px] text-slate-300"><b>منبع استخراج:</b> ${data.sample.source}</div>` : ''}
+                    ${data.extracted_sub_domain ? `<div class="text-[10px] text-cyan-300 font-mono"><b>دامنه ساب استخراج‌شده:</b> ${data.extracted_sub_domain}</div>` : ''}
+                </div>
                 <div class="flex items-center justify-between pb-2 border-b border-slate-800">
-                    <span class="font-bold text-white flex items-center gap-1.5">
+                    <span class="font-bold text-white flex items-center gap-1.5 text-xs">
                         <i class="fa-solid fa-circle-check text-emerald-400"></i>
-                        <span>اینباندهای فعال شناسایی‌شده در سرور</span>
+                        <span>اینباندهای فعال انتخاب‌شده جهت تحویل به کلاینت</span>
                     </span>
-                    <span class="text-[10px] text-purple-300 bg-purple-950/80 px-2 py-0.5 rounded border border-purple-800">${(data.inbounds || []).length} اینباند فعال</span>
                 </div>
             `;
 

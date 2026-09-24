@@ -289,30 +289,36 @@ if (time() - $lastNightlyReport >= 86400) {
     }
 }
 
-// GitHub Auto-Update & Notification Check (Every 6 Hours)
+// GitHub Auto-Update Engine (همگام‌سازی و به‌روزرسانی خودکار با گیت‌هاب روی کرون جاب هاست)
+$isAutoApply = Setting::get('auto_apply_github_updates', '1') !== '0';
 $lastUpdateCheck = (int)Setting::get('last_cron_update_check', '0');
-if (time() - $lastUpdateCheck >= 21600) {
+$forceCheck = isset($_GET['auto_update']) || isset($_GET['update_now']) || (php_sapi_name() === 'cli' && in_array('--update', $argv ?? []));
+
+// Check every 3 minutes if auto-apply enabled, or if forced
+if ($forceCheck || (time() - $lastUpdateCheck >= 180)) {
     Setting::set('last_cron_update_check', (string)time());
-    echo "[" . date('Y-m-d H:i:s') . "] Checking GitHub for panel updates..." . $eol;
+    echo "[" . date('Y-m-d H:i:s') . "] Checking GitHub (hojjatrad/panelconnectix) for updates..." . $eol;
     try {
         require_once __DIR__ . '/../core/Updater.php';
         $updateInfo = Updater::checkForUpdates(true);
         if (!empty($updateInfo['has_update'])) {
-            $isAutoApply = (bool)Setting::get('auto_apply_github_updates', false);
-            if ($isAutoApply) {
-                $applyRes = Updater::applyUpdate();
-                if ($applyRes['success']) {
-                    TelegramBot::sendMessage("🚀 <b>به‌روزرسانی خودکار انجام شد!</b>\n\nسیستم به آخرین نسخه در گیت‌هاب (<code>{$updateInfo['latest_version']}</code>) به‌روزرسانی شد.\n\n📝 تغییرات: " . strip_tags($updateInfo['changelog'] ?? ''));
-                    echo "[" . date('Y-m-d H:i:s') . "] Auto-update applied successfully." . $eol;
-                }
+            echo "[Auto-Update] New version detected ({$updateInfo['latest_version']}). Applying update..." . $eol;
+            $applyRes = Updater::applyUpdate();
+            if ($applyRes['success']) {
+                $msg = "🚀 <b>به‌روزرسانی خودکار پنل از گیت‌هاب با موفقیت اعمال شد!</b>\n\n"
+                     . "🏷 نسخه جدید: <code>{$updateInfo['latest_version']}</code>\n"
+                     . "📅 زمان: " . date('Y-m-d H:i:s') . "\n"
+                     . "📝 تغییرات: " . strip_tags($updateInfo['changelog'] ?? 'همگام‌سازی آخرین کدهای مخزن');
+                TelegramBot::sendMessage($msg);
+                echo "[Auto-Update] Panel updated successfully to {$updateInfo['latest_version']}." . $eol;
             } else {
-                // Notify admin via Telegram
-                TelegramBot::sendMessage("🔔 <b>نسخه جدیدی از پنل در گیت‌هاب منتشر شده است!</b>\n\n🏷 نسخه جدید: <code>{$updateInfo['latest_version']}</code>\n📝 تغییرات:\n" . strip_tags($updateInfo['changelog'] ?? '') . "\n\nبرای اعمال با ۱ کلیک به منوی تنظیمات > آپدیت مراجعه نمایید.");
-                echo "[" . date('Y-m-d H:i:s') . "] Update available notification sent to admin." . $eol;
+                echo "[Auto-Update Error] " . ($applyRes['error'] ?? 'failed') . $eol;
             }
+        } else {
+            echo "[Auto-Update] Panel is up-to-date with GitHub ({$updateInfo['latest_version']})." . $eol;
         }
     } catch (Throwable $e) {
-        echo "[" . date('Y-m-d H:i:s') . "] Update check error: " . $e->getMessage() . $eol;
+        echo "[Auto-Update Error] " . $e->getMessage() . $eol;
     }
 }
 
