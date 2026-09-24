@@ -410,6 +410,7 @@ class ApiController {
                 'ip_limit' => (int)($client['ip_limit'] ?? 2),
                 'sub_url' => Helpers::subUrl($client['sub_token'])
             ],
+            'servers' => self::extractServerList($client, $pdo),
             'branding' => [
                 'app_name' => $client['brand_name'] ?? 'Connectix VPN',
                 'logo_url' => $client['logo_url'] ?? '',
@@ -491,18 +492,13 @@ class ApiController {
      * Returns Structured Connection Nodes + Raw Base64 Sublink
      */
     /**
-     * GET /api/v1/app/configs
-     * Returns Structured Connection Nodes + Raw Base64 Sublink
-     * Shows ALL configs without filtering out inactive or failed ones
+     * Helper: Extract and structure all real server connections
      */
-    public function appConfigs(): void {
-        $client = self::authenticateClientApp();
-        $pdo = Database::getConnection();
+    public static function extractServerList(array $client, PDO $pdo): array {
         require_once __DIR__ . '/SublinkController.php';
-
         $realLinks = [];
 
-        // Ensure client is attached to an active server if server_id was NULL
+        // 1. Ensure client is bound to an active real server node
         if (empty($client['server_id'])) {
             $activeServer = $pdo->query("SELECT id FROM server_nodes WHERE is_active = 1 AND driver != 'mock' ORDER BY id ASC LIMIT 1")->fetch();
             if ($activeServer) {
@@ -511,31 +507,8 @@ class ApiController {
             }
         }
 
-        // 1. First priority: Check stored node_sublink directly
-        if (!empty($client['node_sublink'])) {
-            $ch = curl_init($client['node_sublink']);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 8);
-            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-            curl_setopt($ch, CURLOPT_USERAGENT, 'v2rayNG/1.8.5');
-            $subContent = curl_exec($ch);
-            curl_close($ch);
-            if (!empty($subContent)) {
-                $decoded = base64_decode(trim($subContent), true) ?: $subContent;
-                $lines = preg_split("/\r\n|\n|\r/", $decoded);
-                foreach ($lines as $line) {
-                    $line = trim($line);
-                    if (preg_match('/^(vless|vmess|trojan|ss|shadowsocks|hysteria2|hy2|tuic|wireguard):\/\//i', $line)) {
-                        $realLinks[] = $line;
-                    }
-                }
-            }
-        }
-
-        // 2. Second priority: Query server driver directly (Marzban / Pasargad / 3x-ui)
-        if (empty($realLinks) && !empty($client['server_id'])) {
+        // 2. Direct Query to Server Driver (Fastest, zero loopback delay)
+        if (!empty($client['server_id'])) {
             try {
                 $stmtNode = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ?");
                 $stmtNode->execute([(int)$client['server_id']]);
@@ -544,13 +517,13 @@ class ApiController {
                     $driver = DriverFactory::create($node);
                     $liveData = $driver->getUser($client['username']);
 
-                    // If user not found on node, provision them immediately on the node
+                    // Auto-provision user on remote node if not found
                     if (!$liveData) {
                         $createRes = $driver->createUser([
                             'username' => $client['username'],
-                            'uuid' => $client['uuid'],
+                            'uuid' => $client['uuid'] ?: Helpers::generateUUID(),
                             'password' => $client['password'] ?: '123456',
-                            'traffic_limit_bytes' => (int)$client['traffic_limit_bytes'],
+                            'traffic_limit_bytes' => (int)($client['traffic_limit_bytes'] ?? 0),
                             'expire_timestamp' => !empty($client['expire_at']) ? strtotime($client['expire_at']) : (time() + 30 * 86400)
                         ]);
                         if ($createRes['success']) {
@@ -558,10 +531,14 @@ class ApiController {
                             if (!empty($createRes['links'])) {
                                 $realLinks = $createRes['links'];
                             }
+                            if (!empty($createRes['sublink'])) {
+                                $pdo->prepare("UPDATE clients SET node_sublink = ? WHERE id = ?")
+                                    ->execute([$createRes['sublink'], $client['id']]);
+                            }
                         }
                     }
 
-                    if (!empty($liveData['links']) && is_array($liveData['links'])) {
+                    if (empty($realLinks) && !empty($liveData['links']) && is_array($liveData['links'])) {
                         foreach ($liveData['links'] as $link) {
                             $link = trim($link);
                             if (preg_match('/^(vless|vmess|trojan|ss|shadowsocks|hysteria2|hy2|tuic|wireguard):\/\//i', $link)) {
@@ -571,26 +548,25 @@ class ApiController {
                     }
 
                     if (empty($realLinks) && !empty($liveData['subscription_url'])) {
-                        $client['node_sublink'] = $liveData['subscription_url'];
-                        $pdo->prepare("UPDATE clients SET node_sublink = ? WHERE id = ?")
-                            ->execute([$liveData['subscription_url'], $client['id']]);
-
-                        $ch = curl_init($liveData['subscription_url']);
-                        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                        curl_setopt($ch, CURLOPT_TIMEOUT, 8);
-                        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-                        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-                        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-                        curl_setopt($ch, CURLOPT_USERAGENT, 'v2rayNG/1.8.5');
-                        $subContent = curl_exec($ch);
-                        curl_close($ch);
-                        if (!empty($subContent)) {
-                            $decoded = base64_decode(trim($subContent), true) ?: $subContent;
-                            $lines = preg_split("/\r\n|\n|\r/", $decoded);
-                            foreach ($lines as $line) {
-                                $line = trim($line);
-                                if (preg_match('/^(vless|vmess|trojan|ss|shadowsocks|hysteria2|hy2|tuic|wireguard):\/\//i', $line)) {
-                                    $realLinks[] = $line;
+                        $subUrl = $liveData['subscription_url'];
+                        if (!str_contains($subUrl, $_SERVER['HTTP_HOST'] ?? 'vpbotn.ir') && !str_contains($subUrl, '/sub/' . ($client['sub_token'] ?? ''))) {
+                            $ch = curl_init($subUrl);
+                            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                            curl_setopt($ch, CURLOPT_TIMEOUT, 6);
+                            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+                            curl_setopt($ch, CURLOPT_USERAGENT, 'v2rayNG/1.8.5');
+                            $subContent = curl_exec($ch);
+                            curl_close($ch);
+                            if (!empty($subContent)) {
+                                $decoded = base64_decode(trim($subContent), true) ?: $subContent;
+                                $lines = preg_split("/\r\n|\n|\r/", $decoded);
+                                foreach ($lines as $line) {
+                                    $line = trim($line);
+                                    if (preg_match('/^(vless|vmess|trojan|ss|shadowsocks|hysteria2|hy2|tuic|wireguard):\/\//i', $line)) {
+                                        $realLinks[] = $line;
+                                    }
                                 }
                             }
                         }
@@ -599,7 +575,7 @@ class ApiController {
             } catch (Throwable $e) {}
         }
 
-        // 3. Third priority: Query SublinkController buildConfigs
+        // 3. SublinkController buildConfigs fallback
         if (empty($realLinks)) {
             $built = SublinkController::buildConfigs($client);
             if (!empty($built)) {
@@ -612,37 +588,34 @@ class ApiController {
             }
         }
 
-        // 4. Fourth priority: Server template replacement
-        if (empty($realLinks) && !empty($client['server_id'])) {
-            try {
-                $stmtNode = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ?");
-                $stmtNode->execute([(int)$client['server_id']]);
-                $node = $stmtNode->fetch(PDO::FETCH_ASSOC);
-                if ($node && !empty($node['config_template'])) {
-                    $tmpl = trim($node['config_template']);
-                    $lines = preg_split("/\r\n|\n|\r/", $tmpl);
-                    foreach ($lines as $l) {
-                        $l = trim($l);
-                        if (!empty($l)) {
-                            $parsed = str_replace(
-                                ['{uuid}', '{username}', '{remark}'],
-                                [$client['uuid'], $client['username'], ($node['name'] ?? 'Server') . '-' . $client['username']],
-                                $l
-                            );
-                            if (preg_match('/^(vless|vmess|trojan|ss|shadowsocks):\/\//i', $parsed)) {
-                                $realLinks[] = $parsed;
-                            }
+        // 4. Remote node_sublink fallback (guarded against self loop)
+        if (empty($realLinks) && !empty($client['node_sublink'])) {
+            $nodeSub = $client['node_sublink'];
+            if (!str_contains($nodeSub, $_SERVER['HTTP_HOST'] ?? 'vpbotn.ir') && !str_contains($nodeSub, '/sub/' . ($client['sub_token'] ?? ''))) {
+                $ch = curl_init($nodeSub);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 6);
+                curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+                curl_setopt($ch, CURLOPT_USERAGENT, 'v2rayNG/1.8.5');
+                $subContent = curl_exec($ch);
+                curl_close($ch);
+                if (!empty($subContent)) {
+                    $decoded = base64_decode(trim($subContent), true) ?: $subContent;
+                    $lines = preg_split("/\r\n|\n|\r/", $decoded);
+                    foreach ($lines as $line) {
+                        $line = trim($line);
+                        if (preg_match('/^(vless|vmess|trojan|ss|shadowsocks|hysteria2|hy2|tuic|wireguard):\/\//i', $line)) {
+                            $realLinks[] = $line;
                         }
                     }
                 }
-            } catch (Throwable $e) {}
+            }
         }
 
-        // Never return fake dummy connections! If no links found, report clean error:
-        if (empty($realLinks)) {
-            self::jsonError('کانکشنی از سرور دریافت نشد. لطفا از فعال بودن نود و تنظیم اینباندها اطمینان حاصل فرمایید.', 404);
-            return;
-        }
+        // Deduplicate links
+        $realLinks = array_values(array_unique($realLinks));
 
         $serverList = [];
         $idx = 1;
@@ -709,6 +682,24 @@ class ApiController {
                 'is_online' => true
             ];
             $idx++;
+        }
+
+        return $serverList;
+    }
+
+    /**
+     * GET /api/v1/app/configs
+     * Returns Structured Connection Nodes + Raw Base64 Sublink
+     */
+    public function appConfigs(): void {
+        $client = self::authenticateClientApp();
+        $pdo = Database::getConnection();
+
+        $serverList = self::extractServerList($client, $pdo);
+
+        if (empty($serverList)) {
+            self::jsonError('کانکشنی از سرور دریافت نشد. لطفا از فعال بودن نود و تنظیم اینباندها اطمینان حاصل فرمایید.', 404);
+            return;
         }
 
         $rawSublink = base64_encode(implode("\n", array_column($serverList, 'config_uri')));

@@ -245,6 +245,30 @@ if ($hasConfig) {
             exit;
         }
 
+        // Auto-fix any clients whose node_sublink is invalid or empty
+        try {
+            $clientsToFix = $pdo->query("SELECT * FROM clients WHERE status = 'active'")->fetchAll(PDO::FETCH_ASSOC);
+            $fixedClients = 0;
+            foreach ($clientsToFix as $cl) {
+                if (empty($cl['node_sublink']) || str_contains($cl['node_sublink'], '/sub/' . $cl['sub_token'])) {
+                    if (!empty($cl['server_id'])) {
+                        $srv = $pdo->query("SELECT * FROM server_nodes WHERE id = " . (int)$cl['server_id'])->fetch(PDO::FETCH_ASSOC);
+                        if ($srv && $srv['driver'] !== 'mock') {
+                            $drv = DriverFactory::create($srv);
+                            $lUser = $drv->getUser($cl['username']);
+                            if ($lUser && !empty($lUser['subscription_url'])) {
+                                $pdo->prepare("UPDATE clients SET node_sublink = ? WHERE id = ?")->execute([$lUser['subscription_url'], $cl['id']]);
+                                $fixedClients++;
+                            }
+                        }
+                    }
+                }
+            }
+            if ($fixedClients > 0) {
+                $adminMsg .= " [تعداد {$fixedClients} کلاینت با ساب‌لینک مستقیم سرور همگام شدند.]";
+            }
+        } catch (Throwable $e) {}
+
         $stepResults['db'] = [
             'status' => true, 
             'msg' => "ارتباط با پایگاه داده برقراره و تعداد {$tableCount} جدول تایید شد. {$adminMsg}"

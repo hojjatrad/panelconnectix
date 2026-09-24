@@ -37,10 +37,18 @@ class ApiService {
         await prefs.setString('auth_token', data['data']['auth_token'] ?? '');
         await prefs.setString('saved_username', username);
         await prefs.setString('saved_password', password);
+
+        List<ServerModel> initialServers = [];
+        if (data['data']['servers'] != null && data['data']['servers'] is List) {
+          final List sList = data['data']['servers'];
+          initialServers = sList.map((e) => ServerModel.fromJson(e)).toList();
+        }
+
         return {
           'success': true,
           'client': ClientModel.fromJson(data['data']['client']),
           'branding': BrandingModel.fromJson(data['data']['branding']),
+          'servers': initialServers,
         };
       } else {
         return {

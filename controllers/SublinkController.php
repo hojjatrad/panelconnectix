@@ -110,8 +110,13 @@ class SublinkController {
         // 5. Update last connected timestamp
         $pdo->prepare("UPDATE clients SET last_connected_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$client['id']]);
 
-        // 5.5 Auto-upgrade / resolve node_sublink if empty
-        if (empty($client['node_sublink'])) {
+        // 5.5 Auto-upgrade / resolve node_sublink if empty or points to local panel
+        $localSubBase = Helpers::subUrl($client['sub_token']);
+        $needsNodeResolve = empty($client['node_sublink']) || 
+                            $client['node_sublink'] === $localSubBase || 
+                            str_contains($client['node_sublink'], '/sub/' . $client['sub_token']);
+
+        if ($needsNodeResolve) {
             $realServer = null;
             if (!empty($client['server_id'])) {
                 $stmtSrv = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ? AND is_active = 1 AND driver != 'mock'");
@@ -127,13 +132,14 @@ class SublinkController {
                     $live = $driver->getUser($client['username']);
                     if ($live && !empty($live['subscription_url'])) {
                         $client['node_sublink'] = $live['subscription_url'];
-                        $pdo->prepare("UPDATE clients SET node_sublink = ? WHERE id = ?")
-                            ->execute([$live['subscription_url'], $client['id']]);
+                        $client['server_id'] = $realServer['id'];
+                        $pdo->prepare("UPDATE clients SET server_id = ?, node_sublink = ? WHERE id = ?")
+                            ->execute([$realServer['id'], $live['subscription_url'], $client['id']]);
                     } else {
                         $driverPayload = [
                             'username' => $client['username'],
-                            'password' => $client['password'],
-                            'uuid' => $client['uuid'],
+                            'password' => $client['password'] ?: '123456',
+                            'uuid' => $client['uuid'] ?: Helpers::generateUUID(),
                             'sub_token' => $client['sub_token'],
                             'traffic_limit_bytes' => (int)$client['traffic_limit_bytes'],
                             'expire_timestamp' => !empty($client['expire_at']) ? strtotime($client['expire_at']) : (time() + 30 * 86400)
@@ -151,41 +157,9 @@ class SublinkController {
             }
         }
 
-        // 6. Direct Proxy / Redirect from Real Node Sublink if present
-        if (!empty($client['node_sublink'])) {
-            if ($isApp && !isset($_GET['web'])) {
-                header('Location: ' . $client['node_sublink'], true, 302);
-                exit;
-            }
-
-            $ch = curl_init($client['node_sublink']);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 8);
-            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-            curl_setopt($ch, CURLOPT_USERAGENT, $_SERVER['HTTP_USER_AGENT'] ?? 'v2rayNG/1.8.5');
-            $sub = curl_exec($ch);
-            $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
-
-            if ($code >= 200 && $code < 400 && !empty($sub)) {
-                $decoded = base64_decode(trim($sub), true) ?: $sub;
-                $lines = array_filter(array_map('trim', explode("\n", $decoded)));
-                $out = [];
-                foreach ($lines as $i => $l) {
-                    if (str_starts_with($l, 'vless://') || str_starts_with($l, 'vmess://') || str_starts_with($l, 'trojan://') || str_starts_with($l, 'ss://')) {
-                        $out['sub_link_' . ($i + 1)] = $l;
-                    }
-                }
-                if (!empty($out)) {
-                    $this->renderWebLanding($client, $out);
-                    exit;
-                }
-            }
-        }
-
-        // 7. Generate Connection Configs with Operator-Specific Routing
+        // 6. Generate and Deliver Real Connection Configs directly
+        // We deliver raw subscription directly to VPN clients (no 302 redirects)
+        // to prevent client-side redirect drops, loopback blocks, and ISP port 8000 filtering.
         $configs = self::buildConfigs($client);
 
         if ($isApp && !isset($_GET['web'])) {
@@ -201,7 +175,16 @@ class SublinkController {
         $username = $client['username'] ?? 'user';
         $brand = !empty($client['brand_name']) ? preg_replace('/[^\p{L}\p{N}_-]/u', '', str_replace(' ', '_', $client['brand_name'])) : 'Connectix';
 
-        // 1. Check if server node has custom config_template
+        // 1. Ensure client is bound to an active real server node
+        if (empty($client['server_id'])) {
+            $bestServer = Provisioner::findBestServer('default', $pdo);
+            if ($bestServer && $bestServer['driver'] !== 'mock') {
+                $client['server_id'] = (int)$bestServer['id'];
+                $pdo->prepare("UPDATE clients SET server_id = ? WHERE id = ?")->execute([$client['server_id'], $client['id']]);
+            }
+        }
+
+        // 2. Check if server node has custom config_template
         if (!empty($client['server_id'])) {
             try {
                 $stmtNode = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ?");
@@ -224,7 +207,7 @@ class SublinkController {
             } catch (Throwable $e) {}
         }
 
-        // 2. If client is on a real node (Marzban / Pasargad / 3x-ui), fetch real links directly from the remote node
+        // 3. Query Server Driver directly (Marzban / Pasargad / 3x-ui)
         if (!empty($client['server_id'])) {
             try {
                 $stmtNode = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ?");
@@ -233,6 +216,31 @@ class SublinkController {
                 if ($node && $node['driver'] !== 'mock') {
                     $driver = DriverFactory::create($node);
                     $liveUser = $driver->getUser($client['username']);
+
+                    // If user does not exist on remote node, create them now
+                    if (!$liveUser) {
+                        $driverPayload = [
+                            'username' => $client['username'],
+                            'password' => $client['password'] ?: '123456',
+                            'uuid' => $client['uuid'] ?: Helpers::generateUUID(),
+                            'sub_token' => $client['sub_token'],
+                            'traffic_limit_bytes' => (int)($client['traffic_limit_bytes'] ?? 0),
+                            'expire_timestamp' => !empty($client['expire_at']) ? strtotime($client['expire_at']) : (time() + 30 * 86400)
+                        ];
+                        $createRes = $driver->createUser($driverPayload);
+                        if ($createRes['success']) {
+                            $liveUser = $driver->getUser($client['username']);
+                            if (!empty($createRes['links'])) {
+                                $out = [];
+                                foreach ($createRes['links'] as $i => $l) {
+                                    $out['node_link_' . ($i + 1)] = $l;
+                                }
+                                if (!empty($out)) return $out;
+                            }
+                        }
+                    }
+
+                    // Extract all active links directly from remote node response
                     if (!empty($liveUser['links']) && is_array($liveUser['links'])) {
                         $out = [];
                         foreach ($liveUser['links'] as $i => $l) {
@@ -240,53 +248,66 @@ class SublinkController {
                         }
                         if (!empty($out)) return $out;
                     }
+
+                    // If links empty but subscription_url is present, fetch and parse configs
                     if (!empty($liveUser['subscription_url'])) {
-                        $ch = curl_init($liveUser['subscription_url']);
-                        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                        curl_setopt($ch, CURLOPT_TIMEOUT, 6);
-                        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-                        $sub = curl_exec($ch);
-                        curl_close($ch);
-                        if (!empty($sub)) {
-                            $decoded = base64_decode(trim($sub), true) ?: $sub;
-                            $lines = array_filter(array_map('trim', explode("\n", $decoded)));
-                            $out = [];
-                            foreach ($lines as $i => $l) {
-                                if (str_starts_with($l, 'vless://') || str_starts_with($l, 'vmess://') || str_starts_with($l, 'trojan://') || str_starts_with($l, 'ss://')) {
-                                    $out['sub_link_' . ($i + 1)] = $l;
+                        $subUrl = $liveUser['subscription_url'];
+                        if (!str_contains($subUrl, $_SERVER['HTTP_HOST'] ?? 'vpbotn.ir') && !str_contains($subUrl, '/sub/' . ($client['sub_token'] ?? ''))) {
+                            $ch = curl_init($subUrl);
+                            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                            curl_setopt($ch, CURLOPT_TIMEOUT, 6);
+                            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+                            curl_setopt($ch, CURLOPT_USERAGENT, 'v2rayNG/1.8.5');
+                            $sub = curl_exec($ch);
+                            curl_close($ch);
+                            if (!empty($sub)) {
+                                $decoded = base64_decode(trim($sub), true) ?: $sub;
+                                $lines = array_filter(array_map('trim', explode("\n", $decoded)));
+                                $out = [];
+                                foreach ($lines as $i => $l) {
+                                    if (preg_match('/^(vless|vmess|trojan|ss|shadowsocks|hysteria2|hy2|tuic|wireguard):\/\//i', $l)) {
+                                        $out['sub_link_' . ($i + 1)] = $l;
+                                    }
                                 }
+                                if (!empty($out)) return $out;
                             }
-                            if (!empty($out)) return $out;
                         }
                     }
                 }
             } catch (Throwable $e) {}
         }
 
-        // 3. Fallback: If client has node_sublink, fetch configs from it
+        // 4. Fallback: Query remote node_sublink if not self-referential
         if (!empty($client['node_sublink'])) {
-            try {
-                $ch = curl_init($client['node_sublink']);
-                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($ch, CURLOPT_TIMEOUT, 6);
-                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-                $sub = curl_exec($ch);
-                curl_close($ch);
-                if (!empty($sub)) {
-                    $decoded = base64_decode(trim($sub), true) ?: $sub;
-                    $lines = array_filter(array_map('trim', explode("\n", $decoded)));
-                    $out = [];
-                    foreach ($lines as $i => $l) {
-                        if (str_starts_with($l, 'vless://') || str_starts_with($l, 'vmess://') || str_starts_with($l, 'trojan://') || str_starts_with($l, 'ss://')) {
-                            $out['sub_link_' . ($i + 1)] = $l;
+            $nodeSub = $client['node_sublink'];
+            if (!str_contains($nodeSub, $_SERVER['HTTP_HOST'] ?? 'vpbotn.ir') && !str_contains($nodeSub, '/sub/' . ($client['sub_token'] ?? ''))) {
+                try {
+                    $ch = curl_init($nodeSub);
+                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                    curl_setopt($ch, CURLOPT_TIMEOUT, 6);
+                    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+                    curl_setopt($ch, CURLOPT_USERAGENT, 'v2rayNG/1.8.5');
+                    $sub = curl_exec($ch);
+                    curl_close($ch);
+                    if (!empty($sub)) {
+                        $decoded = base64_decode(trim($sub), true) ?: $sub;
+                        $lines = array_filter(array_map('trim', explode("\n", $decoded)));
+                        $out = [];
+                        foreach ($lines as $i => $l) {
+                            if (preg_match('/^(vless|vmess|trojan|ss|shadowsocks|hysteria2|hy2|tuic|wireguard):\/\//i', $l)) {
+                                $out['sub_link_' . ($i + 1)] = $l;
+                            }
                         }
+                        if (!empty($out)) return $out;
                     }
-                    if (!empty($out)) return $out;
-                }
-            } catch (Throwable $e) {}
+                } catch (Throwable $e) {}
+            }
         }
 
-        // Return empty if no real configs from node (no fake fallbacks)
         return [];
     }
 

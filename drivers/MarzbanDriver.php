@@ -386,7 +386,7 @@ class MarzbanDriver implements PanelDriverInterface {
                     $updPayload = ['inbounds' => $allInbounds];
                     $proxies = $u['proxies'] ?? [];
                     if (empty($proxies)) {
-                        $uuid = $u['username'] ?? Helpers::generateUUID();
+                        $uuid = (!empty($u['proxies']['vless']['id'])) ? $u['proxies']['vless']['id'] : Helpers::generateUUID();
                         $updPayload['proxies'] = [
                             'vless' => ['id' => $uuid],
                             'vmess' => ['id' => $uuid],

@@ -12,11 +12,13 @@ import 'server_list_modal.dart';
 class DashboardScreen extends StatefulWidget {
   final ClientModel client;
   final BrandingModel branding;
+  final List<ServerModel>? initialServers;
 
   const DashboardScreen({
     Key? key,
     required this.client,
     required this.branding,
+    this.initialServers,
   }) : super(key: key);
 
   @override
@@ -45,6 +47,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   void initState() {
     super.initState();
     _client = widget.client;
+    if (widget.initialServers != null && widget.initialServers!.isNotEmpty) {
+      _servers = widget.initialServers!;
+      _selectedServer = _servers.first;
+    }
     _initV2Ray();
     _loadServers();
     _refreshProfile();
@@ -680,9 +686,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               // Server Selector Card
               InkWell(
                 onTap: () async {
-                  if (_servers.isEmpty) {
-                    _manualRefresh();
-                    return;
+                  if (_servers.isEmpty && !_isRefreshing) {
+                    _loadServers();
                   }
                   final selected = await showModalBottomSheet<ServerModel>(
                     context: context,

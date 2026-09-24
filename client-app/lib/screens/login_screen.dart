@@ -132,6 +132,7 @@ class _LoginScreenState extends State<LoginScreen> {
           builder: (_) => DashboardScreen(
             client: res['client'],
             branding: res['branding'],
+            initialServers: res['servers'] is List<ServerModel> ? res['servers'] : null,
           ),
         ),
       );

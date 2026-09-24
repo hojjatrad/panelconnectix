@@ -65,39 +65,72 @@ class TelegramBotController {
      * If not stored, it queries the live node, updates the database, and returns the real link.
      */
     public static function getClientPrimarySublink(array $client, ?PDO $pdo = null): string {
-        // 1. If client already has a non-empty node_sublink, return it
-        if (!empty($client['node_sublink'])) {
+        $pdo = $pdo ?: Database::getConnection();
+        $subUrlLocal = Helpers::subUrl($client['sub_token'] ?? '');
+
+        // 1. If client already has a valid remote node_sublink (not pointing to our own sub proxy)
+        if (!empty($client['node_sublink']) && 
+            $client['node_sublink'] !== $subUrlLocal && 
+            !str_contains($client['node_sublink'], '/sub/' . ($client['sub_token'] ?? '')) &&
+            !str_contains($client['node_sublink'], $_SERVER['HTTP_HOST'] ?? 'vpbotn.ir')) {
             return $client['node_sublink'];
         }
 
-        // 2. If not stored, but client has a real server_id, fetch live subscription URL directly from node!
-        if (!empty($client['server_id']) && !empty($client['username'])) {
+        // 2. Fetch live subscription URL directly from remote node (Marzban / Pasargad)
+        if (!empty($client['username'])) {
             try {
-                $pdo = $pdo ?: Database::getConnection();
-                $stmtNode = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ?");
-                $stmtNode->execute([(int)$client['server_id']]);
-                $node = $stmtNode->fetch(PDO::FETCH_ASSOC);
+                $node = null;
+                if (!empty($client['server_id'])) {
+                    $stmtNode = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ?");
+                    $stmtNode->execute([(int)$client['server_id']]);
+                    $node = $stmtNode->fetch(PDO::FETCH_ASSOC);
+                }
+                if (!$node) {
+                    $node = Provisioner::findBestServer('default', $pdo);
+                }
+
                 if ($node && $node['driver'] !== 'mock') {
                     $driver = DriverFactory::create($node);
                     $live = $driver->getUser($client['username']);
+
+                    // If user not found on node yet, auto-provision
+                    if (!$live) {
+                        $provRes = $driver->createUser([
+                            'username' => $client['username'],
+                            'password' => $client['password'] ?: '123456',
+                            'uuid' => $client['uuid'] ?: Helpers::generateUUID(),
+                            'sub_token' => $client['sub_token'],
+                            'traffic_limit_bytes' => (int)($client['traffic_limit_bytes'] ?? 0),
+                            'expire_timestamp' => !empty($client['expire_at']) ? strtotime($client['expire_at']) : (time() + 30 * 86400)
+                        ]);
+                        if ($provRes['success']) {
+                            $live = $driver->getUser($client['username']);
+                            if (!empty($provRes['sublink'])) {
+                                $pdo->prepare("UPDATE clients SET server_id = ?, node_sublink = ? WHERE id = ?")
+                                    ->execute([$node['id'], $provRes['sublink'], $client['id']]);
+                                return $provRes['sublink'];
+                            }
+                        }
+                    }
+
                     if ($live && !empty($live['subscription_url'])) {
                         $liveSub = $live['subscription_url'];
-                        $pdo->prepare("UPDATE clients SET node_sublink = ? WHERE id = ?")
-                            ->execute([$liveSub, $client['id']]);
+                        $pdo->prepare("UPDATE clients SET server_id = ?, node_sublink = ? WHERE id = ?")
+                            ->execute([$node['id'], $liveSub, $client['id']]);
                         return $liveSub;
                     }
                     if ($live && !empty($live['links'])) {
                         $firstLink = $live['links'][0];
-                        $pdo->prepare("UPDATE clients SET node_sublink = ? WHERE id = ?")
-                            ->execute([$firstLink, $client['id']]);
+                        $pdo->prepare("UPDATE clients SET server_id = ?, node_sublink = ? WHERE id = ?")
+                            ->execute([$node['id'], $firstLink, $client['id']]);
                         return $firstLink;
                     }
                 }
             } catch (Throwable $e) {}
         }
 
-        // 3. Fallback to Connectix Sublink URL
-        return Helpers::subUrl($client['sub_token'] ?? '');
+        // 3. Fallback to Connectix Sublink Proxy URL
+        return $subUrlLocal;
     }
 
     /**
