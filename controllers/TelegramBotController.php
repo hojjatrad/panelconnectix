@@ -71,8 +71,7 @@ class TelegramBotController {
         // 1. If client already has a valid remote node_sublink (not pointing to our own sub proxy)
         if (!empty($client['node_sublink']) && 
             $client['node_sublink'] !== $subUrlLocal && 
-            !str_contains($client['node_sublink'], '/sub/' . ($client['sub_token'] ?? '')) &&
-            !str_contains($client['node_sublink'], $_SERVER['HTTP_HOST'] ?? 'vpbotn.ir')) {
+            !Helpers::isPanelSubUrl($client['node_sublink'])) {
             return $client['node_sublink'];
         }
 

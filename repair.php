@@ -250,7 +250,7 @@ if ($hasConfig) {
             $clientsToFix = $pdo->query("SELECT * FROM clients WHERE status = 'active'")->fetchAll(PDO::FETCH_ASSOC);
             $fixedClients = 0;
             foreach ($clientsToFix as $cl) {
-                if (empty($cl['node_sublink']) || str_contains($cl['node_sublink'], '/sub/' . $cl['sub_token'])) {
+                if (empty($cl['node_sublink']) || Helpers::isPanelSubUrl($cl['node_sublink'])) {
                     if (!empty($cl['server_id'])) {
                         $srv = $pdo->query("SELECT * FROM server_nodes WHERE id = " . (int)$cl['server_id'])->fetch(PDO::FETCH_ASSOC);
                         if ($srv && $srv['driver'] !== 'mock') {

@@ -18,6 +18,8 @@ class DriverFactory {
             case 'marzban':
                 return new MarzbanDriver($url, $user, $pass, $token, $subDomain);
             case 'pasargad':
+            case 'pasarguard':
+            case 'pasar_guard':
                 return new PasargadDriver($url, $user, $pass, $token, $subDomain);
             case '3xui':
             case 'xui':

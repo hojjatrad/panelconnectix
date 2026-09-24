@@ -549,7 +549,7 @@ class ApiController {
 
                     if (empty($realLinks) && !empty($liveData['subscription_url'])) {
                         $subUrl = $liveData['subscription_url'];
-                        if (!str_contains($subUrl, $_SERVER['HTTP_HOST'] ?? 'vpbotn.ir') && !str_contains($subUrl, '/sub/' . ($client['sub_token'] ?? ''))) {
+                        if (!Helpers::isPanelSubUrl($subUrl)) {
                             $ch = curl_init($subUrl);
                             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
                             curl_setopt($ch, CURLOPT_TIMEOUT, 6);
@@ -591,7 +591,7 @@ class ApiController {
         // 4. Remote node_sublink fallback (guarded against self loop)
         if (empty($realLinks) && !empty($client['node_sublink'])) {
             $nodeSub = $client['node_sublink'];
-            if (!str_contains($nodeSub, $_SERVER['HTTP_HOST'] ?? 'vpbotn.ir') && !str_contains($nodeSub, '/sub/' . ($client['sub_token'] ?? ''))) {
+            if (!Helpers::isPanelSubUrl($nodeSub)) {
                 $ch = curl_init($nodeSub);
                 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
                 curl_setopt($ch, CURLOPT_TIMEOUT, 6);

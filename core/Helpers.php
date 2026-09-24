@@ -48,6 +48,31 @@ class Helpers {
         return self::fullUrl("sub/{$subToken}");
     }
 
+    /**
+     * Check if a given URL is local to this panel rather than a remote node server (e.g. Pasargad, Marzban)
+     */
+    public static function isPanelSubUrl(?string $url): bool {
+        if (empty($url)) return false;
+        $parsed = parse_url($url);
+        $urlHost = strtolower($parsed['host'] ?? '');
+        $currentHost = strtolower($_SERVER['HTTP_HOST'] ?? 'vpbotn.ir');
+
+        $urlHost = explode(':', $urlHost)[0];
+        $currentHost = explode(':', $currentHost)[0];
+
+        // If the URL has a distinct remote host, it is definitely a remote node server!
+        if (!empty($urlHost) && $urlHost !== $currentHost) {
+            return false;
+        }
+
+        $path = $parsed['path'] ?? '';
+        $base = self::basePath();
+        if (!empty($base) && str_contains($path, $base . '/sub/')) {
+            return true;
+        }
+        return str_contains($path, '/contax/sub/') || ($urlHost === $currentHost && str_contains($path, '/sub/'));
+    }
+
     public static function fullFileUrl(string $filename): string {
         $proto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || ($_SERVER['SERVER_PORT'] ?? 80) == 443 || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https') ? 'https://' : 'http://';
         $host = $_SERVER['HTTP_HOST'] ?? 'localhost';

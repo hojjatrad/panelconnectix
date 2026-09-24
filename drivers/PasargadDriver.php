@@ -148,24 +148,21 @@ class PasargadDriver implements PanelDriverInterface {
     public function authenticate(): bool {
         // Strategy A: If token is already present, test with system status
         if (!empty($this->token)) {
-            $res = $this->request('/api/system');
-            if ($res['success']) {
-                $this->isPasarGuard = true;
-                $this->apiPrefix = '/api';
-                $this->lastError = null;
-                return true;
-            }
-            $resLegacy = $this->request('/api/status');
-            if ($resLegacy['success'] || $resLegacy['code'] === 200) {
-                $this->isPasarGuard = false;
-                $this->lastError = null;
-                return true;
+            foreach (['/api/system', '/api/v1/system', '/api/status', '/api/inbounds'] as $testEndpoint) {
+                $res = $this->request($testEndpoint);
+                if ($res['success'] || $res['code'] === 200) {
+                    $this->isPasarGuard = str_contains($testEndpoint, 'system') || str_contains($testEndpoint, 'inbounds');
+                    $this->apiPrefix = str_starts_with($testEndpoint, '/api/v1') ? '/api/v1' : '/api';
+                    $this->lastError = null;
+                    return true;
+                }
             }
         }
 
         // Strategy B: Modern PasarGuard with username & password (OAuth2 Form /api/admin/token)
         if (!empty($this->username) && !empty($this->password)) {
-            foreach (['/api/admin/token', '/api/v1/admin/token'] as $endpoint) {
+            // 1. Try form-urlencoded login endpoints
+            foreach (['/api/admin/token', '/api/v1/admin/token', '/api/admin/login'] as $endpoint) {
                 $res = $this->request($endpoint, 'POST', [
                     'username' => $this->username,
                     'password' => $this->password
@@ -178,15 +175,22 @@ class PasargadDriver implements PanelDriverInterface {
                     $this->lastError = null;
                     return true;
                 }
+            }
 
-                if ($res['code'] === 400 || $res['code'] === 401) {
-                    $detail = $res['data']['detail'] ?? '';
-                    if (stripos($detail, 'Incorrect') !== false || stripos($detail, 'password') !== false) {
-                        $this->lastError = "نام کاربری یا رمز عبور ادمین پاسارگاد اشتباه است.";
-                    } else {
-                        $this->lastError = "خطای احراز هویت پاسارگاد: {$detail}";
-                    }
-                    return false;
+            // 2. Try JSON body login endpoints (FastAPI / Pasargad JSON APIs)
+            foreach (['/api/admin/token', '/api/v1/admin/token', '/api/admin/login', '/api/v1/auth/login', '/api/auth/token'] as $endpoint) {
+                $res = $this->request($endpoint, 'POST', [
+                    'username' => $this->username,
+                    'password' => $this->password
+                ], false);
+
+                $tokenCandidate = $res['data']['access_token'] ?? $res['data']['token'] ?? null;
+                if ($res['success'] && !empty($tokenCandidate)) {
+                    $this->token = $tokenCandidate;
+                    $this->isPasarGuard = true;
+                    $this->apiPrefix = str_starts_with($endpoint, '/api/v1') ? '/api/v1' : '/api';
+                    $this->lastError = null;
+                    return true;
                 }
             }
         }
@@ -368,13 +372,30 @@ class PasargadDriver implements PanelDriverInterface {
             }
 
             $res = $this->request($this->apiPrefix . '/user', 'POST', $body);
+            if (!$res['success']) {
+                $errRaw = is_array($res['data'] ?? '') ? json_encode($res['data'], JSON_UNESCAPED_UNICODE) : (string)($res['data'] ?? '');
+                if ($res['code'] === 409 || stripos($errRaw, 'already') !== false || stripos($errRaw, 'exist') !== false || stripos($errRaw, 'موجود') !== false) {
+                    $live = $this->getUser($payload['username']);
+                    if ($live) {
+                        return [
+                            'success' => true,
+                            'uuid' => $payload['uuid'],
+                            'sublink' => $live['subscription_url'] ?? '',
+                            'links' => $live['links'] ?? [],
+                            'vless_link' => $live['links'][0] ?? '',
+                            'error' => null
+                        ];
+                    }
+                }
+            }
+
             if ($res['success']) {
                 $data = $res['data'] ?? [];
 
                 // Fetch fresh user profile from node to ensure server core has resolved all links & sublink
                 $live = $this->getUser($payload['username']);
-                if ($live) {
-                    $subUrl = $live['subscription_url'] ?? '';
+                if ($live && !empty($live['subscription_url'])) {
+                    $subUrl = $live['subscription_url'];
                     $links = $live['links'] ?? [];
                 } else {
                     $subUrl = $data['subscription_url'] 
@@ -486,13 +507,38 @@ class PasargadDriver implements PanelDriverInterface {
 
                 $expireVal = self::formatExpireDate($u['expire'] ?? null);
 
+                $links = $u['links'] ?? [];
+
+                // If user links are empty in PasarGuard API response, fetch configs from the subscription URL directly!
+                if (empty($links) && !empty($subUrl) && !Helpers::isPanelSubUrl($subUrl)) {
+                    $ch = curl_init($subUrl);
+                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                    curl_setopt($ch, CURLOPT_TIMEOUT, 6);
+                    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+                    curl_setopt($ch, CURLOPT_USERAGENT, 'v2rayNG/1.8.5');
+                    $subContent = curl_exec($ch);
+                    curl_close($ch);
+                    if (!empty($subContent)) {
+                        $decoded = base64_decode(trim($subContent), true) ?: $subContent;
+                        $lines = preg_split("/\r\n|\n|\r/", $decoded);
+                        foreach ($lines as $l) {
+                            $l = trim($l);
+                            if (preg_match('/^(vless|vmess|trojan|ss|shadowsocks|hysteria2|hy2|tuic|wireguard):\/\//i', $l)) {
+                                $links[] = $l;
+                            }
+                        }
+                    }
+                }
+
                 return [
                     'traffic_used_bytes' => $u['used_traffic'] ?? $u['traffic_used'] ?? 0,
                     'traffic_limit_bytes' => $u['data_limit'] ?? $u['total_traffic'] ?? 0,
                     'expire_at' => $expireVal,
                     'status' => $u['status'] ?? 'active',
                     'online' => ($u['online_at'] ?? 0) > (time() - 300),
-                    'links' => $u['links'] ?? [],
+                    'links' => $links,
                     'subscription_url' => $subUrl
                 ];
             }
@@ -510,13 +556,37 @@ class PasargadDriver implements PanelDriverInterface {
 
                 $expireVal = self::formatExpireDate($u['expire_time'] ?? null);
 
+                $links = $u['links'] ?? [];
+
+                if (empty($links) && !empty($subUrl) && !Helpers::isPanelSubUrl($subUrl)) {
+                    $ch = curl_init($subUrl);
+                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                    curl_setopt($ch, CURLOPT_TIMEOUT, 6);
+                    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+                    curl_setopt($ch, CURLOPT_USERAGENT, 'v2rayNG/1.8.5');
+                    $subContent = curl_exec($ch);
+                    curl_close($ch);
+                    if (!empty($subContent)) {
+                        $decoded = base64_decode(trim($subContent), true) ?: $subContent;
+                        $lines = preg_split("/\r\n|\n|\r/", $decoded);
+                        foreach ($lines as $l) {
+                            $l = trim($l);
+                            if (preg_match('/^(vless|vmess|trojan|ss|shadowsocks|hysteria2|hy2|tuic|wireguard):\/\//i', $l)) {
+                                $links[] = $l;
+                            }
+                        }
+                    }
+                }
+
                 return [
                     'traffic_used_bytes' => $u['used_traffic'] ?? 0,
                     'traffic_limit_bytes' => $u['total_traffic'] ?? 0,
                     'expire_at' => $expireVal,
                     'status' => $u['status'] ?? 'active',
                     'online' => !empty($u['is_online']),
-                    'links' => $u['links'] ?? [],
+                    'links' => $links,
                     'subscription_url' => $subUrl
                 ];
             }

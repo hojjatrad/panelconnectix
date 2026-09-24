@@ -114,7 +114,7 @@ class SublinkController {
         $localSubBase = Helpers::subUrl($client['sub_token']);
         $needsNodeResolve = empty($client['node_sublink']) || 
                             $client['node_sublink'] === $localSubBase || 
-                            str_contains($client['node_sublink'], '/sub/' . $client['sub_token']);
+                            Helpers::isPanelSubUrl($client['node_sublink']);
 
         if ($needsNodeResolve) {
             $realServer = null;
@@ -252,7 +252,7 @@ class SublinkController {
                     // If links empty but subscription_url is present, fetch and parse configs
                     if (!empty($liveUser['subscription_url'])) {
                         $subUrl = $liveUser['subscription_url'];
-                        if (!str_contains($subUrl, $_SERVER['HTTP_HOST'] ?? 'vpbotn.ir') && !str_contains($subUrl, '/sub/' . ($client['sub_token'] ?? ''))) {
+                        if (!Helpers::isPanelSubUrl($subUrl)) {
                             $ch = curl_init($subUrl);
                             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
                             curl_setopt($ch, CURLOPT_TIMEOUT, 6);
@@ -282,7 +282,7 @@ class SublinkController {
         // 4. Fallback: Query remote node_sublink if not self-referential
         if (!empty($client['node_sublink'])) {
             $nodeSub = $client['node_sublink'];
-            if (!str_contains($nodeSub, $_SERVER['HTTP_HOST'] ?? 'vpbotn.ir') && !str_contains($nodeSub, '/sub/' . ($client['sub_token'] ?? ''))) {
+            if (!Helpers::isPanelSubUrl($nodeSub)) {
                 try {
                     $ch = curl_init($nodeSub);
                     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
