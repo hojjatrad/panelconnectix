@@ -17,6 +17,15 @@ $zipUrls = [
     "https://api.github.com/repos/{$repo}/zipball/main"
 ];
 
+$token = '';
+if (file_exists(__DIR__ . '/data/panel.sqlite')) {
+    try {
+        $db = new PDO('sqlite:' . __DIR__ . '/data/panel.sqlite');
+        $s = $db->query("SELECT setting_value FROM system_settings WHERE setting_key = 'github_token'")->fetchColumn();
+        if (!empty($s)) $token = trim($s);
+    } catch (Throwable $e) {}
+}
+
 $zipData = false;
 $usedUrl = '';
 
@@ -27,7 +36,11 @@ foreach ($zipUrls as $url) {
     curl_setopt($ch, CURLOPT_TIMEOUT, 60);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, ['User-Agent: Connectix-Updater']);
+    $headers = ['User-Agent: Connectix-Updater'];
+    if (!empty($token) && str_contains($url, 'api.github.com')) {
+        $headers[] = 'Authorization: token ' . $token;
+    }
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
     $data = curl_exec($ch);
     $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
