@@ -4,18 +4,20 @@
  */
 
 ini_set('display_errors', '1');
-ini_set('display_startup_errors', '1');
 error_reporting(E_ALL);
 
 header('Content-Type: text/html; charset=utf-8');
 
-try {
-    if (!defined('CONNECTIX_REPAIR')) {
-        define('CONNECTIX_REPAIR', true);
-    }
-    require_once __DIR__ . '/config.php';
-    require_once __DIR__ . '/core/Database.php';
+define('CONNECTIX_REPAIR', true);
 
+$configPath = __DIR__ . '/config.php';
+if (!file_exists($configPath)) {
+    die("config.php not found");
+}
+require_once $configPath;
+require_once __DIR__ . '/core/Database.php';
+
+try {
     $pdo = Database::getConnection();
     $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
 
@@ -43,13 +45,12 @@ try {
     $deletedCounts = [];
     foreach ($wipeTables as $tbl) {
         try {
-            $count = (int)$pdo->query("SELECT COUNT(*) FROM `{$tbl}`")->fetchColumn();
-            $pdo->exec("DELETE FROM `{$tbl}`");
-            if ($driver === 'mysql') {
-                $pdo->exec("ALTER TABLE `{$tbl}` AUTO_INCREMENT = 1");
-            }
-            $deletedCounts[$tbl] = $count;
-        } catch (Throwable $ex) {}
+            $cnt = (int)$pdo->query("SELECT COUNT(*) FROM {$tbl}")->fetchColumn();
+            $pdo->exec("DELETE FROM {$tbl}");
+            $deletedCounts[$tbl] = $cnt;
+        } catch (Throwable $e) {
+            $deletedCounts[$tbl] = 0;
+        }
     }
 
     if ($driver === 'mysql') {
@@ -58,19 +59,21 @@ try {
         $pdo->exec("PRAGMA foreign_keys = ON;");
     }
 
-    // Ensure Admin Account Exists
-    $adminUser = $pdo->query("SELECT id, username FROM users WHERE role = 'admin' LIMIT 1")->fetch();
-    if (!$adminUser) {
-        $adminPass = password_hash('admin123', PASSWORD_BCRYPT);
-        $pdo->exec("INSERT INTO users (username, password_hash, role, full_name, email, wallet_balance, api_token) 
-                    VALUES ('admin', '{$adminPass}', 'admin', 'مدیر کل سیستم', 'admin@connectix.local', 0, 'admin_secret_123')");
-    }
+    // Ensure Admin User Exists
+    try {
+        $adminUser = $pdo->query("SELECT id, username FROM users WHERE role = 'admin' LIMIT 1")->fetch();
+        if (!$adminUser) {
+            $adminPass = password_hash('admin123', PASSWORD_BCRYPT);
+            $pdo->exec("INSERT INTO users (username, password_hash, role, full_name, email, wallet_balance, api_token) 
+                        VALUES ('admin', '{$adminPass}', 'admin', 'مدیر کل سیستم', 'admin@connectix.local', 0, 'admin_secret_123')");
+        }
+    } catch (Throwable $e) {}
 
     if (function_exists('opcache_reset')) @opcache_reset();
     if (function_exists('clearstatcache')) @clearstatcache(true);
 
 } catch (Throwable $e) {
-    die("<div style='font-family:sans-serif;direction:rtl;padding:40px;color:#ef4444;'><h2>خطا در خام‌سازی:</h2><p>" . htmlspecialchars($e->getMessage()) . "</p><pre>" . htmlspecialchars($e->getTraceAsString()) . "</pre></div>");
+    die("<div style='font-family:sans-serif;direction:rtl;padding:40px;color:#ef4444;'><h2>خطا:</h2><p>" . htmlspecialchars($e->getMessage()) . "</p></div>");
 }
 ?>
 <!DOCTYPE html>
@@ -101,7 +104,7 @@ try {
         <div class="bg-slate-950/80 border border-slate-800/80 rounded-2xl p-4 text-xs text-right space-y-2">
             <div class="text-[11px] font-bold text-slate-400 border-b border-slate-800 pb-1.5 flex items-center justify-between">
                 <span>📋 گزارش حذف جداول:</span>
-                <span class="text-purple-400 font-mono">DB: <?= strtoupper($driver) ?></span>
+                <span class="text-purple-400 font-mono">DB: <?= strtoupper($driver ?? 'SQL') ?></span>
             </div>
             <div class="grid grid-cols-2 gap-2 text-[11px]">
                 <div class="bg-slate-900/90 p-2 rounded-xl flex items-center justify-between">
