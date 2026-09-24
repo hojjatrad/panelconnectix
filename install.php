@@ -5,6 +5,17 @@
  * Language: Persian (Farsi) - RTL
  */
 
+if (isset($_GET['check_index_file'])) {
+    header('Content-Type: application/json; charset=utf-8');
+    $idx = file_get_contents(__DIR__ . '/index.php');
+    echo json_encode([
+        'has_v2' => str_contains($idx, 'ApiControllerV2'),
+        'configs_line' => array_values(array_filter(explode("\n", $idx), fn($l) => str_contains($l, 'app/configs'))),
+        'size' => strlen($idx)
+    ], JSON_PRETTY_PRINT);
+    exit;
+}
+
 if (isset($_GET['test_v2'])) {
     header('Content-Type: application/json; charset=utf-8');
     require_once __DIR__ . '/config.php';
