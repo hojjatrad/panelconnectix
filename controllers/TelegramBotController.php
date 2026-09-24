@@ -3389,10 +3389,10 @@ class TelegramBotController {
     public function setWebhookAction(): void {
         Auth::requireAdmin();
         $webhookUrl = Helpers::fullFileUrl('webhook.php');
-        $res = TelegramBot::setWebhook($webhookUrl);
+        $res = TelegramBot::setWebhook($webhookUrl, null, true);
 
         if (isset($res['ok']) && $res['ok'] === true) {
-            Helpers::flash('success', "وبهوک تلگرام با موفقیت تنظیم شد: {$webhookUrl}");
+            Helpers::flash('success', "وبهوک تلگرام با موفقیت تنظیم و صف پیام‌های معلق پاکسازی شد: {$webhookUrl}");
         } else {
             $desc = $res['description'] ?? 'خطای نامشخص در ارتباط با تلگرام';
             Helpers::flash('error', "خطا در تنظیم وبهوک: {$desc}");
