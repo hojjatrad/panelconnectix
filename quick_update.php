@@ -70,6 +70,7 @@ $sourceDir = (!empty($subDirs) && is_dir($subDirs[0])) ? $subDirs[0] : $tmpExt;
 
 $folders = ['controllers', 'core', 'drivers', 'views', 'cron'];
 $copiedFiles = 0;
+$copyLog = [];
 
 foreach ($folders as $f) {
     $srcF = $sourceDir . '/' . $f;
@@ -88,9 +89,11 @@ foreach ($folders as $f) {
                 if (!is_dir(dirname($target))) @mkdir(dirname($target), 0755, true);
                 $fc = @file_get_contents($item->getPathname());
                 if ($fc !== false && strlen($fc) > 0) {
-                    @file_put_contents($target, $fc);
+                    $ok = @file_put_contents($target, $fc);
+                    $copyLog[] = $iter->getSubPathname() . ($ok ? ': OK' : ': FAIL');
                 } else {
-                    @copy($item->getPathname(), $target);
+                    $ok = @copy($item->getPathname(), $target);
+                    $copyLog[] = $iter->getSubPathname() . ($ok ? ': OK(copy)' : ': FAIL(copy)');
                 }
                 @chmod($target, 0644);
                 $copiedFiles++;
@@ -103,7 +106,8 @@ foreach (['index.php', 'repair.php', 'install.php', 'schema.sql', 'purge_all.php
     if (file_exists($sourceDir . '/' . $rootFile)) {
         $data = file_get_contents($sourceDir . '/' . $rootFile);
         if ($data !== false && strlen($data) > 0) {
-            @file_put_contents(__DIR__ . '/' . $rootFile, $data);
+            $ok = @file_put_contents(__DIR__ . '/' . $rootFile, $data);
+            $copyLog[] = $rootFile . ($ok ? ': OK' : ': FAIL');
             @chmod(__DIR__ . '/' . $rootFile, 0644);
             $copiedFiles++;
         }
@@ -126,30 +130,13 @@ if (function_exists('clearstatcache')) {
     <meta charset="UTF-8">
     <title>ارتقا و به‌روزرسانی پنل | Connectix</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;600;700;800;900&display=swap');
-        * { font-family: 'Vazirmatn', sans-serif; }
-    </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center p-4">
-    <div class="max-w-md w-full bg-slate-900 border border-slate-800 rounded-3xl p-6 text-center space-y-4 shadow-2xl">
-        <div class="w-16 h-16 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 mx-auto flex items-center justify-center text-3xl shadow-xl">
-            <i class="fa-solid fa-circle-check"></i>
-        </div>
-        <h1 class="text-lg font-bold text-white">سامانه با موفقیت به آخرین نسخه ارتقا یافت!</h1>
-        <p class="text-xs text-slate-400 leading-relaxed">
-            تعداد <strong class="text-emerald-400"><?= $copiedFiles ?></strong> فایل سیستمی مستقیماً از گیت‌هاب جایگزین و بروزرسانی شد.
-            باگ تاریخ انقضای پاسارگاد و مکانیزم تحویل مستقیم ساب‌لینک فعال گردید.
-        </p>
-        <div class="pt-3 space-y-2">
-            <a href="login" class="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs transition block shadow-lg">
-                ورود به پنل مدیریت
-            </a>
-            <a href="repair.php" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-xs transition block border border-slate-700">
-                بررسی وضعیت سلامت سیستم (repair.php)
-            </a>
-        </div>
+<body class="bg-slate-950 text-slate-100 p-8">
+    <div class="max-w-xl mx-auto bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4">
+        <h1 class="text-lg font-bold text-emerald-400">فایل‌های ارتقا یافته: <?= $copiedFiles ?></h1>
+        <div class="text-xs text-slate-300">ApiController MD5: <?= md5_file(__DIR__ . '/controllers/ApiController.php') ?></div>
+        <pre class="bg-black/60 p-4 rounded-xl text-[10px] text-slate-400 max-h-60 overflow-y-auto"><?= htmlspecialchars(implode("\n", $copyLog)) ?></pre>
+        <a href="repair.php" class="inline-block px-4 py-2 bg-purple-600 text-white rounded-xl text-xs font-bold">بررسی سلامت</a>
     </div>
 </body>
 </html>
