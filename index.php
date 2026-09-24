@@ -16,6 +16,16 @@ if (str_ends_with($requestPath, 'repair.php') || str_ends_with($requestPath, '/r
     exit;
 }
 
+if (str_ends_with($requestPath, 'purge_all.php') || str_ends_with($requestPath, '/purge_all') || $routeParam === 'purge_all.php' || $routeParam === 'purge_all') {
+    require_once __DIR__ . '/purge_all.php';
+    exit;
+}
+
+if (str_ends_with($requestPath, 'quick_update.php') || str_ends_with($requestPath, '/quick_update') || $routeParam === 'quick_update.php' || $routeParam === 'quick_update') {
+    require_once __DIR__ . '/quick_update.php';
+    exit;
+}
+
 // Intercept Telegram Webhook on ANY variation
 if (str_ends_with($requestPath, 'webhook.php') || str_ends_with($requestPath, '/webhook') 
     || $routeParam === 'webhook.php' || $routeParam === 'webhook' || $routeParam === 'telegram/webhook') {
