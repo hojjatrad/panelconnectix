@@ -176,14 +176,15 @@ class PlanController {
 
         $id = (int)($_POST['id'] ?? 0);
         $pdo = Database::getConnection();
-        $clientCount = (int)$pdo->query("SELECT COUNT(*) FROM clients WHERE plan_id = $id")->fetchColumn();
-        if ($clientCount > 0) {
-            Helpers::flash('error', "این پلن دارای {$clientCount} مشترک فعال است و قابل حذف نیست. می‌توانید وضعیت آن را غیرفعال کنید.");
-            Helpers::redirect('plans');
-        }
+
+        // Safely detach clients, orders, and reseller mappings before plan deletion
+        $pdo->prepare("UPDATE clients SET plan_id = NULL WHERE plan_id = ?")->execute([$id]);
+        $pdo->prepare("UPDATE bot_orders SET plan_id = NULL WHERE plan_id = ?")->execute([$id]);
+        $pdo->prepare("DELETE FROM reseller_plans WHERE plan_id = ?")->execute([$id]);
+        $pdo->prepare("DELETE FROM reserved_plans WHERE plan_id = ?")->execute([$id]);
 
         $pdo->prepare("DELETE FROM plans WHERE id = ?")->execute([$id]);
-        Helpers::flash('success', 'پلن مورد نظر با موفقیت حذف شد.');
+        Helpers::flash('success', 'پلن مورد نظر با موفقیت حذف گردید.');
         Helpers::redirect('plans');
     }
 }

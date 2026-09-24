@@ -194,15 +194,13 @@ class ServerController {
         $id = (int)($_POST['id'] ?? 0);
         $pdo = Database::getConnection();
 
-        // Check if clients exist on this server
-        $count = $pdo->query("SELECT COUNT(*) FROM clients WHERE server_id = $id")->fetchColumn();
-        if ($count > 0) {
-            Helpers::flash('error', "این سرور دارای {$count} کلاینت فعال است و امکان حذف مستقیم آن وجود ندارد. ابتدا کلاینت‌ها را منتقل یا حذف کنید.");
-            Helpers::redirect('servers');
-        }
+        // Safely detach clients and plans before server deletion
+        $pdo->prepare("UPDATE clients SET server_id = NULL WHERE server_id = ?")->execute([$id]);
+        $pdo->prepare("UPDATE plans SET server_id = NULL WHERE server_id = ?")->execute([$id]);
+        $pdo->prepare("UPDATE bot_orders SET server_id = NULL WHERE server_id = ?")->execute([$id]);
 
         $pdo->prepare("DELETE FROM server_nodes WHERE id = ?")->execute([$id]);
-        Helpers::flash('success', 'سرور با موفقیت حذف شد.');
+        Helpers::flash('success', 'سرور با موفقیت حذف گردید.');
         Helpers::redirect('servers');
     }
 

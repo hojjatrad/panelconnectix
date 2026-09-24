@@ -665,62 +665,8 @@ SQL;
         $stmt = $pdo->prepare("INSERT OR IGNORE INTO users (id, username, password_hash, role, full_name, email, wallet_balance, api_token) VALUES (1, 'admin', ?, 'admin', 'مدیر کل سیستم', 'admin@connectix.local', 0, 'admin_secret_token_123')");
         $stmt->execute([$adminPass]);
 
-        // Seed default Reseller: reseller / 123456
-        $resellerPass = password_hash('123456', PASSWORD_BCRYPT);
-        $stmt = $pdo->prepare("INSERT OR IGNORE INTO users (id, username, password_hash, role, full_name, email, wallet_balance, discount_percent, api_token) VALUES (2, 'novinvpn', ?, 'reseller', 'نوین وی‌پی‌ان (نماینده نمونه)', 'novin@example.com', 500000, 15, 'reseller_novin_token_456')");
-        $stmt->execute([$resellerPass]);
-
-        // Seed default Branding for Reseller
-        $pdo->exec("INSERT OR IGNORE INTO branding_metadata (user_id, brand_name, theme_color, telegram_support, whatsapp_support, welcome_message) VALUES (2, 'نوین وی‌پی‌ان', 'violet', '@NovinVPN_Support', '+989123456789', 'به نوین وی‌پی‌ان خوش آمدید. با بالاترین کیفیت و سرعت متصل شوید.')");
-        $pdo->exec("INSERT OR IGNORE INTO branding_metadata (user_id, brand_name, theme_color, telegram_support, whatsapp_support, welcome_message) VALUES (1, 'Connectix Panel', 'violet', '@Connectix_Admin', '+989000000000', 'پنل مدیریت اختصاصی کانکتیکس')");
-
-        // Seed default Server Nodes (Mock, Marzban, Pasargad, 3x-ui)
-        $pdo->exec("INSERT OR IGNORE INTO server_nodes (id, name, driver, api_url, server_group, sub_domain, is_active) VALUES 
-            (1, 'سرور فنلاند کلاود (Marzban Core)', 'mock', 'https://fi.marzban.example.com:8000', 'default', 'fi.connectix.space', 1),
-            (2, 'سرور آلمان VIP (Pasargad Core)', 'mock', 'https://de.pasargad.example.com', 'vip', 'de-vip.connectix.space', 1),
-            (3, 'سرور ملی ایران اکسس (3x-ui Core)', 'mock', 'https://ir.node.example.com:2053', 'iran_access', 'ir.connectix.space', 1),
-            (4, 'سرور هلند اقتصادی (Economic Node)', 'mock', 'https://nl.node.example.com', 'economic', 'nl.connectix.space', 1)
-        ");
-
-        // Seed default Plans
-        $pdo->exec("INSERT OR IGNORE INTO plans (id, title, traffic_gb, duration_days, base_price, reseller_price, server_group, is_free) VALUES 
-            (1, 'پلن تست رایگان ۱ روزه (1GB)', 1, 1, 0, 0, 'default', 1),
-            (2, 'یک‌ماهه ۳۰ گیگابایت (اقتصادی)', 30, 30, 95000, 75000, 'economic', 0),
-            (3, 'یک‌ماهه ۵۰ گیگابایت (استاندارد)', 50, 30, 145000, 115000, 'default', 0),
-            (4, 'دو‌ماهه ۱۰۰ گیگابایت (VIP تجاری)', 100, 60, 270000, 210000, 'vip', 0),
-            (5, 'سه‌ماهه ۱۵۰ گیگابایت (ویژه)', 150, 90, 380000, 295000, 'default', 0),
-            (6, 'یک‌ماهه نامحدود ایران اکسس', 200, 30, 190000, 150000, 'iran_access', 0)
-        ");
-
-        // Seed some sample Clients for demo analytics
-        $now = date('Y-m-d H:i:s');
-        $exp1 = date('Y-m-d H:i:s', strtotime('+25 days'));
-        $exp2 = date('Y-m-d H:i:s', strtotime('+5 days'));
-        $exp3 = date('Y-m-d H:i:s', strtotime('-2 days'));
-
-        $pdo->exec("INSERT OR IGNORE INTO clients (id, reseller_id, server_id, plan_id, username, password, uuid, sub_token, traffic_limit_bytes, traffic_used_bytes, expire_at, status, last_connected_at) VALUES 
-            (1, 2, 1, 3, 'user_arash_77', 'pass_9901', '7c3d2f5a-4b21-4f9e-8c3a-1d5e6f7a8b9c', 'sub_token_arash_77', 53687091200, 18253611008, '$exp1', 'active', '$now'),
-            (2, 2, 2, 4, 'vip_sara_m', 'pass_4432', 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d', 'sub_token_sara_m', 107374182400, 89456123904, '$exp2', 'active', '$now'),
-            (3, 2, 4, 2, 'eco_reza_k', 'pass_1123', 'f9e8d7c6-b5a4-4f3e-2d1c-0b9a8f7e6d5c', 'sub_token_reza_k', 32212254720, 32212254720, '$exp3', 'expired', NULL),
-            (4, 2, 1, 1, 'test_user_demo', 'pass_demo', '88e8d7c6-b5a4-4f3e-2d1c-0b9a8f7e6999', 'sub_token_test_demo', 1073741824, 0, '$exp1', 'never_connected', NULL)
-        ");
-
-        // Seed a sample reserved plan for user_arash_77
-        $pdo->exec("INSERT OR IGNORE INTO reserved_plans (client_id, plan_id, traffic_gb, duration_days, status) VALUES (1, 3, 50, 30, 'queued')");
-
-        // Seed initial transactions
-        $pdo->exec("INSERT OR IGNORE INTO transactions (user_id, amount, balance_after, type, description, reference_id, status) VALUES 
-            (2, 1000000, 1000000, 'wallet_topup', 'شارژ اولیه کیف پول از طریق درگاه زرین‌پال', 'ZP-9823412', 'completed'),
-            (2, -115000, 885000, 'plan_purchase', 'خرید پلن استاندارد ۵۰ گیگابایت برای مشتری user_arash_77', 'TX-1001', 'completed'),
-            (2, -210000, 675000, 'plan_purchase', 'خرید پلن VIP ۱۰۰ گیگابایت برای مشتری vip_sara_m', 'TX-1002', 'completed'),
-            (2, -75000, 600000, 'plan_purchase', 'خرید پلن اقتصادی ۳۰ گیگابایت برای مشتری eco_reza_k', 'TX-1003', 'completed'),
-            (2, -100000, 500000, 'plan_renewal', 'رزرو پلن استاندارد ۵۰ گیگابایت برای مشتری user_arash_77', 'TX-1004', 'completed')
-        ");
-
-        // Seed announcement
-        $pdo->exec("INSERT OR IGNORE INTO notifications (title, message, target_role, created_by) VALUES 
-            ('بهینه‌سازی سرورهای آلمان و فنلاند', 'کلیه تانل‌های سرور فنلاند و آلمان به پروتکل‌های ضد فیلتر جدید مجهز شدند. سرعت و پایداری در بالاترین سطح قرار دارد.', 'all', 1)
-        ");
+        // Seed default Branding
+        $pdo->exec("INSERT OR IGNORE INTO branding_metadata (user_id, brand_name, theme_color, telegram_support, whatsapp_support, welcome_message) VALUES (1, 'Connectix Panel', 'violet', '@Connectix_Admin', '+989000000000', 'به پنل مدیریت اختصاصی کانکتیکس خوش آمدید.')");
     }
 
     /**

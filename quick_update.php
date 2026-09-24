@@ -94,7 +94,7 @@ foreach ($folders as $f) {
     }
 }
 
-foreach (['index.php', 'repair.php', 'install.php', 'schema.sql'] as $rootFile) {
+foreach (['index.php', 'repair.php', 'install.php', 'schema.sql', 'purge_all.php'] as $rootFile) {
     if (file_exists($sourceDir . '/' . $rootFile)) {
         @copy($sourceDir . '/' . $rootFile, __DIR__ . '/' . $rootFile);
         @chmod(__DIR__ . '/' . $rootFile, 0644);

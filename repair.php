@@ -131,31 +131,26 @@ if ($hasConfig) {
             } catch (Throwable $e) {}
         }
 
-        // Complete Purge of all sample plans, mock servers, and test clients (Clean Slate)
-        if (isset($_GET['purge_samples']) && $_GET['purge_samples'] == '1') {
+        // Complete 100% Purge of all servers, plans, clients, orders, and logs (Clean Slate)
+        if ((isset($_GET['purge_samples']) && $_GET['purge_samples'] == '1') || (isset($_GET['purge_all']) && $_GET['purge_all'] == '1')) {
             try {
                 if ($driver === 'mysql') {
                     $pdo->exec("SET FOREIGN_KEY_CHECKS=0");
-                    $pdo->exec("DELETE FROM bot_orders");
-                    $pdo->exec("DELETE FROM trial_logs");
-                    $pdo->exec("DELETE FROM reserved_plans");
-                    $pdo->exec("DELETE FROM clients");
-                    $pdo->exec("DELETE FROM reseller_plans");
-                    $pdo->exec("DELETE FROM plans");
-                    $pdo->exec("DELETE FROM server_nodes WHERE driver = 'mock'");
-                    $pdo->exec("SET FOREIGN_KEY_CHECKS=1");
                 } else {
                     $pdo->exec("PRAGMA foreign_keys = OFF");
-                    $pdo->exec("DELETE FROM bot_orders");
-                    $pdo->exec("DELETE FROM trial_logs");
-                    $pdo->exec("DELETE FROM reserved_plans");
-                    $pdo->exec("DELETE FROM clients");
-                    $pdo->exec("DELETE FROM reseller_plans");
-                    $pdo->exec("DELETE FROM plans");
-                    $pdo->exec("DELETE FROM server_nodes WHERE driver = 'mock'");
+                }
+
+                $wipe = ['bot_orders', 'trial_logs', 'reserved_plans', 'clients', 'reseller_plans', 'plans', 'server_nodes', 'transactions', 'lucky_wheel_logs', 'wallet_logs', 'crypto_payments', 'bot_sessions'];
+                foreach ($wipe as $w) {
+                    try { $pdo->exec("DELETE FROM `{$w}`"); } catch (Throwable $ignore) {}
+                }
+
+                if ($driver === 'mysql') {
+                    $pdo->exec("SET FOREIGN_KEY_CHECKS=1");
+                } else {
                     $pdo->exec("PRAGMA foreign_keys = ON");
                 }
-                $adminMsg .= ' [تمامی پلن‌های نمونه، سفارشات تستی و سرورهای ماک پاکسازی شدند. سیستم ۱۰۰٪ خام و آماده معرفی سرور و پلن‌های واقعی شماست.]';
+                $adminMsg .= ' [تمامی سرورها، پلن‌ها، سفارشات تستی و تراکنش‌ها ۱۰۰٪ پاکسازی شدند. سیستم کاملاً خام و آماده است.]';
             } catch (Throwable $e) {
                 $adminMsg .= ' [خطا در پاکسازی: ' . $e->getMessage() . ']';
             }
@@ -566,9 +561,9 @@ foreach ($stepResults as $r) {
             </div>
 
             <div>
-                <a href="repair.php?purge_samples=1" onclick="return confirm('⚠️ اخطار بسیار مهم:\nآیا از پاکسازی کامل تمامی پلن‌های نمونه، سفارشات تستی و سرورهای ماک اطمینان دارید؟\nسیستم کاملاً خام خواهد شد تا بتوانید سرور و پلن‌های اختصاصی خود را از نو تعریف کنید.');" class="w-full py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs transition shadow-lg shadow-rose-900/40 flex items-center justify-center gap-1.5">
+                <a href="purge_all.php" onclick="return confirm('⚠️ اخطار قطعی:\nآیا از پاکسازی ۱۰۰٪ کامل تمامی سرورها، پلن‌ها، سفارشات و کلاینت‌ها اطمینان دارید؟\nسیستم کاملاً خام خواهد شد تا بتوانید سرور و پلن‌های اختصاصی خود را از ابتدا تعریف کنید.');" class="w-full py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs transition shadow-lg shadow-rose-900/40 flex items-center justify-center gap-1.5">
                     <i class="fa-solid fa-broom"></i>
-                    <span>پاکسازی کامل نمونه‌ها و شروع از صفر (شروع تمیز بدون پلن و سرور ماک)</span>
+                    <span>پاکسازی ۱۰۰٪ کامل نمونه‌ها و شروع از صفر (Clean Slate)</span>
                 </a>
             </div>
         </div>
