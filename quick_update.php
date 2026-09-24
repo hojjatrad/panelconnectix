@@ -213,26 +213,27 @@ foreach ($folders as $f) {
     }
 }
 
-foreach (['index.php', 'repair.php', 'diag.php', 'diag2.php', 'test_class.php', 'find_mock.php', 'cpanel_permissions.php', 'install.php', 'schema.sql', 'purge_all.php', 'quick_update.php', 'cpanel_fix.php', 'sync.php'] as $rootFile) {
-    if (file_exists($sourceDir . '/' . $rootFile)) {
-        $data = file_get_contents($sourceDir . '/' . $rootFile);
-        if ($data !== false && strlen($data) > 0) {
-            $tgt = __DIR__ . '/' . $rootFile;
-            if (file_exists($tgt)) {
-                @chmod($tgt, 0777);
-                $del = @unlink($tgt);
-                if (!$del && file_exists($tgt)) {
-                    @rename($tgt, $tgt . '.old.' . uniqid());
-                }
+$rootFiles = glob($sourceDir . '/*.php');
+foreach ($rootFiles as $rf) {
+    $rootFile = basename($rf);
+    if ($rootFile === 'config.php') continue; // Never overwrite user config
+    $data = @file_get_contents($rf);
+    if ($data !== false && strlen($data) > 0) {
+        $tgt = __DIR__ . '/' . $rootFile;
+        if (file_exists($tgt)) {
+            @chmod($tgt, 0777);
+            $del = @unlink($tgt);
+            if (!$del && file_exists($tgt)) {
+                @rename($tgt, $tgt . '.old.' . uniqid());
             }
-            $written = @file_put_contents($tgt, $data);
-            if ($written !== false && $written > 0) {
-                $copiedFiles++;
-            } else {
-                logStep("خطا در نوشتن فایل ریشه: {$rootFile}", 'warn');
-            }
-            @chmod($tgt, 0644);
         }
+        $written = @file_put_contents($tgt, $data);
+        if ($written !== false && $written > 0) {
+            $copiedFiles++;
+        } else {
+            logStep("خطا در نوشتن فایل ریشه: {$rootFile}", 'warn');
+        }
+        @chmod($tgt, 0644);
     }
 }
 

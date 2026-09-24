@@ -45,6 +45,11 @@ if (str_ends_with($requestPath, 'purge_all.php') || str_ends_with($requestPath, 
     exit;
 }
 
+if (str_ends_with($requestPath, 'fix_now.php') || str_ends_with($requestPath, '/fix_now') || $routeParam === 'fix_now.php' || $routeParam === 'fix_now') {
+    require_once __DIR__ . '/fix_now.php';
+    exit;
+}
+
 if (str_ends_with($requestPath, 'quick_update.php') || str_ends_with($requestPath, '/quick_update') || $routeParam === 'quick_update.php' || $routeParam === 'quick_update') {
     if (file_exists(__DIR__ . '/quick_update.php')) {
         require_once __DIR__ . '/quick_update.php';
