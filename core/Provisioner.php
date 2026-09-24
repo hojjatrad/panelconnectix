@@ -91,7 +91,7 @@ class Provisioner {
             }
             $nodeSublink = $driverResult['sublink'] ?? null;
             if (empty($nodeSublink)) {
-                return ['success' => false, 'error' => 'سرور مرزبان نتوانست لینک ساب‌لینک اختصاصی تولید کند. لطفاً وضعیت اینباندهای سرور مرزبان را در پنل بررسی فرمایید.'];
+                return ['success' => false, 'error' => 'سرور نود متصل (' . $server['name'] . ') نتوانست لینک ساب‌لینک اختصاصی تولید کند. لطفاً وضعیت اینباندهای سرور را در پنل بررسی فرمایید.'];
             }
         } catch (Throwable $e) {
             return ['success' => false, 'error' => 'استثنا در برقراری ارتباط با سرور نود: ' . $e->getMessage()];
@@ -424,7 +424,7 @@ class Provisioner {
             }
             $nodeSublink = $driverResult['sublink'] ?? null;
             if (empty($nodeSublink)) {
-                return ['success' => false, 'error' => 'سرور مرزبان نتوانست ساب‌لینک تست تولید کند. لطفاً اینباندهای سرور را بررسی فرمایید.'];
+                return ['success' => false, 'error' => 'سرور نود متصل (' . $server['name'] . ') نتوانست ساب‌لینک تست تولید کند. لطفاً اینباندهای سرور را بررسی فرمایید.'];
             }
         } catch (Throwable $e) {
             return ['success' => false, 'error' => 'خطا در ارتباط با سرور: ' . $e->getMessage()];

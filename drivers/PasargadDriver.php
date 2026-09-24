@@ -6,12 +6,13 @@ class PasargadDriver implements PanelDriverInterface {
     private ?string $username;
     private ?string $password;
     private ?string $token;
+    private ?string $subDomain = null;
     private string $apiPrefix = '/api';
     private bool $isPasarGuard = true; // Modern PasarGuard (FastAPI) vs legacy Pasargad
     private ?string $lastError = null;
     private int $timeout = 12;
 
-    public function __construct(string $baseUrl, ?string $username = null, ?string $password = null, ?string $token = null) {
+    public function __construct(string $baseUrl, ?string $username = null, ?string $password = null, ?string $token = null, ?string $subDomain = null) {
         $clean = rtrim(trim($baseUrl), '/');
         $clean = preg_replace('#/(dashboard|admin|api|v1)+/?$#i', '', $clean);
         $this->baseUrl = rtrim($clean, '/');
@@ -19,10 +20,35 @@ class PasargadDriver implements PanelDriverInterface {
         $this->username = $username ? trim($username) : null;
         $this->password = $password ? trim($password) : null;
         $this->token = $token ? trim($token) : ($this->username ? null : $this->password);
+        $this->subDomain = $subDomain ? trim($subDomain) : null;
     }
 
     public function getLastError(): ?string {
         return $this->lastError;
+    }
+
+    private function getEffectiveSubDomain(): string {
+        if (!empty($this->subDomain)) {
+            $clean = trim($this->subDomain);
+            return str_starts_with($clean, 'http') ? rtrim($clean, '/') : ('https://' . rtrim($clean, '/'));
+        }
+        return $this->baseUrl;
+    }
+
+    private function applySubDomain(string $url): string {
+        if (empty($this->subDomain)) return $url;
+        $parts = parse_url($url);
+        if (!$parts || empty($parts['host'])) return $url;
+
+        $targetDomain = trim($this->subDomain);
+        $scheme = str_starts_with($targetDomain, 'http://') ? 'http' : 'https';
+        $targetHost = preg_replace('#^https?://#i', '', rtrim($targetDomain, '/'));
+
+        $path = $parts['path'] ?? '';
+        $query = !empty($parts['query']) ? ('?' . $parts['query']) : '';
+        $fragment = !empty($parts['fragment']) ? ('#' . $parts['fragment']) : '';
+
+        return "{$scheme}://{$targetHost}{$path}{$query}{$fragment}";
     }
 
     private function request(string $endpoint, string $method = 'GET', ?array $data = null, bool $isForm = false): array {
@@ -171,6 +197,31 @@ class PasargadDriver implements PanelDriverInterface {
         return false;
     }
 
+    public function getDetailedInbounds(): array {
+        if (!$this->authenticate()) return [];
+        $res = $this->request($this->apiPrefix . '/inbounds');
+        if ($res['success'] && is_array($res['data'])) {
+            $list = [];
+            foreach ($res['data'] as $proto => $items) {
+                if (is_array($items)) {
+                    foreach ($items as $item) {
+                        if (is_array($item)) {
+                            $list[] = [
+                                'tag' => $item['tag'] ?? 'Inbound',
+                                'protocol' => strtolower($proto),
+                                'network' => $item['network'] ?? 'tcp',
+                                'tls' => $item['tls'] ?? 'none',
+                                'port' => $item['port'] ?? 443
+                            ];
+                        }
+                    }
+                }
+            }
+            return $list;
+        }
+        return [];
+    }
+
     public function getInbounds(): array {
         if (!$this->authenticate()) return [];
         $res = $this->request($this->apiPrefix . '/inbounds');
@@ -203,12 +254,44 @@ class PasargadDriver implements PanelDriverInterface {
             ];
         }
 
+        $domainBase = $this->getEffectiveSubDomain();
+
         if ($this->isPasarGuard) {
             // Modern PasarGuard
-            $inbounds = $this->getInbounds();
+            $allInbounds = $this->getInbounds();
+            $inbounds = $allInbounds;
+
+            if (!empty($payload['selected_inbounds'])) {
+                $selectedTags = is_array($payload['selected_inbounds']) 
+                    ? $payload['selected_inbounds'] 
+                    : json_decode($payload['selected_inbounds'], true);
+
+                if (!empty($selectedTags) && is_array($selectedTags)) {
+                    $filtered = [];
+                    foreach ($allInbounds as $proto => $tags) {
+                        foreach ($tags as $t) {
+                            if (in_array($t, $selectedTags)) {
+                                $filtered[$proto][] = $t;
+                            }
+                        }
+                    }
+                    if (!empty($filtered)) {
+                        $inbounds = $filtered;
+                    }
+                }
+            }
+
+            $hasReality = false;
+            $detailed = $this->getDetailedInbounds();
+            foreach ($detailed as $d) {
+                if ($d['protocol'] === 'vless' && ($d['tls'] === 'reality' || str_contains(strtolower($d['tag']), 'reality'))) {
+                    $hasReality = true;
+                    break;
+                }
+            }
 
             $proxies = [
-                'vless' => ['id' => $payload['uuid'], 'flow' => 'xtls-rprx-vision'],
+                'vless' => ['id' => $payload['uuid'], 'flow' => $hasReality ? 'xtls-rprx-vision' : ''],
                 'vmess' => ['id' => $payload['uuid']],
                 'trojan' => ['password' => $payload['password'] ?? $payload['uuid']],
                 'shadowsocks' => ['password' => $payload['password'] ?? $payload['uuid'], 'method' => 'chacha20-ietf-poly1305']
@@ -237,6 +320,10 @@ class PasargadDriver implements PanelDriverInterface {
                 'note' => 'Provisioned automatically via Connectix Panel'
             ];
 
+            if (!empty($payload['sub_token'])) {
+                $body['sub_token'] = $payload['sub_token'];
+            }
+
             if (!empty($inbounds)) {
                 $body['inbounds'] = $inbounds;
             }
@@ -244,20 +331,37 @@ class PasargadDriver implements PanelDriverInterface {
             $res = $this->request($this->apiPrefix . '/user', 'POST', $body);
             if ($res['success']) {
                 $data = $res['data'] ?? [];
-                $subUrl = $data['subscription_url'] ?? '';
-                $links = $data['links'] ?? [];
+
+                // Fetch fresh user profile from node to ensure server core has resolved all links & sublink
+                $live = $this->getUser($payload['username']);
+                if ($live) {
+                    $subUrl = $live['subscription_url'] ?? '';
+                    $links = $live['links'] ?? [];
+                } else {
+                    $subUrl = $data['subscription_url'] 
+                           ?? $data['sub_link'] 
+                           ?? $data['sub_url'] 
+                           ?? $data['subscription_link'] 
+                           ?? (!empty($data['sub_token']) ? ('/sub/' . $data['sub_token']) : '');
+                    $links = $data['links'] ?? [];
+                }
 
                 if (empty($subUrl) && !empty($links)) {
                     $subUrl = $links[0];
                 }
+
                 if (!empty($subUrl) && str_starts_with($subUrl, '/')) {
-                    $subUrl = $this->baseUrl . $subUrl;
+                    $subUrl = $domainBase . $subUrl;
+                } elseif (!empty($subUrl) && !empty($this->subDomain)) {
+                    $subUrl = $this->applySubDomain($subUrl);
                 }
+
+                $primarySub = $subUrl ?: ($domainBase . '/sub/' . ($payload['sub_token'] ?? $payload['uuid']));
 
                 return [
                     'success' => true,
                     'uuid' => $payload['uuid'],
-                    'sublink' => $subUrl ?: ($this->baseUrl . '/sub/' . $payload['uuid']),
+                    'sublink' => $primarySub,
                     'links' => $links,
                     'vless_link' => $links[0] ?? '',
                     'error' => null
@@ -283,11 +387,31 @@ class PasargadDriver implements PanelDriverInterface {
 
             $res = $this->request('/api/users/add', 'POST', $body);
             if ($res['success']) {
-                $sublink = $res['data']['sub_link'] ?? ($this->baseUrl . '/sub/' . $payload['uuid']);
+                $raw = $res['data'] ?? [];
+                $nested = $raw['data'] ?? [];
+                $sublink = $raw['sub_link'] 
+                        ?? $raw['subscription_url'] 
+                        ?? $raw['sub_url'] 
+                        ?? $nested['sub_link'] 
+                        ?? $nested['subscription_url'] 
+                        ?? '';
+
+                if (empty($sublink)) {
+                    $sublink = $domainBase . '/sub/' . ($payload['sub_token'] ?? $payload['uuid']);
+                } elseif (str_starts_with($sublink, '/')) {
+                    $sublink = $domainBase . $sublink;
+                } else {
+                    $sublink = $this->applySubDomain($sublink);
+                }
+
+                $links = !empty($raw['links']) ? $raw['links'] : (!empty($nested['links']) ? $nested['links'] : []);
+
                 return [
                     'success' => true,
                     'uuid' => $payload['uuid'],
                     'sublink' => $sublink,
+                    'links' => $links,
+                    'vless_link' => $links[0] ?? ($raw['vless_link'] ?? ($nested['vless_link'] ?? '')),
                     'error' => null
                 ];
             }
@@ -304,24 +428,45 @@ class PasargadDriver implements PanelDriverInterface {
     public function getUser(string $username): ?array {
         if (!$this->authenticate()) return null;
 
+        $domainBase = $this->getEffectiveSubDomain();
+
         if ($this->isPasarGuard) {
             $res = $this->request($this->apiPrefix . '/user/' . urlencode($username));
             if ($res['success'] && !empty($res['data'])) {
                 $u = $res['data'];
+                $subUrl = $u['subscription_url'] 
+                       ?? $u['sub_link'] 
+                       ?? $u['sub_url'] 
+                       ?? (!empty($u['sub_token']) ? ('/sub/' . $u['sub_token']) : '');
+
+                if (!empty($subUrl) && str_starts_with($subUrl, '/')) {
+                    $subUrl = $domainBase . $subUrl;
+                } elseif (!empty($subUrl) && !empty($this->subDomain)) {
+                    $subUrl = $this->applySubDomain($subUrl);
+                }
+
                 return [
-                    'traffic_used_bytes' => $u['used_traffic'] ?? 0,
-                    'traffic_limit_bytes' => $u['data_limit'] ?? 0,
+                    'traffic_used_bytes' => $u['used_traffic'] ?? $u['traffic_used'] ?? 0,
+                    'traffic_limit_bytes' => $u['data_limit'] ?? $u['total_traffic'] ?? 0,
                     'expire_at' => !empty($u['expire']) ? date('Y-m-d H:i:s', $u['expire']) : null,
                     'status' => $u['status'] ?? 'active',
                     'online' => ($u['online_at'] ?? 0) > (time() - 300),
                     'links' => $u['links'] ?? [],
-                    'subscription_url' => $u['subscription_url'] ?? ''
+                    'subscription_url' => $subUrl
                 ];
             }
         } else {
             $res = $this->request('/api/users/' . urlencode($username));
             if ($res['success'] && !empty($res['data'])) {
                 $u = $res['data'];
+                $subUrl = $u['sub_link'] ?? $u['subscription_url'] ?? '';
+
+                if (!empty($subUrl) && str_starts_with($subUrl, '/')) {
+                    $subUrl = $domainBase . $subUrl;
+                } elseif (!empty($subUrl) && !empty($this->subDomain)) {
+                    $subUrl = $this->applySubDomain($subUrl);
+                }
+
                 return [
                     'traffic_used_bytes' => $u['used_traffic'] ?? 0,
                     'traffic_limit_bytes' => $u['total_traffic'] ?? 0,
@@ -329,7 +474,7 @@ class PasargadDriver implements PanelDriverInterface {
                     'status' => $u['status'] ?? 'active',
                     'online' => !empty($u['is_online']),
                     'links' => $u['links'] ?? [],
-                    'subscription_url' => $u['sub_link'] ?? ''
+                    'subscription_url' => $subUrl
                 ];
             }
         }

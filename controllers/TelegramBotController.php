@@ -61,6 +61,46 @@ class TelegramBotController {
     }
 
     /**
+     * Get authoritative direct sublink from the remote node server (Pasargad / Marzban)
+     * If not stored, it queries the live node, updates the database, and returns the real link.
+     */
+    public static function getClientPrimarySublink(array $client, ?PDO $pdo = null): string {
+        // 1. If client already has a non-empty node_sublink, return it
+        if (!empty($client['node_sublink'])) {
+            return $client['node_sublink'];
+        }
+
+        // 2. If not stored, but client has a real server_id, fetch live subscription URL directly from node!
+        if (!empty($client['server_id']) && !empty($client['username'])) {
+            try {
+                $pdo = $pdo ?: Database::getConnection();
+                $stmtNode = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ?");
+                $stmtNode->execute([(int)$client['server_id']]);
+                $node = $stmtNode->fetch(PDO::FETCH_ASSOC);
+                if ($node && $node['driver'] !== 'mock') {
+                    $driver = DriverFactory::create($node);
+                    $live = $driver->getUser($client['username']);
+                    if ($live && !empty($live['subscription_url'])) {
+                        $liveSub = $live['subscription_url'];
+                        $pdo->prepare("UPDATE clients SET node_sublink = ? WHERE id = ?")
+                            ->execute([$liveSub, $client['id']]);
+                        return $liveSub;
+                    }
+                    if ($live && !empty($live['links'])) {
+                        $firstLink = $live['links'][0];
+                        $pdo->prepare("UPDATE clients SET node_sublink = ? WHERE id = ?")
+                            ->execute([$firstLink, $client['id']]);
+                        return $firstLink;
+                    }
+                }
+            } catch (Throwable $e) {}
+        }
+
+        // 3. Fallback to Connectix Sublink URL
+        return Helpers::subUrl($client['sub_token'] ?? '');
+    }
+
+    /**
      * Check if user has joined the mandatory channel (Force Join)
      */
     public static function checkForceJoin(PDO $pdo, string $chatId, string $fromId, ?string $botToken = null): bool {
@@ -676,10 +716,11 @@ class TelegramBotController {
 
             if ($result['success']) {
                 TelegramBot::answerCallbackQuery($cbId, "✅ سفارش #{$orderId} تایید و تحویل شد.", false, $botToken);
+                $directSub = !empty($result['node_sublink']) ? $result['node_sublink'] : ($result['primary_sub'] ?? $result['sub_url']);
                 $statusText = "✅ <b>سفارش #{$orderId} با موفقیت تایید و تحویل شد.</b>\n"
                             . "👤 کاربر: <code>{$result['username']}</code>\n"
                             . "🔑 کلمه عبور: <code>{$result['password']}</code>\n"
-                            . "🔗 لینک ساب‌لینک: <code>{$result['sub_url']}</code>";
+                            . "🔗 <b>لینک مستقیم سرور:</b>\n<code>{$directSub}</code>";
                 if ($messageId) {
                     TelegramBot::editAnyMessage($statusText, $chatId, $messageId, null, $botToken);
                 }
@@ -1583,14 +1624,14 @@ class TelegramBotController {
                 $used = Helpers::formatBytes($client['traffic_used_bytes']);
                 $total = Helpers::formatBytes($client['traffic_limit_bytes']);
                 $days = Helpers::daysRemaining($client['expire_at']);
-                $subUrl = Helpers::subUrl($client['sub_token']);
+                $subUrl = self::getClientPrimarySublink($client, $pdo);
 
                 $msg = "🎉 <b>حساب با موفقیت به تلگرام متصل شد! (روش ۱)</b>\n\n"
                      . "👤 <b>نام کاربری:</b> <code>{$client['username']}</code>\n"
                      . "🔑 <b>کلمه عبور:</b> <code>{$client['password']}</code>\n"
                      . "📊 <b>میزان مصرف:</b> {$used} از {$total}\n"
                      . "⏳ <b>اعتبار زمانی:</b> {$days}\n\n"
-                     . "🔗 <b>لینک ساب‌لینک:</b>\n<code>{$subUrl}</code>\n\n"
+                     . "🔗 <b>لینک مستقیم ساب‌لینک سرور:</b>\n<code>{$subUrl}</code>\n\n"
                      . "📱 <i>بارکد QR فوق آماده اسکن مستقیم در نرم‌افزار است.</i>";
 
                 $kb = [
@@ -1653,7 +1694,7 @@ class TelegramBotController {
                 $rem = max(0, $client['traffic_limit_bytes'] - $client['traffic_used_bytes']);
                 $remStr = Helpers::formatBytes($rem);
                 $days = Helpers::daysRemaining($client['expire_at']);
-                $subUrl = Helpers::subUrl($client['sub_token']);
+                $subUrl = self::getClientPrimarySublink($client, $pdo);
 
                 $statusFa = match($client['status']) {
                     'active' => '🟢 فعال و متصل',
@@ -1670,7 +1711,7 @@ class TelegramBotController {
                      . "💾 <b>حجم باقیمانده:</b> <b>{$remStr}</b>\n"
                      . "⏳ <b>اعتبار زمانی:</b> <b>{$days}</b>\n"
                      . "🌐 <b>سرور:</b> " . ($client['server_name'] ?? 'سرور ابری') . "\n\n"
-                     . "🔗 <b>لینک ساب‌لینک:</b>\n<code>{$subUrl}</code>\n\n"
+                     . "🔗 <b>لینک مستقیم ساب‌لینک سرور:</b>\n<code>{$subUrl}</code>\n\n"
                      . "📱 <i>بارکد QR فوق آماده اسکن است.</i>";
 
                 $kb = [
@@ -1719,14 +1760,14 @@ class TelegramBotController {
         $used = Helpers::formatBytes($client['traffic_used_bytes']);
         $total = Helpers::formatBytes($client['traffic_limit_bytes']);
         $days = Helpers::daysRemaining($client['expire_at']);
-        $subUrl = Helpers::subUrl($client['sub_token']);
+        $subUrl = self::getClientPrimarySublink($client, $pdo);
 
         $msg = "🎉 <b>اتصال خودکار به تلگرام با موفقیت انجام شد! (روش ۲ - دیپ‌لینک ۱ کلیکه)</b>\n\n"
              . "👤 <b>نام کاربری:</b> <code>{$client['username']}</code>\n"
              . "🔑 <b>کلمه عبور:</b> <code>" . ($client['password'] ?: '123456') . "</code>\n"
              . "📊 <b>ترافیک مصرفی:</b> {$used} از {$total}\n"
              . "⏳ <b>اعتبار زمانی:</b> {$days}\n\n"
-             . "🔗 <b>لینک ساب‌لینک:</b>\n<code>{$subUrl}</code>\n\n"
+             . "🔗 <b>لینک مستقیم ساب‌لینک سرور:</b>\n<code>{$subUrl}</code>\n\n"
              . "<i>از این پس وضعیت حجم، تمدید و اعلان‌های این اکانت در همین ربات در دسترس شماست.</i>";
 
         $kb = [
@@ -1804,7 +1845,7 @@ class TelegramBotController {
         $rem = max(0, $c['traffic_limit_bytes'] - $c['traffic_used_bytes']);
         $remStr = Helpers::formatBytes($rem);
         $days = Helpers::daysRemaining($c['expire_at']);
-        $subUrl = Helpers::subUrl($c['sub_token']);
+        $primarySub = self::getClientPrimarySublink($c, $pdo);
 
         $statusFa = match($c['status']) {
             'active' => '🟢 فعال و متصل',
@@ -1820,11 +1861,15 @@ class TelegramBotController {
              . "💾 <b>حجم باقیمانده:</b> <b>{$remStr}</b>\n"
              . "⏳ <b>اعتبار زمانی:</b> <b>{$days}</b>\n"
              . "🌐 <b>سرور:</b> " . ($c['server_name'] ?? 'سرور ابری') . "\n\n"
-             . "🔗 <b>لینک ساب‌لینک اختصاصی:</b>\n<code>{$subUrl}</code>\n\n"
+             . "🔗 <b>لینک مستقیم ساب‌لینک سرور:</b>\n<code>{$primarySub}</code>\n\n"
              . "📱 <i>بارکد QR فوق آماده اسکن مستقیم است:</i>";
 
         $kb = [
             'inline_keyboard' => [
+                [
+                    ['text' => '⚡ اتصال با V2rayNG', 'url' => 'v2rayng://install-config?url=' . urlencode($primarySub)],
+                    ['text' => '🚀 اتصال با Hiddify / Streisand', 'url' => 'hiddify://install-sub?url=' . urlencode($primarySub)]
+                ],
                 [
                     ['text' => '🔄 تمدید این اشتراک', 'callback_data' => 'renew_acc_' . $c['id']],
                     ['text' => '📥 دریافت کانفیگ‌ها', 'callback_data' => 'configs_acc_' . $c['id']]
@@ -1834,11 +1879,12 @@ class TelegramBotController {
                 ],
                 [
                     ['text' => '👤 بازگشت به لیست حساب‌ها', 'callback_data' => 'menu_my_accounts'],
-                    ['text' => '🔙 منوی اصلی', 'callback_data' => 'menu_main']]
+                    ['text' => '🔙 منوی اصلی', 'callback_data' => 'menu_main']
                 ]
+            ]
         ];
 
-        $qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=' . urlencode($subUrl);
+        $qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=' . urlencode($primarySub);
         TelegramBot::sendPhoto($qrUrl, $msg, $chatId, $kb);
     }
 
@@ -1864,19 +1910,33 @@ class TelegramBotController {
         $ref->setAccessible(true);
         $configs = $ref->invoke($subCtrl, $client);
 
-        $subUrl = Helpers::subUrl($client['sub_token']);
+        $primarySub = self::getClientPrimarySublink($client, $pdo);
 
         $msg = "📥 <b>کانفیگ‌های اختصاصی حساب {$client['username']}</b>\n\n"
-             . "⚡️ <b>کانفیگ ضد فیلتر VLESS Reality:</b>\n<code>{$configs['vless_reality']}</code>\n\n"
-             . "🛡 <b>کانفیگ CDN WebSocket:</b>\n<code>{$configs['vless_ws']}</code>\n\n"
-             . "🔒 <b>کانفیگ Trojan TLS:</b>\n<code>{$configs['trojan']}</code>\n\n"
-             . "<i>جهت کپی کافیست روی هر متن ضربه بزنید.</i>";
+             . "🔗 <b>لینک مستقیم ساب‌لینک سرور:</b>\n<code>{$primarySub}</code>\n\n";
 
-        $qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' . urlencode($subUrl);
+        if (!empty($configs['vless_reality'])) {
+            $msg .= "⚡️ <b>کانفیگ VLESS Reality:</b>\n<code>{$configs['vless_reality']}</code>\n\n";
+        }
+        if (!empty($configs['vless_ws'])) {
+            $msg .= "🛡 <b>کانفیگ WebSocket:</b>\n<code>{$configs['vless_ws']}</code>\n\n";
+        }
+        if (!empty($configs['trojan'])) {
+            $msg .= "🔒 <b>کانفیگ Trojan:</b>\n<code>{$configs['trojan']}</code>\n\n";
+        }
+        foreach ($configs as $k => $v) {
+            if (str_starts_with($k, 'node_link_') || str_starts_with($k, 'sub_link_')) {
+                $msg .= "🚀 <b>کانکشن مستقیم:</b>\n<code>{$v}</code>\n\n";
+            }
+        }
+        $msg .= "<i>جهت کپی کافیست روی هر متن ضربه بزنید یا بارکد فوق را اسکن فرمایید.</i>";
+
+        $qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' . urlencode($primarySub);
 
         $kb = [
             'inline_keyboard' => [
-                [['text' => '🌐 باز کردن صفحه ساب‌لینک', 'url' => $subUrl]],
+                [['text' => '⚡ اتصال با V2rayNG', 'url' => 'v2rayng://install-config?url=' . urlencode($primarySub)]],
+                [['text' => '🚀 اتصال با Hiddify', 'url' => 'hiddify://install-sub?url=' . urlencode($primarySub)]],
                 [['text' => '🔙 بازگشت به جزئیات حساب', 'callback_data' => 'view_acc_' . $client['id']]]
             ]
         ];
@@ -2350,10 +2410,11 @@ class TelegramBotController {
                 $stmtCl->execute([$order['client_id']]);
                 $cl = $stmtCl->fetch();
                 if ($cl) {
-                    return ['success' => true, 'username' => $cl['username'], 'password' => $cl['password'] ?: '123456', 'sub_url' => Helpers::subUrl($cl['sub_token'])];
+                    $clSub = self::getClientPrimarySublink($cl, $pdo);
+                    return ['success' => true, 'username' => $cl['username'], 'password' => $cl['password'] ?: '123456', 'sub_url' => Helpers::subUrl($cl['sub_token']), 'node_sublink' => $clSub, 'primary_sub' => $clSub];
                 }
             }
-            return ['success' => true, 'username' => 'قبلاً فعال شده', 'password' => '---', 'sub_url' => ''];
+            return ['success' => true, 'username' => 'قبلاً فعال شده', 'password' => '---', 'sub_url' => '', 'node_sublink' => '', 'primary_sub' => ''];
         }
 
         if (empty($order['plan_id'])) {
@@ -2415,19 +2476,21 @@ class TelegramBotController {
             $stmtCl->execute([$order['client_id']]);
             $client = $stmtCl->fetch();
 
-            $subUrl = Helpers::subUrl($client['sub_token']);
-            $qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=' . urlencode($subUrl);
+            $primarySub = self::getClientPrimarySublink($client, $pdo);
+            $qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=' . urlencode($primarySub);
 
             $customerMsg = "🎉 <b>تمدید اشتراک شما با موفقیت تایید و اعمال گردید!</b>\n\n"
                          . "👤 <b>نام کاربری:</b> <code>{$client['username']}</code>\n"
                          . "🔑 <b>کلمه عبور:</b> <code>" . ($client['password'] ?: '123456') . "</code>\n"
                          . "➕ <b>حجم افزوده شده:</b> {$order['traffic_gb']} گیگابایت\n"
                          . "⏳ <b>تاریخ انقضای جدید:</b> {$renewResult['new_expire']}\n\n"
-                         . "🔗 <b>لینک ساب‌لینک اختصاصی:</b>\n<code>{$subUrl}</code>\n\n"
+                         . "🔗 <b>لینک مستقیم ساب‌لینک سرور:</b>\n<code>{$primarySub}</code>\n\n"
                          . "📱 <i>بارکد QR فوق به‌روزرسانی شده و آماده اسکن است.</i>";
 
             TelegramBot::sendPhoto($qrUrl, $customerMsg, $order['user_tg_id'], [
                 'inline_keyboard' => [
+                    [['text' => '⚡ اتصال مستقیم با V2rayNG', 'url' => 'v2rayng://install-config?url=' . urlencode($primarySub)]],
+                    [['text' => '🚀 اتصال با Streisand / Hiddify', 'url' => 'hiddify://install-sub?url=' . urlencode($primarySub)]],
                     [['text' => '📊 مشاهده وضعیت اشتراک', 'callback_data' => 'view_acc_' . $client['id']]],
                     [['text' => '🔙 منوی اصلی', 'callback_data' => 'menu_main']]
                 ]
@@ -2437,7 +2500,9 @@ class TelegramBotController {
                 'success' => true,
                 'username' => $client['username'],
                 'password' => $client['password'] ?: '123456',
-                'sub_url' => $subUrl
+                'sub_url' => Helpers::subUrl($client['sub_token']),
+                'node_sublink' => $primarySub,
+                'primary_sub' => $primarySub
             ];
         }
 
@@ -2527,7 +2592,9 @@ class TelegramBotController {
             'success' => true,
             'username' => $prov['username'],
             'password' => $prov['password'],
-            'sub_url' => $prov['sub_url']
+            'sub_url' => $prov['sub_url'],
+            'node_sublink' => $prov['node_sublink'] ?? '',
+            'primary_sub' => $primarySub
         ];
     }
 

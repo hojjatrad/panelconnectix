@@ -109,27 +109,42 @@ class SublinkController {
         // 5. Update last connected timestamp
         $pdo->prepare("UPDATE clients SET last_connected_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$client['id']]);
 
-        // 5.5 Auto-upgrade client to real server if client was created on mock or has no node_sublink
-        if (empty($client['node_sublink']) || (!empty($client['driver']) && $client['driver'] === 'mock')) {
-            $realServer = Provisioner::findBestServer('default', $pdo);
+        // 5.5 Auto-upgrade / resolve node_sublink if empty
+        if (empty($client['node_sublink'])) {
+            $realServer = null;
+            if (!empty($client['server_id'])) {
+                $stmtSrv = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ? AND is_active = 1 AND driver != 'mock'");
+                $stmtSrv->execute([(int)$client['server_id']]);
+                $realServer = $stmtSrv->fetch();
+            }
+            if (!$realServer) {
+                $realServer = Provisioner::findBestServer('default', $pdo);
+            }
             if ($realServer && $realServer['driver'] !== 'mock') {
                 try {
                     $driver = DriverFactory::create($realServer);
-                    $driverPayload = [
-                        'username' => $client['username'],
-                        'password' => $client['password'],
-                        'uuid' => $client['uuid'],
-                        'sub_token' => $client['sub_token'],
-                        'traffic_limit_bytes' => (int)$client['traffic_limit_bytes'],
-                        'expire_timestamp' => !empty($client['expire_at']) ? strtotime($client['expire_at']) : (time() + 30 * 86400)
-                    ];
-                    $resDriver = $driver->createUser($driverPayload);
-                    if ($resDriver['success'] && !empty($resDriver['sublink'])) {
-                        $client['node_sublink'] = $resDriver['sublink'];
-                        $client['server_id'] = $realServer['id'];
-                        $client['driver'] = $realServer['driver'];
-                        $pdo->prepare("UPDATE clients SET server_id = ?, node_sublink = ? WHERE id = ?")
-                            ->execute([$realServer['id'], $resDriver['sublink'], $client['id']]);
+                    $live = $driver->getUser($client['username']);
+                    if ($live && !empty($live['subscription_url'])) {
+                        $client['node_sublink'] = $live['subscription_url'];
+                        $pdo->prepare("UPDATE clients SET node_sublink = ? WHERE id = ?")
+                            ->execute([$live['subscription_url'], $client['id']]);
+                    } else {
+                        $driverPayload = [
+                            'username' => $client['username'],
+                            'password' => $client['password'],
+                            'uuid' => $client['uuid'],
+                            'sub_token' => $client['sub_token'],
+                            'traffic_limit_bytes' => (int)$client['traffic_limit_bytes'],
+                            'expire_timestamp' => !empty($client['expire_at']) ? strtotime($client['expire_at']) : (time() + 30 * 86400)
+                        ];
+                        $resDriver = $driver->createUser($driverPayload);
+                        if ($resDriver['success'] && !empty($resDriver['sublink'])) {
+                            $client['node_sublink'] = $resDriver['sublink'];
+                            $client['server_id'] = $realServer['id'];
+                            $client['driver'] = $realServer['driver'];
+                            $pdo->prepare("UPDATE clients SET server_id = ?, node_sublink = ? WHERE id = ?")
+                                ->execute([$realServer['id'], $resDriver['sublink'], $client['id']]);
+                        }
                     }
                 } catch (Throwable $e) {}
             }

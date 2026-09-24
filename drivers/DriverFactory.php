@@ -12,12 +12,13 @@ class DriverFactory {
         $user = $server['api_username'] ?? '';
         $pass = $server['api_password'] ?? '';
         $token = $server['api_token'] ?? '';
+        $subDomain = $server['sub_domain'] ?? null;
 
         switch ($driver) {
             case 'marzban':
-                return new MarzbanDriver($url, $user, $pass, $token);
+                return new MarzbanDriver($url, $user, $pass, $token, $subDomain);
             case 'pasargad':
-                return new PasargadDriver($url, $user, $pass, $token);
+                return new PasargadDriver($url, $user, $pass, $token, $subDomain);
             case '3xui':
             case 'xui':
                 return new XUiDriver($url, $user, $pass);

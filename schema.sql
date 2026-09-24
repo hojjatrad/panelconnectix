@@ -113,6 +113,7 @@ CREATE TABLE IF NOT EXISTS `clients` (
     `password` VARCHAR(64) NULL,
     `uuid` VARCHAR(64) NOT NULL UNIQUE,
     `sub_token` VARCHAR(64) NOT NULL UNIQUE,
+    `node_sublink` TEXT NULL,
     `traffic_limit_bytes` BIGINT NOT NULL,
     `traffic_used_bytes` BIGINT DEFAULT 0,
     `expire_at` DATETIME NULL,

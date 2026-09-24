@@ -8,9 +8,10 @@ class MarzbanDriver implements PanelDriverInterface {
     private ?string $token;
     private string $apiPrefix = '/api';
     private ?string $lastError = null;
+    private ?string $subDomain = null;
     private int $timeout = 12;
 
-    public function __construct(string $baseUrl, ?string $username, ?string $password, ?string $token = null) {
+    public function __construct(string $baseUrl, ?string $username, ?string $password, ?string $token = null, ?string $subDomain = null) {
         // Clean URL: remove trailing slashes, /dashboard, /admin, /api
         $clean = rtrim(trim($baseUrl), '/');
         $clean = preg_replace('#/(dashboard|admin|api|v1)+/?$#i', '', $clean);
@@ -19,6 +20,7 @@ class MarzbanDriver implements PanelDriverInterface {
         $this->username = $username ? trim($username) : null;
         $this->password = $password ? trim($password) : null;
         $this->token = $token ? trim($token) : null;
+        $this->subDomain = $subDomain ? trim($subDomain) : null;
     }
 
     public function getLastError(): ?string {
@@ -296,15 +298,25 @@ class MarzbanDriver implements PanelDriverInterface {
             if (empty($subUrl) && !empty($links)) {
                 $subUrl = $links[0];
             }
-            // Ensure full absolute URL if relative path returned
+            // Ensure full absolute URL if relative path returned, respecting custom subDomain if set
+            $domainBase = !empty($this->subDomain) ? (str_starts_with($this->subDomain, 'http') ? rtrim($this->subDomain, '/') : ('https://' . rtrim($this->subDomain, '/'))) : $this->baseUrl;
             if (!empty($subUrl) && str_starts_with($subUrl, '/')) {
-                $subUrl = $this->baseUrl . $subUrl;
+                $subUrl = $domainBase . $subUrl;
+            } elseif (!empty($subUrl) && !empty($this->subDomain)) {
+                $parts = parse_url($subUrl);
+                if ($parts && !empty($parts['host'])) {
+                    $targetHost = preg_replace('#^https?://#i', '', rtrim($this->subDomain, '/'));
+                    $scheme = str_starts_with($this->subDomain, 'http://') ? 'http' : 'https';
+                    $path = $parts['path'] ?? '';
+                    $query = !empty($parts['query']) ? ('?' . $parts['query']) : '';
+                    $subUrl = "{$scheme}://{$targetHost}{$path}{$query}";
+                }
             }
 
             return [
                 'success' => true,
                 'uuid' => $payload['uuid'],
-                'sublink' => $subUrl ?: ($this->baseUrl . '/sub/' . $payload['uuid']),
+                'sublink' => $subUrl ?: ($domainBase . '/sub/' . ($payload['sub_token'] ?? $payload['uuid'])),
                 'links' => $links,
                 'vless_link' => $links[0] ?? '',
                 'error' => null
