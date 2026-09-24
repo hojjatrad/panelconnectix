@@ -13,10 +13,80 @@ ini_set('display_errors', 1);
 
 // Direct Zero-Dependency One-Click Restoration Hook
 if (isset($_GET['update_from_git']) || (isset($_GET['restore_files']) && $_GET['restore_files'] === '1')) {
-    if (file_exists(__DIR__ . '/quick_update.php')) {
-        require __DIR__ . '/quick_update.php';
-        exit;
+    header('Content-Type: text/html; charset=utf-8');
+    echo "<!DOCTYPE html><html lang='fa' dir='rtl'><head><meta charset='UTF-8'><title>به‌روزرسانی آنی</title><style>body{background:#0b0f19;color:#fff;font-family:sans-serif;padding:30px;text-align:center;}</style></head><body><h2>🚀 در حال به‌روزرسانی آنی کدهای پنل از مخزن گیت‌هاب...</h2>";
+    $repo = 'hojjatrad/panelconnectix';
+    $url = "https://codeload.github.com/{$repo}/zip/refs/heads/main";
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['User-Agent: Connectix-Live-Updater']);
+    $zipData = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($httpCode === 200 && strlen((string)$zipData) > 5000) {
+        $tmpZip = sys_get_temp_dir() . '/cx_live_' . uniqid() . '.zip';
+        $tmpExt = sys_get_temp_dir() . '/cx_live_' . uniqid();
+        file_put_contents($tmpZip, $zipData);
+        $zip = new ZipArchive();
+        if ($zip->open($tmpZip) === true) {
+            $zip->extractTo($tmpExt);
+            $zip->close();
+            @unlink($tmpZip);
+            $subDirs = glob($tmpExt . '/*', GLOB_ONLYDIR);
+            $sourceDir = (!empty($subDirs) && is_dir($subDirs[0])) ? $subDirs[0] : $tmpExt;
+
+            $folders = ['controllers', 'core', 'drivers', 'views', 'cron'];
+            $count = 0;
+            foreach ($folders as $f) {
+                $srcF = $sourceDir . '/' . $f;
+                $dstF = __DIR__ . '/' . $f;
+                if (is_dir($srcF)) {
+                    if (!is_dir($dstF)) @mkdir($dstF, 0755, true);
+                    $iter = new RecursiveIteratorIterator(
+                        new RecursiveDirectoryIterator($srcF, RecursiveDirectoryIterator::SKIP_DOTS),
+                        RecursiveIteratorIterator::SELF_FIRST
+                    );
+                    foreach ($iter as $item) {
+                        $target = $dstF . DIRECTORY_SEPARATOR . $iter->getSubPathname();
+                        if ($item->isDir()) {
+                            if (!is_dir($target)) @mkdir($target, 0755, true);
+                        } else {
+                            if (!is_dir(dirname($target))) @mkdir(dirname($target), 0755, true);
+                            $fc = @file_get_contents($item->getPathname());
+                            if ($fc !== false) {
+                                @file_put_contents($target, $fc);
+                                $count++;
+                            }
+                        }
+                    }
+                }
+            }
+            foreach (['index.php', 'repair.php', 'install.php', 'schema.sql', 'purge_all.php', 'quick_update.php', 'cpanel_fix.php', 'sync.php'] as $rootFile) {
+                if (file_exists($sourceDir . '/' . $rootFile)) {
+                    $data = file_get_contents($sourceDir . '/' . $rootFile);
+                    if ($data !== false) {
+                        @file_put_contents(__DIR__ . '/' . $rootFile, $data);
+                        $count++;
+                    }
+                }
+            }
+            if (function_exists('opcache_reset')) @opcache_reset();
+            if (function_exists('clearstatcache')) @clearstatcache(true);
+            echo "<p style='color:#10b981;font-weight:bold;'>✓ تعداد {$count} فایل با موفقیت از گیت‌هاب بروزرسانی شد!</p>";
+            echo "<p><a href='repair.php' style='color:#a855f7;font-weight:bold;'>بازگشت به صفحه عیب‌یابی (repair.php)</a></p>";
+        } else {
+            echo "<p style='color:#ef4444;'>خطا در بازگشایی زیپ</p>";
+        }
+    } else {
+        echo "<p style='color:#ef4444;'>خطا در دریافت زیپ: کد {$httpCode}</p>";
     }
+    echo "</body></html>";
+    exit;
 }
 
 $stepResults = [];
