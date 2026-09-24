@@ -42,10 +42,18 @@ class ApiService {
         await prefs.setString('saved_username', username);
         await prefs.setString('saved_password', password);
 
+        if (data['data']['client'] != null && data['data']['client']['sub_url'] != null) {
+          await prefs.setString('sub_url', data['data']['client']['sub_url'].toString());
+        }
+
         List<ServerModel> initialServers = [];
         if (data['data']['servers'] != null && data['data']['servers'] is List) {
           final List sList = data['data']['servers'];
-          initialServers = sList.map((e) => ServerModel.fromJson(e)).toList();
+          final parsed = sList.map((e) => ServerModel.fromJson(e)).toList();
+          final bool hasMock = parsed.any((s) => s.configUri.contains('mock_pbk') || s.id == 'mci_reality_de');
+          if (!hasMock && parsed.isNotEmpty) {
+            initialServers = parsed;
+          }
         }
 
         return {
@@ -69,24 +77,63 @@ class ApiService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token') ?? '';
+      final subUrl = prefs.getString('sub_url') ?? '';
 
-      // Dual authorization delivery: query parameter + header to bypass cPanel FastCGI stripping
-      final url = Uri.parse("$baseUrl/api/v1/app/configs?auth_token=${Uri.encodeComponent(token)}");
-      final response = await http.get(
-        url,
-        headers: {
-          'Authorization': 'Bearer $token',
-          'X-Auth-Token': token,
-          'Accept': 'application/json'
-        },
-      );
+      List<ServerModel> servers = [];
 
-      final data = jsonDecode(utf8.decode(response.bodyBytes));
-      if (data['success'] == true && data['data']['servers'] != null) {
-        final List list = data['data']['servers'];
-        return list.map((e) => ServerModel.fromJson(e)).toList();
+      // 1. Primary: Dedicated App Configs API
+      try {
+        final url = Uri.parse("$baseUrl/api/v1/app/configs?auth_token=${Uri.encodeComponent(token)}");
+        final response = await http.get(
+          url,
+          headers: {
+            'Authorization': 'Bearer $token',
+            'X-Auth-Token': token,
+            'Accept': 'application/json'
+          },
+        ).timeout(const Duration(seconds: 7));
+
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        if (data['success'] == true && data['data']['servers'] != null) {
+          final List list = data['data']['servers'];
+          final parsed = list.map((e) => ServerModel.fromJson(e)).toList();
+          final bool hasMock = parsed.any((s) => s.configUri.contains('mock_pbk') || s.id == 'mci_reality_de');
+          if (!hasMock && parsed.isNotEmpty) {
+            servers = parsed;
+          }
+        }
+      } catch (_) {}
+
+      // 2. Direct Node / Panel Sublink Auto-Resolver (Delivers all 14 live PasarGuard inbounds)
+      if (servers.isEmpty && subUrl.isNotEmpty) {
+        try {
+          final subResp = await http.get(
+            Uri.parse(subUrl),
+            headers: {'User-Agent': 'v2rayNG/1.8.5'},
+          ).timeout(const Duration(seconds: 8));
+
+          if (subResp.statusCode == 200 && subResp.body.isNotEmpty) {
+            String decoded = subResp.body.trim();
+            try {
+              decoded = utf8.decode(base64Decode(decoded));
+            } catch (_) {}
+            final lines = decoded
+                .split(RegExp(r'[\r\n]+'))
+                .map((l) => l.trim())
+                .where((l) => l.isNotEmpty)
+                .toList();
+
+            int idx = 1;
+            for (final line in lines) {
+              if (line.contains('://')) {
+                servers.add(ServerModel.fromUri(line, idx++));
+              }
+            }
+          }
+        } catch (_) {}
       }
-      return [];
+
+      return servers;
     } catch (e) {
       return [];
     }

@@ -1,7 +1,7 @@
 name: connectix_vpn
 description: Connectix Professional Multiplatform VPN Client (User & Password Login)
 publish_to: 'none'
-version: 1.0.4+5
+version: 1.0.5+6
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
