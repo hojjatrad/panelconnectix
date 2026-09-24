@@ -22,6 +22,20 @@ if (isset($_GET['dump_clients'])) {
     exit;
 }
 
+if (isset($_GET['test_api_configs'])) {
+    header('Content-Type: application/json; charset=utf-8');
+    require_once __DIR__ . '/config.php';
+    require_once __DIR__ . '/core/Database.php';
+    require_once __DIR__ . '/core/Helpers.php';
+    require_once __DIR__ . '/controllers/ApiController.php';
+    $pdo = Database::getConnection();
+    $u = $_GET['user'] ?? 'usr_10f575';
+    $cl = $pdo->query("SELECT * FROM clients WHERE username = '{$u}'")->fetch(PDO::FETCH_ASSOC);
+    $servers = ApiController::extractServerList($cl, $pdo);
+    echo json_encode(['count' => count($servers), 'servers' => $servers], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 // Direct Zero-Dependency One-Click Restoration Hook
 if (isset($_GET['update_from_git']) || (isset($_GET['restore_files']) && $_GET['restore_files'] === '1')) {
     header('Content-Type: text/html; charset=utf-8');
