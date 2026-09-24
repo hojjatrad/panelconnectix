@@ -52,13 +52,23 @@ class Database {
         return self::$instance;
     }
 
-        public static function safeAddColumn(PDO $pdo, string $table, string $column, string $definition): void {
+    public static function safeAddColumn(PDO $pdo, string $table, string $column, string $definition): void {
         try {
             $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
             if ($driver === 'mysql') {
-                $stmt = $pdo->query("SHOW COLUMNS FROM `{$table}` LIKE '{$column}'");
-                if ($stmt && !$stmt->fetch()) {
+                static $existingCols = null;
+                if ($existingCols === null) {
+                    $existingCols = [];
+                    try {
+                        $rows = $pdo->query("SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE()")->fetchAll(PDO::FETCH_ASSOC);
+                        foreach ($rows as $r) {
+                            $existingCols[$r['TABLE_NAME'] . '.' . $r['COLUMN_NAME']] = true;
+                        }
+                    } catch (Throwable $e) {}
+                }
+                if (!isset($existingCols[$table . '.' . $column])) {
                     $pdo->exec("ALTER TABLE `{$table}` ADD COLUMN `{$column}` {$definition}");
+                    $existingCols[$table . '.' . $column] = true;
                 }
             } else {
                 $pdo->exec("ALTER TABLE `{$table}` ADD COLUMN `{$column}` {$definition}");

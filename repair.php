@@ -72,6 +72,7 @@ if (empty($missingExts)) {
 
 // 4. Test Database connection & Auto-migrate schema
 $dbOk = false;
+$pdo = null;
 if ($hasConfig) {
     try {
         require_once __DIR__ . '/core/Database.php';
