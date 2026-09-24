@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../core/Database.php';
 require_once __DIR__ . '/../core/Helpers.php';
 require_once __DIR__ . '/../core/Setting.php';
+require_once __DIR__ . '/../core/Provisioner.php';
 require_once __DIR__ . '/../drivers/DriverFactory.php';
 
 class SublinkController {
@@ -150,8 +151,13 @@ class SublinkController {
             }
         }
 
-        // 6. Direct Proxy from Real Node Sublink if present
+        // 6. Direct Proxy / Redirect from Real Node Sublink if present
         if (!empty($client['node_sublink'])) {
+            if ($isApp && !isset($_GET['web'])) {
+                header('Location: ' . $client['node_sublink'], true, 302);
+                exit;
+            }
+
             $ch = curl_init($client['node_sublink']);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_TIMEOUT, 8);
@@ -164,13 +170,6 @@ class SublinkController {
             curl_close($ch);
 
             if ($code >= 200 && $code < 400 && !empty($sub)) {
-                if ($isApp && !isset($_GET['web'])) {
-                    header('Content-Type: text/plain; charset=utf-8');
-                    header('Profile-Update-Interval: 6');
-                    header('Content-Disposition: inline; filename="connectix_sub.txt"');
-                    echo $sub;
-                    exit;
-                }
                 $decoded = base64_decode(trim($sub), true) ?: $sub;
                 $lines = array_filter(array_map('trim', explode("\n", $decoded)));
                 $out = [];

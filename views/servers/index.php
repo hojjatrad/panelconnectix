@@ -239,8 +239,9 @@ require __DIR__ . '/../layout/header.php';
 
             <div class="grid grid-cols-2 gap-3">
                 <div>
-                    <label class="block text-slate-300 mb-1 font-semibold">دامنه سابسکریپشن / CDN</label>
-                    <input type="text" name="sub_domain" dir="ltr" placeholder="de1.connectix.space" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
+                    <label class="block text-slate-300 mb-1 font-semibold">دامنه سابسکریپشن / پورت ساب‌لینک</label>
+                    <input type="text" name="sub_domain" dir="ltr" placeholder="sub.speedur.org:2096" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
+                    <span class="text-[10px] text-slate-400 mt-0.5 block">مثال: sub.speedur.org:2096 (در صورت خالی بودن، از آدرس API استفاده می‌شود)</span>
                 </div>
                 <div>
                     <label class="block text-slate-300 mb-1 font-semibold">حداکثر ظرفیت کاربر</label>
@@ -346,8 +347,9 @@ require __DIR__ . '/../layout/header.php';
 
             <div class="grid grid-cols-2 gap-3">
                 <div>
-                    <label class="block text-slate-300 mb-1 font-semibold">دامنه سابسکریپشن / CDN</label>
-                    <input type="text" name="sub_domain" id="edit_server_sub_domain" dir="ltr" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
+                    <label class="block text-slate-300 mb-1 font-semibold">دامنه سابسکریپشن / پورت ساب‌لینک</label>
+                    <input type="text" name="sub_domain" id="edit_server_sub_domain" dir="ltr" placeholder="sub.speedur.org:2096" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
+                    <span class="text-[10px] text-slate-400 mt-0.5 block">مثال: sub.speedur.org:2096 (در صورت خالی بودن، از آدرس API استفاده می‌شود)</span>
                 </div>
                 <div>
                     <label class="block text-slate-300 mb-1 font-semibold">حداکثر ظرفیت کاربر</label>

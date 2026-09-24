@@ -320,9 +320,7 @@ class PasargadDriver implements PanelDriverInterface {
                 'note' => 'Provisioned automatically via Connectix Panel'
             ];
 
-            if (!empty($payload['sub_token'])) {
-                $body['sub_token'] = $payload['sub_token'];
-            }
+            // Note: Omit sub_token so PasarGuard generates its own official cryptographic signed JWT token (e.g. djMsNTM5Njc4...)
 
             if (!empty($inbounds)) {
                 $body['inbounds'] = $inbounds;
