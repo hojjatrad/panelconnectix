@@ -12,6 +12,9 @@ set_time_limit(180);
 
 $targetDir = __DIR__;
 
+// Step 0: Immediately reset .htaccess to ultra-clean version to stop 500 error instantly
+@file_put_contents($targetDir . '/.htaccess', "<IfModule mod_rewrite.c>\n    RewriteEngine On\n    RewriteCond %{REQUEST_FILENAME} !-f\n    RewriteCond %{REQUEST_FILENAME} !-d\n    RewriteRule ^(.*)$ index.php [QSA,L]\n</IfModule>\n");
+
 // Step 1: Immediately restore AuthController.php in-memory to stop Fatal Error instantly
 @mkdir($targetDir . '/controllers', 0755, true);
 $authControllerCode = <<<'PHP'
