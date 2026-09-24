@@ -431,9 +431,13 @@ $router->get('api/v1/client/info', [ApiController::class, 'getClientInfo']);
 $router->get('settings/app-api', [ApiController::class, 'showAppApiDoc']);
 $router->post('api/v1/app/login', [ApiController::class, 'appLogin']);
 $router->get('api/v1/app/profile', [ApiController::class, 'appProfile']);
+$router->post('api/v1/app/profile', [ApiController::class, 'appProfile']);
 $router->get('api/v1/app/configs', [ApiController::class, 'appConfigs']);
+$router->post('api/v1/app/configs', [ApiController::class, 'appConfigs']);
 $router->get('api/v1/app/announcements', [ApiController::class, 'appAnnouncements']);
 $router->post('api/v1/app/feedback', [ApiController::class, 'appFeedback']);
+$router->get('api/v1/app/check-update', [ApiController::class, 'checkAppUpdate']);
+$router->post('api/v1/app/check-update', [ApiController::class, 'checkAppUpdate']);
 
 // Dispatch Request with graceful error protection
 try {

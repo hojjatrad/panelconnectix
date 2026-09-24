@@ -536,8 +536,11 @@ function renderSimDashboard(client) {
 }
 
 function fetchSimConfigs() {
-    fetch('<?= Helpers::url('api/v1/app/configs') ?>', {
-        headers: {'Authorization': 'Bearer ' + simAuthToken}
+    fetch('<?= Helpers::url('api/v1/app/configs') ?>?auth_token=' + encodeURIComponent(simAuthToken), {
+        headers: {
+            'Authorization': 'Bearer ' + simAuthToken,
+            'X-Auth-Token': simAuthToken
+        }
     })
     .then(r => r.json())
     .then(data => {

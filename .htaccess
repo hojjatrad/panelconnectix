@@ -2,6 +2,10 @@
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
+    # Ensure Authorization header reaches PHP in FastCGI / PHP-FPM / cPanel environments
+    RewriteCond %{HTTP:Authorization} ^(.*)
+    RewriteRule .* - [e=HTTP_AUTHORIZATION:%1]
+
     # Prevent direct access to sensitive directories
     RewriteRule ^(core|drivers|data|cron)/.*$ - [F,L]
 
@@ -11,6 +15,14 @@
 
     # Redirect all other requests to index.php
     RewriteRule ^(.*)$ index.php [QSA,L]
+</IfModule>
+
+<IfModule mod_setenvif.c>
+    SetEnvIfNoCase Authorization "^(.*)$" HTTP_AUTHORIZATION=$1
+</IfModule>
+
+<IfModule mod_proxy_fcgi.c>
+    CGIPassAuth On
 </IfModule>
 
 # Security Headers

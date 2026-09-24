@@ -31,6 +31,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   bool _isConnected = false;
   bool _isConnecting = false;
+  bool _isRefreshing = false;
   int _connectedSeconds = 0;
   Timer? _timer;
 
@@ -84,9 +85,139 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       setState(() {
         _servers = list;
         if (_servers.isNotEmpty) {
-          _selectedServer = _servers.first;
+          if (_selectedServer == null || !_servers.any((s) => s.id == _selectedServer!.id)) {
+            _selectedServer = _servers.first;
+          }
         }
       });
+    }
+  }
+
+  void _manualRefresh() async {
+    if (_isRefreshing) return;
+    setState(() {
+      _isRefreshing = true;
+    });
+
+    final profileFuture = ApiService.getProfile();
+    final serversFuture = ApiService.getServers();
+
+    final results = await Future.wait([profileFuture, serversFuture]);
+    final updatedProfile = results[0] as ClientModel?;
+    final updatedServers = results[1] as List<ServerModel>;
+
+    if (mounted) {
+      setState(() {
+        _isRefreshing = false;
+        if (updatedProfile != null) {
+          _client = updatedProfile;
+        }
+        if (updatedServers.isNotEmpty) {
+          _servers = updatedServers;
+          if (_selectedServer == null || !_servers.any((s) => s.id == _selectedServer!.id)) {
+            _selectedServer = _servers.first;
+          }
+        }
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            updatedServers.isNotEmpty
+                ? 'اطلاعات حساب و ${updatedServers.length} کانکشن سرور با موفقیت بروزرسانی شد.'
+                : 'اطلاعات حساب با موفقیت بروزرسانی شد.',
+          ),
+          backgroundColor: const Color(0xFF10B981),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  void _checkAppUpdate() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(
+        child: CircularProgressIndicator(color: Color(0xFF6366F1)),
+      ),
+    );
+
+    final updateData = await ApiService.checkAppUpdate();
+    if (!mounted) return;
+    Navigator.pop(context);
+
+    if (updateData != null && updateData['has_update'] == true) {
+      final latestVer = updateData['latest_version'] ?? '3.1.0';
+      final changelog = updateData['changelog'] ?? '• پشتیبانی از نمایش تمام کانکشن‌ها\n• بهبود هسته V2Ray و پایداری شبکه';
+      final downloadUrl = updateData['download_url'] ?? '';
+
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: const Color(0xFF0F172A),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+            side: const BorderSide(color: Color(0xFF312E81)),
+          ),
+          title: Row(
+            children: [
+              const Icon(Icons.system_update_alt, color: Color(0xFF818CF8), size: 24),
+              const SizedBox(width: 8),
+              Text(
+                'نسخه جدید Connectix ($latestVer)',
+                style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'تغییرات نگارش جدید:',
+                style: TextStyle(color: Color(0xFFA5B4FC), fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                changelog,
+                style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12, height: 1.6),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('بعداً', style: TextStyle(color: Color(0xFF64748B))),
+            ),
+            ElevatedButton.icon(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                if (downloadUrl.isNotEmpty) {
+                  final uri = Uri.parse(downloadUrl);
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF6366F1),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              icon: const Icon(Icons.download, size: 16),
+              label: const Text('دانلود مستقیم APK'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('نرم‌افزار شما به آخرین نسخه رسمی بروز می‌باشد.'),
+          backgroundColor: Color(0xFF1E293B),
+        ),
+      );
     }
   }
 
@@ -190,12 +321,20 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh, color: Color(0xFF94A3B8)),
-            onPressed: () {
-              _refreshProfile();
-              _loadServers();
-            },
-            tooltip: 'بروزرسانی وضعیت',
+            icon: _isRefreshing
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF6366F1)),
+                  )
+                : const Icon(Icons.refresh, color: Color(0xFF94A3B8)),
+            onPressed: _manualRefresh,
+            tooltip: 'بروزرسانی وضعیت و کانکشن‌ها',
+          ),
+          IconButton(
+            icon: const Icon(Icons.system_update_alt, color: Color(0xFF818CF8)),
+            onPressed: _checkAppUpdate,
+            tooltip: 'بررسی نسخه جدید نرم‌افزار',
           ),
           IconButton(
             icon: const Icon(Icons.logout, color: Color(0xFF94A3B8)),
@@ -388,13 +527,16 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               // Server Selector Card
               InkWell(
                 onTap: () async {
-                  if (_servers.isEmpty) return;
+                  if (_servers.isEmpty) {
+                    _manualRefresh();
+                    return;
+                  }
                   final selected = await showModalBottomSheet<ServerModel>(
                     context: context,
                     backgroundColor: Colors.transparent,
                     isScrollControlled: true,
                     builder: (_) => FractionallySizedBox(
-                      heightFactor: 0.65,
+                      heightFactor: 0.70,
                       child: ServerListModal(
                         servers: _servers,
                         selectedServer: _selectedServer,

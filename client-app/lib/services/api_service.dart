@@ -55,10 +55,15 @@ class ApiService {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token') ?? '';
 
-      final url = Uri.parse("$baseUrl/api/v1/app/configs");
+      // Dual authorization delivery: query parameter + header to bypass cPanel FastCGI stripping
+      final url = Uri.parse("$baseUrl/api/v1/app/configs?auth_token=${Uri.encodeComponent(token)}");
       final response = await http.get(
         url,
-        headers: {'Authorization': 'Bearer $token'},
+        headers: {
+          'Authorization': 'Bearer $token',
+          'X-Auth-Token': token,
+          'Accept': 'application/json'
+        },
       );
 
       final data = jsonDecode(utf8.decode(response.bodyBytes));
@@ -77,15 +82,45 @@ class ApiService {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token') ?? '';
 
-      final url = Uri.parse("$baseUrl/api/v1/app/profile");
+      // Dual authorization delivery: query parameter + header
+      final url = Uri.parse("$baseUrl/api/v1/app/profile?auth_token=${Uri.encodeComponent(token)}");
       final response = await http.get(
         url,
-        headers: {'Authorization': 'Bearer $token'},
+        headers: {
+          'Authorization': 'Bearer $token',
+          'X-Auth-Token': token,
+          'Accept': 'application/json'
+        },
       );
 
       final data = jsonDecode(utf8.decode(response.bodyBytes));
-      if (data['success'] == true) {
+      if (data['success'] == true && data['data'] != null) {
         return ClientModel.fromJson(data['data']);
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  static Future<Map<String, dynamic>?> checkAppUpdate() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token') ?? '';
+
+      final url = Uri.parse("$baseUrl/api/v1/app/check-update?auth_token=${Uri.encodeComponent(token)}");
+      final response = await http.get(
+        url,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'X-Auth-Token': token,
+          'Accept': 'application/json'
+        },
+      );
+
+      final data = jsonDecode(utf8.decode(response.bodyBytes));
+      if (data['success'] == true && data['data'] != null) {
+        return data['data'];
       }
       return null;
     } catch (e) {

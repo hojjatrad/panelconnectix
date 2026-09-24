@@ -10,6 +10,7 @@ class ServerModel {
   final String pingUrl;
   final String configUri;
   final bool isRecommended;
+  final bool isOnline;
   int? pingMs;
 
   ServerModel({
@@ -24,6 +25,7 @@ class ServerModel {
     required this.pingUrl,
     required this.configUri,
     required this.isRecommended,
+    this.isOnline = true,
     this.pingMs,
   });
 
@@ -31,8 +33,8 @@ class ServerModel {
     return ServerModel(
       id: json['id'] ?? '',
       name: json['name'] ?? 'سرور ابری',
-      countryName: json['country_name'] ?? 'آلمان',
-      countryCode: json['country_code'] ?? 'DE',
+      countryName: json['country_name'] ?? 'بین‌الملل',
+      countryCode: json['country_code'] ?? 'INT',
       flag: json['flag'] ?? '🌐',
       protocol: json['protocol'] ?? 'vless',
       operatorTag: json['operator_tag'] ?? 'all',
@@ -40,6 +42,7 @@ class ServerModel {
       pingUrl: json['ping_url'] ?? 'https://www.google.com/generate_204',
       configUri: json['config_uri'] ?? '',
       isRecommended: json['is_recommended'] ?? false,
+      isOnline: json['is_online'] ?? true,
       pingMs: null,
     );
   }
