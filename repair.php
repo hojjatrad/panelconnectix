@@ -22,18 +22,27 @@ if (isset($_GET['dump_clients'])) {
     exit;
 }
 
-if (isset($_GET['check_api'])) {
+if (isset($_GET['clear_opcache'])) {
     header('Content-Type: application/json; charset=utf-8');
-    $apiFile = __DIR__ . '/controllers/ApiController.php';
-    echo json_encode([
-        'exists' => file_exists($apiFile),
-        'size' => file_exists($apiFile) ? filesize($apiFile) : 0,
-        'md5' => file_exists($apiFile) ? md5_file($apiFile) : null,
-        'has_mci_reality_de' => file_exists($apiFile) ? str_contains(file_get_contents($apiFile), 'mci_reality_de') : false,
-        'has_extractServerList' => file_exists($apiFile) ? str_contains(file_get_contents($apiFile), 'extractServerList') : false,
-        'writable' => is_writable($apiFile),
-        'dir_writable' => is_writable(__DIR__ . '/controllers'),
-    ], JSON_PRETTY_PRINT);
+    $res = [];
+    if (function_exists('opcache_reset')) {
+        $res['opcache_reset'] = @opcache_reset();
+    }
+    $files = [
+        __DIR__ . '/controllers/ApiController.php',
+        __DIR__ . '/controllers/SublinkController.php',
+        __DIR__ . '/controllers/ClientController.php',
+        __DIR__ . '/drivers/PasargadDriver.php',
+        __DIR__ . '/index.php'
+    ];
+    foreach ($files as $f) {
+        @touch($f);
+        if (function_exists('opcache_invalidate')) {
+            $res[basename($f)] = @opcache_invalidate($f, true);
+        }
+    }
+    clearstatcache(true);
+    echo json_encode(['success' => true, 'details' => $res], JSON_PRETTY_PRINT);
     exit;
 }
 
