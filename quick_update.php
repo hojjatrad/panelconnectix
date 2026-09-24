@@ -150,6 +150,32 @@ if (function_exists('clearstatcache')) {
     @clearstatcache(true);
 }
 
+// Send Notification to Telegram Supergroup Reports Topic
+$tgNotice = '';
+try {
+    require_once __DIR__ . '/config.php';
+    require_once __DIR__ . '/core/Database.php';
+    require_once __DIR__ . '/core/Setting.php';
+    require_once __DIR__ . '/core/TelegramBot.php';
+
+    $dateTime = date('Y-m-d H:i:s');
+    $tgMsg = "🚀 <b>بروزرسانی موفق پنل با آخرین نسخه گیت‌هاب</b>\n\n"
+           . "📅 <b>زمان:</b> <code>{$dateTime}</code>\n"
+           . "📦 <b>تعداد فایل‌های ارتقا یافته:</b> <code>{$copiedFiles} فایل</code>\n"
+           . "🌐 <b>مخزن:</b> <code>{$repo} (شاخه main)</code>\n"
+           . "⚡️ <b>وضعیت:</b> تمامی فایل‌ها، کنترلرها و درایورها با موفقیت مستقر شدند ✅\n\n"
+           . "💡 <i>سامانه با موفقیت به آخرین نسخه رسمی متصل گردید.</i>";
+
+    // Route directly to Reports Topic (bot_topic_general or bot_topic_notifications)
+    $sent = TelegramBot::sendCategorizedReport('general', $tgMsg);
+    if (!$sent) {
+        $sent = TelegramBot::sendCategorizedReport('notifications', $tgMsg);
+    }
+    if ($sent) {
+        $tgNotice = 'پیام تایید به سوپرگروه تلگرام در تب گزارش‌ها ارسال شد.';
+    }
+} catch (Throwable $e) {}
+
 @unlink($tmpZip);
 ?>
 <!DOCTYPE html>
@@ -162,6 +188,11 @@ if (function_exists('clearstatcache')) {
 <body class="bg-slate-950 text-slate-100 p-8">
     <div class="max-w-xl mx-auto bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4">
         <h1 class="text-lg font-bold text-emerald-400">فایل‌های ارتقا یافته: <?= $copiedFiles ?></h1>
+        <?php if (!empty($tgNotice)): ?>
+            <div class="p-3 rounded-xl bg-sky-950/60 border border-sky-800 text-sky-200 text-xs font-bold flex items-center gap-2">
+                <span>📢 <?= htmlspecialchars($tgNotice) ?></span>
+            </div>
+        <?php endif; ?>
         <div class="text-xs text-slate-300">ApiController MD5: <?= md5_file(__DIR__ . '/controllers/ApiController.php') ?></div>
         <pre class="bg-black/60 p-4 rounded-xl text-[10px] text-slate-400 max-h-60 overflow-y-auto"><?= htmlspecialchars(implode("\n", $copyLog)) ?></pre>
         <a href="repair.php" class="inline-block px-4 py-2 bg-purple-600 text-white rounded-xl text-xs font-bold">بررسی سلامت</a>

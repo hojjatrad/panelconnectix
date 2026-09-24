@@ -277,6 +277,22 @@ class Updater {
 
         Helpers::logActivity('system_update', "به‌روزرسانی موفق پنل به نگارش {$installedVer}", 'system');
 
+        // Send Notification to Telegram Supergroup Reports Topic
+        try {
+            require_once __DIR__ . '/TelegramBot.php';
+            $msg = "🚀 <b>بروزرسانی موفق پنل با آخرین کدهای گیت‌هاب</b>\n\n"
+                 . "📅 <b>تاریخ:</b> " . date('Y-m-d H:i:s') . "\n"
+                 . "🔖 <b>نگارش فعال:</b> <code>v{$installedVer}</code>\n"
+                 . "📦 <b>مخزن:</b> <code>" . self::getRepo() . " (" . self::getBranch() . ")</code>\n"
+                 . "✅ تمامی فایل‌های هسته، کنترلرها و درایورها با موفقیت بروزرسانی شدند.";
+            
+            // Send to Supergroup Reports Topic (general or notifications)
+            $sent = TelegramBot::sendCategorizedReport('general', $msg);
+            if (!$sent) {
+                TelegramBot::sendCategorizedReport('notifications', $msg);
+            }
+        } catch (Throwable $e) {}
+
         return [
             'success' => true,
             'version' => $installedVer,
