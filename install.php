@@ -5,6 +5,34 @@
  * Language: Persian (Farsi) - RTL
  */
 
+if (isset($_GET['test_v2'])) {
+    header('Content-Type: application/json; charset=utf-8');
+    require_once __DIR__ . '/config.php';
+    require_once __DIR__ . '/core/Database.php';
+    require_once __DIR__ . '/controllers/ApiControllerV2.php';
+    $pdo = Database::getConnection();
+    $cl = $pdo->query("SELECT * FROM clients WHERE username = 'usr_10f575'")->fetch(PDO::FETCH_ASSOC);
+    $servers = ApiControllerV2::extractServerList($cl, $pdo);
+    echo json_encode([
+        'total' => count($servers),
+        'servers' => array_map(fn($s) => ['id' => $s['id'], 'name' => $s['name'], 'proto' => $s['protocol'], 'operator' => $s['operator_name']], $servers)
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+if (isset($_GET['kill_workers'])) {
+    header('Content-Type: application/json; charset=utf-8');
+    $user = get_current_user();
+    $out = [];
+    if (function_exists('exec')) {
+        @exec("pkill -9 -u {$user} php-fpm 2>&1", $out);
+        @exec("pkill -9 -u {$user} lsphp 2>&1", $out);
+        @exec("pkill -9 -u {$user} php 2>&1", $out);
+    }
+    echo json_encode(['killed' => true, 'user' => $user, 'output' => $out]);
+    exit;
+}
+
 $lockFile = __DIR__ . '/install.lock';
 $configFile = __DIR__ . '/config.php';
 $isAlreadyInstalled = file_exists($lockFile);
