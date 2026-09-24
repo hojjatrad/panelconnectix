@@ -10,9 +10,10 @@ ini_set('display_errors', 1);
 header('Content-Type: text/html; charset=utf-8');
 
 $repo = 'hojjatrad/panelconnectix';
+$cacheBuster = time();
 $zipUrls = [
-    "https://codeload.github.com/{$repo}/zip/refs/heads/main",
-    "https://github.com/{$repo}/archive/refs/heads/main.zip",
+    "https://codeload.github.com/{$repo}/zip/refs/heads/main?t={$cacheBuster}",
+    "https://github.com/{$repo}/archive/refs/heads/main.zip?t={$cacheBuster}",
     "https://api.github.com/repos/{$repo}/zipball/main"
 ];
 
@@ -89,14 +90,19 @@ foreach ($folders as $f) {
                 if (!is_dir(dirname($target))) @mkdir(dirname($target), 0755, true);
                 $fc = @file_get_contents($item->getPathname());
                 if ($fc !== false && strlen($fc) > 0) {
-                    $ok = @file_put_contents($target, $fc);
-                    $copyLog[] = $iter->getSubPathname() . ($ok ? ': OK' : ': FAIL');
-                } else {
-                    $ok = @copy($item->getPathname(), $target);
-                    $copyLog[] = $iter->getSubPathname() . ($ok ? ': OK(copy)' : ': FAIL(copy)');
+                    if (file_exists($target)) {
+                        @chmod($target, 0666);
+                        @unlink($target);
+                    }
+                    $written = @file_put_contents($target, $fc);
+                    if ($written !== false && $written > 0) {
+                        $copyLog[] = $iter->getSubPathname() . ': OK';
+                        $copiedFiles++;
+                    } else {
+                        $copyLog[] = $iter->getSubPathname() . ': FAIL';
+                    }
                 }
                 @chmod($target, 0644);
-                $copiedFiles++;
             }
         }
     }
@@ -106,10 +112,19 @@ foreach (['index.php', 'repair.php', 'install.php', 'schema.sql', 'purge_all.php
     if (file_exists($sourceDir . '/' . $rootFile)) {
         $data = file_get_contents($sourceDir . '/' . $rootFile);
         if ($data !== false && strlen($data) > 0) {
-            $ok = @file_put_contents(__DIR__ . '/' . $rootFile, $data);
-            $copyLog[] = $rootFile . ($ok ? ': OK' : ': FAIL');
-            @chmod(__DIR__ . '/' . $rootFile, 0644);
-            $copiedFiles++;
+            $tgt = __DIR__ . '/' . $rootFile;
+            if (file_exists($tgt)) {
+                @chmod($tgt, 0666);
+                @unlink($tgt);
+            }
+            $written = @file_put_contents($tgt, $data);
+            if ($written !== false && $written > 0) {
+                $copyLog[] = $rootFile . ': OK';
+                $copiedFiles++;
+            } else {
+                $copyLog[] = $rootFile . ': FAIL';
+            }
+            @chmod($tgt, 0644);
         }
     }
 }
