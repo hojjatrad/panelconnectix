@@ -213,7 +213,7 @@ foreach ($folders as $f) {
     }
 }
 
-foreach (['index.php', 'repair.php', 'diag.php', 'diag2.php', 'cpanel_permissions.php', 'install.php', 'schema.sql', 'purge_all.php', 'quick_update.php', 'cpanel_fix.php', 'sync.php'] as $rootFile) {
+foreach (['index.php', 'repair.php', 'diag.php', 'diag2.php', 'find_mock.php', 'cpanel_permissions.php', 'install.php', 'schema.sql', 'purge_all.php', 'quick_update.php', 'cpanel_fix.php', 'sync.php'] as $rootFile) {
     if (file_exists($sourceDir . '/' . $rootFile)) {
         $data = file_get_contents($sourceDir . '/' . $rootFile);
         if ($data !== false && strlen($data) > 0) {
