@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/client_model.dart';
@@ -7,6 +9,8 @@ import '../models/server_model.dart';
 class ApiService {
   // Permanently preset and concealed Connectix Panel URL
   static String baseUrl = "https://vpbotn.ir/contax";
+
+  static const MethodChannel _updaterChannel = MethodChannel('com.connectix.vpn/updater');
 
   static Future<void> initBaseUrl() async {
     final prefs = await SharedPreferences.getInstance();
@@ -187,9 +191,9 @@ class ApiService {
 
         return {
           'has_update': false, // controlled by semantic version check in UI
-          'latest_version': tag.isNotEmpty ? tag : '1.0.4',
+          'latest_version': tag.isNotEmpty ? tag : '3.0.0',
           'title': ghData['name'] ?? 'نگارش جدید Connectix',
-          'changelog': ghData['body'] ?? 'بهینه‌سازی کانکشن‌ها و امکان بروزرسانی خودکار درون‌برنامه‌ای',
+          'changelog': ghData['body'] ?? 'بهینه‌سازی کانکشن‌ها، بروزرسانی خودکار درون‌برنامه‌ای، اتصال هوشمند و تونل اختصاصی برنامه‌های بانکی',
           'download_url': arm64Url.isNotEmpty ? arm64Url : "https://github.com/hojjatrad/panelconnectix/releases/download/v3.0.0/Connectix-ARM64-v8a.apk",
           'universal_url': universalUrl
         };
@@ -199,9 +203,107 @@ class ApiService {
     return null;
   }
 
+  /**
+   * High-Speed In-App Download and Native Package Installation
+   * Downloads APK directly into cache with progress callback, then summons Android PackageInstaller
+   */
+  static Future<void> downloadAndInstallApk({
+    required String downloadUrl,
+    required Function(double progress, int receivedBytes, int totalBytes) onProgress,
+    required Function(String error) onError,
+    required Function() onSuccess,
+  }) async {
+    try {
+      // 1. Check Android 8.0+ Unknown Sources Permission
+      bool canInstall = true;
+      try {
+        final res = await _updaterChannel.invokeMethod<bool>('canInstallPackages');
+        canInstall = res ?? true;
+      } catch (_) {}
+
+      if (!canInstall) {
+        await _updaterChannel.invokeMethod('openInstallPermissionSettings');
+        onError('لطفاً دسترسی نصب برنامه را در صفحه تنظیمات باز شده فعال فرمایید و مجدداً تلاش کنید.');
+        return;
+      }
+
+      // 2. Query Cache Directory
+      String? cacheDirPath;
+      try {
+        cacheDirPath = await _updaterChannel.invokeMethod<String>('getCacheDir');
+      } catch (_) {}
+
+      if (cacheDirPath == null || cacheDirPath.isEmpty) {
+        cacheDirPath = "/data/user/0/com.connectix.vpn/cache";
+      }
+
+      final dir = Directory(cacheDirPath);
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
+      }
+
+      final file = File('$cacheDirPath/Connectix-Update.apk');
+      if (await file.exists()) {
+        try {
+          await file.delete();
+        } catch (_) {}
+      }
+
+      // 3. Stream download with real-time byte tracking
+      final client = http.Client();
+      final request = http.Request('GET', Uri.parse(downloadUrl));
+      final response = await client.send(request);
+
+      if (response.statusCode >= 400) {
+        onError('خطا در دریافت بسته نرم‌افزاری (کد خطا: ${response.statusCode})');
+        return;
+      }
+
+      final totalBytes = response.contentLength ?? 0;
+      int receivedBytes = 0;
+      final sink = file.openWrite();
+
+      await response.stream.listen(
+        (chunk) {
+          receivedBytes += chunk.length;
+          sink.add(chunk);
+          if (totalBytes > 0) {
+            onProgress(receivedBytes / totalBytes, receivedBytes, totalBytes);
+          } else {
+            onProgress(0.0, receivedBytes, 0);
+          }
+        },
+        cancelOnError: true,
+      ).asFuture();
+
+      await sink.flush();
+      await sink.close();
+
+      // 4. Trigger Native Android Package Installer Dialog
+      final installResult = await _updaterChannel.invokeMethod('installApk', {
+        'filePath': file.path,
+      });
+
+      if (installResult == true) {
+        onSuccess();
+      } else {
+        onError('نصاب اندروید قادر به باز کردن بسته نبود.');
+      }
+    } catch (e) {
+      onError('خطا در دانلود یا نصب بسته: $e');
+    }
+  }
+
+  static Future<void> openHotspotSettings() async {
+    try {
+      await _updaterChannel.invokeMethod('openHotspotSettings');
+    } catch (_) {}
+  }
+
   static Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
     await prefs.remove('saved_password');
   }
 }
+
