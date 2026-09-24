@@ -77,11 +77,32 @@ if (file_exists(__DIR__ . '/data/panel.sqlite')) {
 
 $repo = 'hojjatrad/panelconnectix';
 $cacheBuster = time();
-$zipUrls = [
-    "https://api.github.com/repos/{$repo}/zipball/main?t={$cacheBuster}",
-    "https://codeload.github.com/{$repo}/zip/refs/heads/main?t={$cacheBuster}",
-    "https://github.com/{$repo}/archive/refs/heads/main.zip?t={$cacheBuster}"
-];
+
+// Fetch latest commit SHA
+$latestSha = '';
+$chSha = curl_init("https://api.github.com/repos/{$repo}/commits/main");
+curl_setopt($chSha, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($chSha, CURLOPT_TIMEOUT, 6);
+curl_setopt($chSha, CURLOPT_SSL_VERIFYPEER, false);
+curl_setopt($chSha, CURLOPT_SSL_VERIFYHOST, false);
+curl_setopt($chSha, CURLOPT_HTTPHEADER, ['User-Agent: Connectix-Live-Updater']);
+$shaJson = curl_exec($chSha);
+curl_close($chSha);
+if ($shaJson) {
+    $shaData = json_decode($shaJson, true);
+    if (!empty($shaData['sha'])) {
+        $latestSha = $shaData['sha'];
+    }
+}
+
+$zipUrls = [];
+if (!empty($latestSha)) {
+    $zipUrls[] = "https://codeload.github.com/{$repo}/zip/{$latestSha}";
+    $zipUrls[] = "https://github.com/{$repo}/archive/{$latestSha}.zip";
+}
+$zipUrls[] = "https://codeload.github.com/{$repo}/zip/refs/heads/main?t={$cacheBuster}";
+$zipUrls[] = "https://api.github.com/repos/{$repo}/zipball/main?t={$cacheBuster}";
+$zipUrls[] = "https://github.com/{$repo}/archive/refs/heads/main.zip?t={$cacheBuster}";
 
 $zipData = false;
 $usedUrl = '';
@@ -121,8 +142,8 @@ if (!$zipData) {
     exit;
 }
 
-$tmpZip = sys_get_temp_dir() . '/cx_upd_' . time() . '.zip';
-$tmpExt = sys_get_temp_dir() . '/cx_ext_' . time();
+$tmpZip = sys_get_temp_dir() . '/cx_upd_' . uniqid() . '.zip';
+$tmpExt = sys_get_temp_dir() . '/cx_ext_' . uniqid();
 file_put_contents($tmpZip, $zipData);
 
 logStep("در حال بازگشایی و استخراج فایل‌های جدید...", 'info');
