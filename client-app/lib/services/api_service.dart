@@ -133,10 +133,31 @@ class ApiService {
   }
 
   /**
-   * Dual-Engine In-App Updater: checks GitHub Releases directly with Panel fallback
+   * Dual-Engine In-App Updater: checks Panel update API with GitHub fallback
    */
   static Future<Map<String, dynamic>?> checkAppUpdate() async {
-    // 1. First priority: Check GitHub API directly
+    // 1. Primary: Query Panel /api/v1/app/check-update
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token') ?? '';
+
+      final url = Uri.parse("$baseUrl/api/v1/app/check-update?auth_token=${Uri.encodeComponent(token)}");
+      final response = await http.get(
+        url,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'X-Auth-Token': token,
+          'Accept': 'application/json'
+        },
+      );
+
+      final data = jsonDecode(utf8.decode(response.bodyBytes));
+      if (data['success'] == true && data['data'] != null) {
+        return data['data'];
+      }
+    } catch (_) {}
+
+    // 2. Fallback: Check GitHub API directly
     try {
       final ghUri = Uri.parse("https://api.github.com/repos/hojjatrad/panelconnectix/releases/latest");
       final ghRes = await http.get(ghUri, headers: {'Accept': 'application/vnd.github.v3+json'});
@@ -157,8 +178,8 @@ class ApiService {
         }
 
         return {
-          'has_update': true,
-          'latest_version': tag.isNotEmpty ? tag : '3.1.0',
+          'has_update': false, // controlled by semantic version check in UI
+          'latest_version': tag.isNotEmpty ? tag : '1.0.4',
           'title': ghData['name'] ?? 'نگارش جدید Connectix',
           'changelog': ghData['body'] ?? 'بهینه‌سازی کانکشن‌ها و امکان بروزرسانی خودکار درون‌برنامه‌ای',
           'download_url': arm64Url.isNotEmpty ? arm64Url : "https://github.com/hojjatrad/panelconnectix/releases/download/v3.0.0/Connectix-ARM64-v8a.apk",
@@ -167,29 +188,7 @@ class ApiService {
       }
     } catch (_) {}
 
-    // 2. Second priority: Query Panel /api/v1/app/check-update
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('auth_token') ?? '';
-
-      final url = Uri.parse("$baseUrl/api/v1/app/check-update?auth_token=${Uri.encodeComponent(token)}");
-      final response = await http.get(
-        url,
-        headers: {
-          'Authorization': 'Bearer $token',
-          'X-Auth-Token': token,
-          'Accept': 'application/json'
-        },
-      );
-
-      final data = jsonDecode(utf8.decode(response.bodyBytes));
-      if (data['success'] == true && data['data'] != null) {
-        return data['data'];
-      }
-      return null;
-    } catch (e) {
-      return null;
-    }
+    return null;
   }
 
   static Future<void> logout() async {

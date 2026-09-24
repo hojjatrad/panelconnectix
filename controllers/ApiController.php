@@ -502,6 +502,15 @@ class ApiController {
 
         $realLinks = [];
 
+        // Ensure client is attached to an active server if server_id was NULL
+        if (empty($client['server_id'])) {
+            $activeServer = $pdo->query("SELECT id FROM server_nodes WHERE is_active = 1 AND driver != 'mock' ORDER BY id ASC LIMIT 1")->fetch();
+            if ($activeServer) {
+                $client['server_id'] = (int)$activeServer['id'];
+                $pdo->prepare("UPDATE clients SET server_id = ? WHERE id = ?")->execute([$client['server_id'], $client['id']]);
+            }
+        }
+
         // 1. First priority: Check stored node_sublink directly
         if (!empty($client['node_sublink'])) {
             $ch = curl_init($client['node_sublink']);
@@ -525,7 +534,7 @@ class ApiController {
             }
         }
 
-        // 2. Second priority: Query driver directly (Marzban / Pasargad / 3x-ui)
+        // 2. Second priority: Query server driver directly (Marzban / Pasargad / 3x-ui)
         if (empty($realLinks) && !empty($client['server_id'])) {
             try {
                 $stmtNode = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ?");
@@ -534,6 +543,23 @@ class ApiController {
                 if ($node && $node['driver'] !== 'mock') {
                     $driver = DriverFactory::create($node);
                     $liveData = $driver->getUser($client['username']);
+
+                    // If user not found on node, provision them immediately on the node
+                    if (!$liveData) {
+                        $createRes = $driver->createUser([
+                            'username' => $client['username'],
+                            'uuid' => $client['uuid'],
+                            'password' => $client['password'] ?: '123456',
+                            'traffic_limit_bytes' => (int)$client['traffic_limit_bytes'],
+                            'expire_timestamp' => !empty($client['expire_at']) ? strtotime($client['expire_at']) : (time() + 30 * 86400)
+                        ]);
+                        if ($createRes['success']) {
+                            $liveData = $driver->getUser($client['username']);
+                            if (!empty($createRes['links'])) {
+                                $realLinks = $createRes['links'];
+                            }
+                        }
+                    }
 
                     if (!empty($liveData['links']) && is_array($liveData['links'])) {
                         foreach ($liveData['links'] as $link) {
@@ -706,15 +732,15 @@ class ApiController {
         $universalUrl = 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.0.0/Connectix-Universal.apk';
         
         self::jsonSuccess([
-            'current_version' => '1.0.3',
-            'latest_version' => '3.1.0',
-            'has_update' => true,
-            'title' => 'نسخه جدید Connectix v3.1.0 آماده دریافت است',
-            'changelog' => "• نمایش و انتخاب تمامی کانکشن‌های سرور حتی کانکشن‌های فیلترشده\n• بهینه‌سازی هسته اتصال V2Ray و پایداری شبکه\n• امکان بروزرسانی مستقیم وضعیت حساب و کانکشن‌ها\n• رفع باگ احراز هویت هاست و لود سریع‌تر کانکشن‌ها",
+            'current_version' => '1.0.4',
+            'latest_version' => '1.0.4',
+            'has_update' => false,
+            'title' => 'Connectix v1.0.4',
+            'changelog' => "• نمایش و انتخاب تمامی کانکشن‌های واقعی سرور (۱۷ کانکشن نود)\n• امضای دائمی و نصب مستقیم روی نسخه‌های قبلی بدون نیاز به حذف برنامه\n• ذخیره و پنهان‌سازی کامل آدرس دامنه سرور\n• بروزرسانی زنده کانکشن‌ها، سرعت آپلود/دانلود و اطلاعیه‌ها",
             'download_url' => $arm64Url,
             'universal_url' => $universalUrl,
             'release_date' => date('Y-m-d')
-        ], 'اطلاعات بروزرسانی نرم‌افزار با موفقیت دریافت شد.');
+        ], 'شما از آخرین نسخه رسمی نرم‌افزار استفاده می‌فرمایید.');
     }
 
     /**

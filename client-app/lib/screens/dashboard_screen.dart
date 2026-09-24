@@ -51,6 +51,27 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     _autoCheckUpdateInBackground();
   }
 
+  static const String currentAppVersion = '1.0.4';
+
+  static bool isNewerVersion(String latest, String current) {
+    try {
+      List<int> parse(String v) => v
+          .replaceAll(RegExp(r'[^\d.]'), '')
+          .split('.')
+          .map((e) => int.tryParse(e) ?? 0)
+          .toList();
+      final l = parse(latest);
+      final c = parse(current);
+      for (int i = 0; i < 3; i++) {
+        final lv = i < l.length ? l[i] : 0;
+        final cv = i < c.length ? c[i] : 0;
+        if (lv > cv) return true;
+        if (lv < cv) return false;
+      }
+    } catch (_) {}
+    return false;
+  }
+
   void _loadAnnouncements() async {
     final list = await ApiService.getAnnouncements();
     if (mounted && list.isNotEmpty) {
@@ -61,13 +82,31 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   void _autoCheckUpdateInBackground() async {
-    final updateData = await ApiService.checkAppUpdate();
-    if (mounted && updateData != null && updateData['has_update'] == true) {
-      setState(() {
-        _hasAppUpdate = true;
-        _updateInfo = updateData;
-      });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final updateData = await ApiService.checkAppUpdate();
+      if (mounted && updateData != null) {
+        final latest = (updateData['latest_version'] ?? '').toString();
+        final dismissed = prefs.getString('dismissed_version') ?? '';
+
+        if (isNewerVersion(latest, currentAppVersion) && dismissed != latest) {
+          setState(() {
+            _hasAppUpdate = true;
+            _updateInfo = updateData;
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
+  void _dismissUpdateBanner() async {
+    if (_updateInfo != null) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('dismissed_version', (_updateInfo!['latest_version'] ?? '').toString());
     }
+    setState(() {
+      _hasAppUpdate = false;
+    });
   }
 
   void _initV2Ray() async {
@@ -173,9 +212,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     if (!mounted) return;
     Navigator.pop(context);
 
-    if (updateData != null && updateData['has_update'] == true) {
-      final latestVer = updateData['latest_version'] ?? '3.1.0';
-      final changelog = updateData['changelog'] ?? '• پشتیبانی از نمایش تمام کانکشن‌ها\n• بهبود هسته V2Ray و پایداری شبکه';
+    if (updateData != null && isNewerVersion((updateData['latest_version'] ?? '').toString(), currentAppVersion)) {
+      final latestVer = updateData['latest_version'] ?? 'جدید';
+      final changelog = updateData['changelog'] ?? '• بهینه‌سازی هسته اتصال و پایداری شبکه';
       final downloadUrl = updateData['download_url'] ?? '';
 
       showDialog(
@@ -239,9 +278,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('نرم‌افزار شما به آخرین نسخه رسمی بروز می‌باشد.'),
-          backgroundColor: Color(0xFF1E293B),
+        SnackBar(
+          content: Text('شما از آخرین نسخه رسمی نرم‌افزار ($currentAppVersion) استفاده می‌فرمایید.'),
+          backgroundColor: const Color(0xFF1E293B),
         ),
       );
     }
@@ -432,6 +471,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
                         child: const Text('آپدیت', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                      ),
+                      const SizedBox(width: 4),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white70, size: 16),
+                        onPressed: _dismissUpdateBanner,
+                        tooltip: 'بستن',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
                       ),
                     ],
                   ),

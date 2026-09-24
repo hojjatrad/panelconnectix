@@ -240,14 +240,28 @@ class PasargadDriver implements PanelDriverInterface {
         $res = $this->request($this->apiPrefix . '/inbounds');
         if ($res['success'] && is_array($res['data'])) {
             $inbounds = [];
-            foreach ($res['data'] as $proto => $items) {
-                if (is_array($items)) {
-                    $inbounds[$proto] = [];
-                    foreach ($items as $item) {
-                        if (is_array($item) && !empty($item['tag'])) {
-                            $inbounds[$proto][] = $item['tag'];
-                        } elseif (is_string($item)) {
-                            $inbounds[$proto][] = $item;
+            // Check if flat list
+            if (isset($res['data'][0]) && is_array($res['data'][0])) {
+                foreach ($res['data'] as $item) {
+                    if (is_array($item)) {
+                        $proto = strtolower($item['protocol'] ?? 'vless');
+                        $tag = $item['tag'] ?? null;
+                        if ($tag) {
+                            $inbounds[$proto][] = $tag;
+                        }
+                    }
+                }
+            } else {
+                foreach ($res['data'] as $proto => $items) {
+                    $protoLower = strtolower((string)$proto);
+                    if (is_array($items)) {
+                        $inbounds[$protoLower] = [];
+                        foreach ($items as $item) {
+                            if (is_array($item) && !empty($item['tag'])) {
+                                $inbounds[$protoLower][] = $item['tag'];
+                            } elseif (is_string($item)) {
+                                $inbounds[$protoLower][] = $item;
+                            }
                         }
                     }
                 }

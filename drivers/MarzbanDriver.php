@@ -165,17 +165,32 @@ class MarzbanDriver implements PanelDriverInterface {
         $res = $this->request($this->apiPrefix . '/inbounds');
         if ($res['success'] && is_array($res['data'])) {
             $list = [];
-            foreach ($res['data'] as $proto => $items) {
-                if (is_array($items)) {
-                    foreach ($items as $item) {
-                        if (is_array($item)) {
-                            $list[] = [
-                                'tag' => $item['tag'] ?? 'Inbound',
-                                'protocol' => strtolower($proto),
-                                'network' => $item['network'] ?? 'tcp',
-                                'tls' => $item['tls'] ?? 'none',
-                                'port' => $item['port'] ?? 443
-                            ];
+            // Check if flat list
+            if (isset($res['data'][0]) && is_array($res['data'][0])) {
+                foreach ($res['data'] as $item) {
+                    if (is_array($item)) {
+                        $list[] = [
+                            'tag' => $item['tag'] ?? 'Inbound',
+                            'protocol' => strtolower($item['protocol'] ?? 'vless'),
+                            'network' => $item['network'] ?? 'tcp',
+                            'tls' => $item['tls'] ?? 'none',
+                            'port' => $item['port'] ?? 443
+                        ];
+                    }
+                }
+            } else {
+                foreach ($res['data'] as $proto => $items) {
+                    if (is_array($items)) {
+                        foreach ($items as $item) {
+                            if (is_array($item)) {
+                                $list[] = [
+                                    'tag' => $item['tag'] ?? 'Inbound',
+                                    'protocol' => strtolower((string)$proto),
+                                    'network' => $item['network'] ?? 'tcp',
+                                    'tls' => $item['tls'] ?? 'none',
+                                    'port' => $item['port'] ?? 443
+                                ];
+                            }
                         }
                     }
                 }
@@ -190,14 +205,28 @@ class MarzbanDriver implements PanelDriverInterface {
         $res = $this->request($this->apiPrefix . '/inbounds');
         if ($res['success'] && is_array($res['data'])) {
             $inbounds = [];
-            foreach ($res['data'] as $proto => $items) {
-                if (is_array($items)) {
-                    $inbounds[$proto] = [];
-                    foreach ($items as $item) {
-                        if (is_array($item) && !empty($item['tag'])) {
-                            $inbounds[$proto][] = $item['tag'];
-                        } elseif (is_string($item)) {
-                            $inbounds[$proto][] = $item;
+            // Check if flat list
+            if (isset($res['data'][0]) && is_array($res['data'][0])) {
+                foreach ($res['data'] as $item) {
+                    if (is_array($item)) {
+                        $proto = strtolower($item['protocol'] ?? 'vless');
+                        $tag = $item['tag'] ?? null;
+                        if ($tag) {
+                            $inbounds[$proto][] = $tag;
+                        }
+                    }
+                }
+            } else {
+                foreach ($res['data'] as $proto => $items) {
+                    $protoLower = strtolower((string)$proto);
+                    if (is_array($items)) {
+                        $inbounds[$protoLower] = [];
+                        foreach ($items as $item) {
+                            if (is_array($item) && !empty($item['tag'])) {
+                                $inbounds[$protoLower][] = $item['tag'];
+                            } elseif (is_string($item)) {
+                                $inbounds[$protoLower][] = $item;
+                            }
                         }
                     }
                 }
@@ -347,13 +376,29 @@ class MarzbanDriver implements PanelDriverInterface {
                     $expAt = ($ts !== false && $ts > 0) ? date('Y-m-d H:i:s', $ts) : (string)$expRaw;
                 }
             }
+
+            $links = $u['links'] ?? [];
+
+            // If user has no links, auto-attach all active server inbounds to user so Marzban generates all configs
+            if (empty($links)) {
+                $allInbounds = $this->getInbounds();
+                if (!empty($allInbounds)) {
+                    $updRes = $this->request($this->apiPrefix . '/user/' . urlencode($username), 'PUT', [
+                        'inbounds' => $allInbounds
+                    ]);
+                    if ($updRes['success'] && !empty($updRes['data']['links'])) {
+                        $links = $updRes['data']['links'];
+                    }
+                }
+            }
+
             return [
                 'traffic_used_bytes' => $u['used_traffic'] ?? 0,
                 'traffic_limit_bytes' => $u['data_limit'] ?? 0,
                 'expire_at' => $expAt,
                 'status' => $u['status'] ?? 'active',
                 'online' => ($u['online_at'] ?? 0) > (time() - 300),
-                'links' => $u['links'] ?? [],
+                'links' => $links,
                 'subscription_url' => $u['subscription_url'] ?? ''
             ];
         }
