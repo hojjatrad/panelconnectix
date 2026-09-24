@@ -11,6 +11,17 @@ define('CONNECTIX_REPAIR', true);
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
+if (isset($_GET['dump_clients'])) {
+    header('Content-Type: application/json; charset=utf-8');
+    require_once __DIR__ . '/config.php';
+    require_once __DIR__ . '/core/Database.php';
+    $pdo = Database::getConnection();
+    $rows = $pdo->query("SELECT id, name, driver, config_template, sub_domain FROM server_nodes")->fetchAll(PDO::FETCH_ASSOC);
+    $clients = $pdo->query("SELECT id, username, password, server_id, sub_token, node_sublink, traffic_limit_bytes, traffic_used_bytes, expire_at, status FROM clients ORDER BY id DESC LIMIT 10")->fetchAll(PDO::FETCH_ASSOC);
+    echo json_encode(['servers' => $rows, 'clients' => $clients], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 // Direct Zero-Dependency One-Click Restoration Hook
 if (isset($_GET['update_from_git']) || (isset($_GET['restore_files']) && $_GET['restore_files'] === '1')) {
     header('Content-Type: text/html; charset=utf-8');
