@@ -105,6 +105,14 @@ foreach (['index.php', 'repair.php', 'install.php', 'schema.sql', 'purge_all.php
     }
 }
 
+// Invalidate OPcache and stat cache so changes take effect immediately
+if (function_exists('opcache_reset')) {
+    @opcache_reset();
+}
+if (function_exists('clearstatcache')) {
+    @clearstatcache(true);
+}
+
 @unlink($tmpZip);
 ?>
 <!DOCTYPE html>
