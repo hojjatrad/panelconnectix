@@ -94,8 +94,8 @@ jobs:
                   applicationId = "com.connectix.vpn"
                   minSdk = 21
                   targetSdk = 34
-                  versionCode = 5
-                  versionName = "1.0.4"
+                  versionCode = 6
+                  versionName = "3.0.0"
                   multiDexEnabled = true
               }
 

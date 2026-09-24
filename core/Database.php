@@ -71,22 +71,16 @@ class Database {
         try {
             $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
             if ($driver === 'mysql') {
-                static $existingCols = null;
-                if ($existingCols === null) {
-                    $existingCols = [];
-                    try {
-                        $rows = $pdo->query("SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE()")->fetchAll(PDO::FETCH_ASSOC);
-                        foreach ($rows as $r) {
-                            $existingCols[$r['TABLE_NAME'] . '.' . $r['COLUMN_NAME']] = true;
-                        }
-                    } catch (Throwable $e) {}
-                }
-                if (!isset($existingCols[$table . '.' . $column])) {
+                $check = $pdo->query("SHOW COLUMNS FROM `{$table}` LIKE '{$column}'")->fetch();
+                if (!$check) {
                     $pdo->exec("ALTER TABLE `{$table}` ADD COLUMN `{$column}` {$definition}");
-                    $existingCols[$table . '.' . $column] = true;
                 }
             } else {
-                $pdo->exec("ALTER TABLE `{$table}` ADD COLUMN `{$column}` {$definition}");
+                $cols = $pdo->query("PRAGMA table_info(`{$table}`)")->fetchAll(PDO::FETCH_ASSOC);
+                $names = array_column($cols, 'name');
+                if (!in_array($column, $names)) {
+                    $pdo->exec("ALTER TABLE `{$table}` ADD COLUMN `{$column}` {$definition}");
+                }
             }
         } catch (Throwable $e) {}
     }
@@ -580,6 +574,13 @@ CREATE TABLE IF NOT EXISTS plans (
     base_price INTEGER NOT NULL, -- Tomans
     reseller_price INTEGER NOT NULL, -- Tomans
     server_group TEXT NOT NULL DEFAULT 'default',
+    server_id INTEGER NULL DEFAULT NULL,
+    category_id INTEGER NULL DEFAULT NULL,
+    category TEXT DEFAULT '۱ ماهه',
+    show_in_bot INTEGER DEFAULT 1,
+    ip_limit INTEGER DEFAULT 2,
+    max_devices INTEGER DEFAULT 2,
+    start_on_first_use INTEGER DEFAULT 0,
     is_free INTEGER DEFAULT 0,
     is_active INTEGER DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP

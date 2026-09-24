@@ -638,12 +638,10 @@ class ApiController {
             } catch (Throwable $e) {}
         }
 
-        // 5. Fallback: Always generate functional direct & CDN configs from server domain/IP so list is never empty
+        // Never return fake dummy connections! If no links found, report clean error:
         if (empty($realLinks)) {
-            $domain = !empty($client['sub_domain']) ? $client['sub_domain'] : ($_SERVER['HTTP_HOST'] ?? 'vpbotn.ir');
-            $uuid = $client['uuid'] ?? 'adc6ed75-e6bd-4a15-911a-e29f09eee801';
-            $realLinks[] = "vless://{$uuid}@{$domain}:443?type=tcp&security=tls&fp=chrome#⚡ {$domain} - Direct TLS";
-            $realLinks[] = "vless://{$uuid}@{$domain}:80?type=ws&security=none&path=%2F#🌐 {$domain} - Cloud CDN";
+            self::jsonError('کانکشنی از سرور دریافت نشد. لطفا از فعال بودن نود و تنظیم اینباندها اطمینان حاصل فرمایید.', 404);
+            return;
         }
 
         $serverList = [];
@@ -732,10 +730,10 @@ class ApiController {
         $universalUrl = 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.0.0/Connectix-Universal.apk';
         
         self::jsonSuccess([
-            'current_version' => '1.0.4',
-            'latest_version' => '1.0.4',
+            'current_version' => '3.0.0',
+            'latest_version' => '3.0.0',
             'has_update' => false,
-            'title' => 'Connectix v1.0.4',
+            'title' => 'Connectix v3.0.0',
             'changelog' => "• نمایش و انتخاب تمامی کانکشن‌های واقعی سرور (۱۷ کانکشن نود)\n• امضای دائمی و نصب مستقیم روی نسخه‌های قبلی بدون نیاز به حذف برنامه\n• ذخیره و پنهان‌سازی کامل آدرس دامنه سرور\n• بروزرسانی زنده کانکشن‌ها، سرعت آپلود/دانلود و اطلاعیه‌ها",
             'download_url' => $arm64Url,
             'universal_url' => $universalUrl,

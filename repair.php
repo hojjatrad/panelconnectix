@@ -21,12 +21,40 @@ if (isset($_GET['restore_files']) && $_GET['restore_files'] === '1') {
 
 $stepResults = [];
 
+// Auto-detect and fix subfolder extraction (if connectix-panel/ subfolder exists)
+$subfolder = __DIR__ . '/connectix-panel';
+if (is_dir($subfolder) && file_exists($subfolder . '/index.php')) {
+    try {
+        $files = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($subfolder, RecursiveDirectoryIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::SELF_FIRST
+        );
+        foreach ($files as $file) {
+            $target = __DIR__ . '/' . $files->getSubPathname();
+            if ($file->isDir()) {
+                if (!is_dir($target)) @mkdir($target, 0755, true);
+            } else {
+                if (!is_dir(dirname($target))) @mkdir(dirname($target), 0755, true);
+                @copy($file->getPathname(), $target);
+                @chmod($target, 0644);
+            }
+        }
+        $stepResults['relocation'] = ['status' => true, 'msg' => 'پوشه تو در توی connectix-panel شناسایی و تمامی فایل‌ها به مسیر اصلی منتقل شدند.'];
+    } catch (Throwable $e) {
+        $stepResults['relocation'] = ['status' => false, 'msg' => 'خطا در انتقال فایل‌ها: ' . $e->getMessage()];
+    }
+}
+
 // 1. Repair and overwrite .htaccess to remove any hardcoded RewriteBase
 $htaccessPath = __DIR__ . '/.htaccess';
 $standardHtaccess = <<<HTACCESS
 # Connectix Panel - Apache / cPanel URL Rewriting
 <IfModule mod_rewrite.c>
     RewriteEngine On
+
+    # Ensure Authorization header reaches PHP in FastCGI / PHP-FPM / cPanel environments
+    RewriteCond %{HTTP:Authorization} ^(.*)
+    RewriteRule .* - [e=HTTP_AUTHORIZATION:%1]
 
     # Prevent direct access to sensitive directories
     RewriteRule ^(core|drivers|data|cron)/.*$ - [F,L]
@@ -37,6 +65,10 @@ $standardHtaccess = <<<HTACCESS
 
     # Redirect all other requests to index.php
     RewriteRule ^(.*)$ index.php [QSA,L]
+</IfModule>
+
+<IfModule mod_setenvif.c>
+    SetEnvIfNoCase Authorization "^(.*)$" HTTP_AUTHORIZATION=$1
 </IfModule>
 
 # Security Headers

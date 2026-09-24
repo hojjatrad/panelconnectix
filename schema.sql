@@ -95,6 +95,8 @@ CREATE TABLE IF NOT EXISTS `plans` (
     `category` VARCHAR(64) NOT NULL DEFAULT '۱ ماهه',
     `show_in_bot` TINYINT(1) DEFAULT 1,
     `ip_limit` INT DEFAULT 2,
+    `max_devices` INT DEFAULT 2,
+    `start_on_first_use` TINYINT(1) DEFAULT 0,
     `is_free` TINYINT(1) DEFAULT 0,
     `is_active` TINYINT(1) DEFAULT 1,
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,

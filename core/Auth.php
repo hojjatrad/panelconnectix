@@ -63,7 +63,22 @@ class Auth {
 
     public static function role(): ?string {
         self::init();
-        return $_SESSION['role'] ?? null;
+        if (!empty($_SESSION['role'])) {
+            return $_SESSION['role'];
+        }
+        if (!empty($_SESSION['user_id'])) {
+            try {
+                $pdo = Database::getConnection();
+                $stmt = $pdo->prepare("SELECT role FROM users WHERE id = ? LIMIT 1");
+                $stmt->execute([(int)$_SESSION['user_id']]);
+                $role = $stmt->fetchColumn();
+                if ($role) {
+                    $_SESSION['role'] = $role;
+                    return $role;
+                }
+            } catch (Throwable $e) {}
+        }
+        return null;
     }
 
     public static function isAdmin(): bool {

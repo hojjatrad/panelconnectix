@@ -9,15 +9,30 @@ class PlanController {
         $pdo = Database::getConnection();
         Database::ensureExtendedTablesExist($pdo);
 
-        $plans = $pdo->query("SELECT p.*, s.name as server_name, s.driver as server_driver, s.sub_domain as server_subdomain,
-                              c.name as cluster_name, c.badge_color as cluster_color, c.icon as cluster_icon, c.slug as cluster_slug 
-                              FROM plans p 
-                              LEFT JOIN server_nodes s ON p.server_id = s.id 
-                              LEFT JOIN categories c ON (p.category_id = c.id OR (p.category_id IS NULL AND p.server_group = c.slug))
-                              ORDER BY p.is_free DESC, p.base_price ASC")->fetchAll(PDO::FETCH_ASSOC);
-        $servers = $pdo->query("SELECT * FROM server_nodes WHERE is_active = 1 ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
+        try {
+            $plans = $pdo->query("SELECT p.*, s.name as server_name, s.driver as server_driver, s.sub_domain as server_subdomain,
+                                  c.name as cluster_name, c.badge_color as cluster_color, c.icon as cluster_icon, c.slug as cluster_slug 
+                                  FROM plans p 
+                                  LEFT JOIN server_nodes s ON p.server_id = s.id 
+                                  LEFT JOIN categories c ON (p.category_id = c.id OR (p.category_id IS NULL AND p.server_group = c.slug))
+                                  ORDER BY p.is_free DESC, p.base_price ASC")->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Throwable $e) {
+            // Fallback query if joins fail on older schemas
+            $plans = $pdo->query("SELECT * FROM plans ORDER BY is_free DESC, base_price ASC")->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        try {
+            $servers = $pdo->query("SELECT * FROM server_nodes WHERE is_active = 1 ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Throwable $e) {
+            $servers = [];
+        }
         
-        $allCategories = $pdo->query("SELECT * FROM categories WHERE is_active = 1 ORDER BY sort_order ASC, id ASC")->fetchAll(PDO::FETCH_ASSOC);
+        try {
+            $allCategories = $pdo->query("SELECT * FROM categories WHERE is_active = 1 ORDER BY sort_order ASC, id ASC")->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Throwable $e) {
+            $allCategories = [];
+        }
+
         $serverCategories = array_values(array_filter($allCategories, fn($c) => in_array($c['type'] ?? '', ['servers', 'server', 'both'])));
         $planCategories = array_values(array_filter($allCategories, fn($c) => in_array($c['type'] ?? '', ['plans', 'plan', 'both'])));
         if (empty($planCategories)) {
@@ -56,6 +71,8 @@ class PlanController {
         }
 
         $pdo = Database::getConnection();
+        Database::ensureExtendedTablesExist($pdo);
+
         if ($categoryId) {
             $catRow = $pdo->query("SELECT * FROM categories WHERE id = " . (int)$categoryId)->fetch(PDO::FETCH_ASSOC);
             if ($catRow) {
@@ -76,10 +93,53 @@ class PlanController {
         $startOnFirstUse = isset($_POST['start_on_first_use']) ? 1 : 0;
         $maxDevices = max(1, (int)($_POST['max_devices'] ?? $ipLimit));
 
-        $stmt = $pdo->prepare("INSERT INTO plans (title, traffic_gb, duration_days, base_price, reseller_price, server_group, server_id, category_id, category, ip_limit, max_devices, start_on_first_use, show_in_bot, is_free) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->execute([$title, $traffic, $days, $basePrice, $resellerPrice, $serverGroup, $serverId, $categoryId, $category, $ipLimit, $maxDevices, $startOnFirstUse, $showInBot, $isFree]);
+        // Intelligently detect available columns in plans table
+        $availableCols = [];
+        try {
+            $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+            if ($driver === 'mysql') {
+                $cStmt = $pdo->query("SHOW COLUMNS FROM `plans`");
+                while ($r = $cStmt->fetch(PDO::FETCH_ASSOC)) {
+                    $availableCols[$r['Field']] = true;
+                }
+            } else {
+                $cStmt = $pdo->query("PRAGMA table_info(plans)");
+                while ($r = $cStmt->fetch(PDO::FETCH_ASSOC)) {
+                    $availableCols[$r['name']] = true;
+                }
+            }
+        } catch (Throwable $e) {}
 
-        Helpers::flash('success', 'پلن جدید با موفقیت ایجاد شد.');
+        $data = [
+            'title' => $title,
+            'traffic_gb' => $traffic,
+            'duration_days' => $days,
+            'base_price' => $basePrice,
+            'reseller_price' => $resellerPrice,
+            'server_group' => $serverGroup,
+            'is_free' => $isFree
+        ];
+
+        if (isset($availableCols['server_id'])) $data['server_id'] = $serverId;
+        if (isset($availableCols['category_id'])) $data['category_id'] = $categoryId;
+        if (isset($availableCols['category'])) $data['category'] = $category;
+        if (isset($availableCols['ip_limit'])) $data['ip_limit'] = $ipLimit;
+        if (isset($availableCols['max_devices'])) $data['max_devices'] = $maxDevices;
+        if (isset($availableCols['start_on_first_use'])) $data['start_on_first_use'] = $startOnFirstUse;
+        if (isset($availableCols['show_in_bot'])) $data['show_in_bot'] = $showInBot;
+
+        $fields = array_keys($data);
+        $placeholders = array_fill(0, count($fields), '?');
+        $sql = "INSERT INTO `plans` (`" . implode("`, `", $fields) . "`) VALUES (" . implode(", ", $placeholders) . ")";
+
+        try {
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute(array_values($data));
+            Helpers::flash('success', 'پلن جدید با موفقیت ایجاد شد.');
+        } catch (Throwable $e) {
+            Helpers::flash('error', 'خطا در ثبت پلن: ' . $e->getMessage());
+        }
+
         Helpers::redirect('plans');
     }
 
@@ -112,6 +172,8 @@ class PlanController {
         }
 
         $pdo = Database::getConnection();
+        Database::ensureExtendedTablesExist($pdo);
+
         if ($categoryId) {
             $catRow = $pdo->query("SELECT * FROM categories WHERE id = " . (int)$categoryId)->fetch(PDO::FETCH_ASSOC);
             if ($catRow) {
@@ -132,10 +194,59 @@ class PlanController {
         $startOnFirstUse = isset($_POST['start_on_first_use']) ? 1 : 0;
         $maxDevices = max(1, (int)($_POST['max_devices'] ?? $ipLimit));
 
-        $stmt = $pdo->prepare("UPDATE plans SET title = ?, traffic_gb = ?, duration_days = ?, base_price = ?, reseller_price = ?, server_group = ?, server_id = ?, category_id = ?, category = ?, ip_limit = ?, max_devices = ?, start_on_first_use = ?, show_in_bot = ?, is_free = ? WHERE id = ?");
-        $stmt->execute([$title, $traffic, $days, $basePrice, $resellerPrice, $serverGroup, $serverId, $categoryId, $category, $ipLimit, $maxDevices, $startOnFirstUse, $showInBot, $isFree, $id]);
+        // Intelligently detect available columns in plans table
+        $availableCols = [];
+        try {
+            $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+            if ($driver === 'mysql') {
+                $cStmt = $pdo->query("SHOW COLUMNS FROM `plans`");
+                while ($r = $cStmt->fetch(PDO::FETCH_ASSOC)) {
+                    $availableCols[$r['Field']] = true;
+                }
+            } else {
+                $cStmt = $pdo->query("PRAGMA table_info(plans)");
+                while ($r = $cStmt->fetch(PDO::FETCH_ASSOC)) {
+                    $availableCols[$r['name']] = true;
+                }
+            }
+        } catch (Throwable $e) {}
 
-        Helpers::flash('success', "پلن '{$title}' با موفقیت به‌روزرسانی شد.");
+        $data = [
+            'title' => $title,
+            'traffic_gb' => $traffic,
+            'duration_days' => $days,
+            'base_price' => $basePrice,
+            'reseller_price' => $resellerPrice,
+            'server_group' => $serverGroup,
+            'is_free' => $isFree
+        ];
+
+        if (isset($availableCols['server_id'])) $data['server_id'] = $serverId;
+        if (isset($availableCols['category_id'])) $data['category_id'] = $categoryId;
+        if (isset($availableCols['category'])) $data['category'] = $category;
+        if (isset($availableCols['ip_limit'])) $data['ip_limit'] = $ipLimit;
+        if (isset($availableCols['max_devices'])) $data['max_devices'] = $maxDevices;
+        if (isset($availableCols['start_on_first_use'])) $data['start_on_first_use'] = $startOnFirstUse;
+        if (isset($availableCols['show_in_bot'])) $data['show_in_bot'] = $showInBot;
+
+        $setParts = [];
+        $values = [];
+        foreach ($data as $f => $val) {
+            $setParts[] = "`{$f}` = ?";
+            $values[] = $val;
+        }
+        $values[] = $id;
+
+        $sql = "UPDATE `plans` SET " . implode(", ", $setParts) . " WHERE `id` = ?";
+
+        try {
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($values);
+            Helpers::flash('success', "پلن '{$title}' با موفقیت به‌روزرسانی شد.");
+        } catch (Throwable $e) {
+            Helpers::flash('error', 'خطا در به‌روزرسانی پلن: ' . $e->getMessage());
+        }
+
         Helpers::redirect('plans');
     }
 

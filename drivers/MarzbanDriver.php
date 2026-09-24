@@ -379,16 +379,40 @@ class MarzbanDriver implements PanelDriverInterface {
 
             $links = $u['links'] ?? [];
 
-            // If user has no links, auto-attach all active server inbounds to user so Marzban generates all configs
+            // If user has no links, auto-attach all active server inbounds and proxies to user so Marzban generates all configs
             if (empty($links)) {
                 $allInbounds = $this->getInbounds();
                 if (!empty($allInbounds)) {
-                    $updRes = $this->request($this->apiPrefix . '/user/' . urlencode($username), 'PUT', [
-                        'inbounds' => $allInbounds
-                    ]);
+                    $updPayload = ['inbounds' => $allInbounds];
+                    $proxies = $u['proxies'] ?? [];
+                    if (empty($proxies)) {
+                        $uuid = $u['username'] ?? Helpers::generateUUID();
+                        $updPayload['proxies'] = [
+                            'vless' => ['id' => $uuid],
+                            'vmess' => ['id' => $uuid],
+                            'trojan' => ['password' => $uuid],
+                            'shadowsocks' => ['password' => $uuid, 'method' => 'chacha20-ietf-poly1305']
+                        ];
+                    }
+                    $updRes = $this->request($this->apiPrefix . '/user/' . urlencode($username), 'PUT', $updPayload);
                     if ($updRes['success'] && !empty($updRes['data']['links'])) {
                         $links = $updRes['data']['links'];
                     }
+                }
+            }
+
+            $subUrl = $u['subscription_url'] ?? '';
+            $domainBase = !empty($this->subDomain) ? (str_starts_with($this->subDomain, 'http') ? rtrim($this->subDomain, '/') : ('https://' . rtrim($this->subDomain, '/'))) : $this->baseUrl;
+            if (!empty($subUrl) && str_starts_with($subUrl, '/')) {
+                $subUrl = $domainBase . $subUrl;
+            } elseif (!empty($subUrl) && !empty($this->subDomain)) {
+                $parts = parse_url($subUrl);
+                if ($parts && !empty($parts['host'])) {
+                    $targetHost = preg_replace('#^https?://#i', '', rtrim($this->subDomain, '/'));
+                    $scheme = str_starts_with($this->subDomain, 'http://') ? 'http' : 'https';
+                    $path = $parts['path'] ?? '';
+                    $query = !empty($parts['query']) ? ('?' . $parts['query']) : '';
+                    $subUrl = "{$scheme}://{$targetHost}{$path}{$query}";
                 }
             }
 
@@ -399,7 +423,7 @@ class MarzbanDriver implements PanelDriverInterface {
                 'status' => $u['status'] ?? 'active',
                 'online' => ($u['online_at'] ?? 0) > (time() - 300),
                 'links' => $links,
-                'subscription_url' => $u['subscription_url'] ?? ''
+                'subscription_url' => $subUrl
             ];
         }
         return null;

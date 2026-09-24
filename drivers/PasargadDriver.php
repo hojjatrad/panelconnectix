@@ -215,17 +215,31 @@ class PasargadDriver implements PanelDriverInterface {
         $res = $this->request($this->apiPrefix . '/inbounds');
         if ($res['success'] && is_array($res['data'])) {
             $list = [];
-            foreach ($res['data'] as $proto => $items) {
-                if (is_array($items)) {
-                    foreach ($items as $item) {
-                        if (is_array($item)) {
-                            $list[] = [
-                                'tag' => $item['tag'] ?? 'Inbound',
-                                'protocol' => strtolower($proto),
-                                'network' => $item['network'] ?? 'tcp',
-                                'tls' => $item['tls'] ?? 'none',
-                                'port' => $item['port'] ?? 443
-                            ];
+            if (isset($res['data'][0]) && is_array($res['data'][0])) {
+                foreach ($res['data'] as $item) {
+                    if (is_array($item)) {
+                        $list[] = [
+                            'tag' => $item['tag'] ?? 'Inbound',
+                            'protocol' => strtolower($item['protocol'] ?? 'vless'),
+                            'network' => $item['network'] ?? 'tcp',
+                            'tls' => $item['tls'] ?? 'none',
+                            'port' => $item['port'] ?? 443
+                        ];
+                    }
+                }
+            } else {
+                foreach ($res['data'] as $proto => $items) {
+                    if (is_array($items)) {
+                        foreach ($items as $item) {
+                            if (is_array($item)) {
+                                $list[] = [
+                                    'tag' => $item['tag'] ?? 'Inbound',
+                                    'protocol' => strtolower((string)$proto),
+                                    'network' => $item['network'] ?? 'tcp',
+                                    'tls' => $item['tls'] ?? 'none',
+                                    'port' => $item['port'] ?? 443
+                                ];
+                            }
                         }
                     }
                 }

@@ -51,7 +51,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     _autoCheckUpdateInBackground();
   }
 
-  static const String currentAppVersion = '1.0.4';
+  static const String currentAppVersion = '3.0.0';
 
   static bool isNewerVersion(String latest, String current) {
     try {
@@ -86,10 +86,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       final prefs = await SharedPreferences.getInstance();
       final updateData = await ApiService.checkAppUpdate();
       if (mounted && updateData != null) {
+        final bool hasUpdateFlag = updateData['has_update'] == true;
         final latest = (updateData['latest_version'] ?? '').toString();
         final dismissed = prefs.getString('dismissed_version') ?? '';
 
-        if (isNewerVersion(latest, currentAppVersion) && dismissed != latest) {
+        // Only show if backend flags an active update AND version is strictly newer AND user hasn't dismissed it
+        if (hasUpdateFlag && isNewerVersion(latest, currentAppVersion) && dismissed != latest) {
           setState(() {
             _hasAppUpdate = true;
             _updateInfo = updateData;
@@ -212,7 +214,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     if (!mounted) return;
     Navigator.pop(context);
 
-    if (updateData != null && isNewerVersion((updateData['latest_version'] ?? '').toString(), currentAppVersion)) {
+    if (updateData != null && updateData['has_update'] == true && isNewerVersion((updateData['latest_version'] ?? '').toString(), currentAppVersion)) {
       final latestVer = updateData['latest_version'] ?? 'جدید';
       final changelog = updateData['changelog'] ?? '• بهینه‌سازی هسته اتصال و پایداری شبکه';
       final downloadUrl = updateData['download_url'] ?? '';
