@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/server_model.dart';
 import '../services/api_service.dart';
 import 'dashboard_screen.dart';
 
