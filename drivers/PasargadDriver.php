@@ -27,6 +27,19 @@ class PasargadDriver implements PanelDriverInterface {
         return $this->lastError;
     }
 
+    public static function formatExpireDate(mixed $raw): ?string {
+        if (empty($raw)) return null;
+        if (is_numeric($raw)) {
+            $ts = (int)$raw;
+            return ($ts > 0) ? date('Y-m-d H:i:s', $ts) : null;
+        }
+        if (is_string($raw)) {
+            $ts = strtotime($raw);
+            return ($ts !== false && $ts > 0) ? date('Y-m-d H:i:s', $ts) : $raw;
+        }
+        return null;
+    }
+
     private function getEffectiveSubDomain(): string {
         if (!empty($this->subDomain)) {
             $clean = trim($this->subDomain);
@@ -443,10 +456,12 @@ class PasargadDriver implements PanelDriverInterface {
                     $subUrl = $this->applySubDomain($subUrl);
                 }
 
+                $expireVal = self::formatExpireDate($u['expire'] ?? null);
+
                 return [
                     'traffic_used_bytes' => $u['used_traffic'] ?? $u['traffic_used'] ?? 0,
                     'traffic_limit_bytes' => $u['data_limit'] ?? $u['total_traffic'] ?? 0,
-                    'expire_at' => !empty($u['expire']) ? date('Y-m-d H:i:s', $u['expire']) : null,
+                    'expire_at' => $expireVal,
                     'status' => $u['status'] ?? 'active',
                     'online' => ($u['online_at'] ?? 0) > (time() - 300),
                     'links' => $u['links'] ?? [],
@@ -465,10 +480,12 @@ class PasargadDriver implements PanelDriverInterface {
                     $subUrl = $this->applySubDomain($subUrl);
                 }
 
+                $expireVal = self::formatExpireDate($u['expire_time'] ?? null);
+
                 return [
                     'traffic_used_bytes' => $u['used_traffic'] ?? 0,
                     'traffic_limit_bytes' => $u['total_traffic'] ?? 0,
-                    'expire_at' => !empty($u['expire_time']) ? date('Y-m-d H:i:s', $u['expire_time']) : null,
+                    'expire_at' => $expireVal,
                     'status' => $u['status'] ?? 'active',
                     'online' => !empty($u['is_online']),
                     'links' => $u['links'] ?? [],

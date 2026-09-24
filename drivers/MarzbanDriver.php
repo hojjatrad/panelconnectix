@@ -337,10 +337,20 @@ class MarzbanDriver implements PanelDriverInterface {
         $res = $this->request($this->apiPrefix . '/user/' . urlencode($username));
         if ($res['success'] && !empty($res['data'])) {
             $u = $res['data'];
+            $expRaw = $u['expire'] ?? null;
+            $expAt = null;
+            if (!empty($expRaw)) {
+                if (is_numeric($expRaw)) {
+                    $expAt = ((int)$expRaw > 0) ? date('Y-m-d H:i:s', (int)$expRaw) : null;
+                } else {
+                    $ts = strtotime((string)$expRaw);
+                    $expAt = ($ts !== false && $ts > 0) ? date('Y-m-d H:i:s', $ts) : (string)$expRaw;
+                }
+            }
             return [
                 'traffic_used_bytes' => $u['used_traffic'] ?? 0,
                 'traffic_limit_bytes' => $u['data_limit'] ?? 0,
-                'expire_at' => !empty($u['expire']) ? date('Y-m-d H:i:s', $u['expire']) : null,
+                'expire_at' => $expAt,
                 'status' => $u['status'] ?? 'active',
                 'online' => ($u['online_at'] ?? 0) > (time() - 300),
                 'links' => $u['links'] ?? [],

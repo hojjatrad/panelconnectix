@@ -1,13 +1,23 @@
 <?php
 /**
- * Connectix Panel - Emergency Self-Healing & Diagnostic Utility (v3.0.0)
+ * Connectix Panel - Emergency Self-Healing & Diagnostic Utility (v3.1.0)
  * Language: Persian (Farsi) - RTL
  * Purpose: Automatically repair .htaccess, verify database connection,
  * migrate missing tables/columns, fix permissions, and restore panel functionality.
  */
 
+define('CONNECTIX_REPAIR', true);
+
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
+
+// Direct Zero-Dependency One-Click Restoration Hook
+if (isset($_GET['restore_files']) && $_GET['restore_files'] === '1') {
+    if (file_exists(__DIR__ . '/quick_update.php')) {
+        require __DIR__ . '/quick_update.php';
+        exit;
+    }
+}
 
 $stepResults = [];
 

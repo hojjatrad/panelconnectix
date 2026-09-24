@@ -25,27 +25,42 @@ class Database {
                         self::initializeSqliteSchema(self::$instance);
                     }
                 } else {
-                    $dsn = "mysql:host=" . DB_HOST . ";port=" . DB_PORT . ";dbname=" . DB_NAME . ";charset=utf8mb4";
+                    $hosts = [DB_HOST];
+                    if (DB_HOST === 'localhost') {
+                        $hosts[] = '127.0.0.1';
+                    } elseif (DB_HOST === '127.0.0.1') {
+                        $hosts[] = 'localhost';
+                    }
+
                     $opts = [
                         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                         PDO::ATTR_EMULATE_PREPARES => false,
                         PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci"
                     ];
-                    $attempts = 0;
-                    while ($attempts < 3) {
-                        try {
-                            self::$instance = new PDO($dsn, DB_USER, DB_PASS, $opts);
-                            break;
-                        } catch (PDOException $pe) {
-                            $attempts++;
-                            if ($attempts >= 3) throw $pe;
-                            usleep(200000); // 200ms retry backoff for cPanel MySQL
+
+                    $lastEx = null;
+                    foreach ($hosts as $h) {
+                        for ($attempt = 0; $attempt < 3; $attempt++) {
+                            try {
+                                $dsn = "mysql:host={$h};port=" . DB_PORT . ";dbname=" . DB_NAME . ";charset=utf8mb4";
+                                self::$instance = new PDO($dsn, DB_USER, DB_PASS, $opts);
+                                break 2;
+                            } catch (Throwable $pe) {
+                                $lastEx = $pe;
+                                usleep(150000); // 150ms backoff
+                            }
                         }
+                    }
+                    if (self::$instance === null) {
+                        throw $lastEx ?: new Exception("عدم امکان اتصال به MySQL");
                     }
                 }
                 self::ensureExtendedTablesExist(self::$instance);
             } catch (Throwable $e) {
+                if (defined('CONNECTIX_REPAIR') || defined('CONNECTIX_INSTALL') || (defined('CONNECTIX_NO_DIE') && CONNECTIX_NO_DIE)) {
+                    throw $e;
+                }
                 die("<!DOCTYPE html><html lang='fa' dir='rtl'><head><meta charset='UTF-8'><title>خطای پایگاه داده</title><script src='https://cdn.tailwindcss.com'></script><style>@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700&display=swap'); *{font-family:'Vazirmatn',sans-serif;}</style></head><body class='bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center p-4'><div class='bg-slate-900 border border-rose-900/50 p-8 rounded-2xl max-w-md w-full text-center shadow-2xl space-y-4'><div class='w-16 h-16 rounded-2xl bg-rose-500/20 text-rose-400 mx-auto flex items-center justify-center text-3xl'>⚠️</div><h2 class='text-lg font-bold text-white'>خطا در ارتباط با دیتابیس</h2><p class='text-xs text-rose-300 leading-relaxed'>" . htmlspecialchars($e->getMessage()) . "</p><div class='pt-2'><a href='install.php?reinstall=1' class='inline-block w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs transition-all shadow-md'>ورود به نصب‌کننده و تنظیم مجدد دیتابیس</a></div></div></body></html>");
             }
         }
