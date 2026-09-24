@@ -22,4 +22,11 @@ if ($cl) {
     echo "Node sublink: {$cl['node_sublink']}\n";
     echo "Traffic Limit: " . round($cl['traffic_limit_bytes'] / 1073741824, 2) . " GB\n";
     echo "Traffic Used: " . round($cl['traffic_used_bytes'] / 1073741824, 2) . " GB\n";
+
+    require_once __DIR__ . '/controllers/ApiControllerV2.php';
+    $list = ApiControllerV2::extractServerList($cl, $pdo);
+    echo "\nAPI CONTROLLER V2 EXTRACTED COUNT: " . count($list) . "\n";
+    foreach ($list as $s) {
+        echo "- {$s['id']}: {$s['name']} ({$s['protocol']})\n";
+    }
 }
