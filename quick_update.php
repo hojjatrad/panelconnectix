@@ -60,10 +60,13 @@ function logStep($msg, $type = 'info') {
 
 logStep("شروع فرآیند به‌روزرسانی...", 'info');
 
-// 0. Auto-Fix .htaccess to prevent 500 error permanently
+// 0. Auto-Fix .htaccess and disable OPcache to force immediate reload
 $cleanHtaccess = "<IfModule mod_rewrite.c>\n    RewriteEngine On\n    RewriteCond %{REQUEST_FILENAME} !-f\n    RewriteCond %{REQUEST_FILENAME} !-d\n    RewriteRule ^(.*)$ index.php [QSA,L]\n</IfModule>\n";
 @file_put_contents(__DIR__ . '/.htaccess', $cleanHtaccess);
-logStep("فایل .htaccess بررسی و قوانین استاندارد آپاچی بازنشانی شد.", 'success');
+@file_put_contents(__DIR__ . '/.user.ini', "opcache.enable=0\nopcache.revalidate_freq=0\nopcache.validate_timestamps=1\n");
+@touch(__DIR__ . '/.htaccess');
+@touch(__DIR__ . '/.user.ini');
+logStep("فایل‌های .htaccess و .user.ini بررسی و قوانین وب‌سرور بازنشانی شدند.", 'success');
 
 // 1. Retrieve GitHub Token
 $token = '';
