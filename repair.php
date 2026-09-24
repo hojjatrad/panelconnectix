@@ -213,6 +213,20 @@ if ($hasConfig) {
                 $auth = $driverInst->authenticate();
                 $err = method_exists($driverInst, 'getLastError') ? $driverInst->getLastError() : null;
                 $inbounds = method_exists($driverInst, 'getInbounds') ? $driverInst->getInbounds() : [];
+                $detailedInbounds = method_exists($driverInst, 'getDetailedInbounds') ? $driverInst->getDetailedInbounds() : [];
+
+                $rawInboundsDiag = [];
+                if (method_exists($driverInst, 'request')) {
+                    foreach (['/api/inbounds', '/api/v1/inbounds', '/api/hosts', '/api/system'] as $testEp) {
+                        $epRes = $driverInst->request($testEp);
+                        $rawInboundsDiag[$testEp] = [
+                            'code' => $epRes['code'] ?? null,
+                            'success' => $epRes['success'] ?? false,
+                            'data' => $epRes['data'] ?? null
+                        ];
+                    }
+                }
+
                 $sampleLink = null;
                 if ($auth) {
                     $testUser = 'diag_' . substr(bin2hex(random_bytes(3)), 0, 6);
@@ -223,10 +237,37 @@ if ($hasConfig) {
                         'expire_timestamp' => time() + 86400
                     ]);
                     if ($cRes['success']) {
+                        $sub = $cRes['sublink'] ?? null;
+                        $curlOrig = null;
+                        $curlRewritten = null;
+                        if (!empty($sub)) {
+                            $testCurl = function($url) {
+                                $ch = curl_init($url);
+                                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                                curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+                                curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                                curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+                                curl_setopt($ch, CURLOPT_USERAGENT, 'v2rayNG/1.8.5');
+                                $body = curl_exec($ch);
+                                $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                                $err = curl_error($ch);
+                                curl_close($ch);
+                                return ['code' => $code, 'error' => $err, 'len' => strlen((string)$body), 'preview' => substr((string)$body, 0, 100)];
+                            };
+                            $curlOrig = $testCurl($sub);
+                            if (str_contains($sub, 'gga1.montago-shop.ir')) {
+                                $rewritten = str_replace('https://gga1.montago-shop.ir', rtrim($full['api_url'], '/'), $sub);
+                                $curlRewritten = $testCurl($rewritten);
+                            }
+                        }
+
                         $sampleLink = [
-                            'sublink' => $cRes['sublink'] ?? null,
+                            'sublink' => $sub,
                             'links' => $cRes['links'] ?? [],
-                            'vless_link' => $cRes['vless_link'] ?? null
+                            'vless_link' => $cRes['vless_link'] ?? null,
+                            'sublink_curl_test' => $curlOrig,
+                            'sublink_rewritten_test' => $curlRewritten
                         ];
                         $driverInst->deleteUser($testUser);
                     } else {
@@ -238,6 +279,8 @@ if ($hasConfig) {
                     'auth' => $auth,
                     'error' => $err,
                     'inbounds' => $inbounds,
+                    'detailed_inbounds' => $detailedInbounds,
+                    'raw_inbounds_endpoints' => $rawInboundsDiag,
                     'sample' => $sampleLink
                 ];
             }
@@ -250,7 +293,7 @@ if ($hasConfig) {
             $clientsToFix = $pdo->query("SELECT * FROM clients WHERE status = 'active'")->fetchAll(PDO::FETCH_ASSOC);
             $fixedClients = 0;
             foreach ($clientsToFix as $cl) {
-                if (empty($cl['node_sublink']) || Helpers::isPanelSubUrl($cl['node_sublink'])) {
+                if (empty($cl['node_sublink']) || Helpers::isPanelSubUrl($cl['node_sublink']) || str_contains($cl['node_sublink'], 'gga1.montago-shop.ir')) {
                     if (!empty($cl['server_id'])) {
                         $srv = $pdo->query("SELECT * FROM server_nodes WHERE id = " . (int)$cl['server_id'])->fetch(PDO::FETCH_ASSOC);
                         if ($srv && $srv['driver'] !== 'mock') {

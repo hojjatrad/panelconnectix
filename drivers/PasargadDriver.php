@@ -49,11 +49,23 @@ class PasargadDriver implements PanelDriverInterface {
     }
 
     private function applySubDomain(string $url): string {
-        if (empty($this->subDomain)) return $url;
+        if (empty($url)) return $url;
         $parts = parse_url($url);
         if (!$parts || empty($parts['host'])) return $url;
 
-        $targetDomain = trim($this->subDomain);
+        // Target domain to rewrite to
+        $targetDomain = !empty($this->subDomain) ? trim($this->subDomain) : '';
+
+        // If targetDomain is not set, but the server returned a known broken domain (like gga1.montago-shop.ir)
+        // or a domain that differs from api_url host, fallback to baseUrl
+        if (empty($targetDomain)) {
+            if ($parts['host'] === 'gga1.montago-shop.ir' || str_contains($parts['host'], 'montago-shop.ir')) {
+                $targetDomain = $this->baseUrl;
+            } else {
+                return $url;
+            }
+        }
+
         $scheme = str_starts_with($targetDomain, 'http://') ? 'http' : 'https';
         $targetHost = preg_replace('#^https?://#i', '', rtrim($targetDomain, '/'));
 

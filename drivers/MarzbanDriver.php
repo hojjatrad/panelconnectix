@@ -160,14 +160,52 @@ class MarzbanDriver implements PanelDriverInterface {
         return false;
     }
 
+    public function applySubDomain(string $url): string {
+        if (empty($url)) return $url;
+        $parts = parse_url($url);
+        if (!$parts || empty($parts['host'])) return $url;
+
+        // Target domain to rewrite to
+        $targetDomain = !empty($this->subDomain) ? trim($this->subDomain) : '';
+
+        // If targetDomain is not set, but the server returned a known broken domain (like gga1.montago-shop.ir)
+        // or a domain that differs from api_url host, fallback to baseUrl
+        if (empty($targetDomain)) {
+            if ($parts['host'] === 'gga1.montago-shop.ir' || str_contains($parts['host'], 'montago-shop.ir')) {
+                $targetDomain = $this->baseUrl;
+            } else {
+                return $url;
+            }
+        }
+
+        $scheme = str_starts_with($targetDomain, 'http://') ? 'http' : 'https';
+        $targetHost = preg_replace('#^https?://#i', '', rtrim($targetDomain, '/'));
+
+        $path = $parts['path'] ?? '';
+        $query = !empty($parts['query']) ? ('?' . $parts['query']) : '';
+        $fragment = !empty($parts['fragment']) ? ('#' . $parts['fragment']) : '';
+
+        return "{$scheme}://{$targetHost}{$path}{$query}{$fragment}";
+    }
+
     public function getDetailedInbounds(): array {
         if (!$this->authenticate()) return [];
-        $res = $this->request($this->apiPrefix . '/inbounds');
-        if ($res['success'] && is_array($res['data'])) {
+
+        $endpoints = [$this->apiPrefix . '/inbounds', '/api/inbounds', '/api/v1/inbounds', '/api/system'];
+        foreach ($endpoints as $ep) {
+            $res = $this->request($ep);
+            if (!$res['success'] || empty($res['data'])) continue;
+
+            $raw = $res['data'];
+            if (isset($raw['inbounds']) && is_array($raw['inbounds'])) {
+                $raw = $raw['inbounds'];
+            } elseif (isset($raw['data']) && is_array($raw['data'])) {
+                $raw = $raw['data'];
+            }
+
             $list = [];
-            // Check if flat list
-            if (isset($res['data'][0]) && is_array($res['data'][0])) {
-                foreach ($res['data'] as $item) {
+            if (isset($raw[0]) && is_array($raw[0])) {
+                foreach ($raw as $item) {
                     if (is_array($item)) {
                         $list[] = [
                             'tag' => $item['tag'] ?? 'Inbound',
@@ -178,8 +216,8 @@ class MarzbanDriver implements PanelDriverInterface {
                         ];
                     }
                 }
-            } else {
-                foreach ($res['data'] as $proto => $items) {
+            } elseif (is_array($raw)) {
+                foreach ($raw as $proto => $items) {
                     if (is_array($items)) {
                         foreach ($items as $item) {
                             if (is_array($item)) {
@@ -190,24 +228,44 @@ class MarzbanDriver implements PanelDriverInterface {
                                     'tls' => $item['tls'] ?? 'none',
                                     'port' => $item['port'] ?? 443
                                 ];
+                            } elseif (is_string($item)) {
+                                $list[] = [
+                                    'tag' => $item,
+                                    'protocol' => strtolower((string)$proto),
+                                    'network' => 'tcp',
+                                    'tls' => 'tls',
+                                    'port' => 443
+                                ];
                             }
                         }
                     }
                 }
             }
-            return $list;
+
+            if (!empty($list)) return $list;
         }
+
         return [];
     }
 
     public function getInbounds(): array {
         if (!$this->authenticate()) return [];
-        $res = $this->request($this->apiPrefix . '/inbounds');
-        if ($res['success'] && is_array($res['data'])) {
+
+        $endpoints = [$this->apiPrefix . '/inbounds', '/api/inbounds', '/api/v1/inbounds', '/api/system'];
+        foreach ($endpoints as $ep) {
+            $res = $this->request($ep);
+            if (!$res['success'] || empty($res['data'])) continue;
+
+            $raw = $res['data'];
+            if (isset($raw['inbounds']) && is_array($raw['inbounds'])) {
+                $raw = $raw['inbounds'];
+            } elseif (isset($raw['data']) && is_array($raw['data'])) {
+                $raw = $raw['data'];
+            }
+
             $inbounds = [];
-            // Check if flat list
-            if (isset($res['data'][0]) && is_array($res['data'][0])) {
-                foreach ($res['data'] as $item) {
+            if (isset($raw[0]) && is_array($raw[0])) {
+                foreach ($raw as $item) {
                     if (is_array($item)) {
                         $proto = strtolower($item['protocol'] ?? 'vless');
                         $tag = $item['tag'] ?? null;
@@ -216,8 +274,8 @@ class MarzbanDriver implements PanelDriverInterface {
                         }
                     }
                 }
-            } else {
-                foreach ($res['data'] as $proto => $items) {
+            } elseif (is_array($raw)) {
+                foreach ($raw as $proto => $items) {
                     $protoLower = strtolower((string)$proto);
                     if (is_array($items)) {
                         $inbounds[$protoLower] = [];
@@ -231,8 +289,10 @@ class MarzbanDriver implements PanelDriverInterface {
                     }
                 }
             }
-            return $inbounds;
+
+            if (!empty($inbounds)) return $inbounds;
         }
+
         return [];
     }
 
@@ -320,26 +380,26 @@ class MarzbanDriver implements PanelDriverInterface {
         $res = $this->request($this->apiPrefix . '/user', 'POST', $body);
         if ($res['success']) {
             $data = $res['data'] ?? [];
-            $subUrl = $data['subscription_url'] ?? '';
-            $links = $data['links'] ?? [];
 
-            // If subscription_url is empty, fallback to first config link
+            // Fetch live user to get links resolved by core or decoded from sublink
+            $live = $this->getUser($payload['username']);
+            if ($live && !empty($live['links'])) {
+                $links = $live['links'];
+            } else {
+                $links = $data['links'] ?? [];
+            }
+
+            $subUrl = (!empty($live['subscription_url'])) ? $live['subscription_url'] : ($data['subscription_url'] ?? '');
+
             if (empty($subUrl) && !empty($links)) {
                 $subUrl = $links[0];
             }
-            // Ensure full absolute URL if relative path returned, respecting custom subDomain if set
+
             $domainBase = !empty($this->subDomain) ? (str_starts_with($this->subDomain, 'http') ? rtrim($this->subDomain, '/') : ('https://' . rtrim($this->subDomain, '/'))) : $this->baseUrl;
             if (!empty($subUrl) && str_starts_with($subUrl, '/')) {
                 $subUrl = $domainBase . $subUrl;
-            } elseif (!empty($subUrl) && !empty($this->subDomain)) {
-                $parts = parse_url($subUrl);
-                if ($parts && !empty($parts['host'])) {
-                    $targetHost = preg_replace('#^https?://#i', '', rtrim($this->subDomain, '/'));
-                    $scheme = str_starts_with($this->subDomain, 'http://') ? 'http' : 'https';
-                    $path = $parts['path'] ?? '';
-                    $query = !empty($parts['query']) ? ('?' . $parts['query']) : '';
-                    $subUrl = "{$scheme}://{$targetHost}{$path}{$query}";
-                }
+            } else {
+                $subUrl = $this->applySubDomain($subUrl);
             }
 
             return [
@@ -405,14 +465,37 @@ class MarzbanDriver implements PanelDriverInterface {
             $domainBase = !empty($this->subDomain) ? (str_starts_with($this->subDomain, 'http') ? rtrim($this->subDomain, '/') : ('https://' . rtrim($this->subDomain, '/'))) : $this->baseUrl;
             if (!empty($subUrl) && str_starts_with($subUrl, '/')) {
                 $subUrl = $domainBase . $subUrl;
-            } elseif (!empty($subUrl) && !empty($this->subDomain)) {
-                $parts = parse_url($subUrl);
-                if ($parts && !empty($parts['host'])) {
-                    $targetHost = preg_replace('#^https?://#i', '', rtrim($this->subDomain, '/'));
-                    $scheme = str_starts_with($this->subDomain, 'http://') ? 'http' : 'https';
-                    $path = $parts['path'] ?? '';
-                    $query = !empty($parts['query']) ? ('?' . $parts['query']) : '';
-                    $subUrl = "{$scheme}://{$targetHost}{$path}{$query}";
+            } else {
+                $subUrl = $this->applySubDomain($subUrl);
+            }
+
+            // If user links are still empty in Marzban/PasarGuard API response, fetch configs from the subscription URL directly!
+            if (empty($links) && !empty($subUrl) && !Helpers::isPanelSubUrl($subUrl)) {
+                $ch = curl_init($subUrl);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 6);
+                curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+                curl_setopt($ch, CURLOPT_USERAGENT, 'v2rayNG/1.8.5');
+                $subContent = curl_exec($ch);
+                $subHttpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+
+                if ($subHttpCode === 200 && !empty($subContent)) {
+                    $decoded = base64_decode($subContent, true);
+                    $configText = ($decoded !== false && strlen($decoded) > 10) ? $decoded : $subContent;
+                    $lines = preg_split('/[\r\n]+/', trim($configText));
+                    $extracted = [];
+                    foreach ($lines as $line) {
+                        $line = trim($line);
+                        if (preg_match('/^(vless|vmess|trojan|ss|hy2):\/\//i', $line)) {
+                            $extracted[] = $line;
+                        }
+                    }
+                    if (!empty($extracted)) {
+                        $links = $extracted;
+                    }
                 }
             }
 
