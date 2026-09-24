@@ -223,7 +223,7 @@ if ($hasConfig) {
                     $detailedInbounds = method_exists($driverInst, 'getDetailedInbounds') ? $driverInst->getDetailedInbounds() : [];
 
                     $rawInboundsDiag = [];
-                    if (method_exists($driverInst, 'request')) {
+                    if (is_callable([$driverInst, 'request'])) {
                         foreach (['/api/inbounds', '/api/v1/inbounds', '/api/hosts', '/api/system'] as $testEp) {
                             $epRes = $driverInst->request($testEp);
                             $rawInboundsDiag[$testEp] = [
