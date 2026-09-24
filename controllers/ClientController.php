@@ -356,6 +356,10 @@ class ClientController {
         $telegramChatId = !empty($_POST['telegram_chat_id']) ? trim($_POST['telegram_chat_id']) : null;
         $customNote = trim($_POST['custom_note'] ?? ($client['custom_note'] ?? ''));
         $ipLimit = max(0, (int)($_POST['ip_limit'] ?? ($client['ip_limit'] ?? 2)));
+        $nodeSublink = !empty($_POST['node_sublink']) ? trim($_POST['node_sublink']) : ($client['node_sublink'] ?? null);
+        if ($nodeSublink && str_contains($nodeSublink, 'montago-shop.ir')) {
+            $nodeSublink = preg_replace('#https?://[^/]+#i', 'https://sub.speedur.org:2096', $nodeSublink);
+        }
 
         // If server changed, handle node migration
         $oldServerId = (int)$client['server_id'];
@@ -409,7 +413,8 @@ class ClientController {
             expire_at = ?, 
             ip_limit = ?,
             telegram_chat_id = ?,
-            custom_note = ?
+            custom_note = ?,
+            node_sublink = ?
             {$resetAlertsSql},
             updated_at = CURRENT_TIMESTAMP
             WHERE id = ?");
@@ -425,6 +430,7 @@ class ClientController {
             $ipLimit,
             $telegramChatId,
             $customNote,
+            $nodeSublink,
             $id
         ]);
 

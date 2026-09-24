@@ -268,6 +268,11 @@ if ($hasConfig) {
                 $pdo->exec("UPDATE server_nodes SET is_active = 0 WHERE driver = 'mock'");
                 $pdo->exec("UPDATE plans SET server_id = NULL WHERE server_id IN (SELECT id FROM server_nodes WHERE driver = 'mock')");
             }
+            // Auto-clean broken montago-shop references in clients and servers
+            $pdo->exec("UPDATE clients SET node_sublink = REPLACE(node_sublink, 'gga1.montago-shop.ir', 'sub.speedur.org:2096') WHERE node_sublink LIKE '%montago-shop.ir%'");
+            $pdo->exec("UPDATE clients SET node_sublink = REPLACE(node_sublink, 'montago-shop.ir', 'sub.speedur.org:2096') WHERE node_sublink LIKE '%montago-shop.ir%'");
+            $pdo->exec("UPDATE server_nodes SET config_template = '' WHERE config_template LIKE '%montago-shop.ir%'");
+            $pdo->exec("UPDATE server_nodes SET sub_domain = 'sub.speedur.org:2096' WHERE (sub_domain IS NULL OR sub_domain = '' OR sub_domain LIKE '%montago-shop.ir%') AND api_url LIKE '%speedur.org%'");
         } catch (Throwable $e) {}
 
         // Diagnostic API for testing live servers

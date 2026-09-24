@@ -751,12 +751,6 @@ require __DIR__ . '/../layout/header.php';
                 subInput.value = data.extracted_sub_domain;
             }
 
-            // Auto-fill config template if empty
-            const templateTextarea = form.querySelector('textarea[name="config_template"]');
-            if (templateTextarea && !templateTextarea.value && data.sample && data.sample.vless_link) {
-                templateTextarea.value = data.sample.vless_link.replace(/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/, '{uuid}');
-            }
-
             let html = `
                 <div class="p-3 bg-purple-950/60 border border-purple-800 rounded-xl space-y-1.5 mb-2">
                     <div class="flex items-center justify-between">
