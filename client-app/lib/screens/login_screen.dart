@@ -11,6 +11,7 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  int _logoTapCount = 0;
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
@@ -164,23 +165,32 @@ class _LoginScreenState extends State<LoginScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 // Logo
-                Container(
-                  width: 72,
-                  height: 72,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF9333EA), Color(0xFF4F46E5)],
-                    ),
-                    borderRadius: BorderRadius.circular(22),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF9333EA).withOpacity(0.35),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
+                GestureDetector(
+                  onTap: () {
+                    _logoTapCount++;
+                    if (_logoTapCount >= 5) {
+                      _showServerUrlDialog();
+                      _logoTapCount = 0;
+                    }
+                  },
+                  child: Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF9333EA), Color(0xFF4F46E5)],
                       ),
-                    ],
+                      borderRadius: BorderRadius.circular(22),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF9333EA).withOpacity(0.35),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(Icons.bolt, color: Colors.white, size: 40),
                   ),
-                  child: const Icon(Icons.bolt, color: Colors.white, size: 40),
                 ),
                 const SizedBox(height: 18),
 
@@ -197,44 +207,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 const Text(
                   'ورود اختصاصی با نام کاربری و کلمه عبور',
                   style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                ),
-                const SizedBox(height: 12),
-                InkWell(
-                  onTap: _showServerUrlDialog,
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1E293B),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: ApiService.baseUrl.contains("your-domain.com") ? const Color(0xFFF59E0B) : const Color(0xFF334155),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          ApiService.baseUrl.contains("your-domain.com") ? Icons.warning_amber_rounded : Icons.dns_outlined,
-                          size: 15,
-                          color: ApiService.baseUrl.contains("your-domain.com") ? const Color(0xFFF59E0B) : const Color(0xFF10B981),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          ApiService.baseUrl.contains("your-domain.com")
-                              ? 'تنظیم آدرس سرور پنل (کلیک کنید)'
-                              : ApiService.baseUrl.replaceAll("https://", "").replaceAll("http://", ""),
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: ApiService.baseUrl.contains("your-domain.com") ? const Color(0xFFF59E0B) : const Color(0xFF94A3B8),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        const Icon(Icons.edit, size: 12, color: Color(0xFF64748B)),
-                      ],
-                    ),
-                  ),
                 ),
                 const SizedBox(height: 24),
 

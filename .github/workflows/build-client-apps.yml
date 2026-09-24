@@ -53,11 +53,13 @@ jobs:
           }
           EOF
 
-          # Generate Production Release Keystore for Android 9+ v1/v2 Signing
-          keytool -genkey -v -keystore android/app/release.keystore \
-            -alias connectix -keyalg RSA -keysize 2048 -validity 10000 \
-            -storepass connectix123 -keypass connectix123 \
-            -dname "CN=Connectix VPN, OU=Client, O=Connectix, L=Tehran, ST=Tehran, C=IR"
+          # Keep permanent Release Keystore for seamless updates over existing app without uninstalling
+          if [ ! -f "android/app/release.keystore" ]; then
+            keytool -genkey -v -keystore android/app/release.keystore \
+              -alias connectix -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass connectix123 -keypass connectix123 \
+              -dname "CN=Connectix VPN, OU=Client, O=Connectix, L=Tehran, ST=Tehran, C=IR"
+          fi
 
           # Configure gradle.properties
           cat << 'EOF' >> android/gradle.properties
@@ -92,8 +94,8 @@ jobs:
                   applicationId = "com.connectix.vpn"
                   minSdk = 21
                   targetSdk = 34
-                  versionCode = 4
-                  versionName = "1.0.3"
+                  versionCode = 5
+                  versionName = "1.0.4"
                   multiDexEnabled = true
               }
 

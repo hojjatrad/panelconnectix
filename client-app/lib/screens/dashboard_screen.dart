@@ -36,6 +36,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   int _connectedSeconds = 0;
   Timer? _timer;
 
+  List<Map<String, dynamic>> _announcements = [];
+  bool _hasAppUpdate = false;
+  Map<String, dynamic>? _updateInfo;
+
   @override
   void initState() {
     super.initState();
@@ -43,6 +47,27 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     _initV2Ray();
     _loadServers();
     _refreshProfile();
+    _loadAnnouncements();
+    _autoCheckUpdateInBackground();
+  }
+
+  void _loadAnnouncements() async {
+    final list = await ApiService.getAnnouncements();
+    if (mounted && list.isNotEmpty) {
+      setState(() {
+        _announcements = list;
+      });
+    }
+  }
+
+  void _autoCheckUpdateInBackground() async {
+    final updateData = await ApiService.checkAppUpdate();
+    if (mounted && updateData != null && updateData['has_update'] == true) {
+      setState(() {
+        _hasAppUpdate = true;
+        _updateInfo = updateData;
+      });
+    }
   }
 
   void _initV2Ray() async {
@@ -361,6 +386,83 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           child: Column(
             children: [
+              // New App Update Alert Banner
+              if (_hasAppUpdate && _updateInfo != null)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 14),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF4338CA), Color(0xFF6D28D9)],
+                    ),
+                    borderRadius: BorderRadius.circular(18),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF6366F1).withOpacity(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.rocket_launch, color: Colors.amber, size: 22),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'نگارش جدید ${_updateInfo!['latest_version'] ?? 'جدید'} آماده است',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                            const Text(
+                              'جهت بروزرسانی و نصب مستقیم کلیک کنید',
+                              style: TextStyle(color: Color(0xFFE0E7FF), fontSize: 11),
+                            ),
+                          ],
+                        ),
+                      ),
+                      ElevatedButton(
+                        onPressed: _checkAppUpdate,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: const Color(0xFF4338CA),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        child: const Text('آپدیت', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                      ),
+                    ],
+                  ),
+                ),
+
+              // Announcements Banner
+              if (_announcements.isNotEmpty)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 14),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E293B),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.campaign_rounded, color: Color(0xFF38BDF8), size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _announcements.first['message'] ?? _announcements.first['title'] ?? '',
+                          style: const TextStyle(color: Color(0xFFE2E8F0), fontSize: 11),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
               // User Quota & Live Stats Card
               Container(
                 padding: const EdgeInsets.all(18),
@@ -541,6 +643,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       child: ServerListModal(
                         servers: _servers,
                         selectedServer: _selectedServer,
+                        onRefresh: _manualRefresh,
                       ),
                     ),
                   );

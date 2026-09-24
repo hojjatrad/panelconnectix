@@ -4,11 +4,13 @@ import '../models/server_model.dart';
 class ServerListModal extends StatelessWidget {
   final List<ServerModel> servers;
   final ServerModel? selectedServer;
+  final VoidCallback? onRefresh;
 
   const ServerListModal({
     Key? key,
     required this.servers,
     required this.selectedServer,
+    this.onRefresh,
   }) : super(key: key);
 
   @override
@@ -42,17 +44,46 @@ class ServerListModal extends StatelessWidget {
                   'انتخاب سرور و پروتکل اتصال',
                   style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF6366F1).withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFF6366F1).withOpacity(0.3)),
-                  ),
-                  child: Text(
-                    '${servers.length} کانکشن فعال',
-                    style: const TextStyle(color: Color(0xFFA5B4FC), fontSize: 11, fontWeight: FontWeight.bold),
-                  ),
+                Row(
+                  children: [
+                    if (onRefresh != null)
+                      InkWell(
+                        onTap: () {
+                          onRefresh!();
+                          Navigator.pop(context);
+                        },
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1E293B),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFF334155)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              Icon(Icons.refresh, size: 13, color: Color(0xFF38BDF8)),
+                              SizedBox(width: 4),
+                              Text('بروزرسانی', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 10, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF6366F1).withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFF6366F1).withOpacity(0.3)),
+                      ),
+                      child: Text(
+                        '${servers.length} کانکشن',
+                        style: const TextStyle(color: Color(0xFFA5B4FC), fontSize: 11, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
