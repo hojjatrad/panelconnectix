@@ -311,14 +311,14 @@ class TelegramBot {
         return isset($res['ok']) && $res['ok'] === true;
     }
 
-    public static function setWebhook(string $webhookUrl, ?string $customToken = null): array {
+    public static function setWebhook(string $webhookUrl, ?string $customToken = null, bool $dropPending = false): array {
         $token = !empty($customToken) ? trim($customToken) : self::getToken();
         if (empty($token)) {
             return ['ok' => false, 'description' => 'توکن ربات تلگرام تنظیم نشده است.'];
         }
         $res = self::request('setWebhook', [
             'url' => $webhookUrl,
-            'drop_pending_updates' => false
+            'drop_pending_updates' => $dropPending
         ], $token);
         return $res ?: ['ok' => false, 'description' => 'پاسخی از تلگرام دریافت نشد.'];
     }

@@ -402,6 +402,74 @@ if (!empty($_FILES['emergency_sql_file']['tmp_name']) && $_FILES['emergency_sql_
     }
 }
 
+// 8. Telegram Bot Diagnostics & Instant Re-Activation Handler
+$botMsg = '';
+$currToken = '';
+$webhookInfo = null;
+
+if ($dbOk) {
+    try {
+        require_once __DIR__ . '/core/Setting.php';
+        require_once __DIR__ . '/core/TelegramBot.php';
+        require_once __DIR__ . '/core/Helpers.php';
+        $currToken = TelegramBot::getToken();
+
+        if (isset($_POST['action']) && $_POST['action'] === 'reset_bot') {
+            $newToken = trim($_POST['bot_token'] ?? '');
+            if (!empty($newToken)) {
+                Setting::set('telegram_bot_token', $newToken);
+                $currToken = $newToken;
+            }
+            $appBase = Helpers::fullUrl('');
+            $webhookUrl = rtrim($appBase, '/') . '/webhook.php';
+            $res = TelegramBot::setWebhook($webhookUrl, $currToken, true);
+            if (!empty($res['ok'])) {
+                $botMsg = "<div class='p-3 bg-emerald-950/80 border border-emerald-800 text-emerald-200 rounded-xl text-xs'>✅ وبهوک ربات تلگرام با موفقیت مجدداً ثبت گردید و صف پیام‌های معلق پاکسازی شد.<br><b>آدرس وبهوک:</b> <code>{$webhookUrl}</code></div>";
+            } else {
+                $botMsg = "<div class='p-3 bg-rose-950/80 border border-rose-800 text-rose-200 rounded-xl text-xs'>❌ خطا در ثبت وبهوک: " . htmlspecialchars($res['description'] ?? 'عدم پاسخ تلگرام') . "</div>";
+            }
+        }
+
+        if (!empty($currToken) && !str_contains($currToken, 'FAKE')) {
+            $webhookInfo = TelegramBot::getWebhookInfo($currToken);
+        }
+    } catch (Throwable $e) {}
+}
+
+// 9. Database Switcher (Switch between SQLite and MySQL directly)
+$dbSwitchMsg = '';
+if (isset($_POST['action']) && $_POST['action'] === 'switch_db') {
+    $targetDriver = trim($_POST['db_driver'] ?? 'mysql');
+    if ($targetDriver === 'mysql') {
+        $mHost = trim($_POST['db_host'] ?? '127.0.0.1');
+        $mPort = trim($_POST['db_port'] ?? '3306');
+        $mName = trim($_POST['db_name'] ?? '');
+        $mUser = trim($_POST['db_user'] ?? '');
+        $mPass = trim($_POST['db_pass'] ?? '');
+
+        try {
+            $testDsn = "mysql:host={$mHost};port={$mPort};dbname={$mName};charset=utf8mb4";
+            $testPdo = new PDO($testDsn, $mUser, $mPass, [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_TIMEOUT => 5
+            ]);
+            
+            $cfg = file_get_contents(__DIR__ . '/config.php');
+            $cfg = preg_replace("/define\('DB_DRIVER',\s*'.*?'\);/", "define('DB_DRIVER', 'mysql');", $cfg);
+            $cfg = preg_replace("/define\('DB_HOST',\s*'.*?'\);/", "define('DB_HOST', " . var_export($mHost, true) . ");", $cfg);
+            $cfg = preg_replace("/define\('DB_PORT',\s*'.*?'\);/", "define('DB_PORT', " . var_export($mPort, true) . ");", $cfg);
+            $cfg = preg_replace("/define\('DB_NAME',\s*'.*?'\);/", "define('DB_NAME', " . var_export($mName, true) . ");", $cfg);
+            $cfg = preg_replace("/define\('DB_USER',\s*'.*?'\);/", "define('DB_USER', " . var_export($mUser, true) . ");", $cfg);
+            $cfg = preg_replace("/define\('DB_PASS',\s*'.*?'\);/", "define('DB_PASS', " . var_export($mPass, true) . ");", $cfg);
+            file_put_contents(__DIR__ . '/config.php', $cfg);
+            
+            $dbSwitchMsg = "<div class='p-3 bg-emerald-950/80 border border-emerald-800 text-emerald-200 rounded-xl text-xs'>✅ اتصال به MySQL تایید و فایل config.php با موفقیت بروزرسانی شد! لطفاً صفحه را مجدداً رفرش فرمایید.</div>";
+        } catch (Throwable $e) {
+            $dbSwitchMsg = "<div class='p-3 bg-rose-950/80 border border-rose-800 text-rose-200 rounded-xl text-xs'>❌ خطا در اتصال به MySQL: " . htmlspecialchars($e->getMessage()) . "</div>";
+        }
+    }
+}
+
 // Check overall status
 $allOk = true;
 foreach ($stepResults as $r) {
@@ -503,6 +571,116 @@ foreach ($stepResults as $r) {
                     <span>پاکسازی کامل نمونه‌ها و شروع از صفر (شروع تمیز بدون پلن و سرور ماک)</span>
                 </a>
             </div>
+        </div>
+
+        <!-- Telegram Bot Quick Diagnostic & Reactivation Card -->
+        <div class="p-4 bg-slate-950/80 border border-slate-800 rounded-2xl space-y-3 text-xs">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2 text-white font-bold">
+                    <i class="fa-brands fa-telegram text-sky-400 text-base"></i>
+                    <span>عیب‌یابی فوری و فعال‌سازی مجدد ربات تلگرام</span>
+                </div>
+                <?php if ($webhookInfo && !empty($webhookInfo['ok'])): ?>
+                    <span class="px-2 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                        وضعیت وبهوک: فعال
+                    </span>
+                <?php else: ?>
+                    <span class="px-2 py-0.5 rounded text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                        نیاز به ثبت وبهوک
+                    </span>
+                <?php endif; ?>
+            </div>
+
+            <?= $botMsg ?>
+
+            <?php if ($webhookInfo && !empty($webhookInfo['result'])): 
+                $wh = $webhookInfo['result'];
+            ?>
+                <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-3 space-y-1.5 text-[11px]">
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-400">آدرس وبهوک ثبت‌شده:</span>
+                        <code class="font-mono text-cyan-300 select-all"><?= htmlspecialchars($wh['url'] ?: 'ثبت نشده') ?></code>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-400">پیام‌های معلق در صف تلگرام:</span>
+                        <span class="font-bold <?= ($wh['pending_update_count'] > 0) ? 'text-amber-400' : 'text-emerald-400' ?> font-mono">
+                            <?= (int)$wh['pending_update_count'] ?> پیام
+                        </span>
+                    </div>
+                    <?php if (!empty($wh['last_error_message'])): ?>
+                        <div class="pt-1 border-t border-slate-800 text-rose-300">
+                            <span class="block text-slate-400 text-[10px]">آخرین خطای تلگرام:</span>
+                            <code><?= htmlspecialchars($wh['last_error_message']) ?></code>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
+
+            <form action="repair.php" method="POST" class="space-y-2">
+                <input type="hidden" name="action" value="reset_bot">
+                <div>
+                    <label class="block text-slate-400 text-[10px] mb-1">توکن ربات تلگرام (از BotFather):</label>
+                    <input type="text" name="bot_token" dir="ltr" value="<?= htmlspecialchars($currToken ?: '') ?>" placeholder="123456789:ABCdefGHIjklMNOpqrSTUvwxYZ" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-2 font-mono text-xs text-white">
+                </div>
+                <button type="submit" class="w-full py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl transition flex items-center justify-center gap-1.5 shadow-md shadow-sky-900/30">
+                    <i class="fa-solid fa-bolt"></i>
+                    <span>ثبت مجدد وبهوک و پاکسازی صف پیام‌های معلق (Reactivate Bot)</span>
+                </button>
+            </form>
+        </div>
+
+        <!-- Database Switcher Card (MySQL / SQLite) -->
+        <div class="p-4 bg-slate-950/80 border border-slate-800 rounded-2xl space-y-3 text-xs">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2 text-white font-bold">
+                    <i class="fa-solid fa-server text-purple-400"></i>
+                    <span>مدیریت اتصال پایگاه داده (MySQL / SQLite)</span>
+                </div>
+                <span class="px-2 py-0.5 rounded text-[10px] bg-purple-500/10 text-purple-300 border border-purple-500/30 font-mono">
+                    فعلی: <?= strtoupper(DB_DRIVER) ?>
+                </span>
+            </div>
+
+            <?= $dbSwitchMsg ?>
+
+            <?php if (DB_DRIVER === 'sqlite'): ?>
+                <p class="text-[11px] text-slate-400 leading-relaxed">
+                    در حال حاضر سامانه روی <b>SQLite</b> فعال است. در صورتی که دیتابیس قبلی شما روی <b>MySQL</b> بوده، می‌توانید با وارد کردن مشخصات زیر، فایل config.php را مستقیماً به MySQL متصل فرمایید:
+                </p>
+                <form action="repair.php" method="POST" class="space-y-2">
+                    <input type="hidden" name="action" value="switch_db">
+                    <input type="hidden" name="db_driver" value="mysql">
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-slate-400 text-[10px] mb-0.5">نام دیتابیس MySQL:</label>
+                            <input type="text" name="db_name" dir="ltr" placeholder="cpaneluser_contax" required class="w-full bg-slate-900 border border-slate-800 rounded-xl p-2 text-xs font-mono text-white">
+                        </div>
+                        <div>
+                            <label class="block text-slate-400 text-[10px] mb-0.5">نام کاربری MySQL:</label>
+                            <input type="text" name="db_user" dir="ltr" placeholder="cpaneluser_admin" required class="w-full bg-slate-900 border border-slate-800 rounded-xl p-2 text-xs font-mono text-white">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-slate-400 text-[10px] mb-0.5">کلمه عبور MySQL:</label>
+                            <input type="password" name="db_pass" dir="ltr" placeholder="••••••••" required class="w-full bg-slate-900 border border-slate-800 rounded-xl p-2 text-xs font-mono text-white">
+                        </div>
+                        <div>
+                            <label class="block text-slate-400 text-[10px] mb-0.5">هاست (127.0.0.1 پیشنهاد می‌شود):</label>
+                            <input type="text" name="db_host" dir="ltr" value="127.0.0.1" required class="w-full bg-slate-900 border border-slate-800 rounded-xl p-2 text-xs font-mono text-white">
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl transition flex items-center justify-center gap-1.5 shadow-md shadow-purple-900/30">
+                        <i class="fa-solid fa-link"></i>
+                        <span>تست اتصال و سوئیچ فوری به MySQL</span>
+                    </button>
+                </form>
+            <?php else: ?>
+                <div class="text-[11px] text-emerald-300 bg-emerald-950/40 p-2.5 rounded-xl border border-emerald-800/40 flex items-center justify-between">
+                    <span>پایگاه داده MySQL متصل است. (هاست: <code><?= DB_HOST ?></code> | دیتابیس: <code><?= DB_NAME ?></code>)</span>
+                    <i class="fa-solid fa-check text-emerald-400"></i>
+                </div>
+            <?php endif; ?>
         </div>
 
         <!-- Emergency SQL Backup Restore Card -->
