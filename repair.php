@@ -22,6 +22,18 @@ if (isset($_GET['dump_clients'])) {
     exit;
 }
 
+if (isset($_GET['check_index'])) {
+    header('Content-Type: application/json; charset=utf-8');
+    $idxContent = file_get_contents(__DIR__ . '/index.php');
+    echo json_encode([
+        'has_ApiControllerV2' => str_contains($idxContent, 'ApiControllerV2'),
+        'has_SublinkControllerV2' => str_contains($idxContent, 'SublinkControllerV2'),
+        'md5' => md5($idxContent),
+        'size' => strlen($idxContent),
+    ], JSON_PRETTY_PRINT);
+    exit;
+}
+
 if (isset($_GET['reset_traffic'])) {
     header('Content-Type: application/json; charset=utf-8');
     require_once __DIR__ . '/config.php';
