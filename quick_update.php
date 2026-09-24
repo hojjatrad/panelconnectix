@@ -86,7 +86,12 @@ foreach ($folders as $f) {
                 if (!is_dir($target)) @mkdir($target, 0755, true);
             } else {
                 if (!is_dir(dirname($target))) @mkdir(dirname($target), 0755, true);
-                @copy($item->getPathname(), $target);
+                $fc = @file_get_contents($item->getPathname());
+                if ($fc !== false && strlen($fc) > 0) {
+                    @file_put_contents($target, $fc);
+                } else {
+                    @copy($item->getPathname(), $target);
+                }
                 @chmod($target, 0644);
                 $copiedFiles++;
             }
@@ -94,7 +99,7 @@ foreach ($folders as $f) {
     }
 }
 
-foreach (['index.php', 'repair.php', 'install.php', 'schema.sql', 'purge_all.php'] as $rootFile) {
+foreach (['index.php', 'repair.php', 'install.php', 'schema.sql', 'purge_all.php', 'quick_update.php', '.htaccess'] as $rootFile) {
     if (file_exists($sourceDir . '/' . $rootFile)) {
         $data = file_get_contents($sourceDir . '/' . $rootFile);
         if ($data !== false && strlen($data) > 0) {
