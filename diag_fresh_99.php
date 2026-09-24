@@ -15,7 +15,7 @@ try {
     // 2. Reset clients traffic to 0 bytes and set status to active
     $pdo->exec("UPDATE clients SET traffic_used_bytes = 0, status = 'active'");
 
-    $nodes = $pdo->query("SELECT id, name, driver, host, port, sub_domain, config_template, is_active FROM server_nodes")->fetchAll(PDO::FETCH_ASSOC);
+    $nodes = $pdo->query("SELECT id, name, driver, api_url, sub_domain, config_template, is_active FROM server_nodes")->fetchAll(PDO::FETCH_ASSOC);
     $clients = $pdo->query("SELECT id, username, password, server_id, traffic_limit_bytes, traffic_used_bytes, expire_at, status, node_sublink FROM clients ORDER BY id DESC LIMIT 5")->fetchAll(PDO::FETCH_ASSOC);
 
     // 3. Test direct sublink fetch for client 10f575
