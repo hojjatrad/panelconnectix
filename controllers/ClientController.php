@@ -277,9 +277,13 @@ class ClientController {
             }
 
             // Insert Client
-            $stmtInsert = $pdo->prepare("INSERT INTO clients (reseller_id, server_id, plan_id, username, password, uuid, sub_token, traffic_limit_bytes, traffic_used_bytes, expire_at, ip_limit, max_devices, start_on_first_use, duration_days, status, custom_note) 
-                                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)");
-            $stmtInsert->execute([$userId, $serverId, $planId, $username, $password, $uuid, $subToken, $trafficBytes, $expireAt, $ipLimit, $maxDevices, $startOnFirstUse ? 1 : 0, $durationDays, $clientStatus, $customNote]);
+            $nodeSublink = !empty($driverResult['sublink']) ? $driverResult['sublink'] : null;
+            if ($nodeSublink && str_contains($nodeSublink, 'montago-shop.ir')) {
+                $nodeSublink = preg_replace('#https?://[^/]+#i', 'https://sub.speedur.org:2096', $nodeSublink);
+            }
+            $stmtInsert = $pdo->prepare("INSERT INTO clients (reseller_id, server_id, plan_id, username, password, uuid, sub_token, traffic_limit_bytes, traffic_used_bytes, expire_at, ip_limit, max_devices, start_on_first_use, duration_days, status, custom_note, node_sublink) 
+                                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmtInsert->execute([$userId, $serverId, $planId, $username, $password, $uuid, $subToken, $trafficBytes, $expireAt, $ipLimit, $maxDevices, $startOnFirstUse ? 1 : 0, $durationDays, $clientStatus, $customNote, $nodeSublink]);
             $newClientId = $pdo->lastInsertId();
 
             $pdo->commit();

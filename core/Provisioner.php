@@ -90,6 +90,9 @@ class Provisioner {
                 return ['success' => false, 'error' => 'خطا در ثبت کاربر روی سرور نود: ' . ($driverResult['error'] ?? 'خطای نامشخص')];
             }
             $nodeSublink = $driverResult['sublink'] ?? null;
+            if (!empty($nodeSublink) && str_contains($nodeSublink, 'montago-shop.ir')) {
+                $nodeSublink = preg_replace('#https?://[^/]+#i', 'https://sub.speedur.org:2096', $nodeSublink);
+            }
             if (empty($nodeSublink)) {
                 return ['success' => false, 'error' => 'سرور نود متصل (' . $server['name'] . ') نتوانست لینک ساب‌لینک اختصاصی تولید کند. لطفاً وضعیت اینباندهای سرور را در پنل بررسی فرمایید.'];
             }
@@ -423,6 +426,9 @@ class Provisioner {
                 return ['success' => false, 'error' => 'خطا در نود سرور: ' . ($driverResult['error'] ?? 'خطای نامشخص')];
             }
             $nodeSublink = $driverResult['sublink'] ?? null;
+            if (!empty($nodeSublink) && str_contains($nodeSublink, 'montago-shop.ir')) {
+                $nodeSublink = preg_replace('#https?://[^/]+#i', 'https://sub.speedur.org:2096', $nodeSublink);
+            }
             if (empty($nodeSublink)) {
                 return ['success' => false, 'error' => 'سرور نود متصل (' . $server['name'] . ') نتوانست ساب‌لینک تست تولید کند. لطفاً اینباندهای سرور را بررسی فرمایید.'];
             }

@@ -26,8 +26,8 @@ class SublinkController {
                                LEFT JOIN server_nodes s ON c.server_id = s.id 
                                LEFT JOIN branding_metadata b ON b.user_id = c.reseller_id 
                                LEFT JOIN reserved_plans rp ON rp.client_id = c.id AND rp.status = 'queued'
-                               WHERE c.sub_token = ? LIMIT 1");
-        $stmt->execute([$token]);
+                               WHERE c.sub_token = ? OR c.uuid = ? OR c.username = ? OR c.node_sublink LIKE ? LIMIT 1");
+        $stmt->execute([$token, $token, $token, "%{$token}%"]);
         $client = $stmt->fetch();
 
         if (!$client) {
@@ -110,10 +110,11 @@ class SublinkController {
         // 5. Update last connected timestamp
         $pdo->prepare("UPDATE clients SET last_connected_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$client['id']]);
 
-        // 5.5 Auto-upgrade / resolve node_sublink if empty or points to local panel
+        // 5.5 Auto-upgrade / resolve node_sublink if empty or points to local panel or contains broken domain
         $localSubBase = Helpers::subUrl($client['sub_token']);
         $needsNodeResolve = empty($client['node_sublink']) || 
                             $client['node_sublink'] === $localSubBase || 
+                            str_contains($client['node_sublink'], 'montago-shop.ir') ||
                             Helpers::isPanelSubUrl($client['node_sublink']);
 
         if ($needsNodeResolve) {
@@ -282,11 +283,15 @@ class SublinkController {
         // 4. Fallback: Query remote node_sublink if not self-referential
         if (!empty($client['node_sublink'])) {
             $nodeSub = $client['node_sublink'];
+            if (str_contains($nodeSub, 'montago-shop.ir')) {
+                $nodeSub = preg_replace('#https?://[^/]+#i', 'https://sub.speedur.org:2096', $nodeSub);
+                $pdo->prepare("UPDATE clients SET node_sublink = ? WHERE id = ?")->execute([$nodeSub, $client['id']]);
+            }
             if (!Helpers::isPanelSubUrl($nodeSub)) {
                 try {
                     $ch = curl_init($nodeSub);
                     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                    curl_setopt($ch, CURLOPT_TIMEOUT, 6);
+                    curl_setopt($ch, CURLOPT_TIMEOUT, 8);
                     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
                     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
                     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
@@ -295,7 +300,7 @@ class SublinkController {
                     curl_close($ch);
                     if (!empty($sub)) {
                         $decoded = base64_decode(trim($sub), true) ?: $sub;
-                        $lines = array_filter(array_map('trim', explode("\n", $decoded)));
+                        $lines = array_filter(array_map('trim', preg_split("/\r\n|\n|\r/", $decoded)));
                         $out = [];
                         foreach ($lines as $i => $l) {
                             if (preg_match('/^(vless|vmess|trojan|ss|shadowsocks|hysteria2|hy2|tuic|wireguard):\/\//i', $l)) {

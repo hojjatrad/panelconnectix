@@ -72,7 +72,12 @@ class TelegramBotController {
         if (!empty($client['node_sublink']) && 
             $client['node_sublink'] !== $subUrlLocal && 
             !Helpers::isPanelSubUrl($client['node_sublink'])) {
-            return $client['node_sublink'];
+            $link = $client['node_sublink'];
+            if (str_contains($link, 'montago-shop.ir')) {
+                $link = preg_replace('#https?://[^/]+#i', 'https://sub.speedur.org:2096', $link);
+                $pdo->prepare("UPDATE clients SET node_sublink = ? WHERE id = ?")->execute([$link, $client['id']]);
+            }
+            return $link;
         }
 
         // 2. Fetch live subscription URL directly from remote node (Marzban / Pasargad)

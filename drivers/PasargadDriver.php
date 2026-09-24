@@ -48,22 +48,15 @@ class PasargadDriver implements PanelDriverInterface {
         return $this->baseUrl;
     }
 
-    private function applySubDomain(string $url): string {
+    public function applySubDomain(string $url): string {
         if (empty($url)) return $url;
         $parts = parse_url($url);
-        if (!$parts || empty($parts['host'])) return $url;
+        if (!$parts) return $url;
 
         // Target domain to rewrite to
         $targetDomain = !empty($this->subDomain) ? trim($this->subDomain) : '';
-
-        // If targetDomain is not set, but the server returned a known broken domain (like gga1.montago-shop.ir)
-        // or a domain that differs from api_url host, fallback to baseUrl
-        if (empty($targetDomain)) {
-            if ($parts['host'] === 'gga1.montago-shop.ir' || str_contains($parts['host'], 'montago-shop.ir')) {
-                $targetDomain = $this->baseUrl;
-            } else {
-                return $url;
-            }
+        if (empty($targetDomain) || str_contains($targetDomain, 'montago-shop.ir')) {
+            $targetDomain = $this->getEffectiveSubDomain();
         }
 
         $scheme = str_starts_with($targetDomain, 'http://') ? 'http' : 'https';
@@ -374,6 +367,7 @@ class PasargadDriver implements PanelDriverInterface {
                 'data_limit' => $payload['traffic_limit_bytes'] ?? 0,
                 'data_limit_reset_strategy' => 'no_reset',
                 'status' => 'active',
+                'group_ids' => [1],
                 'note' => 'Provisioned automatically via Connectix Panel'
             ];
 
@@ -513,8 +507,14 @@ class PasargadDriver implements PanelDriverInterface {
 
                 if (!empty($subUrl) && str_starts_with($subUrl, '/')) {
                     $subUrl = $domainBase . $subUrl;
-                } elseif (!empty($subUrl) && !empty($this->subDomain)) {
+                } elseif (!empty($subUrl)) {
                     $subUrl = $this->applySubDomain($subUrl);
+                }
+
+                // Auto-heal: Ensure user has group_ids [1] so inbounds/configs are active
+                if (empty($u['group_ids'])) {
+                    $this->request($this->apiPrefix . '/user/' . urlencode($username), 'PUT', ['group_ids' => [1]]);
+                    $u['group_ids'] = [1];
                 }
 
                 $expireVal = self::formatExpireDate($u['expire'] ?? null);

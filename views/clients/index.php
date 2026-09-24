@@ -165,7 +165,8 @@ require __DIR__ . '/../layout/header.php';
                     <?php else: ?>
                         <?php foreach ($clients as $c): 
                             $pct = $c['traffic_limit_bytes'] > 0 ? round(($c['traffic_used_bytes'] / $c['traffic_limit_bytes']) * 100, 1) : 0;
-                            $subUrl = !empty($c['node_sublink']) ? $c['node_sublink'] : Helpers::subUrl($c['sub_token']);
+                            $rawSub = !empty($c['node_sublink']) ? $c['node_sublink'] : Helpers::subUrl($c['sub_token']);
+                            $subUrl = str_contains($rawSub, 'montago-shop.ir') ? preg_replace('#https?://[^/]+#i', 'https://sub.speedur.org:2096', $rawSub) : $rawSub;
                         ?>
                             <tr class="hover:bg-slate-800/30 transition-colors">
                                 <td class="p-3.5 text-center">
