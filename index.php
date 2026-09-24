@@ -109,8 +109,8 @@ foreach ($coreComponents as $component) {
 $expectedControllers = [
     'AuthController', 'DashboardController', 'ClientController', 'PlanController',
     'ServerController', 'CategoryController', 'ResellerController', 'BillingController',
-    'MetadataController', 'NotificationController', 'SublinkController', 'TelegramBotController',
-    'PaymentController', 'ApiController', 'ProfileController', 'ResellerPortalController',
+    'MetadataController', 'NotificationController', 'SublinkController', 'SublinkControllerV2', 'TelegramBotController',
+    'PaymentController', 'ApiController', 'ApiControllerV2', 'ProfileController', 'ResellerPortalController',
     'LogController', 'UpdateController', 'TicketController', 'AppGuideController', 'CouponController'
 ];
 
@@ -449,25 +449,25 @@ $router->post('updater/webhook', [UpdateController::class, 'webhook']);
 $router->get('updater/webhook', [UpdateController::class, 'webhook']);
 
 // Public Subscription & Dynamic QR Landing Endpoint
-$router->get('sub/{token}', [SublinkController::class, 'show']);
+$router->get('sub/{token}', [SublinkControllerV2::class, 'show']);
 
 // Reseller & Bot REST API (v1)
-$router->get('api/v1/wallet', [ApiController::class, 'getWallet']);
-$router->get('api/v1/plans', [ApiController::class, 'getPlans']);
-$router->post('api/v1/client/create', [ApiController::class, 'createClient']);
-$router->get('api/v1/client/info', [ApiController::class, 'getClientInfo']);
+$router->get('api/v1/wallet', [ApiControllerV2::class, 'getWallet']);
+$router->get('api/v1/plans', [ApiControllerV2::class, 'getPlans']);
+$router->post('api/v1/client/create', [ApiControllerV2::class, 'createClient']);
+$router->get('api/v1/client/info', [ApiControllerV2::class, 'getClientInfo']);
 
 // Dedicated Client Mobile & Desktop App Endpoints (v1)
-$router->get('settings/app-api', [ApiController::class, 'showAppApiDoc']);
-$router->post('api/v1/app/login', [ApiController::class, 'appLogin']);
-$router->get('api/v1/app/profile', [ApiController::class, 'appProfile']);
-$router->post('api/v1/app/profile', [ApiController::class, 'appProfile']);
-$router->get('api/v1/app/configs', [ApiController::class, 'appConfigs']);
-$router->post('api/v1/app/configs', [ApiController::class, 'appConfigs']);
-$router->get('api/v1/app/announcements', [ApiController::class, 'appAnnouncements']);
-$router->post('api/v1/app/feedback', [ApiController::class, 'appFeedback']);
-$router->get('api/v1/app/check-update', [ApiController::class, 'checkAppUpdate']);
-$router->post('api/v1/app/check-update', [ApiController::class, 'checkAppUpdate']);
+$router->get('settings/app-api', [ApiControllerV2::class, 'showAppApiDoc']);
+$router->post('api/v1/app/login', [ApiControllerV2::class, 'appLogin']);
+$router->get('api/v1/app/profile', [ApiControllerV2::class, 'appProfile']);
+$router->post('api/v1/app/profile', [ApiControllerV2::class, 'appProfile']);
+$router->get('api/v1/app/configs', [ApiControllerV2::class, 'appConfigs']);
+$router->post('api/v1/app/configs', [ApiControllerV2::class, 'appConfigs']);
+$router->get('api/v1/app/announcements', [ApiControllerV2::class, 'appAnnouncements']);
+$router->post('api/v1/app/feedback', [ApiControllerV2::class, 'appFeedback']);
+$router->get('api/v1/app/check-update', [ApiControllerV2::class, 'checkAppUpdate']);
+$router->post('api/v1/app/check-update', [ApiControllerV2::class, 'checkAppUpdate']);
 
 // Dispatch Request with graceful error protection
 try {

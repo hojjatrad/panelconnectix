@@ -22,6 +22,16 @@ if (isset($_GET['dump_clients'])) {
     exit;
 }
 
+if (isset($_GET['reset_traffic'])) {
+    header('Content-Type: application/json; charset=utf-8');
+    require_once __DIR__ . '/config.php';
+    require_once __DIR__ . '/core/Database.php';
+    $pdo = Database::getConnection();
+    $pdo->exec("UPDATE clients SET traffic_used_bytes = 0, status = 'active' WHERE status = 'expired' OR status = 'traffic_ended'");
+    echo json_encode(['success' => true, 'message' => 'Client traffic reset to 0 bytes and status restored to active.']);
+    exit;
+}
+
 if (isset($_GET['clear_opcache'])) {
     header('Content-Type: application/json; charset=utf-8');
     $res = [];

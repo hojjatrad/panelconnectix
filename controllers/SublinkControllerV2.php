@@ -5,7 +5,7 @@ require_once __DIR__ . '/../core/Setting.php';
 require_once __DIR__ . '/../core/Provisioner.php';
 require_once __DIR__ . '/../drivers/DriverFactory.php';
 
-class SublinkController {
+class SublinkControllerV2 {
     public function show(string $token): void {
         $pdo = Database::getConnection();
 
