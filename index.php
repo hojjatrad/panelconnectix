@@ -226,6 +226,8 @@ $router->post('plans/update', [PlanController::class, 'update']);
 $router->post('plans/toggle', [PlanController::class, 'toggle']);
 $router->post('plans/toggle-bot', [PlanController::class, 'toggleBot']);
 $router->post('plans/delete', [PlanController::class, 'delete']);
+$router->post('plans/purge-all', [PlanController::class, 'purgeAll']);
+$router->get('plans/purge-all', [PlanController::class, 'purgeAll']);
 
 // Server Nodes Management (Admin only)
 $router->get('servers', [ServerController::class, 'index']);

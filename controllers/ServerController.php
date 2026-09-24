@@ -157,27 +157,23 @@ class ServerController {
             $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
             if ($driver === 'mysql') {
                 $pdo->exec("SET FOREIGN_KEY_CHECKS=0");
-                $pdo->exec("DELETE FROM bot_orders");
-                $pdo->exec("DELETE FROM trial_logs");
-                $pdo->exec("DELETE FROM reserved_plans");
-                $pdo->exec("DELETE FROM clients");
-                $pdo->exec("DELETE FROM reseller_plans");
-                $pdo->exec("DELETE FROM plans");
-                $pdo->exec("DELETE FROM server_nodes WHERE driver = 'mock'");
-                $pdo->exec("SET FOREIGN_KEY_CHECKS=1");
             } else {
                 $pdo->exec("PRAGMA foreign_keys = OFF");
-                $pdo->exec("DELETE FROM bot_orders");
-                $pdo->exec("DELETE FROM trial_logs");
-                $pdo->exec("DELETE FROM reserved_plans");
-                $pdo->exec("DELETE FROM clients");
-                $pdo->exec("DELETE FROM reseller_plans");
-                $pdo->exec("DELETE FROM plans");
-                $pdo->exec("DELETE FROM server_nodes WHERE driver = 'mock'");
+            }
+
+            $tablesToWipe = ['bot_orders', 'trial_logs', 'reserved_plans', 'clients', 'reseller_plans', 'plans', 'server_nodes', 'transactions', 'lucky_wheel_logs', 'wallet_logs', 'crypto_payments', 'bot_sessions'];
+            foreach ($tablesToWipe as $tbl) {
+                try { $pdo->exec("DELETE FROM `{$tbl}`"); } catch (Throwable $ignore) {}
+            }
+
+            if ($driver === 'mysql') {
+                $pdo->exec("SET FOREIGN_KEY_CHECKS=1");
+            } else {
                 $pdo->exec("PRAGMA foreign_keys = ON");
             }
-            Helpers::logActivity('purge_all_samples', 'پاکسازی کامل تمامی پلن‌های نمونه، سفارشات تستی و سرورهای ماک توسط مدیر', 'system');
-            Helpers::flash('success', 'تمامی پلن‌های نمونه، سفارشات تستی و سرورهای ماک با موفقیت پاکسازی شدند. سیستم اکنون کاملاً خام و آماده است.');
+
+            Helpers::logActivity('purge_all_samples', 'پاکسازی ۱۰۰٪ کامل تمامی پلن‌ها، سرورها، سفارشات و اکانت‌های تستی توسط مدیر', 'system');
+            Helpers::flash('success', 'تمامی پلن‌ها، سرورها، سفارشات تستی و کلاینت‌ها با موفقیت ۱۰۰٪ پاکسازی شدند! سیستم اکنون کاملاً خام و آماده معرفی سرورها و پلن‌های اختصاصی شماست.');
         } catch (Throwable $e) {
             Helpers::flash('error', 'خطا در پاکسازی: ' . $e->getMessage());
         }

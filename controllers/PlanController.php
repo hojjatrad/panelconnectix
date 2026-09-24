@@ -187,4 +187,28 @@ class PlanController {
         Helpers::flash('success', 'پلن مورد نظر با موفقیت حذف گردید.');
         Helpers::redirect('plans');
     }
+
+    public function purgeAll(): void {
+        Auth::requireAdmin();
+        $pdo = Database::getConnection();
+        try {
+            $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+            if ($driver === 'mysql') $pdo->exec("SET FOREIGN_KEY_CHECKS=0");
+            else $pdo->exec("PRAGMA foreign_keys = OFF");
+
+            $pdo->exec("DELETE FROM plans");
+            $pdo->exec("DELETE FROM reseller_plans");
+            $pdo->exec("DELETE FROM reserved_plans");
+            $pdo->exec("UPDATE clients SET plan_id = NULL");
+            $pdo->exec("UPDATE bot_orders SET plan_id = NULL");
+
+            if ($driver === 'mysql') $pdo->exec("SET FOREIGN_KEY_CHECKS=1");
+            else $pdo->exec("PRAGMA foreign_keys = ON");
+
+            Helpers::flash('success', 'تمامی پلن‌ها به طور کامل پاکسازی شدند. اکنون می‌توانید پلن‌های اختصاصی خود را تعریف فرمایید.');
+        } catch (Throwable $e) {
+            Helpers::flash('error', 'خطا در پاکسازی پلن‌ها: ' . $e->getMessage());
+        }
+        Helpers::redirect('plans');
+    }
 }

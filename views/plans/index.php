@@ -61,6 +61,10 @@ foreach ($customPlanCats as $idx => $custCat) {
 
         <?php if (Auth::isAdmin()): ?>
             <div class="flex items-center gap-2">
+                <a href="<?= Helpers::url('plans/purge-all') ?>" onclick="return confirm('⚠️ آیا از پاکسازی و حذف کامل تمامی پلن‌های موجود اطمینان دارید؟');" class="px-3 py-2 bg-rose-950/40 hover:bg-rose-900/50 text-rose-300 border border-rose-800/50 text-xs font-bold rounded-xl transition flex items-center gap-1.5" title="حذف تمام پلن‌ها جهت تعریف از ابتدا">
+                    <i class="fa-solid fa-trash-can"></i>
+                    <span>خام‌سازی پلن‌ها</span>
+                </a>
                 <a href="<?= Helpers::url('categories') ?>" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-purple-300 border border-slate-700 text-xs font-bold rounded-xl transition-all flex items-center gap-2 shadow-sm">
                     <i class="fa-solid fa-layer-group"></i>
                     <span>مدیریت دسته‌بندی و خوشه‌ها</span>

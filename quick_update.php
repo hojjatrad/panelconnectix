@@ -96,9 +96,12 @@ foreach ($folders as $f) {
 
 foreach (['index.php', 'repair.php', 'install.php', 'schema.sql', 'purge_all.php'] as $rootFile) {
     if (file_exists($sourceDir . '/' . $rootFile)) {
-        @copy($sourceDir . '/' . $rootFile, __DIR__ . '/' . $rootFile);
-        @chmod(__DIR__ . '/' . $rootFile, 0644);
-        $copiedFiles++;
+        $data = file_get_contents($sourceDir . '/' . $rootFile);
+        if ($data !== false && strlen($data) > 0) {
+            @file_put_contents(__DIR__ . '/' . $rootFile, $data);
+            @chmod(__DIR__ . '/' . $rootFile, 0644);
+            $copiedFiles++;
+        }
     }
 }
 
