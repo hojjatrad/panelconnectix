@@ -194,12 +194,17 @@ foreach ($folders as $f) {
                 $fc = @file_get_contents($item->getPathname());
                 if ($fc !== false && strlen($fc) > 0) {
                     if (file_exists($target)) {
-                        @chmod($target, 0666);
-                        @unlink($target);
+                        @chmod($target, 0777);
+                        $del = @unlink($target);
+                        if (!$del && file_exists($target)) {
+                            @rename($target, $target . '.old.' . uniqid());
+                        }
                     }
                     $written = @file_put_contents($target, $fc);
                     if ($written !== false && $written > 0) {
                         $copiedFiles++;
+                    } else {
+                        logStep("خطا در نوشتن فایل: " . basename($target), 'warn');
                     }
                 }
                 @chmod($target, 0644);
@@ -208,18 +213,23 @@ foreach ($folders as $f) {
     }
 }
 
-foreach (['index.php', 'repair.php', 'install.php', 'schema.sql', 'purge_all.php', 'quick_update.php', 'cpanel_fix.php'] as $rootFile) {
+foreach (['index.php', 'repair.php', 'install.php', 'schema.sql', 'purge_all.php', 'quick_update.php', 'cpanel_fix.php', 'sync.php'] as $rootFile) {
     if (file_exists($sourceDir . '/' . $rootFile)) {
         $data = file_get_contents($sourceDir . '/' . $rootFile);
         if ($data !== false && strlen($data) > 0) {
             $tgt = __DIR__ . '/' . $rootFile;
             if (file_exists($tgt)) {
-                @chmod($tgt, 0666);
-                @unlink($tgt);
+                @chmod($tgt, 0777);
+                $del = @unlink($tgt);
+                if (!$del && file_exists($tgt)) {
+                    @rename($tgt, $tgt . '.old.' . uniqid());
+                }
             }
             $written = @file_put_contents($tgt, $data);
             if ($written !== false && $written > 0) {
                 $copiedFiles++;
+            } else {
+                logStep("خطا در نوشتن فایل ریشه: {$rootFile}", 'warn');
             }
             @chmod($tgt, 0644);
         }
