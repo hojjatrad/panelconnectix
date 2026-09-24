@@ -271,7 +271,58 @@ if ($hasConfig) {
         } catch (Throwable $e) {}
 
         // Diagnostic API for testing live servers
-        if (isset($_GET['diag_server'])) {
+        if (isset($_GET['fix_empty_subdomains'])) {
+    header('Content-Type: application/json; charset=utf-8');
+    $results = [];
+    try {
+        $nodes = $pdo->query("SELECT * FROM server_nodes")->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($nodes as $node) {
+            $updated = false;
+            $newSub = $node['sub_domain'];
+            $newDriver = $node['driver'];
+
+            // 1. If pasargad or marzban, check detected driver
+            $detected = ServerController::detectDriverType($node['api_url'], $node['api_username'], $node['api_password'], $node['api_token'], $node['name']);
+            if ($detected && $detected !== $node['driver']) {
+                $newDriver = $detected;
+                $updated = true;
+            }
+
+            // 2. If sub_domain is empty, detect it
+            if (empty($newSub) || str_contains($newSub, 'montago-shop.ir')) {
+                // Try from api_url
+                $p = parse_url($node['api_url']);
+                $host = $p['host'] ?? '';
+                $port = !empty($p['port']) ? (':' . $p['port']) : '';
+                // Check if speedur.org -> sub.speedur.org:2096
+                if (str_contains($host, 'speedur.org')) {
+                    $newSub = 'sub.speedur.org' . $port;
+                } else if (!empty($host)) {
+                    $newSub = $host . $port;
+                }
+                $updated = true;
+            }
+
+            if ($updated) {
+                $stmt = $pdo->prepare("UPDATE server_nodes SET driver = ?, sub_domain = ? WHERE id = ?");
+                $stmt->execute([$newDriver, $newSub, $node['id']]);
+                $results[] = [
+                    'id' => $node['id'],
+                    'name' => $node['name'],
+                    'old_driver' => $node['driver'],
+                    'new_driver' => $newDriver,
+                    'new_sub_domain' => $newSub
+                ];
+            }
+        }
+        echo json_encode(['success' => true, 'updated' => $results], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
+if (isset($_GET['diag_server'])) {
             header('Content-Type: application/json; charset=utf-8');
             try {
                 require_once __DIR__ . '/drivers/DriverFactory.php';
