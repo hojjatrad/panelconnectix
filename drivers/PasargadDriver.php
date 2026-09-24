@@ -76,7 +76,7 @@ class PasargadDriver implements PanelDriverInterface {
         return "{$scheme}://{$targetHost}{$path}{$query}{$fragment}";
     }
 
-    private function request(string $endpoint, string $method = 'GET', ?array $data = null, bool $isForm = false): array {
+    public function request(string $endpoint, string $method = 'GET', ?array $data = null, bool $isForm = false): array {
         $ch = curl_init();
         $url = $this->baseUrl . $endpoint;
 

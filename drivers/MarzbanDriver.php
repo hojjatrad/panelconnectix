@@ -27,7 +27,7 @@ class MarzbanDriver implements PanelDriverInterface {
         return $this->lastError;
     }
 
-    private function request(string $endpoint, string $method = 'GET', ?array $data = null, bool $isForm = false): array {
+    public function request(string $endpoint, string $method = 'GET', ?array $data = null, bool $isForm = false): array {
         $ch = curl_init();
         $url = $this->baseUrl . $endpoint;
 
