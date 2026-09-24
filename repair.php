@@ -116,18 +116,21 @@ if ($hasConfig) {
             try {
                 if ($driver === 'mysql') {
                     $pdo->exec("SET FOREIGN_KEY_CHECKS=0");
-                    $pdo->exec("UPDATE plans SET server_id = NULL");
-                    $pdo->exec("UPDATE clients SET server_id = NULL");
-                    $pdo->exec("DELETE FROM server_nodes");
-                    $pdo->exec("SET FOREIGN_KEY_CHECKS=1");
                 } else {
                     $pdo->exec("PRAGMA foreign_keys = OFF");
-                    $pdo->exec("UPDATE plans SET server_id = NULL");
-                    $pdo->exec("UPDATE clients SET server_id = NULL");
-                    $pdo->exec("DELETE FROM server_nodes");
+                }
+                $pdo->exec("UPDATE plans SET server_id = NULL");
+                $pdo->exec("DELETE FROM reserved_plans");
+                $pdo->exec("DELETE FROM trial_logs");
+                $pdo->exec("DELETE FROM bot_orders");
+                $pdo->exec("DELETE FROM clients");
+                $pdo->exec("DELETE FROM server_nodes");
+                if ($driver === 'mysql') {
+                    $pdo->exec("SET FOREIGN_KEY_CHECKS=1");
+                } else {
                     $pdo->exec("PRAGMA foreign_keys = ON");
                 }
-                $adminMsg .= ' [سرورها به طور کامل پاکسازی و خام شدند.]';
+                $adminMsg .= ' [تمامی سرورها و کلاینت‌ها به طور کامل پاکسازی و خام شدند.]';
             } catch (Throwable $e) {}
         }
 

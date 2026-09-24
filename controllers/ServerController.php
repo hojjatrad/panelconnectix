@@ -131,19 +131,25 @@ class ServerController {
             $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
             if ($driver === 'mysql') {
                 $pdo->exec("SET FOREIGN_KEY_CHECKS=0");
-                $pdo->exec("UPDATE plans SET server_id = NULL");
-                $pdo->exec("UPDATE clients SET server_id = NULL");
-                $pdo->exec("DELETE FROM server_nodes");
-                $pdo->exec("SET FOREIGN_KEY_CHECKS=1");
             } else {
                 $pdo->exec("PRAGMA foreign_keys = OFF");
-                $pdo->exec("UPDATE plans SET server_id = NULL");
-                $pdo->exec("UPDATE clients SET server_id = NULL");
-                $pdo->exec("DELETE FROM server_nodes");
+            }
+
+            // In SQLite/MySQL, clients.server_id is NOT NULL, so mock clients attached to servers are removed
+            $pdo->exec("UPDATE plans SET server_id = NULL");
+            $pdo->exec("DELETE FROM reserved_plans");
+            $pdo->exec("DELETE FROM trial_logs");
+            $pdo->exec("DELETE FROM bot_orders");
+            $pdo->exec("DELETE FROM clients");
+            $pdo->exec("DELETE FROM server_nodes");
+
+            if ($driver === 'mysql') {
+                $pdo->exec("SET FOREIGN_KEY_CHECKS=1");
+            } else {
                 $pdo->exec("PRAGMA foreign_keys = ON");
             }
-            Helpers::logActivity('servers_clear_all', 'خام‌سازی و پاکسازی کامل جدول سرورها توسط مدیر', 'server');
-            Helpers::flash('success', 'تمامی سرورهای قبلی با موفقیت پاکسازی و بخش سرورها کاملاً خام شد. اکنون می‌توانید سرورهای اختصاصی خود را متصل فرمایید.');
+            Helpers::logActivity('servers_clear_all', 'خام‌سازی و پاکسازی کامل جدول سرورها و کلاینت‌ها توسط مدیر', 'server');
+            Helpers::flash('success', 'تمامی سرورها و کلاینت‌های قبلی با موفقیت پاکسازی و بخش سرورها کاملاً خام شد. اکنون می‌توانید سرورهای اختصاصی خود را متصل فرمایید.');
         } catch (Throwable $e) {
             Helpers::flash('error', 'خطا در خام‌سازی سرورها: ' . $e->getMessage());
         }
@@ -190,13 +196,32 @@ class ServerController {
         $id = (int)($_POST['id'] ?? 0);
         $pdo = Database::getConnection();
 
-        // Safely detach clients and plans before server deletion
-        $pdo->prepare("UPDATE clients SET server_id = NULL WHERE server_id = ?")->execute([$id]);
-        $pdo->prepare("UPDATE plans SET server_id = NULL WHERE server_id = ?")->execute([$id]);
-        $pdo->prepare("UPDATE bot_orders SET server_id = NULL WHERE server_id = ?")->execute([$id]);
+        try {
+            $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+            if ($driver === 'mysql') {
+                $pdo->exec("SET FOREIGN_KEY_CHECKS=0");
+            } else {
+                $pdo->exec("PRAGMA foreign_keys = OFF");
+            }
 
-        $pdo->prepare("DELETE FROM server_nodes WHERE id = ?")->execute([$id]);
-        Helpers::flash('success', 'سرور با موفقیت حذف گردید.');
+            // In SQLite/MySQL, clients.server_id is NOT NULL, so delete attached clients safely
+            $pdo->prepare("DELETE FROM reserved_plans WHERE client_id IN (SELECT id FROM clients WHERE server_id = ?)")->execute([$id]);
+            $pdo->prepare("DELETE FROM bot_orders WHERE server_id = ?")->execute([$id]);
+            $pdo->prepare("DELETE FROM clients WHERE server_id = ?")->execute([$id]);
+            $pdo->prepare("UPDATE plans SET server_id = NULL WHERE server_id = ?")->execute([$id]);
+            $pdo->prepare("DELETE FROM server_nodes WHERE id = ?")->execute([$id]);
+
+            if ($driver === 'mysql') {
+                $pdo->exec("SET FOREIGN_KEY_CHECKS=1");
+            } else {
+                $pdo->exec("PRAGMA foreign_keys = ON");
+            }
+
+            Helpers::flash('success', 'سرور با موفقیت حذف گردید.');
+        } catch (Throwable $e) {
+            Helpers::flash('error', 'خطا در حذف سرور: ' . $e->getMessage());
+        }
+
         Helpers::redirect('servers');
     }
 
