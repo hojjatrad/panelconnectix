@@ -978,14 +978,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   launchUrl(Uri.parse('https://wa.me/${widget.branding.whatsappSupport}'), mode: LaunchMode.externalApplication);
                 },
               ),
-            if (widget.branding.renewalLink.isNotEmpty)
+            if (widget.branding.renewalUrl.isNotEmpty)
               _SupportActionTile(
                 icon: Icons.autorenew_rounded,
                 iconColor: const Color(0xFFF59E0B),
                 title: 'پورتال تمدید اشتراک',
                 subtitle: 'شارژ فوری ترافیک و دوره زمانی',
                 onTap: () {
-                  launchUrl(Uri.parse(widget.branding.renewalLink), mode: LaunchMode.externalApplication);
+                  launchUrl(Uri.parse(widget.branding.renewalUrl), mode: LaunchMode.externalApplication);
                 },
               ),
             _SupportActionTile(
