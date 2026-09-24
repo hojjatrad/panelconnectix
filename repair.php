@@ -22,6 +22,21 @@ if (isset($_GET['dump_clients'])) {
     exit;
 }
 
+if (isset($_GET['check_api'])) {
+    header('Content-Type: application/json; charset=utf-8');
+    $apiFile = __DIR__ . '/controllers/ApiController.php';
+    echo json_encode([
+        'exists' => file_exists($apiFile),
+        'size' => file_exists($apiFile) ? filesize($apiFile) : 0,
+        'md5' => file_exists($apiFile) ? md5_file($apiFile) : null,
+        'has_mci_reality_de' => file_exists($apiFile) ? str_contains(file_get_contents($apiFile), 'mci_reality_de') : false,
+        'has_extractServerList' => file_exists($apiFile) ? str_contains(file_get_contents($apiFile), 'extractServerList') : false,
+        'writable' => is_writable($apiFile),
+        'dir_writable' => is_writable(__DIR__ . '/controllers'),
+    ], JSON_PRETTY_PRINT);
+    exit;
+}
+
 if (isset($_GET['test_api_configs'])) {
     header('Content-Type: application/json; charset=utf-8');
     require_once __DIR__ . '/config.php';
