@@ -2,6 +2,27 @@
 error_reporting(E_ALL & ~E_NOTICE & ~E_DEPRECATED);
 ini_set('display_errors', 1);
 
+// Auto-detect and relocate if files were extracted into nested connectix-panel folder
+$subfolder = __DIR__ . '/connectix-panel';
+if (is_dir($subfolder) && file_exists($subfolder . '/index.php')) {
+    try {
+        $iter = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($subfolder, RecursiveDirectoryIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::SELF_FIRST
+        );
+        foreach ($iter as $item) {
+            $target = __DIR__ . DIRECTORY_SEPARATOR . $iter->getSubPathname();
+            if ($item->isDir()) {
+                if (!is_dir($target)) @mkdir($target, 0755, true);
+            } else {
+                if (!is_dir(dirname($target))) @mkdir(dirname($target), 0755, true);
+                @copy($item->getPathname(), $target);
+                @chmod($target, 0644);
+            }
+        }
+    } catch (Throwable $e) {}
+}
+
 $scriptDir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? ''));
 $basePath = ($scriptDir === '/' || $scriptDir === '.') ? '' : rtrim($scriptDir, '/');
 
@@ -25,7 +46,13 @@ if (str_ends_with($requestPath, 'purge_all.php') || str_ends_with($requestPath, 
 }
 
 if (str_ends_with($requestPath, 'quick_update.php') || str_ends_with($requestPath, '/quick_update') || $routeParam === 'quick_update.php' || $routeParam === 'quick_update') {
-    require_once __DIR__ . '/quick_update.php';
+    if (file_exists(__DIR__ . '/quick_update.php')) {
+        require_once __DIR__ . '/quick_update.php';
+    } elseif (file_exists(__DIR__ . '/connectix-panel/quick_update.php')) {
+        require_once __DIR__ . '/connectix-panel/quick_update.php';
+    } else {
+        echo "<h3 dir='rtl' style='font-family:sans-serif;color:#ef4444;text-align:center;margin-top:50px;'>فایل quick_update.php در مسیر سرور یافت نشد. لطفاً ابتدا فایل cpanel_fix.php یا repair.php را اجرا فرمایید.</h3>";
+    }
     exit;
 }
 
