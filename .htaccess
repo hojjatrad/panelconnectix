@@ -1,29 +1,6 @@
-# Connectix Panel - Apache / cPanel URL Rewriting
 <IfModule mod_rewrite.c>
     RewriteEngine On
-
-    # Ensure Authorization header reaches PHP in FastCGI / PHP-FPM / cPanel environments
-    RewriteCond %{HTTP:Authorization} ^(.*)
-    RewriteRule .* - [e=HTTP_AUTHORIZATION:%1]
-
-    # Prevent direct access to sensitive directories
-    RewriteRule ^(core|drivers|data|cron)/.*$ - [F,L]
-
-    # Serve existing files and directories directly
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
-
-    # Redirect all other requests to index.php
     RewriteRule ^(.*)$ index.php [QSA,L]
-</IfModule>
-
-<IfModule mod_setenvif.c>
-    SetEnvIfNoCase Authorization "^(.*)$" HTTP_AUTHORIZATION=$1
-</IfModule>
-
-# Security Headers
-<IfModule mod_headers.c>
-    Header set X-Content-Type-Options "nosniff"
-    Header set X-Frame-Options "SAMEORIGIN"
-    Header set X-XSS-Protection "1; mode=block"
 </IfModule>
