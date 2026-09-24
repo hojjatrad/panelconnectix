@@ -1,20 +1,21 @@
 <?php
 /**
  * Connectix Panel - Instant 100% Clean Slate & Purge Utility
- * Deletes all mock servers, sample plans, test clients, bot orders, and demo transactions.
- * Leaves system 100% clean with only the admin account intact.
  */
 
+ini_set('display_errors', '1');
+ini_set('display_startup_errors', '1');
 error_reporting(E_ALL);
-ini_set('display_errors', 1);
 
 header('Content-Type: text/html; charset=utf-8');
 
-define('CONNECTIX_REPAIR', true);
-require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/core/Database.php';
-
 try {
+    if (!defined('CONNECTIX_REPAIR')) {
+        define('CONNECTIX_REPAIR', true);
+    }
+    require_once __DIR__ . '/config.php';
+    require_once __DIR__ . '/core/Database.php';
+
     $pdo = Database::getConnection();
     $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
 
@@ -24,7 +25,6 @@ try {
         $pdo->exec("PRAGMA foreign_keys = OFF;");
     }
 
-    // List of all tables to completely wipe clean
     $wipeTables = [
         'bot_orders',
         'trial_logs',
@@ -66,12 +66,11 @@ try {
                     VALUES ('admin', '{$adminPass}', 'admin', 'مدیر کل سیستم', 'admin@connectix.local', 0, 'admin_secret_123')");
     }
 
-    // Invalidate opcode cache
     if (function_exists('opcache_reset')) @opcache_reset();
     if (function_exists('clearstatcache')) @clearstatcache(true);
 
 } catch (Throwable $e) {
-    die("<div style='font-family:sans-serif;direction:rtl;padding:40px;color:#ef4444;'><h2>خطا در خام‌سازی:</h2><p>" . htmlspecialchars($e->getMessage()) . "</p></div>");
+    die("<div style='font-family:sans-serif;direction:rtl;padding:40px;color:#ef4444;'><h2>خطا در خام‌سازی:</h2><p>" . htmlspecialchars($e->getMessage()) . "</p><pre>" . htmlspecialchars($e->getTraceAsString()) . "</pre></div>");
 }
 ?>
 <!DOCTYPE html>
