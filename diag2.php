@@ -159,4 +159,29 @@ try {
     $out['v2_test_error'] = $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine();
 }
 
+// Live PHP syntax lint of all project files (finds the PHP CLI binary on the host)
+try {
+    $phpBin = trim((string)@shell_exec('which php 2>/dev/null'));
+    if ($phpBin === '') {
+        foreach (['/usr/local/bin/php', '/usr/bin/php', glob('/opt/cpanel/ea-php*/bin/php') ?: []] as $cand) {
+            if (is_string($cand) && @is_file($cand) && @is_executable($cand)) { $phpBin = $cand; break; }
+        }
+    }
+    $lint = ['php_bin' => $phpBin ?: 'not_found', 'errors' => [], 'checked' => 0];
+    if ($phpBin !== '') {
+        $rii = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(__DIR__, FilesystemIterator::SKIP_DOTS));
+        foreach ($rii as $file) {
+            if ($file->getExtension() !== 'php') continue;
+            $lint['checked']++;
+            $res = @shell_exec('php -l ' . escapeshellarg($file->getPathname()) . ' 2>&1');
+            if (!str_contains((string)$res, 'No syntax errors')) {
+                $lint['errors'][] = basename($file->getPathname()) . ': ' . trim((string)$res);
+            }
+        }
+    }
+    $out['live_lint'] = $lint;
+} catch (Throwable $e) {
+    $out['live_lint_error'] = $e->getMessage();
+}
+
 echo json_encode($out, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
