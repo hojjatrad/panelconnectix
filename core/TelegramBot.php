@@ -203,14 +203,28 @@ class TelegramBot {
         if (empty($logChat)) return false;
 
         $threadId = self::getTopicThreadId($topicKey);
+        $hasThread = $threadId !== null && $threadId > 0;
 
         if (!empty($documentPath) && file_exists($documentPath)) {
-            return self::sendDocument($documentPath, $message, $logChat, $customToken, $threadId);
+            $ok = self::sendDocument($documentPath, $message, $logChat, $customToken, $threadId);
+            // Self-heal: invalid/placeholder topic id -> post without thread (General topic)
+            if (!$ok && $hasThread) {
+                $ok = self::sendDocument($documentPath, $message, $logChat, $customToken, null);
+            }
+            return $ok;
         }
         if (!empty($photoUrl)) {
-            return self::sendPhoto($photoUrl, $message, $logChat, $keyboard, $customToken, $threadId);
+            $ok = self::sendPhoto($photoUrl, $message, $logChat, $keyboard, $customToken, $threadId);
+            if (!$ok && $hasThread) {
+                $ok = self::sendPhoto($photoUrl, $message, $logChat, $keyboard, $customToken, null);
+            }
+            return $ok;
         }
-        return (bool)self::sendMessage($message, $logChat, $keyboard, $customToken, $threadId);
+        $ok = self::sendMessage($message, $logChat, $keyboard, $customToken, $threadId);
+        if (!$ok && $hasThread) {
+            $ok = self::sendMessage($message, $logChat, $keyboard, $customToken, null);
+        }
+        return $ok;
     }
 
     /**
