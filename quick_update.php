@@ -58,7 +58,7 @@ function logStep($msg, $type = 'info') {
     flush();
 }
 
-logStep("شروع فرآیند به‌روزرسانی...", 'info');
+logStep("شروع فرآیند به‌روزرسانی (Updater v4)...", 'info');
 logStep("پوشه نصب: " . __DIR__, 'info');
 
 // 0. Auto-Fix .htaccess and disable OPcache to force immediate reload
@@ -295,6 +295,15 @@ if ($purged > 0) {
 }
 
 // ---- PHASE 4: Post-Update Integrity Report ----
+$selfOnDisk = @file_get_contents(__DIR__ . '/quick_update.php');
+$pkgSelf = @file_get_contents($sourceDir . '/quick_update.php');
+if ($pkgSelf !== false && $selfOnDisk !== false) {
+    if (sha1($selfOnDisk) === sha1($pkgSelf)) {
+        logStep('اعتبارسنجی: نسخه خود به‌روزرسان روی هاست با آخرین نسخه گیت‌هاب مطابقت دارد.', 'success');
+    } else {
+        logStep('خطای جدی: فایل خود به‌روزرسان روی هاست با آخرین نسخه همگام نیست! اجرای دوباره به‌روزرسانی الزامی است.', 'error');
+    }
+}
 $helpersFile = @file_get_contents(__DIR__ . '/core/Helpers.php');
 if ($helpersFile && str_contains($helpersFile, 'isPanelSubUrl') && str_contains($helpersFile, 'stripMockLinks')) {
     logStep('اعتبارسنجی: Helpers.php جدید (با محافظ mock-filter) روی هاست نصب است.', 'success');
