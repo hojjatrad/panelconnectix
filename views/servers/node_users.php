@@ -5,12 +5,6 @@ require_once __DIR__ . '/../../core/Setting.php';
 /** GB formatter */
 function nu_gb($bytes) { return round(((int)$bytes) / 1073741824, 2); }
 
-/** Safe JS string literal (single-line, multi-line friendly) */
-function nu_js($s) {
-    $s = json_encode((string)$s, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
-    return str_replace(["\r", "\n"], ["\\r", "\\n"], $s);
-}
-
 $driverLabel = [
     'marzban' => 'مرزبان (Marzban)',
     'pasargad' => 'پاسارگاد (Pasargad)',
@@ -145,18 +139,18 @@ $isXui = in_array(strtolower((string)$server['driver']), ['3xui', 'xui'], true);
                             <td class="px-4 py-3">
                                 <div class="flex items-center justify-end gap-1.5 flex-wrap">
                                     <?php if (!empty($u['subscription_url'])): ?>
-                                        <button type="button" onclick="copyToClipboard(<?= nu_js($u['subscription_url']) ?>, this)"
+                                        <button type="button" data-copy="<?= htmlspecialchars($u['subscription_url'], ENT_QUOTES) ?>" onclick="copyToClipboard(this.getAttribute('data-copy'), this)"
                                                 class="px-2 py-1.5 bg-cyan-900/40 hover:bg-cyan-800/60 text-cyan-300 rounded-lg text-[10px] font-bold border border-cyan-800/50 transition" title="کپی لینک ساب سرور">
                                             <i class="fa-solid fa-link ml-0.5"></i> ساب
                                         </button>
                                     <?php endif; ?>
                                     <?php if (!empty($u['links'])): ?>
-                                        <button type="button" onclick="copyToClipboard(<?= nu_js($linksBlock) ?>, this)"
+                                        <button type="button" data-copy="<?= htmlspecialchars($linksBlock, ENT_QUOTES) ?>" onclick="copyToClipboard(this.getAttribute('data-copy'), this)"
                                                 class="px-2 py-1.5 bg-indigo-900/40 hover:bg-indigo-800/60 text-indigo-300 rounded-lg text-[10px] font-bold border border-indigo-800/50 transition" title="کپی همه کانفیگ‌ها (vless/vmess/...)">
                                             <i class="fa-solid fa-layer-group ml-0.5"></i> کانفیگ‌ها
                                         </button>
                                     <?php endif; ?>
-                                    <button type="button" onclick="copyToClipboard(<?= nu_js($fullInfo) ?>, this)"
+                                    <button type="button" data-copy="<?= htmlspecialchars($fullInfo, ENT_QUOTES) ?>" onclick="copyToClipboard(this.getAttribute('data-copy'), this)"
                                             class="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[10px] font-bold border border-slate-700 transition" title="کپی کامل اطلاعات (یوزرپسورد + لینک‌ها)">
                                         <i class="fa-solid fa-copy ml-0.5"></i> همه
                                     </button>
@@ -175,12 +169,12 @@ $isXui = in_array(strtolower((string)$server['driver']), ['3xui', 'xui'], true);
                                     </form>
                                     <?php endif; ?>
                                     <?php if (!$isXui): ?>
-                                    <button type="button" onclick="openExtendModal(<?= nu_js($u['username']) ?>)"
+                                    <button type="button" data-user="<?= htmlspecialchars($u['username'], ENT_QUOTES) ?>" onclick="openExtendModal(this.getAttribute('data-user'))"
                                             class="px-2 py-1.5 bg-emerald-900/40 hover:bg-emerald-800/60 text-emerald-300 rounded-lg text-[10px] font-bold border border-emerald-800/50 transition" title="تمدید ترافیک و زمان">
                                         <i class="fa-solid fa-plus ml-0.5"></i> تمدید
                                     </button>
                                     <form method="post" action="<?= Helpers::url('servers/node-users/action') ?>" class="inline m-0"
-                                          onsubmit="return confirm('⚠️ حذف کلاینت ' + <?= nu_js($u['username']) ?> + ' از سرور؟ این عملیات برگشت‌پذیر نیست.');">
+                                          onsubmit="return confirm('⚠️ حذف کلاینت ' + this.querySelector('input[name=username]').value + ' از سرور؟ این عملیات برگشت‌پذیر نیست.');">
                                         <?= Helpers::csrfField() ?>
                                         <input type="hidden" name="server_id" value="<?= (int)$server['id'] ?>">
                                         <input type="hidden" name="username" value="<?= htmlspecialchars($u['username']) ?>">
