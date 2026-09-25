@@ -349,6 +349,17 @@ if (!function_exists('isActiveRoute')) {
                     <span>خروج</span>
                 </a>
             </div>
+
+            <?php
+            require_once __DIR__ . '/../../core/Updater.php';
+            $panelVersion = Updater::CURRENT_VERSION;
+            ?>
+            <div class="mt-2 flex items-center justify-center gap-1.5 text-[10px] text-slate-500" title="پنل به‌صورت خودکار از گیت‌هاب به‌روز می‌شود — همه‌ی پنل‌ها (اصلی و نماینده‌ها) همگام‌اند">
+                <i class="fa-brands fa-github text-[10px]"></i>
+                <span>نسخه پنل</span>
+                <span class="font-mono font-bold text-slate-300" dir="ltr">v<?= htmlspecialchars($panelVersion) ?></span>
+                <span class="text-emerald-500">●</span>
+            </div>
         </div>
     </aside>
 

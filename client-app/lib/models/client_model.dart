@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 class ClientModel {
   final int id;
   final String username;
@@ -52,6 +54,8 @@ class BrandingModel {
   final String telegramSupport;
   final String whatsappSupport;
   final String renewalUrl;
+  final String supportLink;
+  final String announcement;
 
   BrandingModel({
     required this.appName,
@@ -60,6 +64,8 @@ class BrandingModel {
     required this.telegramSupport,
     required this.whatsappSupport,
     required this.renewalUrl,
+    this.supportLink = '',
+    this.announcement = '',
   });
 
   factory BrandingModel.fromJson(Map<String, dynamic> json) {
@@ -70,6 +76,33 @@ class BrandingModel {
       telegramSupport: json['telegram_support'] ?? '@Support',
       whatsappSupport: json['whatsapp_support'] ?? '',
       renewalUrl: json['renewal_url'] ?? '',
+      supportLink: (json['support_link'] ?? '').toString(),
+      announcement: (json['announcement'] ?? '').toString(),
     );
+  }
+
+  /// Reseller white-label accent color (the 5 panel themes)
+  Color get accentColor {
+    switch (themeColor) {
+      case 'cyan':
+        return const Color(0xFF22D3EE);
+      case 'emerald':
+        return const Color(0xFF10B981);
+      case 'amber':
+        return const Color(0xFFF59E0B);
+      case 'rose':
+        return const Color(0xFFF43F5E);
+      case 'blue':
+        return const Color(0xFF3B82F6);
+      case 'green':
+        return const Color(0xFF34D399);
+      case 'orange':
+        return const Color(0xFFFBBF24);
+      case 'black':
+        return const Color(0xFF94A3B8);
+      case 'violet':
+      default:
+        return const Color(0xFFA855F7);
+    }
   }
 }

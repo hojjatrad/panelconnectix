@@ -4,7 +4,7 @@ require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Setting.php';
 
 class Updater {
-    public const CURRENT_VERSION = '3.0.0';
+    public const CURRENT_VERSION = '4.0.0';
 
     public static function getCurrentVersion(): string {
         $dbVer = Setting::get('current_version', '');
@@ -438,7 +438,7 @@ class Updater {
         } catch (Throwable $e) {}
     }
 
-    private static function githubRequest(string $url, string $token = ''): ?array {
+    public static function githubRequest(string $url, string $token = ''): ?array {
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);

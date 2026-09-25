@@ -10,7 +10,25 @@ require __DIR__ . '/../layout/header.php';
                 <i class="fa-solid fa-palette text-fuchsia-400"></i>
                 <span>شخصی‌سازی برندینگ و وایت‌لیبل (White-Label) من</span>
             </h2>
-            <p class="text-xs text-slate-400 mt-1">نام برند، لوگو و راه‌های ارتباطی خود را تنظیم فرمایید تا صفحه وب ساب‌لینک مشتریان و ربات تلگرام کاملاً با هویت اختصاصی شما نمایش داده شود.</p>
+            <p class="text-xs text-slate-400 mt-1">نام برند، لوگو و راه‌های ارتباطی خود را تنظیم فرمایید تا اپلیکیشن، صفحه وب ساب‌لینک مشتریان و ربات تلگرام کاملاً با هویت اختصاصی شما نمایش داده شود.</p>
+        </div>
+    </div>
+
+    <!-- Unified Auto-Update Notice (panel + app, same for main & reseller panels) -->
+    <?php require_once __DIR__ . '/../../core/Updater.php'; $panelVersion = Updater::CURRENT_VERSION; ?>
+    <div class="bg-emerald-950/40 border border-emerald-900/60 rounded-2xl p-4 flex flex-col md:flex-row md:items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0">
+            <i class="fa-solid fa-rotate text-lg"></i>
+        </div>
+        <div class="text-xs space-y-1">
+            <div class="font-bold text-emerald-300 flex items-center gap-2">
+                <span>پنل و اپلیکیشن همیشه به‌صورت خودکار به‌روز می‌مانند</span>
+                <span class="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 font-mono text-[10px] text-emerald-400" dir="ltr">Panel v<?= htmlspecialchars($panelVersion) ?></span>
+            </div>
+            <p class="text-slate-400 leading-relaxed">
+                هر بار که نسخه جدیدی از پنل یا اپلیکیشن منتشر شود، پنل شما (و نسخه‌های پنل نماینده‌های دیگر) بدون دخالت شما به‌روز می‌شود و
+                کاربرانی که با برند شما اشتراک دارند، بلافاصله در اپ خود هشدار آپدیت درون‌برنامه‌ای می‌بینند و بدون حذف و نصب مجدد، روی نسخه فعلی ارتقا می‌یابند.
+            </p>
         </div>
     </div>
 

@@ -52,7 +52,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   bool _hasAppUpdate = false;
   Map<String, dynamic>? _updateInfo;
 
-  static const String currentAppVersion = '3.2.0';
+  static const String currentAppVersion = '3.3.0';
 
   // Iranian & Banking Apps Bypass List (Snapp, Divar, Rubika, Neshan, Torob, Digikala, Banking)
   static const List<String> defaultDomesticBypassApps = [
@@ -1018,8 +1018,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 title: 'پشتیبانی تلگرام',
                 subtitle: widget.branding.telegramSupport,
                 onTap: () {
-                  final handle = widget.branding.telegramSupport.replaceAll('@', '');
-                  launchUrl(Uri.parse('https://t.me/$handle'), mode: LaunchMode.externalApplication);
+                  final link = widget.branding.supportLink.isNotEmpty
+                      ? widget.branding.supportLink
+                      : 'https://t.me/${widget.branding.telegramSupport.replaceAll('@', '')}';
+                  launchUrl(Uri.parse(link), mode: LaunchMode.externalApplication);
                 },
               ),
             if (widget.branding.whatsappSupport.isNotEmpty)
@@ -1074,7 +1076,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Widget build(BuildContext context) {
     final statusColor = _isConnected
         ? const Color(0xFF10B981)
-        : (_isConnecting ? const Color(0xFFF59E0B) : const Color(0xFF9333EA));
+        : (_isConnecting ? const Color(0xFFF59E0B) : widget.branding.accentColor);
 
     final double usageClamped = (_client.usagePercent / 100).clamp(0.0, 1.0);
 
@@ -1097,9 +1099,41 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               ),
             ),
             const SizedBox(width: 10),
-            Text(
-              widget.branding.appName,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            if (widget.branding.logoUrl.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(right: 2, left: 8),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(
+                    widget.branding.logoUrl,
+                    width: 26,
+                    height: 26,
+                    fit: BoxFit.contain,
+                    errorBuilder: (ctx, err, st) => const Icon(
+                      Icons.shield_rounded,
+                      size: 22,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                ),
+              ),
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    widget.branding.appName,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    'نسخه $currentAppVersion',
+                    style: const TextStyle(color: Color(0xFF64748B), fontSize: 9),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -1186,6 +1220,29 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
           child: Column(
             children: [
+              // Global / Reseller Announcement Banner
+              if (widget.branding.announcement.isNotEmpty)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 14),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E293B),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: widget.branding.accentColor.withOpacity(0.35)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.campaign_rounded, color: widget.branding.accentColor, size: 18),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          widget.branding.announcement,
+                          style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 11, height: 1.6),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               // In-App Update Alert Banner
               if (_hasAppUpdate && _updateInfo != null)
                 Container(
@@ -1740,7 +1797,40 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   );
                 },
               ),
-              const SizedBox(height: 20),
+              // App Version & Support Footer
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'نسخه $currentAppVersion',
+                      style: const TextStyle(color: Color(0xFF475569), fontSize: 10),
+                    ),
+                    const SizedBox(width: 14),
+                    GestureDetector(
+                      onTap: () {
+                        final link = widget.branding.supportLink.isNotEmpty
+                            ? widget.branding.supportLink
+                            : 'https://t.me/${widget.branding.telegramSupport.replaceAll('@', '')}';
+                        launchUrl(Uri.parse(link), mode: LaunchMode.externalApplication);
+                      },
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.support_agent_rounded, size: 12, color: Color(0xFF475569)),
+                          const SizedBox(width: 4),
+                          Text(
+                            widget.branding.telegramSupport,
+                            style: const TextStyle(color: Color(0xFF64748B), fontSize: 10),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
             ],
           ),
         ),

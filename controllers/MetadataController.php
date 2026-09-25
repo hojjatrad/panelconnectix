@@ -89,14 +89,31 @@ class MetadataController {
             $appTitle       = trim($_POST['app_update_title'] ?? '');
             $appChangelog   = trim($_POST['app_update_changelog'] ?? '');
             $appEnabled     = !empty($_POST['app_update_enabled']) ? '1' : '0';
+            $appPubMode     = trim($_POST['app_publish_mode'] ?? 'auto'); // auto | manual
             Setting::set('app_latest_version', $appLatest);
             Setting::set('app_download_url', $appDownloadUrl);
             Setting::set('app_universal_url', $appUniversalUrl);
             Setting::set('app_update_title', $appTitle);
             Setting::set('app_update_changelog', $appChangelog);
             Setting::set('app_update_enabled', $appEnabled);
+            // Publish mode: 'manual' locks the auto-publisher (admin is in full control)
+            Setting::set('app_update_source', $appPubMode === 'manual' ? 'admin' : 'auto');
+            if ($appPubMode === 'manual' && $appLatest !== '') {
+                Setting::set('app_update_published_at', date('Y-m-d H:i:s'));
+            }
+
+            // ---- App Management (global support & announcement shown inside the app) ----
+            Setting::set('app_support_id', trim($_POST['app_support_id'] ?? ''));
+            Setting::set('app_support_link', trim($_POST['app_support_link'] ?? ''));
+            Setting::set('app_announcement', trim($_POST['app_announcement'] ?? ''));
+
+            // Force one immediate auto-publish check on next cron tick so the UI status is fresh
+            try { Setting::set('app_release_last_check', '0'); } catch (Throwable $e) {}
+
             if ($appLatest !== '') {
                 Helpers::flash('success', "تنظیمات به‌روزرسانی اپلیکیشن ذخیره شد — کاربران نسخه‌های قدیمی‌تر از {$appLatest} به‌زودی هشدار آپدیت درون‌برنامه‌ای می‌بینند.");
+            } else {
+                Helpers::flash('success', 'تنظیمات مدیریت اپلیکیشن ذخیره شد.');
             }
         }
 

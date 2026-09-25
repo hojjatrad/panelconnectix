@@ -413,14 +413,7 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
                 'sub_url' => Helpers::subUrl($client['sub_token'])
             ],
             'servers' => self::extractServerList($client, $pdo),
-            'branding' => [
-                'app_name' => $client['brand_name'] ?? 'Connectix VPN',
-                'logo_url' => $client['logo_url'] ?? '',
-                'theme_color' => $client['theme_color'] ?? 'violet',
-                'telegram_support' => $client['telegram_support'] ?? '@Support',
-                'whatsapp_support' => $client['whatsapp_support'] ?? '',
-                'renewal_url' => $client['renewal_url'] ?? Helpers::subUrl($client['sub_token'])
-            ]
+            'branding' => self::appBrandingPayload($client)
         ], 'ورود به اپلیکیشن با موفقیت انجام شد.');
     }
 
@@ -495,6 +488,35 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
      * GET /api/v1/app/configs
      * Returns Structured Connection Nodes + Raw Base64 Sublink
      */
+    /**
+     * Helper: Build the white-label branding payload for the mobile app.
+     * Precedence: reseller branding (users / branding_metadata) > global app settings.
+     */
+    public static function appBrandingPayload(array $client): array
+    {
+        require_once __DIR__ . '/../core/Setting.php';
+        $support = trim((string)($client['telegram_support'] ?? ''));
+        if ($support === '' || $support === '@Support') {
+            $support = trim((string)Setting::get('app_support_id', ''));
+        }
+        if ($support === '' || $support === '@Support') {
+            $support = '@Support';
+        }
+        if ($support !== '' && $support[0] !== '@') {
+            $support = '@' . $support;
+        }
+        return [
+            'app_name' => $client['brand_name'] ?? 'Connectix VPN',
+            'logo_url' => $client['logo_url'] ?? '',
+            'theme_color' => $client['theme_color'] ?? 'violet',
+            'telegram_support' => $support,
+            'whatsapp_support' => $client['whatsapp_support'] ?? '',
+            'renewal_url' => $client['renewal_url'] ?? Helpers::subUrl($client['sub_token']),
+            'support_link' => trim((string)Setting::get('app_support_link', '')),
+            'announcement' => trim((string)Setting::get('app_announcement', '')),
+        ];
+    }
+
     /**
      * Helper: Extract and structure all real server connections
      */

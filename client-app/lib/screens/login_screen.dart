@@ -308,6 +308,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 10),
+                Text(
+                  'نسخه ${DashboardScreen.currentAppVersion}',
+                  style: const TextStyle(color: Color(0xFF475569), fontSize: 10),
+                ),
               ],
             ),
           ),

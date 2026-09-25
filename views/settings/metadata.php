@@ -111,39 +111,76 @@ require __DIR__ . '/../layout/header.php';
                         <i class="fa-solid fa-mobile-screen-button text-emerald-400"></i>
                         <span>انتشار به‌روزرسانی اپلیکیشن اندروید (In-App Update)</span>
                     </label>
+<?php
+require_once __DIR__ . '/../../core/AppReleasePublisher.php';
+$appPub = AppReleasePublisher::status();
+$appAutoMode = (($appPub['source'] ?? 'auto') !== 'admin');
+?>
                     <p class="text-[11px] text-slate-400 leading-relaxed">
-                        با وارد کردن نسخه جدید (مثلاً <code class="text-cyan-400 font-mono">3.2.0</code>)، تمامی کاربرانی که نسخه‌ی قدیمی‌تر نصب دارند
-                        بلافاصله پس از باز کردن اپ، دیالوگ به‌روزرسانی با نوار پیشرفت دانلود و <b>نصب مستقیم روی نسخه‌ی فعلی</b> (بدون نیاز به حذف و نصب مجدد) را می‌بینند.
-                        اگر فیلدهای لینک خالی بمانند، فایل APK از آخرین بیلد گیت‌هاب دانلود می‌شود.
+                        بیلد هر نسخه‌ی جدید اپلیکیشن به‌صورت خودکار توسط گیت‌هاب ساخته و در ریلیس منتشر می‌شود و این پنل
+                        <b>خودکار نسخه‌ی جدید را به کاربران اعلام می‌کند</b> (دیالوگ آپدیت با نوار پیشرفت + نصب مستقیم روی نسخه‌ی فعلی، بدون نیاز به حذف و نصب مجدد).
+                        برای کنترل کامل، حالت «دستی» را فعال کنید.
                     </p>
+
+                    <div class="flex flex-wrap items-center gap-4 bg-slate-950/60 border border-slate-800 rounded-xl p-3">
+                        <span class="text-[11px] font-bold text-slate-300">حالت انتشار:</span>
+                        <label class="flex items-center gap-1.5 text-[11px] text-slate-300 cursor-pointer">
+                            <input type="radio" name="app_publish_mode" value="auto" <?= $appAutoMode ? 'checked' : '' ?> onchange="toggleAppPublishMode('auto')" class="accent-emerald-500">
+                            خودکار از گیت‌هاب (پیشنهادی)
+                        </label>
+                        <label class="flex items-center gap-1.5 text-[11px] text-slate-300 cursor-pointer">
+                            <input type="radio" name="app_publish_mode" value="manual" <?= !$appAutoMode ? 'checked' : '' ?> onchange="toggleAppPublishMode('manual')" class="accent-emerald-500">
+                            دستی (کنترل کامل مدیر)
+                        </label>
+                    </div>
+
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px]">
+                        <div class="bg-slate-950/60 border border-slate-800 rounded-xl p-2.5">
+                            <div class="text-slate-500 mb-0.5">نسخه در گیت‌هاب</div>
+                            <div class="font-mono font-bold text-emerald-300" dir="ltr"><?= htmlspecialchars((string)($appPub['remote_version'] ?? 'در انتظار بررسی...')) ?></div>
+                        </div>
+                        <div class="bg-slate-950/60 border border-slate-800 rounded-xl p-2.5">
+                            <div class="text-slate-500 mb-0.5">نسخه منتشرشده</div>
+                            <div class="font-mono font-bold text-white" dir="ltr"><?= htmlspecialchars((string)($appPub['published_version'] !== '' ? $appPub['published_version'] : '—')) ?></div>
+                        </div>
+                        <div class="bg-slate-950/60 border border-slate-800 rounded-xl p-2.5">
+                            <div class="text-slate-500 mb-0.5">وضعیت</div>
+                            <div class="font-bold <?= $appPub['enabled'] ? 'text-emerald-300' : 'text-rose-300' ?>"><?= $appPub['enabled'] ? ($appAutoMode ? 'خودکار' : 'دستی') : 'غیرفعال' ?></div>
+                        </div>
+                        <div class="bg-slate-950/60 border border-slate-800 rounded-xl p-2.5">
+                            <div class="text-slate-500 mb-0.5">آخرین بررسی</div>
+                            <div class="text-slate-300" dir="ltr"><?= htmlspecialchars((string)$appPub['checked_at']) ?></div>
+                        </div>
+                    </div>
+
                     <div class="grid grid-cols-2 gap-2">
                         <div>
-                            <label class="block text-[11px] text-slate-400 mb-1">نسخه‌ی جدید (مثلاً 3.2.0)</label>
-                            <input type="text" name="app_latest_version" value="<?= htmlspecialchars(Setting::get('app_latest_version', '')) ?>" dir="ltr" placeholder="3.2.0"
-                                   class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-xs">
+                            <label class="block text-[11px] text-slate-400 mb-1">نسخه‌ی جدید <span class="text-slate-600">(حالت خودکار: فقط‌نمایش)</span></label>
+                            <input type="text" id="appVerInput" name="app_latest_version" value="<?= htmlspecialchars(Setting::get('app_latest_version', '')) ?>" dir="ltr" placeholder="3.2.0" <?= $appAutoMode ? 'readonly' : '' ?>
+                                   class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-xs <?= $appAutoMode ? 'opacity-60' : '' ?>">
                         </div>
                         <div>
-                            <label class="block text-[11px] text-slate-400 mb-1">عنوان دیالوگ آپدیت</label>
-                            <input type="text" name="app_update_title" value="<?= htmlspecialchars(Setting::get('app_update_title', '')) ?>" dir="rtl" placeholder="Connectix v3.2.0"
-                                   class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white text-xs">
+                            <label class="block text-[11px] text-slate-400 mb-1">عنوان دیالوگ آپدیت <span class="text-slate-600">(حالت خودکار: فقط‌نمایش)</span></label>
+                            <input type="text" id="appTitleInput" name="app_update_title" value="<?= htmlspecialchars(Setting::get('app_update_title', '')) ?>" dir="rtl" placeholder="Connectix v3.2.0" <?= $appAutoMode ? 'readonly' : '' ?>
+                                   class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white text-xs <?= $appAutoMode ? 'opacity-60' : '' ?>">
                         </div>
                     </div>
                     <div class="grid grid-cols-2 gap-2">
                         <div>
                             <label class="block text-[11px] text-slate-400 mb-1">لینک APK (ARM64 — اختیاری)</label>
-                            <input type="text" name="app_download_url" value="<?= htmlspecialchars(Setting::get('app_download_url', '')) ?>" dir="ltr" placeholder="خالی = آخرین بیلد گیت‌هاب"
+                            <input type="text" name="app_download_url" value="<?= htmlspecialchars(Setting::get('app_download_url', '')) ?>" dir="ltr" placeholder="خالی = فایل روی هاست پنل / گیت‌هاب"
                                    class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-[11px]">
                         </div>
                         <div>
                             <label class="block text-[11px] text-slate-400 mb-1">لینک APK (Universal — اختیاری)</label>
-                            <input type="text" name="app_universal_url" value="<?= htmlspecialchars(Setting::get('app_universal_url', '')) ?>" dir="ltr" placeholder="خالی = آخرین بیلد گیت‌هاب"
+                            <input type="text" name="app_universal_url" value="<?= htmlspecialchars(Setting::get('app_universal_url', '')) ?>" dir="ltr" placeholder="خالی = فایل روی هاست پنل / گیت‌هاب"
                                    class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-[11px]">
                         </div>
                     </div>
                     <div>
-                        <label class="block text-[11px] text-slate-400 mb-1">تغییرات این نسخه (Changelog)</label>
-                        <textarea name="app_update_changelog" rows="3" dir="rtl" placeholder="• قابلیت جدید اول&#10;• رفع باگ دوم"
-                                  class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white text-xs"><?= htmlspecialchars(Setting::get('app_update_changelog', '')) ?></textarea>
+                        <label class="block text-[11px] text-slate-400 mb-1">تغییرات این نسخه (Changelog) <span class="text-slate-600">(حالت خودکار: فقط‌نمایش)</span></label>
+                        <textarea id="appChangelogInput" name="app_update_changelog" rows="3" dir="rtl" placeholder="• قابلیت جدید اول&#10;• رفع باگ دوم" <?= $appAutoMode ? 'readonly' : '' ?>
+                                  class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white text-xs <?= $appAutoMode ? 'opacity-60' : '' ?>"><?= htmlspecialchars(Setting::get('app_update_changelog', '')) ?></textarea>
                     </div>
                     <div class="grid grid-cols-2 gap-2">
                         <div>
@@ -160,13 +197,50 @@ require __DIR__ . '/../layout/header.php';
                     <div class="text-[11px] text-slate-500 leading-relaxed">
                         <?= is_file(__DIR__ . '/../../Connectix-ARM64-v8a.apk')
                             ? '✅ APK فعلی روی هاست: ' . round(filesize(__DIR__ . '/../../Connectix-ARM64-v8a.apk') / 1048576, 1) . ' MB — ' . date('Y/m-d H:i', filemtime(__DIR__ . '/../../Connectix-ARM64-v8a.apk'))
-                            : '⚠️ فعلاً APK ای روی هاست پنل نیست؛ اپها از لینک جایگزین گیت‌هاب دانلود می‌کنند.'
+                            : '⚠️ فعلاً APK ای روی هاست پنل نیست؛ اپها از آخرین بیلد گیت‌هاب دانلود می‌کنند.'
                         ?>
                     </div>
+
+                    <div class="border-t border-slate-800 pt-3">
+                        <div class="text-[11px] font-bold text-slate-300 mb-2 flex items-center gap-1.5">
+                            <i class="fa-solid fa-gear text-emerald-400"></i>
+                            <span>مدیریت اپلیکیشن (مشترک بین همه کاربرها — اگر نماینده‌ای خودش تنظیم نکند، این مقادیر نمایش داده می‌شوند)</span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[11px] text-slate-400 mb-1">آیدی تلگرام پشتیبانی (Default Support ID)</label>
+                                <input type="text" name="app_support_id" value="<?= htmlspecialchars(Setting::get('app_support_id', '')) ?>" dir="ltr" placeholder="Support_ID"
+                                       class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-xs">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-slate-400 mb-1">لینک پشتیبانی (اختیاری)</label>
+                                <input type="text" name="app_support_link" value="<?= htmlspecialchars(Setting::get('app_support_link', '')) ?>" dir="ltr" placeholder="https://t.me/Support_ID"
+                                       class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-[11px]">
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <label class="block text-[11px] text-slate-400 mb-1">اطلاعیه‌ی نمایش‌داده‌شده در اپلیکیشن (اختیاری)</label>
+                            <textarea name="app_announcement" rows="2" dir="rtl" placeholder="مثلاً: سرورهای جدید اضافه شد؛ برای پشتیبانی با ما در ارتباط باشید."
+                                      class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white text-xs"><?= htmlspecialchars(Setting::get('app_announcement', '')) ?></textarea>
+                        </div>
+                    </div>
+
                     <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer select-none">
                         <input type="checkbox" name="app_update_enabled" value="1" <?= Setting::get('app_update_enabled', '1') !== '0' ? 'checked' : '' ?> class="w-4 h-4 accent-emerald-500">
                         <span>فعال‌سازی نمایش هشدار آپدیت در اپلیکیشن</span>
                     </label>
+
+                    <script>
+                    function toggleAppPublishMode(mode) {
+                        var auto = (mode === 'auto');
+                        ['appVerInput', 'appTitleInput', 'appChangelogInput'].forEach(function (id) {
+                            var el = document.getElementById(id);
+                            if (!el) return;
+                            el.readOnly = auto;
+                            el.classList.toggle('opacity-60', auto);
+                        });
+                    }
+                    </script>
                 </div>
                 <?php endif; ?>
 

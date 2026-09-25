@@ -338,3 +338,18 @@ if ($forceCheck || (time() - $lastUpdateCheck >= 180)) {
     }
 }
 
+// 5. App Release Auto-Publisher (publishes new Android app builds from CI automatically)
+try {
+    require_once __DIR__ . '/../core/AppReleasePublisher.php';
+    $appPub = AppReleasePublisher::sync();
+    if (!empty($appPub['action'])) {
+        echo "[App Release] remote=" . ($appPub['remote_version'] ?? '?')
+            . " | published=" . ($appPub['published_version'] ?? '-')
+            . " | action=" . $appPub['action'] . $eol;
+    } else {
+        echo "[App Release] " . ($appPub['error'] ?? 'ok') . " (remote=" . ($appPub['remote_version'] ?? '?') . ")" . $eol;
+    }
+} catch (Throwable $e) {
+    echo "[App Release Error] " . $e->getMessage() . $eol;
+}
+
