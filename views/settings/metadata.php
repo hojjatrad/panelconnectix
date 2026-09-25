@@ -105,6 +105,69 @@ require __DIR__ . '/../layout/header.php';
                     <input type="text" name="sublink_custom_domain" value="<?= htmlspecialchars(Setting::get('sublink_custom_domain', '')) ?>" dir="ltr" placeholder="sub.newdomain.com"
                            class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-xs">
                 </div>
+
+                <div class="p-3.5 bg-slate-800/60 rounded-xl border border-emerald-500/30 space-y-2">
+                    <label class="block text-emerald-300 font-bold text-xs flex items-center gap-2">
+                        <i class="fa-solid fa-mobile-screen-button text-emerald-400"></i>
+                        <span>انتشار به‌روزرسانی اپلیکیشن اندروید (In-App Update)</span>
+                    </label>
+                    <p class="text-[11px] text-slate-400 leading-relaxed">
+                        با وارد کردن نسخه جدید (مثلاً <code class="text-cyan-400 font-mono">3.2.0</code>)، تمامی کاربرانی که نسخه‌ی قدیمی‌تر نصب دارند
+                        بلافاصله پس از باز کردن اپ، دیالوگ به‌روزرسانی با نوار پیشرفت دانلود و <b>نصب مستقیم روی نسخه‌ی فعلی</b> (بدون نیاز به حذف و نصب مجدد) را می‌بینند.
+                        اگر فیلدهای لینک خالی بمانند، فایل APK از آخرین بیلد گیت‌هاب دانلود می‌شود.
+                    </p>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-1">نسخه‌ی جدید (مثلاً 3.2.0)</label>
+                            <input type="text" name="app_latest_version" value="<?= htmlspecialchars(Setting::get('app_latest_version', '')) ?>" dir="ltr" placeholder="3.2.0"
+                                   class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-xs">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-1">عنوان دیالوگ آپدیت</label>
+                            <input type="text" name="app_update_title" value="<?= htmlspecialchars(Setting::get('app_update_title', '')) ?>" dir="rtl" placeholder="Connectix v3.2.0"
+                                   class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white text-xs">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-1">لینک APK (ARM64 — اختیاری)</label>
+                            <input type="text" name="app_download_url" value="<?= htmlspecialchars(Setting::get('app_download_url', '')) ?>" dir="ltr" placeholder="خالی = آخرین بیلد گیت‌هاب"
+                                   class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-[11px]">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-1">لینک APK (Universal — اختیاری)</label>
+                            <input type="text" name="app_universal_url" value="<?= htmlspecialchars(Setting::get('app_universal_url', '')) ?>" dir="ltr" placeholder="خالی = آخرین بیلد گیت‌هاب"
+                                   class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-[11px]">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-slate-400 mb-1">تغییرات این نسخه (Changelog)</label>
+                        <textarea name="app_update_changelog" rows="3" dir="rtl" placeholder="• قابلیت جدید اول&#10;• رفع باگ دوم"
+                                  class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white text-xs"><?= htmlspecialchars(Setting::get('app_update_changelog', '')) ?></textarea>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-1">آپلود APK جدید (ARM64)</label>
+                            <input type="file" name="apk_file" accept=".apk"
+                                   class="w-full text-[11px] text-slate-400 file:ml-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-[11px] file:font-semibold file:bg-slate-700 file:text-emerald-300 hover:file:bg-slate-600 bg-slate-900 p-1.5 rounded-xl border border-slate-700">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-1">آپلود APK جدید (Universal)</label>
+                            <input type="file" name="apk_universal_file" accept=".apk"
+                                   class="w-full text-[11px] text-slate-400 file:ml-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-[11px] file:font-semibold file:bg-slate-700 file:text-emerald-300 hover:file:bg-slate-600 bg-slate-900 p-1.5 rounded-xl border border-slate-700">
+                        </div>
+                    </div>
+                    <div class="text-[11px] text-slate-500 leading-relaxed">
+                        <?= is_file(__DIR__ . '/../../Connectix-ARM64-v8a.apk')
+                            ? '✅ APK فعلی روی هاست: ' . round(filesize(__DIR__ . '/../../Connectix-ARM64-v8a.apk') / 1048576, 1) . ' MB — ' . date('Y/m-d H:i', filemtime(__DIR__ . '/../../Connectix-ARM64-v8a.apk'))
+                            : '⚠️ فعلاً APK ای روی هاست پنل نیست؛ اپها از لینک جایگزین گیت‌هاب دانلود می‌کنند.'
+                        ?>
+                    </div>
+                    <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer select-none">
+                        <input type="checkbox" name="app_update_enabled" value="1" <?= Setting::get('app_update_enabled', '1') !== '0' ? 'checked' : '' ?> class="w-4 h-4 accent-emerald-500">
+                        <span>فعال‌سازی نمایش هشدار آپدیت در اپلیکیشن</span>
+                    </label>
+                </div>
                 <?php endif; ?>
 
                 <button type="submit" class="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs transition-all shadow-lg shadow-purple-900/30 mt-2">

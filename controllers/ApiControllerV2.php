@@ -734,19 +734,49 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
 
     /**
      * GET /api/v1/app/check-update
-     * Client Application Auto-Updater Endpoint
+     * Client Application Auto-Updater Endpoint.
+     *
+     * Settings-driven (system_settings) so releasing a new APK requires NO
+     * code redeploy:
+     *   app_latest_version  e.g. "3.2.0"   (blank = no update offered)
+     *   app_download_url    ARM64 APK URL  (blank = stable GitHub release URL)
+     *   app_universal_url   Universal APK URL (blank = stable GitHub release URL)
+     *   app_update_title    dialog title
+     *   app_update_changelog multi-line changelog
+     *   app_update_enabled  1/0 master switch
+     * Editable in the panel: Settings > Metadata (admin section).
      */
     public function checkAppUpdate(): void {
-        $arm64Url = 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.0.0/Connectix-ARM64-v8a.apk';
-        $universalUrl = 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.0.0/Connectix-Universal.apk';
-        
+        require_once __DIR__ . '/../core/Setting.php';
+
+        $latest      = trim(Setting::get('app_latest_version', ''));
+        // Empty URL = let the app use its fast panel-hosted direct APK.
+        $downloadUrl = trim(Setting::get('app_download_url', ''));
+        $universalUrl= trim(Setting::get('app_universal_url', ''));
+        $title       = trim(Setting::get('app_update_title', '')) ?: "Connectix v{$latest}";
+        $changelog   = trim(Setting::get('app_update_changelog', '')) ?: "• نگارش جدید سامانه منتشر شد.";
+        $enabled     = trim(Setting::get('app_update_enabled', '1'));
+
+        if ($latest === '' || $enabled === '0') {
+            self::jsonSuccess([
+                'current_version' => '3.0.0',
+                'latest_version' => '3.1.0',
+                'has_update' => false,
+                'title' => 'Connectix',
+                'changelog' => '',
+                'download_url' => '',
+                'universal_url' => '',
+                'release_date' => date('Y-m-d')
+            ], 'نسخه شما به‌روز است.');
+        }
+
         self::jsonSuccess([
             'current_version' => '3.0.0',
-            'latest_version' => '3.1.0',
+            'latest_version' => $latest,
             'has_update' => true,
-            'title' => 'Connectix v3.1.0 (نگارش پایدار)',
-            'changelog' => "• ماندگاری دائمی ورود به حساب کاربری و باز شدن مستقیم داشبورد بدون بازگشت به صفحه لاگین\n• رفع کامل کانکشن‌های پیش‌فرض و دریافت زنده تمامی ۱۴ اینباند فعال پاسارگاد\n• دانلود و نصب مستقیم و فوق‌سریع درون‌برنامه‌ای بدون نیاز به مرورگر",
-            'download_url' => $arm64Url,
+            'title' => $title,
+            'changelog' => $changelog,
+            'download_url' => $downloadUrl,
             'universal_url' => $universalUrl,
             'release_date' => date('Y-m-d')
         ], 'نگارش جدید سامانه آماده دریافت است.');

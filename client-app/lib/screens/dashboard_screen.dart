@@ -52,7 +52,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   bool _hasAppUpdate = false;
   Map<String, dynamic>? _updateInfo;
 
-  static const String currentAppVersion = '3.1.0';
+  static const String currentAppVersion = '3.2.0';
 
   // Iranian & Banking Apps Bypass List (Snapp, Divar, Rubika, Neshan, Torob, Digikala, Banking)
   static const List<String> defaultDomesticBypassApps = [
@@ -420,6 +420,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     final latestVer = (updateData['latest_version'] ?? '3.1.0').toString();
     final changelog = (updateData['changelog'] ?? '• ماندگاری دائمی ورود به حساب\n• دریافت زنده ۱۴ اینباند فعال پاسارگاد\n• دانلود مستقیم و پرسرعت درون‌برنامه‌ای').toString();
     final downloadUrl = (updateData['download_url'] ?? '').toString();
+    final fallbackUrl = (updateData['fallback_url'] ?? '').toString();
 
     showDialog(
       context: context,
@@ -478,7 +479,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           ElevatedButton.icon(
             onPressed: () {
               Navigator.pop(ctx);
-              _startInAppDownloadAndInstall(downloadUrl, latestVer);
+              _startInAppDownloadAndInstall(downloadUrl, latestVer, fallbackUrl: fallbackUrl);
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF10B981),
@@ -496,12 +497,15 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   // Real-time In-App Downloader Modal Sheet
-  void _startInAppDownloadAndInstall(String downloadUrl, String version) {
+  void _startInAppDownloadAndInstall(String downloadUrl, String version, {String fallbackUrl = ''}) {
     if (downloadUrl.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('لینک مستقیم بسته یافت نشد.')),
-      );
-      return;
+      if (fallbackUrl.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('لینک مستقیم بسته یافت نشد.')),
+        );
+        return;
+      }
+      downloadUrl = fallbackUrl;
     }
 
     double downloadProgress = 0.0;
@@ -509,6 +513,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     String transferredText = '0 MB / ...';
     bool isFailed = false;
     bool hasStarted = false;
+    bool usedFallback = false;
 
     showModalBottomSheet(
       context: context,
@@ -524,36 +529,51 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             // Kick off download exactly once when modal mounts
             if (!hasStarted) {
               hasStarted = true;
-              statusText = 'در حال دریافت بسته نگارش $version...';
-              ApiService.downloadAndInstallApk(
-                downloadUrl: downloadUrl,
-                onProgress: (progress, received, total) {
-                  setModalState(() {
-                    downloadProgress = progress;
-                    final recMb = (received / (1024 * 1024)).toStringAsFixed(1);
-                    final totMb = total > 0 ? (total / (1024 * 1024)).toStringAsFixed(1) : '...';
-                    transferredText = '$recMb MB / $totMb MB (${(progress * 100).toInt()}%)';
-                    statusText = 'در حال دریافت مستقیم بسته...';
-                  });
-                },
-                onError: (error) {
-                  setModalState(() {
-                    isFailed = true;
-                    statusText = error;
-                  });
-                },
-                onSuccess: () {
-                  setModalState(() {
-                    statusText = 'دانلود کامل شد. پنجره نصاب اندروید فراخوانی گردید.';
-                    downloadProgress = 1.0;
-                  });
-                  Future.delayed(const Duration(milliseconds: 1400), () {
-                    if (Navigator.canPop(bottomSheetContext)) {
-                      Navigator.pop(bottomSheetContext);
+
+              void launchDownload(String url) {
+                ApiService.downloadAndInstallApk(
+                  downloadUrl: url,
+                  onProgress: (progress, received, total) {
+                    setModalState(() {
+                      downloadProgress = progress;
+                      final recMb = (received / (1024 * 1024)).toStringAsFixed(1);
+                      final totMb = total > 0 ? (total / (1024 * 1024)).toStringAsFixed(1) : '...';
+                      transferredText = '$recMb MB / $totMb MB (${(progress * 100).toInt()}%)';
+                      statusText = 'در حال دریافت مستقیم بسته...';
+                    });
+                  },
+                  onError: (error) {
+                    // Auto-retry once via the GitHub release fallback
+                    if (!usedFallback && fallbackUrl.isNotEmpty && fallbackUrl != url) {
+                      usedFallback = true;
+                      setModalState(() {
+                        isFailed = false;
+                        downloadProgress = 0.0;
+                        transferredText = '0 MB / ...';
+                        statusText = 'لینک اصلی در دسترس نبود؛ در حال دریافت از لینک جایگزین...';
+                      });
+                      launchDownload(fallbackUrl);
+                    } else {
+                      setModalState(() {
+                        isFailed = true;
+                        statusText = error;
+                      });
                     }
-                  });
-                },
-              );
+                  },
+                  onSuccess: () {
+                    setModalState(() {
+                      statusText = 'دانلود کامل شد. پنجره نصاب اندروید فراخوانی گردید.';
+                      downloadProgress = 1.0;
+                    });
+                    Future.delayed(const Duration(milliseconds: 1400), () {
+                      if (Navigator.canPop(bottomSheetContext)) {
+                        Navigator.pop(bottomSheetContext);
+                      }
+                    });
+                  },
+                );
+              }
+              launchDownload(downloadUrl);
             }
 
             return Padding(

@@ -262,7 +262,12 @@ class ApiService {
       final data = jsonDecode(utf8.decode(response.bodyBytes));
       if (data['success'] == true && data['data'] != null) {
         final map = Map<String, dynamic>.from(data['data']);
-        map['download_url'] = directApkUrl;
+        // Respect the admin-configured APK URL from the panel settings;
+        // otherwise use the fast panel-hosted direct APK.
+        final serverUrl = (map['download_url'] ?? '').toString();
+        map['download_url'] = (serverUrl.isNotEmpty && serverUrl.startsWith('http'))
+            ? serverUrl
+            : directApkUrl;
         map['fallback_url'] = ghApkUrl;
         return map;
       }

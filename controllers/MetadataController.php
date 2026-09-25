@@ -64,6 +64,40 @@ class MetadataController {
         if (Auth::isAdmin() && isset($_POST['sublink_custom_domain'])) {
             require_once __DIR__ . '/../core/Setting.php';
             Setting::set('sublink_custom_domain', trim($_POST['sublink_custom_domain']));
+
+            // ---- Upload new APK builds to the panel web root (fast in-app updates) ----
+            $apkNotes = [];
+            if (!empty($_FILES['apk_file']['name']) && $_FILES['apk_file']['error'] === UPLOAD_ERR_OK) {
+                if (move_uploaded_file($_FILES['apk_file']['tmp_name'], __DIR__ . '/../Connectix-ARM64-v8a.apk')) {
+                    $apkNotes[] = 'APK نسخه ARM64 روی هاست پنل جایگزین شد.';
+                } else {
+                    $apkNotes[] = 'خطا در آپلود APK نسخه ARM64.';
+                }
+            }
+            if (!empty($_FILES['apk_universal_file']['name']) && $_FILES['apk_universal_file']['error'] === UPLOAD_ERR_OK) {
+                if (move_uploaded_file($_FILES['apk_universal_file']['tmp_name'], __DIR__ . '/../Connectix-Universal.apk')) {
+                    $apkNotes[] = 'APK نسخه Universal روی هاست پنل جایگزین شد.';
+                } else {
+                    $apkNotes[] = 'خطا در آپلود APK نسخه Universal.';
+                }
+            }
+
+            // ---- Android App Update Release Settings ----
+            $appLatest      = trim($_POST['app_latest_version'] ?? '');
+            $appDownloadUrl = trim($_POST['app_download_url'] ?? '');
+            $appUniversalUrl= trim($_POST['app_universal_url'] ?? '');
+            $appTitle       = trim($_POST['app_update_title'] ?? '');
+            $appChangelog   = trim($_POST['app_update_changelog'] ?? '');
+            $appEnabled     = !empty($_POST['app_update_enabled']) ? '1' : '0';
+            Setting::set('app_latest_version', $appLatest);
+            Setting::set('app_download_url', $appDownloadUrl);
+            Setting::set('app_universal_url', $appUniversalUrl);
+            Setting::set('app_update_title', $appTitle);
+            Setting::set('app_update_changelog', $appChangelog);
+            Setting::set('app_update_enabled', $appEnabled);
+            if ($appLatest !== '') {
+                Helpers::flash('success', "تنظیمات به‌روزرسانی اپلیکیشن ذخیره شد — کاربران نسخه‌های قدیمی‌تر از {$appLatest} به‌زودی هشدار آپدیت درون‌برنامه‌ای می‌بینند.");
+            }
         }
 
         Helpers::flash('success', 'تنظیمات برند و شخصی‌سازی ظاهر با موفقیت ذخیره شد.');
