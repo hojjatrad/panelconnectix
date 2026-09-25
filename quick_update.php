@@ -106,20 +106,28 @@ $tryCurl = function (string $url, array $headers) {
     return ($code === 200 && is_string($body)) ? $body : false;
 };
 
+$apiSha = '';
+$atomSha = '';
 $apiBody = $tryCurl("https://api.github.com/repos/{$repo}/commits/main", ['User-Agent: Connectix-Live-Updater']);
 if ($apiBody !== false) {
     $shaData = json_decode($apiBody, true);
-    if (!empty($shaData['sha'])) {
-        $latestSha = $shaData['sha'];
-        $shaSource = 'api.github.com';
-    }
+    if (!empty($shaData['sha'])) $apiSha = $shaData['sha'];
 }
-if ($latestSha === '') {
-    $atomBody = $tryCurl("https://github.com/{$repo}/commits/main.atom", ['User-Agent: Connectix-Live-Updater']);
-    if ($atomBody !== false && preg_match('#Grit::Commit/([a-f0-9]{40})#', $atomBody, $m)) {
-        $latestSha = $m[1];
-        $shaSource = 'github.com atom feed';
-    }
+$atomBody = $tryCurl("https://github.com/{$repo}/commits/main.atom", ['User-Agent: Connectix-Live-Updater']);
+if ($atomBody !== false && preg_match('#Grit::Commit/([a-f0-9]{40})#', $atomBody, $m)) {
+    $atomSha = $m[1];
+}
+if ($apiSha !== '' && $atomSha !== '' && $apiSha !== $atomSha) {
+    // Both sources disagree (transparent network caching on this host can serve
+    // a stale SHA from api.github.com). Prefer the web Atom feed in that case.
+    $latestSha = $atomSha;
+    $shaSource = 'atom feed (API SHA differed)';
+} elseif ($apiSha !== '') {
+    $latestSha = $apiSha;
+    $shaSource = 'api.github.com';
+} elseif ($atomSha !== '') {
+    $latestSha = $atomSha;
+    $shaSource = 'github.com atom feed';
 }
 if ($latestSha !== '') {
     logStep("آخرین کامیت شناسایی شد: " . substr($latestSha, 0, 7) . " (منبع: {$shaSource})", 'info');
