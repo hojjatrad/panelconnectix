@@ -1372,10 +1372,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                           ],
                         ),
                       ),
-                      if (widget.branding.renewalLink.isNotEmpty)
+                      if (widget.branding.renewalUrl.isNotEmpty)
                         ElevatedButton(
                           onPressed: () {
-                            launchUrl(Uri.parse(widget.branding.renewalLink), mode: LaunchMode.externalApplication);
+                            launchUrl(Uri.parse(widget.branding.renewalUrl), mode: LaunchMode.externalApplication);
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFFF97316),
