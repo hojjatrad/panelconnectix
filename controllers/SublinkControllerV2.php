@@ -171,6 +171,11 @@ class SublinkControllerV2 {
     }
 
     public static function buildConfigs(array $client): array {
+        // HARD GUARD: strip legacy mock/fake links at the source (covers all early returns)
+        return Helpers::stripMockLinks(self::buildConfigsRaw($client));
+    }
+
+    public static function buildConfigsRaw(array $client): array {
         $pdo = Database::getConnection();
         $uuid = !empty($client['uuid']) ? $client['uuid'] : 'adc6ed75-e6bd-4a15-911a-e29f09eee801';
         $username = $client['username'] ?? 'user';

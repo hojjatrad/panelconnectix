@@ -3,17 +3,84 @@ header('Content-Type: application/json; charset=utf-8');
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/core/Database.php';
-$pdo = Database::getConnection();
+$out = [
+    'time' => date('Y-m-d H:i:s'),
+    'dir' => __DIR__,
+];
 
-$client = $pdo->query("SELECT * FROM clients WHERE username = 'usr_469a8f'")->fetch(PDO::FETCH_ASSOC);
+$checkFiles = [
+    'core/Helpers.php' => ['isPanelSubUrl' => 'isPanelSubUrl', 'mci_reality' => 'mci_reality'],
+    'controllers/ApiController.php' => ['mci_reality_de' => 'mci_reality_de', 'mock_pbk' => 'mock_pbk'],
+    'controllers/ApiControllerV2.php' => ['mci_reality_de' => 'mci_reality_de', 'mock_pbk' => 'mock_pbk'],
+    'controllers/SublinkController.php' => ['mci_reality_de' => 'mci_reality_de'],
+    'controllers/SublinkControllerV2.php' => ['mci_reality_de' => 'mci_reality_de'],
+    'drivers/MockDriver.php' => ['15' => '15 * 1024'],
+    'index.php' => ['ApiControllerV2' => 'ApiControllerV2'],
+    'router.php' => ['ApiControllerV2' => 'ApiControllerV2'],
+];
 
-require_once __DIR__ . '/controllers/ApiControllerV2.php';
-$serversV2 = ApiControllerV2::extractServerList($client, $pdo);
+$out['files'] = [];
+foreach ($checkFiles as $rel => $needles) {
+    $p = __DIR__ . '/' . $rel;
+    if (!file_exists($p)) { $out['files'][$rel] = ['exists' => false]; continue; }
+    $c = file_get_contents($p);
+    $row = [
+        'exists' => true,
+        'sha1' => sha1($c),
+        'size' => strlen($c),
+        'mtime' => date('Y-m-d H:i:s', filemtime($p)),
+    ];
+    foreach ($needles as $label => $needle) {
+        $row['has_' . $label] = str_contains($c, $needle);
+    }
+    $out['files'][$rel] = $row;
+}
 
-echo json_encode([
-    'client' => $client,
-    'servers_count' => count($serversV2),
-    'servers' => $serversV2
-], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+// OpCache state
+$out['opcache'] = function_exists('opcache_get_status') ? opcache_get_status(false) : ['enabled' => false];
+if (is_array($out['opcache']) && isset($out['opcache']['opcache_enabled'])) {
+    $out['opcache'] = [
+        'enabled' => $out['opcache']['opcache_enabled'],
+        'memory' => $out['opcache']['memory_usage'] ?? null,
+        'revalidate_freq' => $out['opcache']['revalidate_freq'] ?? null,
+    ];
+}
+
+// .user.ini
+$out['user_ini'] = file_exists(__DIR__ . '/.user.ini') ? file_get_contents(__DIR__ . '/.user.ini') : null;
+
+// Scan ALL php files for legacy mock markers
+$stale = [];
+$rii = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(__DIR__));
+foreach ($rii as $f) {
+    if ($f->isDir()) continue;
+    if ($f->getExtension() !== 'php') continue;
+    $rel = str_replace(__DIR__, '', $f->getPathname());
+    $c = @file_get_contents($f->getPathname());
+    if ($c && (str_contains($c, 'mci_reality') || str_contains($c, 'mock_pbk'))) {
+        $stale[] = $rel;
+    }
+}
+$out['stale_mock_files'] = $stale;
+
+// Live test: V2 extractServerList for a real client (wrapped)
+try {
+    require_once __DIR__ . '/config.php';
+    require_once __DIR__ . '/core/Database.php';
+    $pdo = Database::getConnection();
+    $cl = $pdo->query("SELECT * FROM clients ORDER BY id DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    if ($cl) {
+        require_once __DIR__ . '/controllers/ApiControllerV2.php';
+        $list = ApiControllerV2::extractServerList($cl, $pdo);
+        $out['v2_test'] = [
+            'client' => $cl['username'],
+            'count' => count($list),
+            'names' => array_column($list, 'name'),
+            'mock_markers' => array_filter(array_column($list, 'config_uri'), fn($l) => str_contains($l, 'mock_pbk') || str_contains($l, 'mock_public_key') || str_contains($l, 'montago-shop')),
+        ];
+    }
+} catch (Throwable $e) {
+    $out['v2_test_error'] = $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine();
+}
+
+echo json_encode($out, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);

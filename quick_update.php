@@ -242,7 +242,76 @@ foreach ($rootFiles as $rf) {
     }
 }
 
-// Invalidate OPcache
+// ---- PHASE 2: SHA1 Integrity Verification with forced-overwrite retry ----
+$verifyFailed = [];
+$forceRetried = 0;
+try {
+    $allSrc = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($sourceDir, RecursiveDirectoryIterator::SKIP_DOTS));
+    foreach ($allSrc as $item) {
+        if ($item->isDir()) continue;
+        if ($item->getExtension() !== 'php') continue;
+        $sub = $item->getSubPathname();
+        $base = basename($sub);
+        $parent = dirname($sub);
+        if ($base === 'config.php' && $parent === '.') continue; // never touch user config
+        $dest = __DIR__ . '/' . $sub;
+        $want = @file_get_contents($item->getPathname());
+        if ($want === false || strlen($want) === 0) continue;
+        if (!file_exists($dest) || sha1_file($dest) !== sha1($want)) {
+            @chmod($dest, 0777);
+            @unlink($dest);
+            $w = @file_put_contents($dest, $want, LOCK_EX);
+            @chmod($dest, 0644);
+            if ($w === false || !file_exists($dest) || sha1_file($dest) !== sha1($want)) {
+                $verifyFailed[] = $sub;
+            } else {
+                $forceRetried++;
+            }
+        }
+    }
+} catch (Throwable $e) {
+    logStep('هشدار در مرحله اعتبارسنجی: ' . $e->getMessage(), 'warn');
+}
+if ($forceRetried > 0) {
+    logStep("تعداد {$forceRetried} فایل با اعتبارسنجی SHA1 و بازنویسی اجباری همگام شدند.", 'success');
+}
+if (!empty($verifyFailed)) {
+    logStep('خطای جدی: همگام‌سازی این فایل‌ها ناموفق بود: ' . implode(', ', $verifyFailed), 'error');
+}
+
+// ---- PHASE 3: Purge stale legacy diagnostic / mock files from the live host ----
+$stalePurge = ['diag_fresh_99.php', 'diag_step_100.php', 'find_mock.php', 'fix_now.php', 'test_class.php'];
+$purged = 0;
+foreach ($stalePurge as $sp) {
+    $spPath = __DIR__ . '/' . $sp;
+    if (file_exists($spPath)) {
+        @chmod($spPath, 0777);
+        if (@unlink($spPath)) $purged++;
+    }
+}
+foreach (glob(__DIR__ . '/*.old.*') as $ob) { @unlink($ob); }
+if ($purged > 0) {
+    logStep("تعداد {$purged} فایل دیباگ قدیمی و پیش‌فرض از روی هاست حذف شد.", 'success');
+}
+
+// ---- PHASE 4: Post-Update Integrity Report ----
+$helpersFile = @file_get_contents(__DIR__ . '/core/Helpers.php');
+if ($helpersFile && str_contains($helpersFile, 'isPanelSubUrl') && str_contains($helpersFile, 'stripMockLinks')) {
+    logStep('اعتبارسنجی: Helpers.php جدید (با محافظ mock-filter) روی هاست نصب است.', 'success');
+} else {
+    logStep('خطای جدی: Helpers.php روی هاست قدیمی است! به‌روزرسانی را مجدداً اجرا کنید.', 'error');
+}
+$apiV1 = @file_get_contents(__DIR__ . '/controllers/ApiController.php');
+$apiV2 = @file_get_contents(__DIR__ . '/controllers/ApiControllerV2.php');
+$mockFree = ($apiV1 && !str_contains($apiV1, 'mci_reality') && !str_contains($apiV1, 'mock_pbk'))
+         && ($apiV2 && !str_contains($apiV2, 'mci_reality') && !str_contains($apiV2, 'mock_pbk'));
+if ($mockFree) {
+    logStep('اعتبارسنجی: کنترلرهای اپ بدون هیچ کانکشن پیش‌فرض/دموی قدیمی هستند.', 'success');
+} else {
+    logStep('خطای جدی: کنترلرهای اپ هنوز حاوی کانکشن‌های پیش‌فرض قدیمی هستند!', 'error');
+}
+
+// Invalidate OPcache (hard reset so every file reloads from disk immediately)
 if (function_exists('opcache_reset')) @opcache_reset();
 if (function_exists('clearstatcache')) @clearstatcache(true);
 

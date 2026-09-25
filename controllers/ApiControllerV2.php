@@ -627,6 +627,12 @@ class ApiControllerV2 {
         // Deduplicate links
         $realLinks = array_values(array_unique($realLinks));
 
+        // HARD GUARD: never deliver legacy mock/fake connections
+        $realLinks = Helpers::stripMockLinks($realLinks);
+        if (empty($realLinks)) {
+            return [];
+        }
+
         $serverList = [];
         $idx = 1;
         foreach ($realLinks as $link) {

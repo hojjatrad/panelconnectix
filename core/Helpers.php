@@ -2,6 +2,40 @@
 require_once __DIR__ . '/../config.php';
 
 class Helpers {
+    /**
+     * HARD GUARD — Legacy mock / fake connection markers.
+     * ANY link or sublink containing one of these markers is treated as
+     * invalid legacy test data and is NEVER delivered to the client.
+     */
+    public const MOCK_MARKERS = [
+        'mock_pbk',
+        'mock_public_key',
+        'mock_pbk_connectix',
+        'mock_domain',
+        'montago-shop',
+        'node.connectix.space',
+        'your-domain.com',
+        'test.node.example',
+    ];
+
+    public static function isMockLink(?string $link): bool {
+        if (empty($link)) return false;
+        $hay = strtolower($link);
+        foreach (self::MOCK_MARKERS as $m) {
+            if (str_contains($hay, $m)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Remove all legacy mock/legacy links from a list of connection links.
+     */
+    public static function stripMockLinks(array $links): array {
+        return array_values(array_filter($links, function ($l) {
+            return !self::isMockLink(is_array($l) ? json_encode($l) : (string)$l);
+        }));
+    }
+
     public static function basePath(): string {
         $scriptDir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? ''));
         return ($scriptDir === '/' || $scriptDir === '.') ? '' : rtrim($scriptDir, '/');
