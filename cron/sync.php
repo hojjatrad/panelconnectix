@@ -319,14 +319,19 @@ if ($forceCheck || (time() - $lastUpdateCheck >= 180)) {
         $updateInfo = Updater::checkForUpdates(true);
         if (!empty($updateInfo['has_update'])) {
             echo "[Auto-Update] New version detected ({$updateInfo['latest_version']}). Applying update..." . $eol;
-            $applyRes = Updater::applyUpdate();
+            $applyRes = Updater::applyUpdate(false);
             if ($applyRes['success']) {
+                $notifySha = ($updateInfo['type'] ?? '') === 'commit'
+                    ? str_replace('commit-', '', (string)($updateInfo['latest_version'] ?? ''))
+                    : (string)($updateInfo['latest_version'] ?? '');
                 $msg = "🚀 <b>به‌روزرسانی خودکار پنل از گیت‌هاب با موفقیت اعمال شد!</b>\n\n"
                      . "🏷 نسخه جدید: <code>{$updateInfo['latest_version']}</code>\n"
                      . "📅 زمان: " . date('Y-m-d H:i:s') . "\n"
                      . "📝 تغییرات: " . strip_tags($updateInfo['changelog'] ?? 'همگام‌سازی آخرین کدهای مخزن');
-                TelegramBot::sendMessage($msg);
-                echo "[Auto-Update] Panel updated successfully to {$updateInfo['latest_version']}." . $eol;
+                // ONE message per applied update in the supergroup reports
+                // topic (de-duplicated by sha so webhook + cron never double-post)
+                $announced = TelegramBot::announcePanelUpdate($notifySha, $msg);
+                echo "[Auto-Update] Panel updated successfully to {$updateInfo['latest_version']} (announced: " . ($announced ? 'yes' : 'deduplicated') . ")." . $eol;
             } else {
                 echo "[Auto-Update Error] " . ($applyRes['error'] ?? 'failed') . $eol;
             }

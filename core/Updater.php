@@ -4,7 +4,7 @@ require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Setting.php';
 
 class Updater {
-    public const CURRENT_VERSION = '4.0.0';
+    public const CURRENT_VERSION = '4.0.1';
 
     public static function getCurrentVersion(): string {
         $dbVer = Setting::get('current_version', '');
@@ -249,7 +249,12 @@ class Updater {
      * independent sources, and we verify the package content against the
      * expected version BEFORE touching any file on disk.
      */
-    public static function applyUpdate(): array {
+    /**
+     * @param bool $notify When false the caller (webhook/cron) takes over the
+     *                     announcement via TelegramBot::announcePanelUpdate,
+     *                     so the same update never produces two bot messages.
+     */
+    public static function applyUpdate(bool $notify = true): array {
         $check = self::checkForUpdates(true);
 
         $repo = self::getRepo();
@@ -392,9 +397,13 @@ class Updater {
                  . "✅ تمامی فایل‌های هسته، کنترلرها و درایورها با موفقیت بروزرسانی شدند.";
             
             // Send to Supergroup Reports Topic (general or notifications)
-            $sent = TelegramBot::sendCategorizedReport('general', $msg);
-            if (!$sent) {
-                TelegramBot::sendCategorizedReport('notifications', $msg);
+            // — only when the caller did not take over announcing
+            // (webhook/cron send their own single message via announcePanelUpdate)
+            if ($notify) {
+                $sent = TelegramBot::sendCategorizedReport('general', $msg);
+                if (!$sent) {
+                    TelegramBot::sendCategorizedReport('notifications', $msg);
+                }
             }
         } catch (Throwable $e) {}
 

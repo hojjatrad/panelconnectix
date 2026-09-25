@@ -236,6 +236,38 @@ class TelegramBot {
     }
 
     /**
+     * Announce a successfully applied GitHub panel update to the supergroup
+     * reports topic — with strict de-duplication so the bot never spams:
+     *
+     *   - the SAME commit sha is announced at most once per 60 minutes
+     *   - only ONE message is sent per applied update (webhook and cron both
+     *     call this; Updater::applyUpdate(notify:false) suppresses its own)
+     *
+     * Returns true when a message was actually sent, false when de-duplicated.
+     */
+    public static function announcePanelUpdate(string $sha, string $text): bool {
+        $sha = trim($sha);
+        $lastSha = trim((string)Setting::get('last_panel_update_notify_sha', ''));
+        $lastAt = (int)Setting::get('last_panel_update_notify_at', '0');
+
+        if ($sha !== '' && $lastSha === $sha && (time() - $lastAt) < 3600) {
+            return false; // same update already announced within the last hour
+        }
+
+        $sent = self::sendCategorizedReport('general', $text);
+        if (!$sent) {
+            $sent = self::sendCategorizedReport('notifications', $text);
+        }
+
+        if ($sent && $sha !== '') {
+            Setting::set('last_panel_update_notify_sha', $sha);
+            Setting::set('last_panel_update_notify_at', (string)time());
+        }
+
+        return $sent;
+    }
+
+    /**
      * Send backup file routed to backup topic in log channel
      */
     public static function sendCategorizedDocument(string $category, string $filePath, string $caption = '', ?string $customToken = null): bool {

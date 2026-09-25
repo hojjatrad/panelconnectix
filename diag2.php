@@ -205,4 +205,26 @@ try {
     $out['live_lint_error'] = $e->getMessage();
 }
 
+// Auto-update / GitHub webhook state (brake, auto-apply, de-dup announce, app release)
+try {
+    if (!class_exists('Setting')) require_once __DIR__ . '/core/Setting.php';
+    $out['auto_update_state'] = [
+        'auto_apply_github_updates' => (string)Setting::get('auto_apply_github_updates', ''),
+        'auto_update_brake_applied' => (string)Setting::get('auto_update_brake_applied', ''),
+        'installed_version'         => (string)Setting::get('current_version', ''),
+        'last_installed_sha'        => (string)Setting::get('last_installed_commit_sha', ''),
+        'last_panel_update_notify'  => [
+            'sha' => (string)Setting::get('last_panel_update_notify_sha', ''),
+            'at'  => (string)Setting::get('last_panel_update_notify_at', '0'),
+        ],
+        'app_release'               => [
+            'published_version' => (string)Setting::get('app_latest_version', ''),
+            'source'            => (string)Setting::get('app_update_source', 'auto'),
+            'enabled'           => Setting::get('app_update_enabled', '1') !== '0',
+        ],
+    ];
+} catch (Throwable $e) {
+    $out['auto_update_state_error'] = $e->getMessage();
+}
+
 echo json_encode($out, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);

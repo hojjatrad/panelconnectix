@@ -159,11 +159,37 @@ class UpdateController {
             exit;
         }
 
-        $res = Updater::applyUpdate();
+        // Pushed commit from the GitHub payload (for de-duplicated announcing)
+        $pushedSha = '';
+        if (!empty($rawPayload)) {
+            $payload = json_decode($rawPayload, true);
+            $pushedSha = is_array($payload) ? (string)($payload['after'] ?? '') : '';
+        }
+
+        // Short-circuit: nothing newer than what is installed → stay silent
+        // (prevents duplicate bot messages on retried/duplicate webhook events)
+        $info = Updater::checkForUpdates(false);
+        if (empty($info['has_update'])) {
+            echo json_encode([
+                'success' => true,
+                'status' => 'up_to_date',
+                'version' => $info['current_version'] ?? '',
+                'message' => 'پنل هم‌اکنون با آخرین نسخه گیت‌هاب همگام است؛ تغییری اعمال نشد.'
+            ]);
+            exit;
+        }
+
+        $res = Updater::applyUpdate(false);
         if ($res['success']) {
             try {
                 require_once __DIR__ . '/../core/TelegramBot.php';
-                TelegramBot::sendMessage("⚡️ <b>آپدیت آنی گیت‌هاب با وب‌هوک اعمال شد!</b>\n\nتغییرات جدید مستقیماً از مخزن گیت‌هاب دریافت و روی پنل هاست مستقر گردید.");
+                $msg = "⚡️ <b>آپدیت آنی گیت‌هاب با وب‌هوک اعمال شد!</b>\n\n"
+                     . "تغییرات جدید مستقیماً از مخزن گیت‌هاب دریافت و روی پنل هاست مستقر گردید.\n"
+                     . "🏷 نسخه: <code>" . htmlspecialchars($res['version'] ?? '', ENT_QUOTES) . "</code>\n"
+                     . "📅 زمان: " . date('Y-m-d H:i:s');
+                // ONE message per applied update, routed to the supergroup
+                // reports topic, de-duplicated by commit sha (no bot spam)
+                TelegramBot::announcePanelUpdate($pushedSha, $msg);
             } catch (Throwable $e) {}
         }
         echo json_encode($res);

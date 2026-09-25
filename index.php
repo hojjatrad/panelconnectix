@@ -110,13 +110,19 @@ foreach ($coreComponents as $component) {
     }
 }
 
-// 2b. EMERGENCY BRAKE (one-shot, stored in shared DB): stop the cron
-//     auto-apply GitHub updates until the zip-download path is verified.
+// 2b. EMERGENCY BRAKE (one-shot, stored in shared DB): on a fresh deployment
+//     of this code the cron auto-apply of GitHub updates is stopped until the
+//     zip-download path is verified.
 //     Incident 2026-09-25: a network-cached stale zip was applied by cron
-//     and overwrote a healthy deployment. Re-enable by setting
-//     auto_update_brake_applied='0' + auto_apply_github_updates='1' in system_settings.
+//     and overwrote a healthy deployment.
+//     State values of auto_update_brake_applied:
+//       ''            -> first boot after deploy -> brake engages (sets '1:...')
+//       '1:...'       -> brake engaged (auto_apply_github_updates forced '0')
+//       'released:...'-> brake deliberately released via release_brake.php
+//     The brake engages ONLY from the '' state, so a deliberate release
+//     ('released:...') is never re-braked by later requests.
 try {
-    if (Setting::get('auto_update_brake_applied', '0') !== '1') {
+    if (trim((string)Setting::get('auto_update_brake_applied', '')) === '') {
         Setting::set('auto_apply_github_updates', '0');
         Setting::set('auto_update_brake_applied', '1:' . date('Y-m-d H:i:s'));
     }
