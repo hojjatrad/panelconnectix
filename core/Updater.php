@@ -167,17 +167,104 @@ class Updater {
     }
 
     /**
-     * Download ZIP and perform 1-Click Update
+     * Resolve the latest commit SHA of the branch from multiple independent
+     * sources (raw.githubusercontent + api.github.com + github.com atom feed),
+     * each hit with a unique cache-buster so transparent network caches cannot
+     * serve a stale answer. Returns ['sha' => '40-hex', 'source' => str,
+     * 'remote_version' => str] or null.
+     */
+    public static function resolveLatestSha(): ?array {
+        $repo = self::getRepo();
+        $branch = self::getBranch();
+        $bust = 't=' . (string)time() . rand(1000, 9999);
+        $apiSha = '';
+        $atomSha = '';
+        $rawVer = '';
+
+        // Source 1: raw Updater.php (also gives us the remote version constant)
+        $rawUrls = [
+            "https://raw.githubusercontent.com/{$repo}/{$branch}/core/Updater.php?{$bust}",
+            "https://github.com/{$repo}/raw/{$branch}/core/Updater.php?{$bust}",
+        ];
+        foreach ($rawUrls as $rawUrl) {
+            $body = (string)self::httpGet($rawUrl);
+            if (preg_match("/CURRENT_VERSION\s*=\s*['\"]([^'\"]+)['\"]/u", $body, $m)) {
+                $rawVer = trim($m[1]);
+                break;
+            }
+        }
+
+        // Source 2: GitHub REST API (commits/{branch})
+        $apiBody = (string)self::httpGet("https://api.github.com/repos/{$repo}/commits/{$branch}?{$bust}");
+        if (preg_match('/"sha"\s*:\s*"([0-9a-f]{40})"/', $apiBody, $m)) {
+            $apiSha = $m[1];
+        }
+
+        // Source 3: GitHub Atom feed (independent pipeline, incident-proven)
+        $atomBody = (string)self::httpGet("https://github.com/{$repo}/commits/{$branch}.atom?{$bust}");
+        if (preg_match('/tag:github\.com,2008:Repository\/\d+\/commit\/([0-9a-f]{40})/', $atomBody, $m)) {
+            $atomSha = $m[1];
+        }
+
+        // Cross-check: API is only trusted when the atom feed agrees, otherwise
+        // the atom feed wins (it survived the 2026-09-25 stale-cache incident).
+        $sha = '';
+        $source = '';
+        if ($apiSha !== '' && $atomSha !== '') {
+            if ($apiSha === $atomSha) { $sha = $apiSha; $source = 'api+atom (agreed)'; }
+            else { $sha = $atomSha; $source = 'atom (API differed)'; }
+        } elseif ($atomSha !== '') {
+            $sha = $atomSha; $source = 'atom feed';
+        } elseif ($apiSha !== '') {
+            $sha = $apiSha; $source = 'api.github.com (no atom cross-check)';
+        }
+
+        if ($sha === '') return null;
+        return ['sha' => $sha, 'source' => $source, 'remote_version' => $rawVer];
+    }
+
+    private static function httpGet(string $url): string {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_TIMEOUT => 12,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => false,
+            CURLOPT_USERAGENT => 'Connectix-Panel-Updater',
+        ]);
+        $body = curl_exec($ch);
+        curl_close($ch);
+        return is_string($body) ? $body : '';
+    }
+
+    /**
+     * Download ZIP and perform 1-Click Update.
+     *
+     * SAFETY GATE (incident 2026-09-25): never apply an update from a
+     * branch-alias zip URL ("refs/heads/main") — the host's transparent network
+     * cache can serve a stale zip for that URL for a long time, which once
+     * overwrote a healthy deployment. We only ever download a COMMIT-PINNED zip
+     * (unique URL, cannot be a stale pin) after the SHA was verified from
+     * independent sources, and we verify the package content against the
+     * expected version BEFORE touching any file on disk.
      */
     public static function applyUpdate(): array {
         $check = self::checkForUpdates(true);
-        $downloadUrl = $check['download_url'] ?? '';
 
-        if (empty($downloadUrl)) {
-            $branch = self::getBranch();
-            $repo = self::getRepo();
-            $downloadUrl = "https://github.com/{$repo}/archive/refs/heads/{$branch}.zip";
+        $repo = self::getRepo();
+        $shaInfo = self::resolveLatestSha();
+        if (!$shaInfo || empty($shaInfo['sha'])) {
+            return ['success' => false, 'error' => 'عدم امکان راستی‌آزمایی SHA آخرین کامیت — به‌روزرسانی انجام نشد (حالت فعلی حفظ شد).'];
         }
+        $sha = $shaInfo['sha'];
+        $expectedVer = (string)($shaInfo['remote_version'] ?? '');
+        $localVer = self::getCurrentVersion();
+        if ($expectedVer !== '' && version_compare($expectedVer, $localVer, '<')) {
+            return ['success' => false, 'error' => "نسخه دورانی ({$expectedVer}) قدیمی‌تر از نسخه نصب‌شده ({$localVer}) است — اعمال نشد."];
+        }
+
+        $downloadUrl = "https://codeload.github.com/{$repo}/zip/{$sha}";
 
         $tmpDir = sys_get_temp_dir() . '/connectix_update_' . time();
         if (!is_dir($tmpDir)) {
@@ -241,6 +328,24 @@ class Updater {
         } else {
             $subDirs = glob($extractPath . '/*', GLOB_ONLYDIR);
             $sourceDir = (!empty($subDirs) && is_dir($subDirs[0])) ? $subDirs[0] : $extractPath;
+        }
+
+        // SAFETY GATE 2: verify the extracted package matches the expected
+        // version before writing anything. A stale/corrupt zip is refused.
+        $pkgUpdater = $sourceDir . '/core/Updater.php';
+        $pkgVer = '';
+        if (is_file($pkgUpdater)) {
+            if (preg_match("/CURRENT_VERSION\s*=\s*['\"]([^'\"]+)['\"]/u", (string)file_get_contents($pkgUpdater), $m)) {
+                $pkgVer = trim($m[1]);
+            }
+        }
+        if ($expectedVer !== '' && $pkgVer !== '' && version_compare($pkgVer, $expectedVer, '<')) {
+            self::deleteDirectory($tmpDir);
+            return ['success' => false, 'error' => "فایل پکیج دریافت‌شده (نسخه {$pkgVer}) با انتظار ({$expectedVer}) مطابقت ندارد — اعمال نشد."];
+        }
+        if ($pkgVer !== '' && version_compare($pkgVer, $localVer, '<')) {
+            self::deleteDirectory($tmpDir);
+            return ['success' => false, 'error' => "پکیج دریافت‌شده ({$pkgVer}) قدیمی‌تر از نسخه نصب‌شده ({$localVer}) است — اعمال نشد."];
         }
 
         // Copy files over panel root, skipping sensitive local configs and user data

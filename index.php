@@ -110,6 +110,18 @@ foreach ($coreComponents as $component) {
     }
 }
 
+// 2b. EMERGENCY BRAKE (one-shot, stored in shared DB): stop the cron
+//     auto-apply GitHub updates until the zip-download path is verified.
+//     Incident 2026-09-25: a network-cached stale zip was applied by cron
+//     and overwrote a healthy deployment. Re-enable by setting
+//     auto_update_brake_applied='0' + auto_apply_github_updates='1' in system_settings.
+try {
+    if (Setting::get('auto_update_brake_applied', '0') !== '1') {
+        Setting::set('auto_apply_github_updates', '0');
+        Setting::set('auto_update_brake_applied', '1:' . date('Y-m-d H:i:s'));
+    }
+} catch (Throwable $e) {}
+
 // 3. Load All Controllers Safely
 $expectedControllers = [
     'AuthController', 'DashboardController', 'ClientController', 'PlanController',

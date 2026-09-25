@@ -232,6 +232,7 @@ $sourceDir = (!empty($subDirs) && is_dir($subDirs[0])) ? $subDirs[0] : $tmpExt;
 $repaired = 0;
 $failed = [];
 $skipped = 0;
+$repairedFiles = []; // rel => expected sha1 (for post-sync forensic verification)
 $srcPrefix = str_replace('\\', '/', rtrim($sourceDir, '/')) . '/';
 $rii = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($sourceDir, RecursiveDirectoryIterator::SKIP_DOTS));
 foreach ($rii as $fileInfo) {
@@ -259,6 +260,7 @@ foreach ($rii as $fileInfo) {
     @chmod($live, 0644);
     if ($w !== false && file_exists($live) && sha1_file($live) === sha1($want)) {
         $repaired++;
+        $repairedFiles[$rel] = sha1($want);
         logStep("تعمیر و همگام‌سازی: " . $rel, 'success');
     } else {
         $failed[] = $rel;
@@ -321,6 +323,36 @@ if ($mockFree) {
 @touch(__DIR__ . '/.deploy_stamp');
 if (function_exists('opcache_reset')) @opcache_reset();
 if (function_exists('clearstatcache')) @clearstatcache(true);
+
+// 8b. Post-sync forensic verification (detects silent revert / split views)
+$forensics = [];
+$forensics['dir'] = __DIR__;
+$forensics['realpath'] = @realpath(__DIR__);
+$forensics['user'] = function_exists('get_current_user') ? get_current_user() : (getenv('USER') ?: '?');
+$forensics['php'] = PHP_VERSION;
+$stampPath = __DIR__ . '/.deploy_stamp';
+$forensics['stamp_mtime'] = @filemtime($stampPath) ? date('Y-m-d H:i:s', @filemtime($stampPath)) : 'missing';
+$markers = glob(__DIR__ . '/.opcache_reset_done_*') ?: [];
+$forensics['opcache_markers'] = array_map(fn($m) => basename($m) . ' @ ' . date('H:i:s', @filemtime($m)), $markers);
+// Canary: a fresh non-PHP file that must be visible to every other process
+$canaryName = '__canary_' . date('His') . '_' . getmypid() . '.txt';
+$canaryOk = @file_put_contents(__DIR__ . '/' . $canaryName, 'forensic ' . date('Y-m-d H:i:s') . ' pid ' . getmypid(), LOCK_EX) !== false;
+$forensics['canary_written'] = $canaryName;
+$forensics['canary_readback'] = ($canaryOk && @file_exists(__DIR__ . '/' . $canaryName)) ? 'ok' : 'FAILED';
+// ls-level view (bypasses PHP stat cache)
+$lsRaw = @shell_exec('ls -la ' . escapeshellarg(__DIR__) . ' 2>&1 | grep -E "canary|deploy_stamp|opcache_reset" | head -8');
+$forensics['ls_view'] = $lsRaw ? array_map('trim', explode("\n", (string)$lsRaw)) : 'shell_exec unavailable';
+// Re-verify the repaired files after a micro-delay
+$revertCheck = [];
+foreach (array_slice($repairedFiles, 0, 40) as $rel => $expectedSha) {
+    $live = __DIR__ . '/' . $rel;
+    $cur = @sha1_file($live);
+    if ($cur !== $expectedSha) {
+        $revertCheck[] = $rel . ' => ' . substr((string)$cur, 0, 10) . ' (want ' . substr($expectedSha, 0, 10) . ') mtime=' . (@filemtime($live) ? date('H:i:s', @filemtime($live)) : '?');
+    }
+}
+$forensics['reverted_now'] = $revertCheck ?: 'none';
+logStep('FORENSICS: ' . json_encode($forensics, JSON_UNESCAPED_UNICODE), $revertCheck ? 'error' : 'info');
 
 // 9. Send Notification to Telegram Supergroup Reports Topic
 $tgNotice = false;

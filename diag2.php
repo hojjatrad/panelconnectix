@@ -159,6 +159,27 @@ try {
     $out['v2_test_error'] = $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine();
 }
 
+// Filesystem forensics: deploy stamp, OPcache reset markers, canaries, raw ls
+try {
+    $fs = [];
+    $stampPath = __DIR__ . '/.deploy_stamp';
+    $fs['stamp_mtime'] = @filemtime($stampPath) ? date('Y-m-d H:i:s', @filemtime($stampPath)) : 'missing';
+    $markers = glob(__DIR__ . '/.opcache_reset_done_*') ?: [];
+    $fs['opcache_markers'] = array_map(fn($m) => basename($m) . ' @ ' . date('H:i:s', @filemtime($m)), $markers);
+    $canaries = glob(__DIR__ . '/__canary_*.txt') ?: [];
+    $fs['canaries'] = array_map(fn($c) => basename($c) . ' @ ' . date('H:i:s', @filemtime($c)), $canaries);
+    $fs['canary_content'] = [];
+    foreach (array_slice($canaries, -2) as $c) {
+        $fs['canary_content'][basename($c)] = (string)@file_get_contents($c);
+    }
+    $lsRaw = @shell_exec('ls -la ' . escapeshellarg(__DIR__) . ' 2>&1 | grep -E "canary|deploy_stamp|opcache_reset|Helpers|ApiController" | head -12');
+    $fs['ls_view'] = $lsRaw ? array_map('trim', explode("\n", (string)$lsRaw)) : 'shell_exec unavailable';
+    $fs['helpers_raw_head'] = substr((string)@file_get_contents(__DIR__ . '/core/Helpers.php'), 0, 120);
+    $out['fs_forensics'] = $fs;
+} catch (Throwable $e) {
+    $out['fs_forensics_error'] = $e->getMessage();
+}
+
 // Live PHP syntax lint of all project files (finds the PHP CLI binary on the host)
 try {
     $phpBin = trim((string)@shell_exec('which php 2>/dev/null'));
