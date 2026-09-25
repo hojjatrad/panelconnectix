@@ -82,6 +82,58 @@ foreach ($rii as $f) {
 }
 $out['stale_mock_files'] = $stale;
 
+// GitHub connectivity probe FROM THIS HOST
+$probe = [];
+try {
+    $ch = curl_init('https://api.github.com/repos/hojjatrad/panelconnectix/commits/main');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 10,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_SSL_VERIFYHOST => false,
+        CURLOPT_HTTPHEADER => ['User-Agent: Connectix-Diag'],
+    ]);
+    $r = curl_exec($ch);
+    $probe['api_code'] = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $probe['api_error'] = curl_error($ch);
+    curl_close($ch);
+    $d = json_decode((string)$r, true);
+    $probe['api_sha'] = $d['sha'] ?? null;
+} catch (Throwable $e) { $probe['api_error'] = $e->getMessage(); }
+try {
+    $ch = curl_init('https://codeload.github.com/hojjatrad/panelconnectix/zip/refs/heads/main?t=' . time());
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_TIMEOUT => 25,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_SSL_VERIFYHOST => false,
+        CURLOPT_HTTPHEADER => ['User-Agent: Connectix-Diag'],
+    ]);
+    $z = curl_exec($ch);
+    $probe['zip_code'] = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $probe['zip_size'] = strlen((string)$z);
+    curl_close($ch);
+    if (is_string($z) && strlen($z) > 5000) {
+        $tmp = sys_get_temp_dir() . '/cx_probe_' . uniqid() . '.zip';
+        file_put_contents($tmp, $z);
+        if (class_exists('ZipArchive')) {
+            $za = new ZipArchive();
+            if ($za->open($tmp) === true) {
+                $names = $za->namelist();
+                $root = $names[0] ?? '';
+                $probe['zip_root_folder'] = explode('/', $root)[0] ?? null;
+                $probe['zip_has_v5_updater'] = in_array($root . 'quick_update.php', $names, false)
+                    ? str_contains($za->getFromName($root . 'quick_update.php'), 'Self-Healing Updater v5')
+                    : null;
+                $za->close();
+            }
+        }
+        @unlink($tmp);
+    }
+} catch (Throwable $e) { $probe['zip_error'] = $e->getMessage(); }
+$out['github_probe'] = $probe;
+
 // Live test: V2 extractServerList for a real client (wrapped)
 try {
     require_once __DIR__ . '/config.php';

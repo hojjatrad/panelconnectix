@@ -89,21 +89,42 @@ if (file_exists(__DIR__ . '/data/panel.sqlite')) {
 $repo = 'hojjatrad/panelconnectix';
 $cacheBuster = time();
 
-// 2. Fetch latest commit SHA
+// 2. Fetch latest commit SHA (multi-source: api.github.com may be blocked/throttled
+//    on some networks — the GitHub Web Atom feed is the robust fallback)
 $latestSha = '';
-$chSha = curl_init("https://api.github.com/repos/{$repo}/commits/main");
-curl_setopt($chSha, CURLOPT_RETURNTRANSFER, true);
-curl_setopt($chSha, CURLOPT_TIMEOUT, 6);
-curl_setopt($chSha, CURLOPT_SSL_VERIFYPEER, false);
-curl_setopt($chSha, CURLOPT_SSL_VERIFYHOST, false);
-curl_setopt($chSha, CURLOPT_HTTPHEADER, ['User-Agent: Connectix-Live-Updater']);
-$shaJson = curl_exec($chSha);
-curl_close($chSha);
-if ($shaJson) {
-    $shaData = json_decode($shaJson, true);
+$shaSource = '';
+$tryCurl = function (string $url, array $headers) {
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 8);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    $body = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    return ($code === 200 && is_string($body)) ? $body : false;
+};
+
+$apiBody = $tryCurl("https://api.github.com/repos/{$repo}/commits/main", ['User-Agent: Connectix-Live-Updater']);
+if ($apiBody !== false) {
+    $shaData = json_decode($apiBody, true);
     if (!empty($shaData['sha'])) {
         $latestSha = $shaData['sha'];
+        $shaSource = 'api.github.com';
     }
+}
+if ($latestSha === '') {
+    $atomBody = $tryCurl("https://github.com/{$repo}/commits/main.atom", ['User-Agent: Connectix-Live-Updater']);
+    if ($atomBody !== false && preg_match('#Grit::Commit/([a-f0-9]{40})#', $atomBody, $m)) {
+        $latestSha = $m[1];
+        $shaSource = 'github.com atom feed';
+    }
+}
+if ($latestSha !== '') {
+    logStep("آخرین کامیت شناسایی شد: " . substr($latestSha, 0, 7) . " (منبع: {$shaSource})", 'info');
+} else {
+    logStep('هشدار: شناسایی SHA آخرین کامیت ناموفق بود؛ از پکیج شاخه main استفاده می‌شود.', 'warn');
 }
 
 $zipUrls = [];
