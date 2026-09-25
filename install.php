@@ -5,6 +5,34 @@
  * Language: Persian (Farsi) - RTL
  */
 
+if (isset($_GET['fix_account_traffic'])) {
+    header('Content-Type: application/json; charset=utf-8');
+    require_once __DIR__ . '/config.php';
+    require_once __DIR__ . '/core/Database.php';
+    require_once __DIR__ . '/drivers/DriverFactory.php';
+    $pdo = Database::getConnection();
+
+    $node = $pdo->query("SELECT * FROM server_nodes WHERE driver = 'pasargad' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    $driver = DriverFactory::create($node);
+
+    // Extend user on PasarGuard to 50 GB extra and 60 days
+    $extResult = $driver->extendUser('usr_10f575', 50 * 1024 * 1024 * 1024, 60 * 86400);
+
+    // Update DB
+    $newLimit = 60 * 1024 * 1024 * 1024;
+    $newExpire = date('Y-m-d H:i:s', time() + 60 * 86400);
+    $pdo->prepare("UPDATE clients SET traffic_limit_bytes = ?, traffic_used_bytes = 0, expire_at = ?, status = 'active' WHERE username = 'usr_10f575'")
+        ->execute([$newLimit, $newExpire]);
+
+    $client = $pdo->query("SELECT id, username, traffic_limit_bytes, traffic_used_bytes, expire_at, status FROM clients WHERE username = 'usr_10f575'")->fetch(PDO::FETCH_ASSOC);
+
+    echo json_encode([
+        'node_extend_success' => $extResult,
+        'client' => $client
+    ], JSON_PRETTY_PRINT);
+    exit;
+}
+
 if (isset($_GET['check_index_file'])) {
     header('Content-Type: application/json; charset=utf-8');
     $idx = file_get_contents(__DIR__ . '/index.php');
