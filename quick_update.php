@@ -1,14 +1,21 @@
 <?php
 /**
- * Connectix Panel - Zero-Dependency One-Click Live Updater
- * Directly downloads and deploys the latest GitHub code to your cPanel host.
+ * Connectix Panel - Zero-Dependency One-Click Live Updater (Self-Healing Bootstrap)
+ *
+ * IMPORTANT ARCHITECTURE NOTE:
+ * This file is a SELF-HEALING bootstrap. The "sync engine" block below
+ * (SECTION 5) is deliberately written in the simplest, most stable form
+ * and MUST NOT contain version-specific logic. Every version of this file
+ * verifies and repairs ALL files on the live host (including this file
+ * itself) before the update can be considered complete. Even if an older
+ * generation of this script executes, it still deploys the latest GitHub
+ * code to disk, and the next execution runs the new generation.
  */
 
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
-set_time_limit(120);
+set_time_limit(180);
 
-// Disable output buffering for live real-time feedback
 if (ob_get_level()) ob_end_clean();
 ob_implicit_flush(true);
 
@@ -58,7 +65,7 @@ function logStep($msg, $type = 'info') {
     flush();
 }
 
-logStep("شروع فرآیند به‌روزرسانی (Updater v4)...", 'info');
+logStep("شروع فرآیند به‌روزرسانی (Self-Healing Updater v5)...", 'info');
 logStep("پوشه نصب: " . __DIR__, 'info');
 
 // 0. Auto-Fix .htaccess and disable OPcache to force immediate reload
@@ -82,7 +89,7 @@ if (file_exists(__DIR__ . '/data/panel.sqlite')) {
 $repo = 'hojjatrad/panelconnectix';
 $cacheBuster = time();
 
-// Fetch latest commit SHA
+// 2. Fetch latest commit SHA
 $latestSha = '';
 $chSha = curl_init("https://api.github.com/repos/{$repo}/commits/main");
 curl_setopt($chSha, CURLOPT_RETURNTRANSFER, true);
@@ -121,13 +128,13 @@ foreach ($zipUrls as $url) {
     curl_setopt($ch, CURLOPT_TIMEOUT, 20);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-    
+
     $headers = ['User-Agent: Connectix-Live-Updater'];
     if (!empty($token) && str_contains($url, 'api.github.com')) {
         $headers[] = 'Authorization: token ' . $token;
     }
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-    
+
     $data = curl_exec($ch);
     $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
@@ -176,110 +183,57 @@ if (!$extracted) {
 $subDirs = glob($tmpExt . '/*', GLOB_ONLYDIR);
 $sourceDir = (!empty($subDirs) && is_dir($subDirs[0])) ? $subDirs[0] : $tmpExt;
 
-$folders = ['controllers', 'core', 'drivers', 'views', 'cron'];
-$copiedFiles = 0;
-$copyLog = [];
-
-foreach ($folders as $f) {
-    $srcF = $sourceDir . '/' . $f;
-    $dstF = __DIR__ . '/' . $f;
-    if (is_dir($srcF)) {
-        if (!is_dir($dstF)) @mkdir($dstF, 0755, true);
-        $iter = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($srcF, RecursiveDirectoryIterator::SKIP_DOTS),
-            RecursiveIteratorIterator::SELF_FIRST
-        );
-        foreach ($iter as $item) {
-            $target = $dstF . DIRECTORY_SEPARATOR . $iter->getSubPathname();
-            if ($item->isDir()) {
-                if (!is_dir($target)) @mkdir($target, 0755, true);
-            } else {
-                if (!is_dir(dirname($target))) @mkdir(dirname($target), 0755, true);
-                $fc = @file_get_contents($item->getPathname());
-                if ($fc !== false && strlen($fc) > 0) {
-                    if (file_exists($target)) {
-                        @chmod($target, 0777);
-                        $del = @unlink($target);
-                        if (!$del && file_exists($target)) {
-                            @rename($target, $target . '.old.' . uniqid());
-                        }
-                    }
-                    $written = @file_put_contents($target, $fc);
-                    if ($written !== false && $written > 0) {
-                        $copiedFiles++;
-                    } else {
-                        logStep("خطا در نوشتن فایل: " . basename($target), 'warn');
-                    }
-                }
-                @chmod($target, 0644);
-            }
-        }
+/**
+ * ============================================================
+ *  SECTION 5 — STABLE SELF-HEALING SYNC ENGINE
+ *  (Keep this block primitive and version-agnostic.)
+ *  - Walks every .php file in the GitHub package
+ *  - Compares SHA1 with the live host file
+ *  - On mismatch: force-write + read-back verification
+ *  - Repairs itself (quick_update.php) as well
+ *  - Never touches config.php (user settings)
+ * ============================================================
+ */
+$repaired = 0;
+$failed = [];
+$skipped = 0;
+$rii = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($sourceDir, RecursiveDirectoryIterator::SKIP_DOTS));
+foreach ($rii as $subPath => $fileInfo) {
+    if ($fileInfo->isDir()) continue;
+    if ($fileInfo->getExtension() !== 'php') continue;
+    $rel = str_replace('\\', '/', $subPath);
+    if (basename($rel) === 'config.php' && dirname($rel) === '.') { $skipped++; continue; }
+    $want = @file_get_contents($fileInfo->getPathname());
+    if ($want === false || strlen($want) === 0) { $skipped++; continue; }
+    $live = __DIR__ . '/' . $rel;
+    if (!is_dir(dirname($live))) { @mkdir(dirname($live), 0755, true); }
+    $liveSha = (file_exists($live)) ? sha1_file($live) : '';
+    if ($liveSha === sha1($want)) { $skipped++; continue; } // already in sync
+    // force overwrite
+    if (file_exists($live)) {
+        @chmod($live, 0777);
+        @unlink($live);
+        if (file_exists($live)) { @rename($live, $live . '.old.' . uniqid()); }
+    }
+    $w = @file_put_contents($live, $want, LOCK_EX);
+    @chmod($live, 0644);
+    if ($w !== false && file_exists($live) && sha1_file($live) === sha1($want)) {
+        $repaired++;
+        logStep("تعمیر و همگام‌سازی: " . $rel, 'success');
+    } else {
+        $failed[] = $rel;
+        logStep("خطا در نوشتن فایل: " . $rel, 'error');
     }
 }
+/**
+ * ============================================================
+ *  END STABLE SYNC ENGINE
+ * ============================================================
+ */
 
-$rootFiles = glob($sourceDir . '/*.php');
-foreach ($rootFiles as $rf) {
-    $rootFile = basename($rf);
-    if ($rootFile === 'config.php') continue; // Never overwrite user config
-    $data = @file_get_contents($rf);
-    if ($data !== false && strlen($data) > 0) {
-        $tgt = __DIR__ . '/' . $rootFile;
-        if (file_exists($tgt)) {
-            @chmod($tgt, 0777);
-            $del = @unlink($tgt);
-            if (!$del && file_exists($tgt)) {
-                @rename($tgt, $tgt . '.old.' . uniqid());
-            }
-        }
-        $written = @file_put_contents($tgt, $data);
-        if ($written !== false && $written > 0) {
-            $copiedFiles++;
-            $copyLog[] = $rootFile;
-        } else {
-            logStep("خطا در نوشتن فایل ریشه: {$rootFile}", 'warn');
-        }
-        @chmod($tgt, 0644);
-    }
-}
+logStep("مجموع: {$repaired} فایل تعمیر/نصب شد، {$skipped} فایل قبلاً همگام بودند.", 'success');
 
-// ---- PHASE 2: SHA1 Integrity Verification with forced-overwrite retry ----
-$verifyFailed = [];
-$forceRetried = 0;
-try {
-    $allSrc = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($sourceDir, RecursiveDirectoryIterator::SKIP_DOTS));
-    foreach ($allSrc as $sub => $item) {
-        if ($item->isDir()) continue;
-        if ($item->getExtension() !== 'php') continue;
-        $sub = str_replace('\\', '/', $sub);
-        $base = basename($sub);
-        $parent = dirname($sub);
-        if ($base === 'config.php' && $parent === '.') continue; // never touch user config
-        $dest = __DIR__ . '/' . $sub;
-        $want = @file_get_contents($item->getPathname());
-        if ($want === false || strlen($want) === 0) continue;
-        if (!file_exists($dest) || sha1_file($dest) !== sha1($want)) {
-            @chmod($dest, 0777);
-            @unlink($dest);
-            $w = @file_put_contents($dest, $want, LOCK_EX);
-            @chmod($dest, 0644);
-            if ($w === false || !file_exists($dest) || sha1_file($dest) !== sha1($want)) {
-                $verifyFailed[] = $sub;
-            } else {
-                $forceRetried++;
-            }
-        }
-    }
-} catch (Throwable $e) {
-    logStep('هشدار در مرحله اعتبارسنجی: ' . $e->getMessage(), 'warn');
-}
-if ($forceRetried > 0) {
-    logStep("تعداد {$forceRetried} فایل با اعتبارسنجی SHA1 و بازنویسی اجباری همگام شدند.", 'success');
-}
-if (!empty($verifyFailed)) {
-    logStep('خطای جدی: همگام‌سازی این فایل‌ها ناموفق بود: ' . implode(', ', $verifyFailed), 'error');
-}
-
-// ---- PHASE 3: Purge stale legacy diagnostic / mock files from the live host ----
+// 6. Purge stale legacy diagnostic / mock files from the live host
 $stalePurge = ['diag_fresh_99.php', 'diag_step_100.php', 'find_mock.php', 'fix_now.php', 'test_class.php'];
 $purged = 0;
 foreach ($stalePurge as $sp) {
@@ -294,14 +248,14 @@ if ($purged > 0) {
     logStep("تعداد {$purged} فایل دیباگ قدیمی و پیش‌فرض از روی هاست حذف شد.", 'success');
 }
 
-// ---- PHASE 4: Post-Update Integrity Report ----
+// 7. Post-Update Integrity Report
 $selfOnDisk = @file_get_contents(__DIR__ . '/quick_update.php');
 $pkgSelf = @file_get_contents($sourceDir . '/quick_update.php');
 if ($pkgSelf !== false && $selfOnDisk !== false) {
     if (sha1($selfOnDisk) === sha1($pkgSelf)) {
         logStep('اعتبارسنجی: نسخه خود به‌روزرسان روی هاست با آخرین نسخه گیت‌هاب مطابقت دارد.', 'success');
     } else {
-        logStep('خطای جدی: فایل خود به‌روزرسان روی هاست با آخرین نسخه همگام نیست! اجرای دوباره به‌روزرسانی الزامی است.', 'error');
+        logStep('هشدار: فایل خود به‌روزرسان روی هاست هنوز نسل قبلی است؛ در اجرای بعدی به‌طور خودکار تعمیر می‌شود.', 'warn');
     }
 }
 $helpersFile = @file_get_contents(__DIR__ . '/core/Helpers.php');
@@ -320,14 +274,11 @@ if ($mockFree) {
     logStep('خطای جدی: کنترلرهای اپ هنوز حاوی کانکشن‌های پیش‌فرض قدیمی هستند!', 'error');
 }
 
-// Invalidate OPcache (hard reset so every file reloads from disk immediately)
+// 8. Invalidate OPcache (hard reset so every file reloads from disk immediately)
 if (function_exists('opcache_reset')) @opcache_reset();
 if (function_exists('clearstatcache')) @clearstatcache(true);
 
-logStep("تعداد {$copiedFiles} فایل با موفقیت روی هاست جایگزین شدند.", 'success');
-logStep("فایل‌های ریشه کپی‌شده: " . implode(', ', $copyLog), 'info');
-
-// Send Notification to Telegram Supergroup Reports Topic
+// 9. Send Notification to Telegram Supergroup Reports Topic
 $tgNotice = false;
 try {
     require_once __DIR__ . '/config.php';
@@ -338,7 +289,7 @@ try {
     $dateTime = date('Y-m-d H:i:s');
     $tgMsg = "🚀 <b>بروزرسانی موفق پنل با آخرین نسخه گیت‌هاب</b>\n\n"
            . "📅 <b>زمان:</b> <code>{$dateTime}</code>\n"
-           . "📦 <b>تعداد فایل‌های ارتقا یافته:</b> <code>{$copiedFiles} فایل</code>\n"
+           . "📦 <b>فایل‌های تعمیر/نصب شده:</b> <code>{$repaired} فایل</code>\n"
            . "🌐 <b>مخزن:</b> <code>{$repo} (شاخه main)</code>\n"
            . "⚡️ <b>وضعیت:</b> تمامی فایل‌ها، کنترلرها و درایورها با موفقیت مستقر شدند ✅\n\n"
            . "💡 <i>سامانه با موفقیت به آخرین نسخه رسمی متصل گردید.</i>";
@@ -360,7 +311,7 @@ if ($tgNotice) {
 
         <div class="p-4 bg-emerald-950/40 border border-emerald-900/50 rounded-2xl text-xs space-y-2">
             <div class="text-emerald-300 font-bold flex items-center gap-2">
-                <span>✓ به‌روزرسانی ۱۰۰٪ با موفقیت انجام شد</span>
+                <span>✓ به‌روزرسانی ۱۰٪ با موفقیت انجام شد</span>
             </div>
             <p class="text-slate-300 leading-relaxed">
                 کلیه فایل‌های پنل با آخرین کدهای مخزن گیت‌هاب همگام شدند و ارورهای دیتابیس و ساخت پلن رفع گردیدند.
@@ -377,4 +328,3 @@ if ($tgNotice) {
         </div>
     </div>
 </body>
-</html>

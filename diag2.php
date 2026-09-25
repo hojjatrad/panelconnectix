@@ -19,6 +19,22 @@ $checkFiles = [
     'router.php' => ['ApiControllerV2' => 'ApiControllerV2'],
 ];
 
+$out['self_updater'] = (function () {
+    $p = __DIR__ . '/quick_update.php';
+    if (!file_exists($p)) return ['exists' => false];
+    $c = file_get_contents($p);
+    return [
+        'exists' => true,
+        'sha1' => sha1($c),
+        'size' => strlen($c),
+        'mtime' => date('Y-m-d H:i:s', filemtime($p)),
+        'has_v4_marker' => str_contains($c, 'Updater v4'),
+        'has_fixed_loop' => str_contains($c, 'as $sub => $item'),
+        'has_getsubpathname_bug' => str_contains($c, 'getSubPathname'),
+        'old_backups' => array_map('basename', glob(__DIR__ . '/*.old.*') ?: []),
+    ];
+})();
+
 $out['files'] = [];
 foreach ($checkFiles as $rel => $needles) {
     $p = __DIR__ . '/' . $rel;
