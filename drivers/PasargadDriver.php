@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/PanelDriverInterface.php';
+require_once __DIR__ . '/../core/Helpers.php';
 
 class PasargadDriver implements PanelDriverInterface {
     private string $baseUrl;
