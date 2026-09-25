@@ -176,13 +176,18 @@ require __DIR__ . '/../layout/header.php';
                                 <td class="p-3.5">
                                     <div class="font-bold text-white text-sm font-mono"><?= htmlspecialchars($c['username']) ?></div>
                                     <div class="text-[10px] text-slate-400 font-mono mt-0.5 truncate max-w-[140px]"><?= htmlspecialchars($c['uuid']) ?></div>
+                                    <?php if (!empty($c['node_sync'])): ?>
+                                        <span class="inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded bg-emerald-950/60 text-emerald-300 border border-emerald-800/40" title="این کلاینت مستقیم روی سرور ساخته شده و از طریق همگام‌سازی در پنل ثبت شده است">
+                                            <i class="fa-solid fa-server ml-0.5"></i>مستقیم سرور
+                                        </span>
+                                    <?php endif; ?>
                                     <?php if (Auth::isAdmin() && !empty($c['reseller_username'])): ?>
                                         <span class="inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded bg-purple-950/60 text-purple-300 border border-purple-800/40">نماینده: <?= htmlspecialchars($c['reseller_username']) ?></span>
                                     <?php endif; ?>
                                 </td>
 
                                 <td class="p-3.5">
-                                    <div class="font-medium text-slate-200"><?= htmlspecialchars($c['plan_title'] ?? 'پلن عادی') ?></div>
+                                    <div class="font-medium text-slate-200"><?= !empty($c['node_sync']) ? 'مستقیم سرور' : htmlspecialchars($c['plan_title'] ?? 'پلن عادی') ?></div>
                                     <div class="text-[11px] text-slate-400 mt-0.5"><?= htmlspecialchars($c['server_name'] ?? 'سرور ابری') ?></div>
                                     <span class="inline-flex items-center gap-1 mt-1 text-[10px] text-purple-300 font-mono bg-purple-950/40 px-1.5 py-0.5 rounded border border-purple-800/30">
                                         <i class="fa-solid fa-users text-[9px]"></i>

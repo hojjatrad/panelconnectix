@@ -1,6 +1,12 @@
 <?php
 // Fake Marzban API for local smoke test
 $uri = $_SERVER['REQUEST_URI'] ?? '/';
+if ($uri === '/subtest') {
+    header('Content-Type: text/plain; charset=utf-8');
+    echo "vless://a1b2c3d4-1111-4111-8111-000000000001@2.3.4.5:443?security=tls&type=ws&path=%2Fws#node1\n";
+    echo "vless://b2c3d4e5-2222-4222-8222-000000000002@2.3.4.5:443?security=tls&type=grpc&serviceName=g#node2\n";
+    exit;
+}
 header('Content-Type: application/json');
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $uri === '/api/admin/token') {
     echo json_encode(['access_token' => 'fake-token-123', 'token_type' => 'bearer']);
@@ -16,7 +22,7 @@ if ($uri === '/api/client/list') {
             'used_traffic' => 12 * 1073741824,
             'data_limit' => 20 * 1073741824,
             'expire' => $now + 30 * 86400,
-            'subscription_url' => '/api/client/ali/sub',
+            'subscription_url' => '/api/client/FAKE/sub',
             'links' => [
                 'vless://a1b2c3d4-1111-4111-8111-000000000001@1.2.3.4:443?encryption=none&security=tls&type=ws&host=panel.ir&path=%2Fws&serviceName=ws#ali-v1',
                 'vmess://eyJoIjoiMS4yLjMuNCJ9#ali-v2',
@@ -29,7 +35,7 @@ if ($uri === '/api/client/list') {
             'used_traffic' => 0,
             'data_limit' => 0,
             'expire' => 0,
-            'subscription_url' => '/api/client/sara/sub',
+            'subscription_url' => '/api/client/FAKE/sub',
             'links' => [],
         ],
         [
@@ -39,7 +45,7 @@ if ($uri === '/api/client/list') {
             'used_traffic' => (int)(99.5 * 1073741824),
             'data_limit' => 100 * 1073741824,
             'expire' => $now - 86400,
-            'subscription_url' => 'https://marzban.example.ir/api/client/direct1/sub',
+            'subscription_url' => '/api/client/FAKE/sub',
             'links' => [
                 'trojan://user:pass@1.2.3.4:443?sni=t.example.ir&type=ws&path=%2Ft#direct1-t1',
             ],

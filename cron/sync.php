@@ -343,6 +343,27 @@ if ($forceCheck || (time() - $lastUpdateCheck >= 180)) {
     }
 }
 
+// 4.5 Node Client Sync (mirror live node users into the clients table every 5 minutes)
+try {
+    require_once __DIR__ . '/../core/NodeSync.php';
+    $lastNodeSync = (int)Setting::get('last_cron_node_sync', '0');
+    if (time() - $lastNodeSync >= 300) {
+        Setting::set('last_cron_node_sync', (string)time());
+        $nodeSyncRes = NodeSync::syncAll($pdo);
+        echo "[Node Sync] servers=" . $nodeSyncRes['servers']
+            . " added=" . $nodeSyncRes['added']
+            . " updated=" . $nodeSyncRes['updated']
+            . " skipped=" . $nodeSyncRes['skipped'] . $eol;
+        if (!empty($nodeSyncRes['errors'])) {
+            echo "[Node Sync] errors: " . implode(' | ', array_slice($nodeSyncRes['errors'], 0, 5)) . $eol;
+        }
+    } else {
+        echo "[Node Sync] skipped (throttled, last run " . (time() - $lastNodeSync) . "s ago)." . $eol;
+    }
+} catch (Throwable $e) {
+    echo "[Node Sync Error] " . $e->getMessage() . $eol;
+}
+
 // 5. App Release Auto-Publisher (publishes new Android app builds from CI automatically)
 try {
     require_once __DIR__ . '/../core/AppReleasePublisher.php';

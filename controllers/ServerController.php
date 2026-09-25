@@ -845,7 +845,7 @@ class ServerController {
             $names = array_values(array_unique(array_column($users, 'username')));
             $ph = implode(',', array_fill(0, count($names), '?'));
             try {
-                $st = $pdo->prepare("SELECT c.username, c.password, c.status AS panel_status, c.sub_token,
+                $st = $pdo->prepare("SELECT c.username, c.password, c.status AS panel_status, c.sub_token, c.node_sync,
                                              u.full_name AS reseller_name, u.username AS reseller_username,
                                              p.title AS plan_title
                                       FROM clients c
@@ -925,6 +925,47 @@ class ServerController {
         }
 
         Helpers::redirect($back);
+    }
+
+    /**
+     * POST servers/{id}/node-users/sync
+     * Mirror this server's live users into the panel clients table
+     * (adds missing node-direct clients with generated credentials,
+     * refreshes usage/expire of already-imported ones).
+     */
+    public function nodeUsersSync(string $id = ''): void {
+        Auth::requireAdmin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
+            Helpers::redirect('servers');
+        }
+
+        $id = (int)$id;
+        $pdo = Database::getConnection();
+        $stmt = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ?");
+        $stmt->execute([$id]);
+        $server = $stmt->fetch();
+        if (!$server) {
+            Helpers::flash('error', 'سرور یافت نشد.');
+            Helpers::redirect('servers');
+        }
+
+        require_once __DIR__ . '/../core/NodeSync.php';
+        try {
+            $st = NodeSync::syncServer($pdo, $server);
+            if (!empty($st['errors'])) {
+                Helpers::flash('error', 'همگام‌سازی با خطا: ' . implode(' | ', array_slice($st['errors'], 0, 3)));
+            } else {
+                Helpers::flash('success', sprintf(
+                    'همگام‌سازی «%s» انجام شد: %d کلاینت جدید وارد پنل شد، %d به‌روزرسانی، %d کلاینت پنلی دست‌نخورده.',
+                    $server['name'], $st['added'], $st['updated'], $st['skipped']
+                ));
+            }
+        } catch (Throwable $e) {
+            Helpers::flash('error', 'خطا در همگام‌سازی: ' . $e->getMessage());
+        }
+
+        Helpers::redirect('servers/' . $id . '/node-users');
     }
 
     /**

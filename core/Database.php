@@ -352,6 +352,7 @@ class Database {
                 'first_connected_at' => 'DATETIME NULL',
                 'duration_days' => 'INT DEFAULT 30',
                 'node_sublink' => 'TEXT NULL',
+                'node_sync' => 'TINYINT(1) DEFAULT 0',
                 'custom_note' => 'TEXT NULL'
             ];
             foreach ($clientCols as $c => $d) {

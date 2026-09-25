@@ -38,6 +38,13 @@ $isXui = in_array(strtolower((string)$server['driver']), ['3xui', 'xui'], true);
             </p>
         </div>
         <div class="flex items-center gap-2">
+            <form method="post" action="<?= Helpers::url('servers/' . (int)$server['id'] . '/node-users/sync') ?>" class="m-0"
+                  onsubmit="return confirm('کلاینت‌های جدید این سرور به بخش «مدیریت کلاینت‌ها» اضافه می‌شوند و اطلاعات کلاینت‌های واردشده با داده‌ی زنده‌ی سرور به‌روز می‌شود. ادامه می‌دهید؟');">
+                <?= Helpers::csrfField() ?>
+                <button type="submit" class="px-3 py-2 bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 border border-purple-500/30 text-xs font-bold rounded-xl transition" title="افزودن کلاینت‌های این سرور به بخش مدیریت کلاینت‌ها (با رمز و لینک ساب پنل)">
+                    <i class="fa-solid fa-arrows-rotate ml-1"></i> همگام‌سازی با پنل
+                </button>
+            </form>
             <a href="<?= Helpers::url('servers/' . (int)$server['id'] . '/node-users/export', ['format' => 'txt']) ?>"
                class="px-3 py-2 bg-cyan-600/20 hover:bg-cyan-600/40 text-cyan-300 border border-cyan-500/30 text-xs font-bold rounded-xl transition" title="دانلود TXT کامل (لینک + یوزرپسورد)">
                 <i class="fa-solid fa-file-lines ml-1"></i> خروجی TXT
@@ -128,10 +135,17 @@ $isXui = in_array(strtolower((string)$server['driver']), ['3xui', 'xui'], true);
                             <td class="px-3 py-3 font-mono text-slate-300" dir="ltr"><?= htmlspecialchars((string)($u['expire_at'] ?? '∞')) ?></td>
                             <td class="px-3 py-3">
                                 <?php if ($pi): ?>
-                                    <span class="px-2 py-0.5 rounded bg-purple-500/15 text-purple-300 border border-purple-500/30 text-[10px] font-bold">
-                                        <i class="fa-solid fa-link ml-0.5"></i><?= htmlspecialchars($pi['plan_title'] ?? 'پلن اختصاصی') ?>
-                                    </span>
-                                    <div class="text-[10px] text-slate-500 mt-1">نماینده: <?= htmlspecialchars($pi['reseller_name'] ?? $pi['reseller_username'] ?? '—') ?></div>
+                                    <?php if (!empty($pi['node_sync'])): ?>
+                                        <span class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold">
+                                            <i class="fa-solid fa-server ml-0.5"></i> مستقیم سرور
+                                        </span>
+                                        <div class="text-[10px] text-slate-500 mt-1">ورود اپ: رمز خودکار تولیدشده (از مدیریت کلاینت‌ها)</div>
+                                    <?php else: ?>
+                                        <span class="px-2 py-0.5 rounded bg-purple-500/15 text-purple-300 border border-purple-500/30 text-[10px] font-bold">
+                                            <i class="fa-solid fa-link ml-0.5"></i><?= htmlspecialchars($pi['plan_title'] ?? 'پلن اختصاصی') ?>
+                                        </span>
+                                        <div class="text-[10px] text-slate-500 mt-1">نماینده: <?= htmlspecialchars($pi['reseller_name'] ?? $pi['reseller_username'] ?? '—') ?></div>
+                                    <?php endif; ?>
                                 <?php else: ?>
                                     <span class="text-[10px] text-slate-500">مستقیم سرور (خارج از پنل)</span>
                                 <?php endif; ?>
