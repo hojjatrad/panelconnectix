@@ -15,6 +15,10 @@ class DashboardScreen extends StatefulWidget {
   final BrandingModel branding;
   final List<ServerModel>? initialServers;
 
+  /// Public app version (mirrors the State constant) so other screens
+  /// (login footer, support sheet) can display it.
+  static const String currentAppVersion = _DashboardScreenState.currentAppVersion;
+
   const DashboardScreen({
     Key? key,
     required this.client,
