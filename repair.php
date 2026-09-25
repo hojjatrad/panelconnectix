@@ -662,6 +662,29 @@ if (!empty($missingControllers) || $forceRestore) {
                 @copy($sourceDir . '/repair.php', __DIR__ . '/repair.php');
                 @chmod(__DIR__ . '/repair.php', 0644);
             }
+            // Also self-heal the live updater and the diagnostic probe so the
+            // self-update pipeline can never be stuck on an old generation.
+            foreach (['quick_update.php', 'diag2.php'] as $healFile) {
+                if (file_exists($sourceDir . '/' . $healFile)) {
+                    @copy($sourceDir . '/' . $healFile, __DIR__ . '/' . $healFile);
+                    @chmod(__DIR__ . '/' . $healFile, 0644);
+                }
+            }
+            if (is_dir($sourceDir . '/cron')) {
+                if (!is_dir(__DIR__ . '/cron')) @mkdir(__DIR__ . '/cron', 0755, true);
+                if (file_exists($sourceDir . '/cron/sync.php')) {
+                    @copy($sourceDir . '/cron/sync.php', __DIR__ . '/cron/sync.php');
+                    @chmod(__DIR__ . '/cron/sync.php', 0644);
+                }
+            }
+            if (file_exists($sourceDir . '/sync.php')) {
+                @copy($sourceDir . '/sync.php', __DIR__ . '/sync.php');
+                @chmod(__DIR__ . '/sync.php', 0644);
+            }
+            if (file_exists($sourceDir . '/router.php')) {
+                @copy($sourceDir . '/router.php', __DIR__ . '/router.php');
+                @chmod(__DIR__ . '/router.php', 0644);
+            }
         }
         @unlink($tmpZip);
     }

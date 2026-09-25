@@ -218,11 +218,16 @@ $sourceDir = (!empty($subDirs) && is_dir($subDirs[0])) ? $subDirs[0] : $tmpExt;
 $repaired = 0;
 $failed = [];
 $skipped = 0;
+$srcPrefix = str_replace('\\', '/', rtrim($sourceDir, '/')) . '/';
 $rii = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($sourceDir, RecursiveDirectoryIterator::SKIP_DOTS));
-foreach ($rii as $subPath => $fileInfo) {
+foreach ($rii as $fileInfo) {
     if ($fileInfo->isDir()) continue;
     if ($fileInfo->getExtension() !== 'php') continue;
-    $rel = str_replace('\\', '/', $subPath);
+    // Derive relative path from the absolute pathname (iterator-key behavior
+    // differs across PHP versions, so never rely on the foreach key here)
+    $full = str_replace('\\', '/', $fileInfo->getPathname());
+    if (!str_starts_with($full, $srcPrefix)) continue;
+    $rel = substr($full, strlen($srcPrefix));
     if (basename($rel) === 'config.php' && dirname($rel) === '.') { $skipped++; continue; }
     $want = @file_get_contents($fileInfo->getPathname());
     if ($want === false || strlen($want) === 0) { $skipped++; continue; }
