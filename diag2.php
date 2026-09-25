@@ -208,11 +208,15 @@ try {
 // Auto-update / GitHub webhook state (brake, auto-apply, de-dup announce, app release)
 try {
     if (!class_exists('Setting')) require_once __DIR__ . '/core/Setting.php';
+    $now = time();
+    $cronLast = (int)Setting::get('last_cron_update_check', '0');
     $out['auto_update_state'] = [
         'auto_apply_github_updates' => (string)Setting::get('auto_apply_github_updates', ''),
         'auto_update_brake_applied' => (string)Setting::get('auto_update_brake_applied', ''),
         'installed_version'         => (string)Setting::get('current_version', ''),
         'last_installed_sha'        => (string)Setting::get('last_installed_commit_sha', ''),
+        'cron_alive'                => $cronLast > 0 && ($now - $cronLast) < 600,
+        'last_cron_update_check'    => $cronLast > 0 ? date('Y-m-d H:i:s', $cronLast) : 'never',
         'last_panel_update_notify'  => [
             'sha' => (string)Setting::get('last_panel_update_notify_sha', ''),
             'at'  => (string)Setting::get('last_panel_update_notify_at', '0'),
@@ -221,10 +225,37 @@ try {
             'published_version' => (string)Setting::get('app_latest_version', ''),
             'source'            => (string)Setting::get('app_update_source', 'auto'),
             'enabled'           => Setting::get('app_update_enabled', '1') !== '0',
+            'last_check'        => (string)Setting::get('app_release_last_check', '0'),
+            'status_cache'      => Setting::get('app_release_status_cache', ''),
         ],
     ];
 } catch (Throwable $e) {
     $out['auto_update_state_error'] = $e->getMessage();
+}
+
+// Telegram report-channel probe (NO message is sent): does the bot config exist
+// and can the reports chat + general topic thread be resolved?
+try {
+    require_once __DIR__ . '/core/TelegramBot.php';
+    $logChat   = trim((string)Setting::get('bot_log_channel', Setting::get('telegram_log_channel_id', Setting::get('telegram_admin_id', ''))));
+    $botToken  = trim((string)Setting::get('telegram_bot_token', defined('TELEGRAM_BOT_TOKEN') ? TELEGRAM_BOT_TOKEN : ''));
+    $getMe     = null;
+    if ($botToken !== '') {
+        $ch = curl_init('https://api.telegram.org/bot' . $botToken . '/getMe');
+        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 8]);
+        $body = curl_exec($ch);
+        $getMe = is_string($body) ? json_decode($body, true) : null;
+        curl_close($ch);
+    }
+    $out['telegram_report_probe'] = [
+        'has_bot_token'        => $botToken !== '',
+        'getMe'                => ($getMe && !empty($getMe['ok'])) ? ($getMe['result']['username'] ?? 'ok') : ($getMe['description'] ?? 'no_token_or_unreachable'),
+        'log_chat_configured'  => $logChat !== '',
+        'log_chat'             => $logChat === '' ? '' : (str_starts_with($logChat, '-100') ? 'supergroup' : 'other'),
+        'general_thread_id'    => TelegramBot::getTopicThreadId('general'),
+    ];
+} catch (Throwable $e) {
+    $out['telegram_report_probe_error'] = $e->getMessage();
 }
 
 echo json_encode($out, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
