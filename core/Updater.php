@@ -4,7 +4,7 @@ require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Setting.php';
 
 class Updater {
-    public const CURRENT_VERSION = '5.0.0';
+    public const CURRENT_VERSION = '5.0.1';
 
     public static function getCurrentVersion(): string {
         $dbVer = Setting::get('current_version', '');
@@ -57,9 +57,12 @@ class Updater {
         $currentVer = self::getCurrentVersion();
 
         // 1. Source 1: Check raw Updater.php on GitHub (Zero rate limit, works with 100% public repos)
+        // Unique bust per request: the host's egress network cache can otherwise
+        // serve a stale copy of this file and block legitimate updates.
+        $bustRaw = 'cb=' . (string)time() . rand(1000, 9999);
         $rawUrls = [
-            "https://raw.githubusercontent.com/{$repo}/{$branch}/core/Updater.php",
-            "https://github.com/{$repo}/raw/{$branch}/core/Updater.php"
+            "https://raw.githubusercontent.com/{$repo}/{$branch}/core/Updater.php?{$bustRaw}",
+            "https://github.com/{$repo}/raw/{$branch}/core/Updater.php?{$bustRaw}"
         ];
 
         foreach ($rawUrls as $rawUrl) {
@@ -69,6 +72,10 @@ class Updater {
             curl_setopt($chRaw, CURLOPT_TIMEOUT, 6);
             curl_setopt($chRaw, CURLOPT_SSL_VERIFYPEER, false);
             curl_setopt($chRaw, CURLOPT_SSL_VERIFYHOST, false);
+            curl_setopt($chRaw, CURLOPT_HTTPHEADER, [
+                'Cache-Control: no-cache, no-store',
+                'Pragma: no-cache'
+            ]);
             $rawCode = curl_exec($chRaw);
             $rawHttp = curl_getinfo($chRaw, CURLINFO_HTTP_CODE);
             curl_close($chRaw);
@@ -232,6 +239,7 @@ class Updater {
             CURLOPT_SSL_VERIFYPEER => false,
             CURLOPT_SSL_VERIFYHOST => false,
             CURLOPT_USERAGENT => 'Connectix-Panel-Updater',
+            CURLOPT_HTTPHEADER => ['Cache-Control: no-cache, no-store', 'Pragma: no-cache'],
         ]);
         $body = curl_exec($ch);
         curl_close($ch);
@@ -279,16 +287,21 @@ class Updater {
         $zipFile = $tmpDir . '/update.zip';
         $token = self::getToken();
 
-        // Download zip
+        // Download zip (unique bust: codeload URLs can be cached by egress proxies)
+        $zipUrl = $downloadUrl . '?cb=' . (string)time() . rand(1000, 9999);
         $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $downloadUrl);
+        curl_setopt($ch, CURLOPT_URL, $zipUrl);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 90);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-        
-        $headers = ['User-Agent: Connectix-Panel-Updater'];
+
+        $headers = [
+            'User-Agent: Connectix-Panel-Updater',
+            'Cache-Control: no-cache, no-store',
+            'Pragma: no-cache'
+        ];
         if (!empty($token)) {
             $headers[] = "Authorization: token {$token}";
         }
@@ -301,13 +314,13 @@ class Updater {
         if ($httpCode === 401 && !empty($token)) {
             // Retry without token in case token expired or repo is public
             $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $downloadUrl);
+            curl_setopt($ch, CURLOPT_URL, $zipUrl);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
             curl_setopt($ch, CURLOPT_TIMEOUT, 90);
             curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
             curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, ['User-Agent: Connectix-Panel-Updater']);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, ['User-Agent: Connectix-Panel-Updater', 'Cache-Control: no-cache, no-store', 'Pragma: no-cache']);
             $zipData = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
@@ -553,6 +566,11 @@ class Updater {
     }
 
     public static function githubRequest(string $url, string $token = ''): ?array {
+        // Unique bust per call: transparent egress caches may otherwise serve
+        // stale GitHub API responses (seen: update blocked for minutes).
+        $sep = (strpos($url, '?') === false) ? '?' : '&';
+        $url = $url . $sep . 'cb=' . (string)time() . rand(1000, 9999);
+
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -562,7 +580,9 @@ class Updater {
 
         $headers = [
             'User-Agent: Connectix-Panel-System',
-            'Accept: application/vnd.github.v3+json'
+            'Accept: application/vnd.github.v3+json',
+            'Cache-Control: no-cache, no-store',
+            'Pragma: no-cache'
         ];
         if (!empty($token)) {
             $headers[] = "Authorization: token {$token}";

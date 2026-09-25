@@ -168,7 +168,10 @@ class UpdateController {
 
         // Short-circuit: nothing newer than what is installed → stay silent
         // (prevents duplicate bot messages on retried/duplicate webhook events)
-        $info = Updater::checkForUpdates(false);
+        // forceRefresh=true: webhook events must always consult GitHub fresh —
+        // the 180s panel cache could otherwise hold a stale "no update" result
+        // written seconds before the push landed.
+        $info = Updater::checkForUpdates(true);
         if (empty($info['has_update'])) {
             echo json_encode([
                 'success' => true,
