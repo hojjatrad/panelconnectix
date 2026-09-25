@@ -44,4 +44,22 @@ interface PanelDriverInterface {
      * Get node system statistics (uptime, users count, status)
      */
     public function getNodeStats(): array;
+
+    /**
+     * List ALL clients/users that exist on the remote node (regardless of
+     * whether the panel tracks them). Used by the server "node users" admin
+     * view for live management + link/credential export.
+     *
+     * Each row: [
+     *   'username' => string,
+     *   'status' => 'active'|'disabled'|'expired'|'limited',
+     *   'online' => bool,
+     *   'traffic_used_bytes' => int,
+     *   'traffic_limit_bytes' => int (0 = unlimited),
+     *   'expire_at' => ?string 'Y-m-d H:i:s',
+     *   'subscription_url' => string (absolute, '' when unknown),
+     *   'links' => string[] (raw config lines: vless://, vmess://, trojan://, ss://),
+     * ]
+     */
+    public function listUsers(): array;
 }

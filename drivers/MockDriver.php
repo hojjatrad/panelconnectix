@@ -58,6 +58,13 @@ class MockDriver implements PanelDriverInterface {
         return true;
     }
 
+    /**
+     * Mock nodes never expose user lists (permanent no-fake-data rule).
+     */
+    public function listUsers(): array {
+        return [];
+    }
+
     public function getNodeStats(): array {
         return [
             'status' => 'online',

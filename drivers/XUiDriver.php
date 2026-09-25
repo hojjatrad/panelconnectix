@@ -3,6 +3,7 @@ require_once __DIR__ . '/PanelDriverInterface.php';
 
 class XUiDriver implements PanelDriverInterface {
     private string $baseUrl;
+    private ?string $subDomain;
     private ?string $username;
     private ?string $password;
     private string $cookieFile;
@@ -13,7 +14,7 @@ class XUiDriver implements PanelDriverInterface {
         return $this->lastError;
     }
 
-    public function __construct(string $baseUrl, ?string $username, ?string $password) {
+    public function __construct(string $baseUrl, ?string $username, ?string $password, ?string $subDomain = null) {
         $this->baseUrl = rtrim($baseUrl, '/');
         $this->username = $username;
         $this->password = $password;
@@ -157,5 +158,99 @@ class XUiDriver implements PanelDriverInterface {
 
     public function getNodeStats(): array {
         return ['status' => 'online', 'version' => '3x-ui Core', 'users' => 1];
+    }
+
+    /**
+     * List ALL clients across all inbounds of this 3x-ui node.
+     * Best-effort: builds vless/vmess/trojan/ss links from inbound settings.
+     */
+    public function listUsers(): array {
+        if (!$this->authenticate()) return [];
+        $res = $this->request('/panel/api/inbounds/list');
+        if (!$res['success'] || empty($res['data']['obj'])) return [];
+
+        $host = '';
+        if (!empty($this->subDomain)) {
+            $host = str_replace(['http://', 'https://'], '', rtrim($this->subDomain, '/'));
+        } elseif (!empty($this->baseUrl)) {
+            $host = str_replace(['http://', 'https://'], '', rtrim($this->baseUrl, '/'));
+        }
+
+        $out = [];
+        foreach ($res['data']['obj'] as $inb) {
+            $protocol = strtolower((string)($inb['protocol'] ?? ''));
+            if (!in_array($protocol, ['vless', 'vmess', 'trojan', 'shadowsocks'])) continue;
+            $settings = json_decode((string)($inb['settings'] ?? '{}'), true) ?: [];
+            $stream = json_decode((string)($inb['streamSettings'] ?? '{}'), true) ?: [];
+            $port = (int)($inb['port'] ?? 0);
+            $clients = $settings['clients'] ?? [];
+            if (!is_array($clients)) continue;
+
+            foreach ($clients as $c) {
+                if (!is_array($c)) continue;
+                $uuid = (string)($c['id'] ?? '');
+                $email = (string)($c['email'] ?? '');
+                $trojanPass = (string)($c['password'] ?? '');
+                $ssMethod = (string)($c['method'] ?? 'chacha20-ietf-poly1305');
+
+                if ($protocol === 'vless' && $uuid !== '') $username = $email !== '' ? $email : $uuid;
+                elseif ($protocol === 'vmess' && $uuid !== '') $username = $email !== '' ? $email : $uuid;
+                elseif ($protocol === 'trojan' && $trojanPass !== '') $username = $trojanPass;
+                elseif ($protocol === 'shadowsocks' && $trojanPass !== '') $username = $trojanPass;
+                else continue;
+
+                $link = '';
+                $security = (string)($stream['security'] ?? 'none');
+                $network = (string)($stream['network'] ?? 'tcp');
+                $sni = (string)($stream['sni'] ?? $stream['serverName'] ?? '');
+                $pbk = (string)($stream['realitySettings']['publicKey'] ?? '');
+                $sp = (string)($stream['tcpSettings'] ?? ['header']['request']['path'] ?? '');
+                $wspath = (string)($stream['wsSettings']['path'] ?? '');
+                $path = $wspath !== '' ? $wspath : $sp;
+
+                if ($protocol === 'vless' && $host !== '' && $port > 0) {
+                    $q = http_build_query(array_filter([
+                        'encryption' => 'none',
+                        'security' => $security,
+                        'type' => $network,
+                        'path' => $path,
+                        'sni' => $sni,
+                        'fp' => 'chrome',
+                        'pbk' => $pbk,
+                        'flow' => (string)($c['flow'] ?? ''),
+                    ]));
+                    $link = "vless://{$uuid}@{$host}:{$port}?{$q}#" . rawurlencode($username);
+                } elseif ($protocol === 'vmess' && $host !== '' && $port > 0) {
+                    $cfg = [
+                        'v' => '2', 'ps' => $username, 'add' => $host, 'port' => (string)$port,
+                        'id' => $uuid, 'aid' => (string)($c['alterId'] ?? 0),
+                        'scy' => 'auto', 'net' => $network, 'type' => 'none',
+                        'host' => $sni, 'path' => $path, 'tls' => ($security === 'tls' || $security === 'reality') ? 'tls' : '',
+                    ];
+                    $link = 'vmess://' . base64_encode(json_encode(array_filter($cfg)));
+                } elseif ($protocol === 'trojan' && $host !== '' && $port > 0) {
+                    $q = http_build_query(array_filter(['security' => $security, 'type' => $network, 'path' => $path, 'sni' => $sni]));
+                    $link = "trojan://{$trojanPass}@{$host}:{$port}?{$q}#" . rawurlencode($username);
+                } elseif ($protocol === 'shadowsocks' && $host !== '' && $port > 0) {
+                    $link = 'ss://' . base64_encode("{$ssMethod}:{$trojanPass}@{$host}:{$port}") . '#' . rawurlencode($username);
+                }
+
+                $subId = (string)($c['subId'] ?? '');
+                $subUrl = ($host !== '' && $subId !== '') ? "https://{$host}/sub/{$subId}" : '';
+
+                $out[] = [
+                    'username' => $username,
+                    'status' => (($c['enable'] ?? true) === true) ? 'active' : 'disabled',
+                    'online' => false,
+                    'traffic_used_bytes' => 0,
+                    'traffic_limit_bytes' => (int)((float)($c['totalGB'] ?? 0) * 1073741824),
+                    'expire_at' => !empty($c['expiryTime']) ? date('Y-m-d H:i:s', (int)($c['expiryTime'] / 1000)) : null,
+                    'subscription_url' => $subUrl,
+                    'links' => $link !== '' ? [$link] : [],
+                    'usage_unknown' => true,
+                ];
+            }
+        }
+        return $out;
     }
 }

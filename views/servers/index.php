@@ -165,6 +165,11 @@ require __DIR__ . '/../layout/header.php';
                         <span>تست API</span>
                     </button>
 
+                    <a href="<?= Helpers::url('servers/' . (int)$s['id'] . '/node-users') ?>" title="مشاهده و مدیریت کلاینت‌های این سرور (همه کلاینت‌های تعریف‌شده روی پنل سرور)" class="px-2.5 py-1.5 bg-cyan-900/40 hover:bg-cyan-800/60 text-cyan-300 rounded-lg text-xs font-medium border border-cyan-800/50 transition-colors flex items-center gap-1">
+                        <i class="fa-solid fa-users text-[10px]"></i>
+                        <span>کلاینت‌های سرور</span>
+                    </a>
+
                     <button onclick='openEditServerModal(<?= json_encode($s) ?>)' title="ویرایش اطلاعات سرور" class="p-1.5 bg-slate-800 hover:bg-slate-700 text-amber-300 rounded-lg text-xs border border-slate-700 transition-colors">
                         <i class="fa-solid fa-pen-to-square"></i>
                     </button>

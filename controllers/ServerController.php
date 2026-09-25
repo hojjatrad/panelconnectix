@@ -813,4 +813,200 @@ class ServerController {
         Helpers::flash('success', "عملیات مهاجرت دسته‌جمعی به پایان رسید: {$migratedCount} کلاینت با موفقیت از '{$fromServer['name']}' به '{$toServer['name']}' منتقل شدند." . ($failedCount > 0 ? " ({$failedCount} خطا)" : ""));
         Helpers::redirect('servers');
     }
+
+    /**
+     * GET servers/{id}/node-users
+     * Live list of ALL clients that exist on the node (from the node API,
+     * Marzban/Pasargad/3x-ui) merged with panel tracking info, for direct
+     * management and copy of links / credentials.
+     */
+    public function nodeUsers(string $id = ''): void {
+        Auth::requireAdmin();
+        $pdo = Database::getConnection();
+        $id = (int)$id;
+
+        $stmt = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ?");
+        $stmt->execute([$id]);
+        $server = $stmt->fetch();
+        if (!$server) {
+            Helpers::flash('error', 'سرور یافت نشد.');
+            Helpers::redirect('servers');
+        }
+
+        $driver = DriverFactory::create($server);
+        $connected = $driver->authenticate();
+        $users = $connected ? $driver->listUsers() : [];
+        $nodeError = $connected ? '' : ($driver->getLastError() ?? 'اتصال برقرار نشد');
+        $driverName = $server['driver'] ?? '';
+
+        // Merge with panel-tracked clients (panel username/password/plan/reseller)
+        $panelInfo = [];
+        if (!empty($users)) {
+            $names = array_values(array_unique(array_column($users, 'username')));
+            $ph = implode(',', array_fill(0, count($names), '?'));
+            try {
+                $st = $pdo->prepare("SELECT c.username, c.password, c.status AS panel_status, c.sub_token,
+                                             u.full_name AS reseller_name, u.username AS reseller_username,
+                                             p.title AS plan_title
+                                      FROM clients c
+                                      LEFT JOIN users u ON u.id = c.reseller_id
+                                      LEFT JOIN plans p ON p.id = c.plan_id
+                                      WHERE c.server_id = ? AND c.username IN ($ph)");
+                $st->execute(array_merge([$id], $names));
+                foreach ($st->fetchAll() as $row) {
+                    $row['sub_url'] = Helpers::subUrl((string)$row['sub_token']);
+                    $panelInfo[(string)$row['username']] = $row;
+                }
+            } catch (Throwable $e) {}
+        }
+
+        $search = trim((string)($_GET['q'] ?? ''));
+
+        require __DIR__ . '/../views/servers/node_users.php';
+    }
+
+    /**
+     * POST servers/node-users/action
+     * Manage a node client: toggle (enable/disable), extend (traffic/time), delete.
+     */
+    public function nodeUsersAction(): void {
+        Auth::requireAdmin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
+            Helpers::redirect('servers');
+        }
+
+        $serverId = (int)($_POST['server_id'] ?? 0);
+        $action = (string)($_POST['action'] ?? '');
+        $username = trim((string)($_POST['username'] ?? ''));
+
+        $back = 'servers/' . $serverId . '/node-users';
+        if ($serverId <= 0 || $username === '' || !in_array($action, ['toggle', 'extend', 'delete'], true)) {
+            Helpers::flash('error', 'درخواست نامعتبر است.');
+            Helpers::redirect('servers');
+        }
+
+        $pdo = Database::getConnection();
+        $stmt = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ?");
+        $stmt->execute([$serverId]);
+        $server = $stmt->fetch();
+        if (!$server) {
+            Helpers::flash('error', 'سرور یافت نشد.');
+            Helpers::redirect('servers');
+        }
+
+        $driver = DriverFactory::create($server);
+        try {
+            if ($action === 'toggle') {
+                $active = ($_POST['active'] ?? '1') === '1';
+                $ok = $driver->toggleUserStatus($username, $active);
+                Helpers::flash($ok ? 'success' : 'error', $ok
+                    ? "کلاینت {$username} " . ($active ? 'فعال' : 'غیرفعال') . " شد."
+                    : "خطا: " . ($driver->getLastError() ?? 'عملیات انجام نشد.'));
+            } elseif ($action === 'extend') {
+                $days = (int)($_POST['days'] ?? 0);
+                $gb = (float)($_POST['gb'] ?? 0);
+                if ($days <= 0 && $gb <= 0) {
+                    Helpers::flash('error', 'مقدار تمدید (روز و/یا گیگ) را وارد کنید.');
+                } else {
+                    $ok = $driver->extendUser($username, (int)($gb * 1073741824), $days * 86400);
+                    Helpers::flash($ok ? 'success' : 'error', $ok
+                        ? "اشتراک {$username} تمدید شد ({$days} روز، {$gb} گیگابایت)."
+                        : "خطا: " . ($driver->getLastError() ?? 'عملیات انجام نشد.'));
+                }
+            } elseif ($action === 'delete') {
+                $ok = $driver->deleteUser($username);
+                Helpers::flash($ok ? 'success' : 'error', $ok
+                    ? "کلاینت {$username} از سرور حذف شد."
+                    : "خطا: " . ($driver->getLastError() ?? 'عملیات انجام نشد.'));
+            }
+        } catch (Throwable $e) {
+            Helpers::flash('error', 'خطای عملیات: ' . $e->getMessage());
+        }
+
+        Helpers::redirect($back);
+    }
+
+    /**
+     * GET servers/{id}/node-users/export?format=txt|csv
+     * Download all node clients with links & credentials (for use in the
+     * dedicated app / other tools).
+     */
+    public function nodeUsersExport(string $id = ''): void {
+        Auth::requireAdmin();
+        $pdo = Database::getConnection();
+        $id = (int)$id;
+
+        $stmt = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ?");
+        $stmt->execute([$id]);
+        $server = $stmt->fetch();
+        if (!$server) {
+            Helpers::flash('error', 'سرور یافت نشد.');
+            Helpers::redirect('servers');
+        }
+
+        $driver = DriverFactory::create($server);
+        $users = $driver->authenticate() ? $driver->listUsers() : [];
+
+        $panelInfo = [];
+        if (!empty($users)) {
+            $names = array_values(array_unique(array_column($users, 'username')));
+            $ph = implode(',', array_fill(0, count($names), '?'));
+            try {
+                $st = $pdo->prepare("SELECT username, password, sub_token FROM clients WHERE server_id = ? AND username IN ($ph)");
+                $st->execute(array_merge([$id], $names));
+                foreach ($st->fetchAll() as $row) $panelInfo[(string)$row['username']] = $row;
+            } catch (Throwable $e) {}
+        }
+
+        $format = (($_GET['format'] ?? 'txt') === 'csv') ? 'csv' : 'txt';
+        $safeName = preg_replace('/[^a-z0-9_-]/i', '_', (string)$server['name']);
+
+        if ($format === 'csv') {
+            header('Content-Type: text/csv; charset=utf-8');
+            header('Content-Disposition: attachment; filename="node_users_' . $safeName . '_' . date('Ymd_Hi') . '.csv"');
+            echo "\u{FEFF}"; // BOM for Excel
+            $csv = fopen('php://output', 'w');
+            fputcsv($csv, ['username', 'panel_password', 'status', 'used_gb', 'limit_gb', 'expire_at', 'panel_sub_url', 'node_subscription_url', 'config_links']);
+            foreach ($users as $u) {
+                $pi = $panelInfo[$u['username']] ?? null;
+                fputcsv($csv, [
+                    $u['username'],
+                    (string)($pi['password'] ?? ''),
+                    $u['status'],
+                    round($u['traffic_used_bytes'] / 1073741824, 2),
+                    $u['traffic_limit_bytes'] > 0 ? round($u['traffic_limit_bytes'] / 1073741824, 2) : 'unlimited',
+                    (string)($u['expire_at'] ?? ''),
+                    $pi ? Helpers::subUrl((string)$pi['sub_token']) : '',
+                    (string)($u['subscription_url'] ?? ''),
+                    implode(' | ', $u['links']),
+                ]);
+            }
+            fclose($csv);
+            exit;
+        }
+
+        header('Content-Type: text/plain; charset=utf-8');
+        header('Content-Disposition: attachment; filename="node_users_' . $safeName . '_' . date('Ymd_Hi') . '.txt"');
+        echo "==================================================\n";
+        echo " سرور: {$server['name']} ({$server['driver']})\n";
+        echo " تاریخ: " . date('Y-m-d H:i:s') . " | تعداد کلاینت: " . count($users) . "\n";
+        echo "==================================================\n\n";
+        foreach ($users as $u) {
+            $pi = $panelInfo[$u['username']] ?? null;
+            $limitGb = $u['traffic_limit_bytes'] > 0 ? round($u['traffic_limit_bytes'] / 1073741824, 2) . ' GB' : 'نامحدود';
+            echo "─── {$u['username']} ─────────────────────────────\n";
+            if ($pi) {
+                echo "رمز عبور پنل: {$pi['password']}\n";
+                echo "لینک ساب پنل: " . Helpers::subUrl((string)$pi['sub_token']) . "\n";
+            } else {
+                echo "(در پنل ثبت نشده است)\n";
+            }
+            echo "وضعیت: {$u['status']} | مصرف: " . round($u['traffic_used_bytes'] / 1073741824, 2) . " GB (سقف: {$limitGb}) | انقضا: " . (($u['expire_at'] ?? 'نامحدود')) . "\n";
+            if (!empty($u['subscription_url'])) echo "ساب سرور: {$u['subscription_url']}\n";
+            foreach ($u['links'] as $link) echo $link . "\n";
+            echo "\n";
+        }
+        exit;
+    }
 }

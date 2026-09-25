@@ -685,4 +685,84 @@ class PasargadDriver implements PanelDriverInterface {
 
         return ['status' => 'online', 'version' => 'Pasargad Core', 'users' => 0];
     }
+
+    /**
+     * List ALL users on this node (PasarGuard = Marzban-style API, legacy Pasargad = /api/users).
+     */
+    public function listUsers(): array {
+        if (!$this->authenticate()) return [];
+
+        $candidates = [];
+        if ($this->isPasarGuard) {
+            if ($this->apiPrefix === '/api/v1') {
+                $candidates[] = $this->apiPrefix . '/client/list';
+            } else {
+                $candidates[] = $this->apiPrefix . '/v1/client/list';
+                $candidates[] = $this->apiPrefix . '/client/list';
+            }
+        }
+        $candidates[] = '/api/users';
+        $candidates[] = $this->apiPrefix . '/users';
+
+        $rawUsers = null;
+        foreach ($candidates as $endpoint) {
+            $res = $this->request($endpoint);
+            if (!$res['success']) continue;
+            $d = $res['data'];
+            if (is_array($d) && isset($d['users']) && is_array($d['users'])) {
+                $rawUsers = $d['users'];
+            } elseif (is_array($d) && isset($d['data']) && is_array($d['data'])) {
+                $rawUsers = $d['data'];
+            } elseif (is_array($d) && isset($d[0])) {
+                $rawUsers = $d;
+            }
+            if ($rawUsers !== null) break;
+        }
+        if ($rawUsers === null) return [];
+
+        $out = [];
+        foreach ($rawUsers as $u) {
+            if (!is_array($u)) continue;
+            $username = (string)($u['username'] ?? $u['name'] ?? '');
+            if ($username === '') continue;
+
+            $expRaw = $u['expire'] ?? $u['expired_at'] ?? $u['expire_at'] ?? null;
+            $expAt = null;
+            if (!empty($expRaw)) {
+                if (is_numeric($expRaw)) {
+                    $expAt = ((int)$expRaw > 0) ? date('Y-m-d H:i:s', (int)$expRaw) : null;
+                } else {
+                    $ts = strtotime((string)$expRaw);
+                    $expAt = ($ts !== false && $ts > 0) ? date('Y-m-d H:i:s', $ts) : (string)$expRaw;
+                }
+            }
+
+            $subUrl = (string)($u['subscription_url'] ?? $u['sub_url'] ?? '');
+            if (!empty($subUrl) && str_starts_with($subUrl, '/')) {
+                $domainBase = !empty($this->subDomain)
+                    ? (str_starts_with($this->subDomain, 'http') ? rtrim($this->subDomain, '/') : ('https://' . rtrim($this->subDomain, '/')))
+                    : $this->baseUrl;
+                $subUrl = $domainBase . $subUrl;
+            } else {
+                $subUrl = $this->applySubDomain($subUrl);
+            }
+
+            $status = (string)($u['status'] ?? 'active');
+            if ($expAt !== null && is_string($expAt) && strtotime($expAt) < time()) $status = 'expired';
+
+            $links = (array)($u['links'] ?? []);
+
+            $out[] = [
+                'username' => $username,
+                'status' => $status,
+                'online' => ((int)($u['online_at'] ?? $u['last_login'] ?? 0)) > (time() - 300),
+                'traffic_used_bytes' => (int)($u['used_traffic'] ?? $u['used_bytes'] ?? 0),
+                'traffic_limit_bytes' => (int)($u['data_limit'] ?? $u['traffic_limit'] ?? 0),
+                'expire_at' => $expAt,
+                'subscription_url' => $subUrl,
+                'links' => array_values(array_filter(array_map('strval', $links))),
+            ];
+        }
+        return $out;
+    }
 }

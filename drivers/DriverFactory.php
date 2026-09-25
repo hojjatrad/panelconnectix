@@ -23,7 +23,7 @@ class DriverFactory {
                 return new PasargadDriver($url, $user, $pass, $token, $subDomain);
             case '3xui':
             case 'xui':
-                return new XUiDriver($url, $user, $pass);
+                return new XUiDriver($url, $user, $pass, $subDomain);
             case 'mock':
             default:
                 return new MockDriver($url, $user, $pass, $token);

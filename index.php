@@ -297,6 +297,11 @@ $router->get('servers/test-raw', [ServerController::class, 'testRawConnection'])
 $router->post('servers/fetch-inbounds-sample', [ServerController::class, 'fetchInboundsAndSample']);
 $router->get('servers/fetch-inbounds-sample', [ServerController::class, 'fetchInboundsAndSample']);
 $router->get('servers/ping', [ServerController::class, 'ping']);
+
+// Live node client manager (all users on the node + links/credentials)
+$router->get('servers/{id}/node-users', [ServerController::class, 'nodeUsers']);
+$router->post('servers/node-users/action', [ServerController::class, 'nodeUsersAction']);
+$router->get('servers/{id}/node-users/export', [ServerController::class, 'nodeUsersExport']);
 $router->get('servers/sync', [ServerController::class, 'syncNow']);
 $router->post('servers/sync', [ServerController::class, 'syncNow']);
 $router->get('servers/health-check', [ServerController::class, 'checkHealth']);

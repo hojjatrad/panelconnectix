@@ -560,4 +560,77 @@ class MarzbanDriver implements PanelDriverInterface {
         }
         return ['status' => 'online', 'users' => 0];
     }
+
+    /**
+     * List ALL users on this Marzban node (admin view + export).
+     */
+    public function listUsers(): array {
+        if (!$this->authenticate()) return [];
+
+        $candidates = [];
+        if ($this->apiPrefix === '/api/v1') {
+            $candidates[] = $this->apiPrefix . '/client/list';
+        } else {
+            $candidates[] = $this->apiPrefix . '/v1/client/list';
+            $candidates[] = $this->apiPrefix . '/client/list';
+        }
+
+        $rawUsers = null;
+        foreach ($candidates as $endpoint) {
+            $res = $this->request($endpoint);
+            if (!$res['success']) continue;
+            $d = $res['data'];
+            if (is_array($d) && isset($d['users']) && is_array($d['users'])) {
+                $rawUsers = $d['users'];
+            } elseif (is_array($d) && isset($d['data']) && is_array($d['data'])) {
+                $rawUsers = $d['data'];
+            } elseif (is_array($d) && isset($d[0])) {
+                $rawUsers = $d;
+            }
+            if ($rawUsers !== null) break;
+        }
+        if ($rawUsers === null) return [];
+
+        $domainBase = !empty($this->subDomain)
+            ? (str_starts_with($this->subDomain, 'http') ? rtrim($this->subDomain, '/') : ('https://' . rtrim($this->subDomain, '/')))
+            : $this->baseUrl;
+
+        $out = [];
+        foreach ($rawUsers as $u) {
+            if (!is_array($u) || empty($u['username'])) continue;
+
+            $expRaw = $u['expire'] ?? null;
+            $expAt = null;
+            if (!empty($expRaw)) {
+                if (is_numeric($expRaw)) {
+                    $expAt = ((int)$expRaw > 0) ? date('Y-m-d H:i:s', (int)$expRaw) : null;
+                } else {
+                    $ts = strtotime((string)$expRaw);
+                    $expAt = ($ts !== false && $ts > 0) ? date('Y-m-d H:i:s', $ts) : (string)$expRaw;
+                }
+            }
+
+            $subUrl = $u['subscription_url'] ?? '';
+            if (!empty($subUrl) && str_starts_with($subUrl, '/')) {
+                $subUrl = $domainBase . $subUrl;
+            } else {
+                $subUrl = $this->applySubDomain((string)$subUrl);
+            }
+
+            $status = (string)($u['status'] ?? 'active');
+            if ($expAt !== null && strtotime($expAt) < time()) $status = 'expired';
+
+            $out[] = [
+                'username' => (string)$u['username'],
+                'status' => $status,
+                'online' => ((int)($u['online_at'] ?? 0)) > (time() - 300),
+                'traffic_used_bytes' => (int)($u['used_traffic'] ?? 0),
+                'traffic_limit_bytes' => (int)($u['data_limit'] ?? 0),
+                'expire_at' => $expAt,
+                'subscription_url' => (string)$subUrl,
+                'links' => array_values(array_filter(array_map('strval', (array)($u['links'] ?? [])))),
+            ];
+        }
+        return $out;
+    }
 }
