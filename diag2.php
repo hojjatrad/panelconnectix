@@ -3,27 +3,25 @@ header('Content-Type: application/json; charset=utf-8');
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/core/Database.php';
+$dir = __DIR__;
+$files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir));
+$matches = [];
 
-try {
-    $pdo = Database::getConnection();
-
-    // 1. Clear any mock template from real nodes
-    $pdo->exec("UPDATE server_nodes SET config_template = '' WHERE driver != 'mock'");
-
-    // 2. Reset clients traffic to 0 bytes and set status to active
-    $pdo->exec("UPDATE clients SET traffic_used_bytes = 0, status = 'active'");
-
-    $nodes = $pdo->query("SELECT id, name, driver, host, port, sub_domain, config_template FROM server_nodes")->fetchAll(PDO::FETCH_ASSOC);
-    $clients = $pdo->query("SELECT id, username, server_id, traffic_limit_bytes, traffic_used_bytes, status, node_sublink FROM clients ORDER BY id DESC LIMIT 5")->fetchAll(PDO::FETCH_ASSOC);
-
-    echo json_encode([
-        'time' => date('Y-m-d H:i:s'),
-        'nodes' => $nodes,
-        'clients' => $clients
-    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-
-} catch (Throwable $e) {
-    echo json_encode(['error' => $e->getMessage()]);
+foreach ($files as $file) {
+    if ($file->isDir()) continue;
+    $ext = pathinfo($file->getPathname(), PATHINFO_EXTENSION);
+    if (!in_array($ext, ['php', 'sql', 'json', 'sqlite'])) continue;
+    $content = @file_get_contents($file->getPathname());
+    if ($content && (str_contains($content, 'mci_reality') || str_contains($content, 'mock_pbk'))) {
+        $matches[] = [
+            'file' => str_replace($dir, '', $file->getPathname()),
+            'size' => strlen($content),
+            'mtime' => date('Y-m-d H:i:s', $file->getMTime())
+        ];
+    }
 }
+
+echo json_encode([
+    'matches' => $matches,
+    'scanned_dir' => $dir
+], JSON_PRETTY_PRINT);
