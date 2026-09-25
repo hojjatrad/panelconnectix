@@ -247,10 +247,10 @@ $verifyFailed = [];
 $forceRetried = 0;
 try {
     $allSrc = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($sourceDir, RecursiveDirectoryIterator::SKIP_DOTS));
-    foreach ($allSrc as $item) {
+    foreach ($allSrc as $sub => $item) {
         if ($item->isDir()) continue;
         if ($item->getExtension() !== 'php') continue;
-        $sub = $item->getSubPathname();
+        $sub = str_replace('\\', '/', $sub);
         $base = basename($sub);
         $parent = dirname($sub);
         if ($base === 'config.php' && $parent === '.') continue; // never touch user config
