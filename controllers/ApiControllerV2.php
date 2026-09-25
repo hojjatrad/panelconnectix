@@ -384,7 +384,9 @@ class ApiControllerV2 {
 
         $usedBytes = (int)$client['traffic_used_bytes'];
         $limitBytes = (int)$client['traffic_limit_bytes'];
-        $remainBytes = max(0, $limitBytes - $usedBytes);
+        // HARD GUARD: usage can never exceed the purchased quota (protects against stale/legacy driver stats)
+$usedBytes = max(0, min((int)$usedBytes, (int)$limitBytes));
+$remainBytes = max(0, $limitBytes - $usedBytes);
         $usagePercent = ($limitBytes > 0) ? min(100, round(($usedBytes / $limitBytes) * 100, 1)) : 0;
         $daysRemaining = Helpers::daysRemaining($client['expire_at']);
 
@@ -457,7 +459,9 @@ class ApiControllerV2 {
 
         $usedBytes = (int)$client['traffic_used_bytes'];
         $limitBytes = (int)$client['traffic_limit_bytes'];
-        $remainBytes = max(0, $limitBytes - $usedBytes);
+        // HARD GUARD: usage can never exceed the purchased quota (protects against stale/legacy driver stats)
+$usedBytes = max(0, min((int)$usedBytes, (int)$limitBytes));
+$remainBytes = max(0, $limitBytes - $usedBytes);
         $usagePercent = ($limitBytes > 0) ? min(100, round(($usedBytes / $limitBytes) * 100, 1)) : 0;
         $daysRemaining = Helpers::daysRemaining($client['expire_at']);
 
