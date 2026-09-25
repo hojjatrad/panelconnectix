@@ -93,6 +93,74 @@ class ServerListModal extends StatelessWidget {
               style: TextStyle(color: Color(0xFF64748B), fontSize: 11),
             ),
             const SizedBox(height: 14),
+
+            // Smart Connect Card (اتصال هوشمند - کمترین پینگ)
+            if (servers.isNotEmpty) ...[
+              InkWell(
+                onTap: () {
+                  // Find best server by lowest ping or recommended flag
+                  final best = servers.reduce((curr, next) {
+                    final currPing = curr.pingMs ?? 999;
+                    final nextPing = next.pingMs ?? 999;
+                    if (currPing < nextPing) return curr;
+                    if (nextPing < currPing) return next;
+                    return curr.isRecommended ? curr : next;
+                  });
+                  Navigator.pop(context, best);
+                },
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF4F46E5), Color(0xFF9333EA)],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF6366F1).withOpacity(0.3),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.bolt_rounded, color: Colors.amberAccent, size: 22),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: const [
+                            Text(
+                              '⚡️ اتصال هوشمند (کمترین پینگ)',
+                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'انتخاب خودکار پایدارترین سرور سازگار با اینترنت شما',
+                              style: TextStyle(color: Color(0xFFE0E7FF), fontSize: 10),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 14),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
+
             Expanded(
               child: servers.isEmpty
                   ? Center(

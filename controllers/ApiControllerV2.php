@@ -495,7 +495,12 @@ class ApiControllerV2 {
      * Helper: Extract and structure all real server connections
      */
     public static function extractServerList(array $client, PDO $pdo): array {
-        require_once __DIR__ . '/SublinkControllerV2.php';
+        if (file_exists(__DIR__ . '/SublinkControllerV2.php')) {
+            require_once __DIR__ . '/SublinkControllerV2.php';
+        }
+        if (file_exists(__DIR__ . '/SublinkController.php')) {
+            require_once __DIR__ . '/SublinkController.php';
+        }
         $realLinks = [];
 
         // 1. Ensure client is bound to an active real server node
@@ -575,9 +580,14 @@ class ApiControllerV2 {
             } catch (Throwable $e) {}
         }
 
-        // 3. SublinkControllerV2 buildConfigs fallback
+        // 3. SublinkController buildConfigs fallback
         if (empty($realLinks)) {
-            $built = SublinkControllerV2::buildConfigs($client);
+            $built = [];
+            if (class_exists('SublinkControllerV2')) {
+                $built = SublinkControllerV2::buildConfigs($client);
+            } elseif (class_exists('SublinkController')) {
+                $built = SublinkController::buildConfigs($client);
+            }
             if (!empty($built)) {
                 foreach ($built as $link) {
                     $link = trim($link);

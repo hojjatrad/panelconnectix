@@ -51,6 +51,22 @@ try {
     echo "[Smart Retention Error] " . $e->getMessage() . $eol;
 }
 
+// 2.5 Automated Daily Cloud Database Backup to Telegram
+try {
+    require_once __DIR__ . '/../core/Backup.php';
+    $lastBackup = Setting::get('last_auto_backup_date', '');
+    $today = date('Y-m-d');
+    if ($lastBackup !== $today) {
+        $backupRes = Backup::sendBackupToTelegram();
+        if ($backupRes['success']) {
+            Setting::set('last_auto_backup_date', $today);
+            echo "[Auto Backup] Dispatched daily database backup to Telegram successfully." . $eol;
+        }
+    }
+} catch (Throwable $e) {
+    echo "[Auto Backup Error] " . $e->getMessage() . $eol;
+}
+
 // Fetch active clients and their servers
 $stmt = $pdo->query("SELECT c.*, s.name as server_name, s.driver as server_driver, s.api_url, s.api_username, s.api_password, s.api_token,
                             rp.id as reserved_id, rp.traffic_gb as reserved_gb, rp.duration_days as reserved_days

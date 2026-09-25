@@ -357,3 +357,32 @@ jobs:
             Connectix-ARM32-v7a.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-windows:
+    name: Build Windows Desktop Client
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.x'
+          channel: 'stable'
+
+      - name: Build Windows Executable
+        run: |
+          cd client-app
+          flutter config --enable-windows-desktop
+          flutter create --platforms=windows .
+          flutter build windows --release
+          Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath ..\Connectix-Windows-Setup.zip
+
+      - name: Publish Windows App to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v3.0.0
+          files: Connectix-Windows-Setup.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -139,13 +139,23 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       if (mounted && updateData != null) {
         final bool hasUpdateFlag = updateData['has_update'] == true;
         final latest = (updateData['latest_version'] ?? '').toString();
-        final dismissed = prefs.getString('dismissed_version') ?? '';
+        final lastPrompted = prefs.getString('last_prompted_version') ?? '';
 
-        if (hasUpdateFlag && isNewerVersion(latest, currentAppVersion) && dismissed != latest) {
+        if (hasUpdateFlag && isNewerVersion(latest, currentAppVersion)) {
           setState(() {
             _hasAppUpdate = true;
             _updateInfo = updateData;
           });
+
+          // Automatically alert user with one-click install dialog if not yet prompted for this version
+          if (lastPrompted != latest) {
+            await prefs.setString('last_prompted_version', latest);
+            Future.delayed(const Duration(milliseconds: 1400), () {
+              if (mounted) {
+                _showUpdateDialog(updateData, isAutoPrompt: true);
+              }
+            });
+          }
         }
       }
     } catch (_) {}
@@ -394,65 +404,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     if (!mounted) return;
     Navigator.pop(context);
 
-    if (updateData != null && updateData['has_update'] == true && isNewerVersion((updateData['latest_version'] ?? '').toString(), currentAppVersion)) {
-      final latestVer = updateData['latest_version'] ?? 'جدید';
-      final changelog = updateData['changelog'] ?? '• بهینه‌سازی هسته اتصال و پایداری شبکه\n• امکان دانلود و نصب خودکار درون‌برنامه‌ای';
-      final downloadUrl = updateData['download_url'] ?? '';
-
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: const Color(0xFF0F172A),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-            side: const BorderSide(color: Color(0xFF312E81)),
-          ),
-          title: Row(
-            children: [
-              const Icon(Icons.system_update_alt, color: Color(0xFF818CF8), size: 24),
-              const SizedBox(width: 8),
-              Text(
-                'نسخه جدید Connectix ($latestVer)',
-                style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'تغییرات نگارش جدید:',
-                style: TextStyle(color: Color(0xFFA5B4FC), fontSize: 12, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                changelog,
-                style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12, height: 1.6),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('بعداً', style: TextStyle(color: Color(0xFF64748B))),
-            ),
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.pop(ctx);
-                _startInAppDownloadAndInstall(downloadUrl, latestVer);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF10B981),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              ),
-              icon: const Icon(Icons.install_mobile_rounded, size: 16),
-              label: const Text('نصب خودکار درون‌برنامه‌ای'),
-            ),
-          ],
-        ),
-      );
+    if (updateData != null && (updateData['has_update'] == true || isNewerVersion((updateData['latest_version'] ?? '').toString(), currentAppVersion))) {
+      _showUpdateDialog(updateData, isAutoPrompt: false);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -461,6 +414,85 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         ),
       );
     }
+  }
+
+  void _showUpdateDialog(Map<String, dynamic> updateData, {bool isAutoPrompt = false}) {
+    final latestVer = (updateData['latest_version'] ?? '3.1.0').toString();
+    final changelog = (updateData['changelog'] ?? '• ماندگاری دائمی ورود به حساب\n• دریافت زنده ۱۴ اینباند فعال پاسارگاد\n• دانلود مستقیم و پرسرعت درون‌برنامه‌ای').toString();
+    final downloadUrl = (updateData['download_url'] ?? '').toString();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF0F172A),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF10B981).withOpacity(0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.system_update_rounded, color: Color(0xFF10B981), size: 24),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'بروزرسانی Connectix ($latestVer)',
+                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                isAutoPrompt ? '✨ نگارش جدید به صورت خودکار شناسایی شد' : 'تغییرات نگارش $latestVer',
+                style: const TextStyle(color: Color(0xFFA5B4FC), fontSize: 11, fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              changelog,
+              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12, height: 1.6),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('بعداً', style: TextStyle(color: Color(0xFF64748B))),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _startInAppDownloadAndInstall(downloadUrl, latestVer);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF10B981),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              elevation: 4,
+            ),
+            icon: const Icon(Icons.install_mobile_rounded, size: 18),
+            label: const Text('نصب خودکار درون‌برنامه‌ای', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+          ),
+        ],
+      ),
+    );
   }
 
   // Real-time In-App Downloader Modal Sheet
@@ -1052,6 +1084,21 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           ],
         ),
         actions: [
+          // New Version Available Badge Button
+          if (_hasAppUpdate)
+            IconButton(
+              icon: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withOpacity(0.2),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFF10B981), width: 1.5),
+                ),
+                child: const Icon(Icons.system_update_rounded, color: Color(0xFF10B981), size: 16),
+              ),
+              onPressed: _checkAppUpdate,
+              tooltip: 'نصب خودکار نگارش جدید',
+            ),
           // Announcements Inbox with Badge
           Stack(
             alignment: Alignment.center,
@@ -1286,7 +1333,65 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 ),
               ),
 
-              const SizedBox(height: 22),
+              // Low Traffic / Expiry Alert Card
+              if (_client.trafficRemainingGb <= 1.5 || _client.usagePercent >= 88.0) ...[
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF7C2D12), Color(0xFF451A03)],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFF97316).withOpacity(0.4)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF97316).withOpacity(0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.warning_amber_rounded, color: Color(0xFFFB923C), size: 20),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              '⚠️ حجم اشتراک شما رو به پایان است',
+                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'تنها ${_client.trafficRemainingGb} GB باقیمانده است. جهت استمرار اتصال تمدید نمایید.',
+                              style: const TextStyle(color: Color(0xFFFED7AA), fontSize: 10),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (widget.branding.renewalLink.isNotEmpty)
+                        ElevatedButton(
+                          onPressed: () {
+                            launchUrl(Uri.parse(widget.branding.renewalLink), mode: LaunchMode.externalApplication);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFF97316),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            elevation: 0,
+                          ),
+                          child: const Text('تمدید آنی', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: 20),
 
               // Smart Connect & Quick Controls Row
               Row(
