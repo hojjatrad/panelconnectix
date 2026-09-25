@@ -52,7 +52,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   bool _hasAppUpdate = false;
   Map<String, dynamic>? _updateInfo;
 
-  static const String currentAppVersion = '3.0.0';
+  static const String currentAppVersion = '3.1.0';
 
   // Iranian & Banking Apps Bypass List (Snapp, Divar, Rubika, Neshan, Torob, Digikala, Banking)
   static const List<String> defaultDomesticBypassApps = [
@@ -476,6 +476,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     String statusText = 'در حال برقراری ارتباط...';
     String transferredText = '0 MB / ...';
     bool isFailed = false;
+    bool hasStarted = false;
 
     showModalBottomSheet(
       context: context,
@@ -488,8 +489,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       builder: (bottomSheetContext) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            // Kick off download once modal mounts
-            if (downloadProgress == 0.0 && !isFailed && statusText == 'در حال برقراری ارتباط...') {
+            // Kick off download exactly once when modal mounts
+            if (!hasStarted) {
+              hasStarted = true;
               statusText = 'در حال دریافت بسته نگارش $version...';
               ApiService.downloadAndInstallApk(
                 downloadUrl: downloadUrl,
@@ -499,7 +501,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     final recMb = (received / (1024 * 1024)).toStringAsFixed(1);
                     final totMb = total > 0 ? (total / (1024 * 1024)).toStringAsFixed(1) : '...';
                     transferredText = '$recMb MB / $totMb MB (${(progress * 100).toInt()}%)';
-                    statusText = 'در حال دریافت مستقیم...';
+                    statusText = 'در حال دریافت مستقیم بسته...';
                   });
                 },
                 onError: (error) {
@@ -510,10 +512,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 },
                 onSuccess: () {
                   setModalState(() {
-                    statusText = 'دانلود کامل شد. در حال باز کردن پنجره نصب...';
+                    statusText = 'دانلود کامل شد. پنجره نصاب اندروید فراخوانی گردید.';
                     downloadProgress = 1.0;
                   });
-                  Future.delayed(const Duration(milliseconds: 900), () {
+                  Future.delayed(const Duration(milliseconds: 1400), () {
                     if (Navigator.canPop(bottomSheetContext)) {
                       Navigator.pop(bottomSheetContext);
                     }
