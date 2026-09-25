@@ -120,11 +120,16 @@ try {
         if (class_exists('ZipArchive')) {
             $za = new ZipArchive();
             if ($za->open($tmp) === true) {
-                $names = $za->namelist();
-                $root = $names[0] ?? '';
-                $probe['zip_root_folder'] = explode('/', $root)[0] ?? null;
+                $names = [];
+                for ($i = 0; $i < $za->numFiles; $i++) { $names[] = $za->getNameByIndex($i); }
+                $root = '';
+                foreach ($names as $n) {
+                    $parts = explode('/', $n);
+                    if (count($parts) >= 2) { $root = $parts[0] . '/'; break; }
+                }
+                $probe['zip_root_folder'] = rtrim($root, '/');
                 $probe['zip_has_v5_updater'] = in_array($root . 'quick_update.php', $names, false)
-                    ? str_contains($za->getFromName($root . 'quick_update.php'), 'Self-Healing Updater v5')
+                    ? str_contains((string)$za->getFromName($root . 'quick_update.php'), 'Self-Healing Updater v5')
                     : null;
                 $za->close();
             }
