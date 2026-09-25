@@ -121,6 +121,23 @@ class AppReleasePublisher
                 : 'up_to_date');
         }
 
+        // Mirror APK assets onto the panel host: the in-app updater downloads
+        // "$baseUrl/Connectix-*.apk" from THIS server (fast + works inside Iran,
+        // where the GitHub fallback fails with a connection error).
+        try {
+            require_once __DIR__ . '/AppApkMirror.php';
+            $mirrorRes = AppApkMirror::mirror($release);
+            $status['apk_mirror'] = $mirrorRes['files'];
+            if ($mirrorRes['changed']) {
+                $status['apk_mirror_changed'] = date('Y-m-d H:i:s');
+            }
+            if (!$mirrorRes['ok']) {
+                $status['apk_mirror_error'] = $mirrorRes['error'] ?? 'failed';
+            }
+        } catch (Throwable $e) {
+            $status['apk_mirror_error'] = $e->getMessage();
+        }
+
         Setting::set('app_release_status_cache', json_encode($status));
         return $status;
     }

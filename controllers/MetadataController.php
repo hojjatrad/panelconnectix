@@ -121,6 +121,35 @@ class MetadataController {
         Helpers::redirect('settings/metadata');
     }
 
+    /**
+     * POST app/apk-mirror — force-mirror the release APKs onto this host so the
+     * in-app updater can download them locally (fast + works inside Iran).
+     */
+    public function mirrorApk(): void {
+        Auth::requireAdmin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
+            Helpers::redirect('settings/metadata');
+        }
+
+        require_once __DIR__ . '/../core/AppApkMirror.php';
+        try {
+            $r = AppApkMirror::mirror(null, true);
+            $changed = array_filter($r['files'], fn($s) => $s === 'downloaded');
+            if ($r['ok']) {
+                Helpers::flash('success', count($changed)
+                    ? 'همگام‌سازی فوری انجام شد: ' . count($changed) . ' فایل APK روی هاست نصب/بروز شد.'
+                    : 'همه‌ی فایل‌های APK قبلاً با ریلیس گیت‌هاب همگام بودند.');
+            } else {
+                $bad = array_filter($r['files'], fn($s) => !in_array($s, ['ok'], true));
+                Helpers::flash('error', 'همگام‌سازی با خطا: ' . implode('، ', array_map(fn($k, $v) => "$k ($v)", array_keys($bad), $bad)));
+            }
+        } catch (Throwable $e) {
+            Helpers::flash('error', 'خطا در همگام‌سازی APK: ' . $e->getMessage());
+        }
+        Helpers::redirect('settings/metadata');
+    }
+
     public function backup(): void {
         Auth::requireAdmin();
         $pdo = Database::getConnection();

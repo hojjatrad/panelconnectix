@@ -197,7 +197,7 @@ $appAutoMode = (($appPub['source'] ?? 'auto') !== 'admin');
                     <div class="text-[11px] text-slate-500 leading-relaxed">
                         <?= is_file(__DIR__ . '/../../Connectix-ARM64-v8a.apk')
                             ? '✅ APK فعلی روی هاست: ' . round(filesize(__DIR__ . '/../../Connectix-ARM64-v8a.apk') / 1048576, 1) . ' MB — ' . date('Y/m-d H:i', filemtime(__DIR__ . '/../../Connectix-ARM64-v8a.apk'))
-                            : '⚠️ فعلاً APK ای روی هاست پنل نیست؛ اپها از آخرین بیلد گیت‌هاب دانلود می‌کنند.'
+                            : '⚠️ فعلاً APK ای روی هاست پنل نیست؛ به‌زودی به‌صورت خودکار (هر ۵ دقیقه) روی هاست دانلود می‌شود، یا دکمه «همگام‌سازی فوری APKها» را پایین همین صفحه بزنید تا همین حالا نصب شود.'
                         ?>
                     </div>
 
@@ -249,6 +249,42 @@ $appAutoMode = (($appPub['source'] ?? 'auto') !== 'admin');
                 </button>
             </form>
         </div>
+
+        <?php if (Auth::isAdmin()): ?>
+        <!-- APK Mirror Card (in-app update downloads from this host) -->
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-sm space-y-3">
+            <?php require_once __DIR__ . '/../../core/AppApkMirror.php'; $apkMirrorSt = AppApkMirror::status(); ?>
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-emerald-600/20 text-emerald-400 flex items-center justify-center text-lg">
+                    <i class="fa-solid fa-download"></i>
+                </div>
+                <div>
+                    <h4 class="text-xs font-bold text-white">آینه‌سازی APK روی هاست پنل (دانلود داخل برنامه)</h4>
+                    <p class="text-[11px] text-slate-400">نصب‌کننده‌ی داخل برنامه، APK را مستقیماً از همین هاست دانلود می‌کند (سریع و در داخل ایران). هر ۵ دقیقه به‌صورت خودکار با ریلیس گیت‌هاب همگام می‌شود.</p>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px]">
+                <?php foreach ($apkMirrorSt['files'] as $fname => $finfo): ?>
+                    <div class="bg-slate-950/60 border <?= $finfo['present'] ? 'border-emerald-800/40' : 'border-rose-800/40' ?> rounded-xl p-2.5">
+                        <div class="text-slate-500 mb-0.5 truncate" title="<?= htmlspecialchars($fname) ?>"><?= htmlspecialchars(basename($fname)) ?></div>
+                        <div class="font-bold <?= $finfo['present'] ? 'text-emerald-300' : 'text-rose-300' ?>">
+                            <?= $finfo['present'] ? round($finfo['size'] / 1048576, 1) . ' MB' : 'روی هاست نیست' ?>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+            <?php $mirrorLast = $apkMirrorSt['last_run'] ?? []; if (!empty($mirrorLast['at'])): ?>
+                <div class="text-[10px] text-slate-500">آخرین همگام‌سازی: <span dir="ltr"><?= htmlspecialchars((string)$mirrorLast['at']) ?></span></div>
+            <?php endif; ?>
+            <form method="post" action="<?= Helpers::url('app/apk-mirror') ?>" class="m-0"
+                  onsubmit="return confirm('فایل‌های APK با ریلیس فعلی گیت‌هاب مقایسه و در صورت نیاز دوباره روی هاست دانلود می‌شوند (چند صد مگابایت). ادامه می‌دهید؟');">
+                <?= Helpers::csrfField() ?>
+                <button type="submit" class="w-full py-2.5 bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 font-bold rounded-xl text-xs border border-emerald-500/30 transition">
+                    <i class="fa-solid fa-arrows-rotate ml-1.5"></i> همگام‌سازی فوری APKها با گیت‌هاب
+                </button>
+            </form>
+        </div>
+        <?php endif; ?>
 
         <!-- Live Preview Card & Backup -->
         <div class="space-y-4">
