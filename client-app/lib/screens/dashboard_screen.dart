@@ -56,7 +56,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   bool _hasAppUpdate = false;
   Map<String, dynamic>? _updateInfo;
 
-  static const String currentAppVersion = '3.3.0';
+  static const String currentAppVersion = '3.3.1';
 
   // Iranian & Banking Apps Bypass List (Snapp, Divar, Rubika, Neshan, Torob, Digikala, Banking)
   static const List<String> defaultDomesticBypassApps = [

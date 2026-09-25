@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -288,6 +289,13 @@ class ApiService {
    * High-Speed In-App Download and Native Package Installation
    * Downloads APK directly into cache with progress callback, then triggers Android PackageInstaller
    */
+  /// Robust APK downloader:
+  /// - Streams the file in 1 MB Range chunks (each request is short, so
+  ///   network/edge timeouts cannot kill a long transfer)
+  /// - On any interruption, retries the SAME chunk (server-side resume via
+  ///   HTTP Range — no data lost, no restart from zero)
+  /// - Falls back to a plain single-stream GET when the server does not
+  ///   support Range (206) responses.
   static Future<void> downloadAndInstallApk({
     required String downloadUrl,
     required Function(double progress, int receivedBytes, int totalBytes) onProgress,
@@ -317,39 +325,100 @@ class ApiService {
         } catch (_) {}
       }
 
-      // 2. Stream download with real-time byte tracking
-      final client = http.Client();
-      final request = http.Request('GET', Uri.parse(downloadUrl));
-      request.headers['User-Agent'] = 'Mozilla/5.0 (Linux; Android 10; Mobile)';
-      final response = await client.send(request);
+      var client = http.Client();
+      const String ua = 'Mozilla/5.0 (Linux; Android 10; Mobile)';
 
-      if (response.statusCode >= 400) {
-        onError('خطا در دریافت بسته (کد خطا: ${response.statusCode})');
-        return;
+      // 2. Discover total size (HEAD, then Range: bytes=0-0 fallback)
+      int totalBytes = 0;
+      bool rangeSupported = false;
+      try {
+        final headReq = http.Request('HEAD', Uri.parse(downloadUrl));
+        headReq.headers['User-Agent'] = ua;
+        final headResp = await client.send(headReq).timeout(const Duration(seconds: 15));
+        totalBytes = int.tryParse(headResp.headers['content-length'] ?? '') ?? 0;
+        rangeSupported = (headResp.headers['accept-ranges'] ?? '').toLowerCase().contains('bytes');
+        await headResp.stream.drain<void>();
+      } catch (_) {}
+      if (totalBytes <= 0 || !rangeSupported) {
+        try {
+          final req0 = http.Request('GET', Uri.parse(downloadUrl))..headers['User-Agent'] = ua;
+          if (rangeSupported) req0.headers['Range'] = 'bytes=0-0';
+          final r0 = await client.send(req0).timeout(const Duration(seconds: 15));
+          if (r0.statusCode == 206) {
+            rangeSupported = true;
+            final m = RegExp(r'/(\d+)\s*$').firstMatch(r0.headers['content-range'] ?? '');
+            if (m != null) totalBytes = int.tryParse(m.group(1)!) ?? 0;
+          } else if (r0.statusCode == 200) {
+            totalBytes = int.tryParse(r0.headers['content-length'] ?? '') ?? 0;
+            rangeSupported = false;
+          }
+          await r0.stream.drain<void>();
+        } catch (_) {}
       }
 
-      final totalBytes = response.contentLength ?? 0;
-      int receivedBytes = 0;
+      const int chunkSize = 1024 * 1024; // 1 MB per HTTP request
+      int offset = 0;
       final sink = file.openWrite();
 
-      await response.stream.listen(
-        (chunk) {
-          receivedBytes += chunk.length;
-          sink.add(chunk);
-          if (totalBytes > 0) {
-            onProgress(receivedBytes / totalBytes, receivedBytes, totalBytes);
-          } else {
-            onProgress(0.0, receivedBytes, 0);
+      if (rangeSupported && totalBytes > 0) {
+        // 3a. Chunked Range download with resume + retry
+        while (offset < totalBytes) {
+          final end = math.min(offset + chunkSize - 1, totalBytes - 1);
+          bool got = false;
+          for (int attempt = 0; attempt < 6 && !got; attempt++) {
+            try {
+              final req = http.Request('GET', Uri.parse(downloadUrl))
+                ..headers['User-Agent'] = ua
+                ..headers['Range'] = 'bytes=$offset-$end';
+              final resp = await client.send(req).timeout(const Duration(seconds: 45));
+              if (resp.statusCode != 206) {
+                await resp.stream.drain<void>();
+                throw Exception('HTTP ${resp.statusCode}');
+              }
+              await resp.stream.listen((c) {
+                sink.add(c);
+                offset += c.length;
+                onProgress(offset / totalBytes, offset, totalBytes);
+              }).asFuture<void>();
+              got = true;
+            } catch (_) {
+              // Interrupted — recycle the client (a timed-out stream may leave
+              // the pooled socket broken), back off, resume from same offset
+              try { client.close(); } catch (_) {}
+              client = http.Client();
+              await Future<void>.delayed(Duration(milliseconds: 1500 * (attempt + 1)));
+            }
           }
-        },
-        cancelOnError: true,
-      ).asFuture();
+          if (!got) {
+            await sink.close();
+            onError('اتصال مکرراً قطع شد؛ لطفاً دوباره تلاش کنید.');
+            return;
+          }
+        }
+      } else {
+        // 3b. Plain single-stream fallback (server without Range support)
+        final req = http.Request('GET', Uri.parse(downloadUrl));
+        req.headers['User-Agent'] = ua;
+        final resp = await client.send(req).timeout(const Duration(minutes: 10));
+        if (resp.statusCode >= 400) {
+          await sink.close();
+          onError('خطا در دریافت بسته (کد خطا: ${resp.statusCode})');
+          return;
+        }
+        await resp.stream.listen((chunk) {
+          sink.add(chunk);
+          offset += chunk.length;
+          onProgress(totalBytes > 0 ? offset / totalBytes : 0, offset, totalBytes);
+        }, cancelOnError: true).asFuture<void>();
+      }
 
       await sink.flush();
       await sink.close();
 
       // Verify file integrity
-      if (!await file.exists() || await file.length() < 1000000) {
+      final len = await file.length();
+      if (!await file.exists() || len < 1000000 ||
+          (totalBytes > 0 && len != totalBytes)) {
         onError('فایل دانلود شده ناقص است.');
         return;
       }
