@@ -68,13 +68,19 @@ function logStep($msg, $type = 'info') {
 logStep("شروع فرآیند به‌روزرسانی (Self-Healing Updater v5)...", 'info');
 logStep("پوشه نصب: " . __DIR__, 'info');
 
-// 0. Auto-Fix .htaccess and disable OPcache to force immediate reload
+// 0. Auto-Fix .htaccess and per-directory PHP settings.
+// NOTE: opcache.enable is a PHP_INI_SYSTEM directive (cannot be set from
+// .user.ini on this host). The reliable per-directory mechanism is
+// auto_prepend_file, which runs .pre_reset.php before every script in every
+// PHP-FPM pool — guaranteeing a one-shot OPcache reset per pool after each
+// deployment, even in pools with frozen caches.
 $cleanHtaccess = "<IfModule mod_rewrite.c>\n    RewriteEngine On\n    RewriteCond %{REQUEST_FILENAME} !-f\n    RewriteCond %{REQUEST_FILENAME} !-d\n    RewriteRule ^(.*)$ index.php [QSA,L]\n</IfModule>\n";
 @file_put_contents(__DIR__ . '/.htaccess', $cleanHtaccess);
-@file_put_contents(__DIR__ . '/.user.ini', "opcache.enable=0\nopcache.revalidate_freq=0\nopcache.validate_timestamps=1\n");
+$userIni = "auto_prepend_file=" . str_replace('\\', '/', __DIR__ . '/.pre_reset.php') . "\n";
+@file_put_contents(__DIR__ . '/.user.ini', $userIni);
 @touch(__DIR__ . '/.htaccess');
 @touch(__DIR__ . '/.user.ini');
-logStep("فایل‌های .htaccess و .user.ini بررسی و قوانین وب‌سرور بازنشانی شدند.", 'success');
+logStep("فایل‌های .htaccess و .user.ini (شامل خودترمیم OPcache) بازنشانی شدند.", 'success');
 
 // 1. Retrieve GitHub Token
 $token = '';
@@ -308,7 +314,11 @@ if ($mockFree) {
     logStep('خطای جدی: کنترلرهای اپ هنوز حاوی کانکشن‌های پیش‌فرض قدیمی هستند!', 'error');
 }
 
-// 8. Invalidate OPcache (hard reset so every file reloads from disk immediately)
+// 8. Deployment stamp + cache invalidation.
+// The stamp triggers .pre_reset.php (via auto_prepend_file) to reset the
+// OPcache of EVERY pool that serves this directory — including pools whose
+// cache is frozen and which will never see our own opcache_reset() call.
+@touch(__DIR__ . '/.deploy_stamp');
 if (function_exists('opcache_reset')) @opcache_reset();
 if (function_exists('clearstatcache')) @clearstatcache(true);
 

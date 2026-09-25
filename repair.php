@@ -714,7 +714,8 @@ if (!empty($missingControllers) || $forceRestore) {
     ];
 }
 
-// 6. Invalidate Caches
+// 6. Invalidate Caches (stamp triggers per-pool OPcache reset via .pre_reset.php)
+@touch(__DIR__ . '/.deploy_stamp');
 if (function_exists('opcache_reset')) {
     @opcache_reset();
 }
