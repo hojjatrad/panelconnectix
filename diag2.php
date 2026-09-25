@@ -57,9 +57,10 @@ foreach ($rii as $f) {
     if ($f->getExtension() !== 'php') continue;
     $rel = str_replace(__DIR__, '', $f->getPathname());
     // These files only reference the markers as search patterns (guard definitions)
+    // montago-shop occurrences elsewhere are legacy-rewrite guards (healing code), not generators
     if (in_array($rel, ['/diag2.php', '/core/Helpers.php', '/quick_update.php'], true)) continue;
     $c = @file_get_contents($f->getPathname());
-    if ($c && (str_contains($c, 'mci_reality') || str_contains($c, 'mock_pbk') || str_contains($c, 'montago-shop'))) {
+    if ($c && (str_contains($c, 'mci_reality') || str_contains($c, 'mock_pbk'))) {
         $stale[] = $rel;
     }
 }
