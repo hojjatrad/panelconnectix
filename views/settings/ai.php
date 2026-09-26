@@ -52,6 +52,17 @@ $maskKey = fn(string $k): string => $k !== '' ? str_repeat('•', 8) . substr($k
         </div>
     </div>
 
+    <!-- Model roster refresh (standalone form — must NOT be nested in the save form) -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-900/80 border border-violet-900/40 rounded-2xl p-4 shadow-sm">
+        <span class="text-[11px] text-slate-400"><i class="fa-solid fa-circle-info text-violet-400"></i> فهرست مدل‌ها مدام عوض می‌شود؛ اگر خطای «model does not exist» گرفتید، این دکمه فهرست زنده را می‌کشد و مدل را خودکار اصلاح می‌کند.</span>
+        <form method="POST" action="<?= Helpers::url('settings/ai/refresh-models') ?>" class="m-0 shrink-0">
+            <?= Helpers::csrfField() ?>
+            <button type="submit" class="px-3.5 py-2 bg-slate-800 hover:bg-violet-900/50 text-violet-300 rounded-xl text-[11px] font-bold border border-slate-700 transition flex items-center gap-2">
+                <i class="fa-solid fa-arrows-rotate"></i> دریافت فهرست مدل‌ها و اصلاح خودکار
+            </button>
+        </form>
+    </div>
+
     <form action="<?= Helpers::url('settings/ai/save') ?>" method="POST" class="space-y-6">
         <?= Helpers::csrfField() ?>
 
@@ -81,15 +92,6 @@ $maskKey = fn(string $k): string => $k !== '' ? str_repeat('•', 8) . substr($k
             <div>
                 <h3 class="text-xs font-bold text-white flex items-center gap-2 mb-1"><i class="fa-solid fa-microchip text-cyan-400"></i> کلیدهای API (رایگان)</h3>
                 <p class="text-[11px] text-slate-500">اولویت خودکار: <b class="text-slate-300">Groq ← Gemini ← OpenRouter</b> — اگر یکی سقف روزانش پر شد یا خطا داد، بعدی امتحان می‌شود. کلیدها را از کنسول همان سرویس بگیرید (بدون کارت اعتباری).</p>
-            </div>
-            <div class="flex items-center justify-between gap-3 bg-slate-950/50 border border-slate-800 rounded-xl p-3">
-                <span class="text-[11px] text-slate-400">فهرست مدل‌ها مدام عوض می‌شود؛ اگر خطای «model does not exist» گرفتید، این دکمه فهرست زنده را می‌کشد و مدل را خودکار اصلاح می‌کند.</span>
-                <form method="POST" action="<?= Helpers::url('settings/ai/refresh-models') ?>" class="m-0 shrink-0">
-                    <?= Helpers::csrfField() ?>
-                    <button type="submit" class="px-3.5 py-2 bg-slate-800 hover:bg-violet-900/50 text-violet-300 rounded-xl text-[11px] font-bold border border-slate-700 transition flex items-center gap-2">
-                        <i class="fa-solid fa-arrows-rotate"></i> دریافت فهرست مدل‌ها و اصلاح خودکار
-                    </button>
-                </form>
             </div>
 
             <div class="grid grid-cols-1 gap-4">
