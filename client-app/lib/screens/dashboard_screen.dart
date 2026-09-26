@@ -62,7 +62,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   bool _hasAppUpdate = false;
   Map<String, dynamic>? _updateInfo;
 
-  static const String currentAppVersion = '3.3.7';
+  static const String currentAppVersion = '3.3.8';
 
   // "Download over Wi-Fi only" for update packages
   bool _updateWifiOnly = false;

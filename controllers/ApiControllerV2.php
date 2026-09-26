@@ -354,30 +354,13 @@ class ApiControllerV2 {
             $computedStatus = 'traffic_ended';
         }
 
-        // Synchronize live stats from real node (Marzban / Pasargad / 3x-ui)
-        if (!empty($client['server_id'])) {
-            try {
-                $stmtNode = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ?");
-                $stmtNode->execute([(int)$client['server_id']]);
-                $node = $stmtNode->fetch(PDO::FETCH_ASSOC);
-                if ($node && $node['driver'] !== 'mock') {
-                    $driver = DriverFactory::create($node);
-                    $liveData = $driver->getUser($client['username']);
-                    if ($liveData) {
-                        $liveUsed = (int)($liveData['traffic_used_bytes'] ?? $client['traffic_used_bytes']);
-                        $liveLimit = (int)($liveData['traffic_limit_bytes'] ?? $client['traffic_limit_bytes']);
-                        $liveExpire = !empty($liveData['expire_at']) ? $liveData['expire_at'] : $client['expire_at'];
-                        
-                        $client['traffic_used_bytes'] = $liveUsed;
-                        $client['traffic_limit_bytes'] = $liveLimit;
-                        $client['expire_at'] = $liveExpire;
-
-                        $pdo->prepare("UPDATE clients SET traffic_used_bytes = ?, traffic_limit_bytes = ?, expire_at = ? WHERE id = ?")
-                            ->execute([$liveUsed, $liveLimit, $liveExpire, $client['id']]);
-                    }
-                }
-            } catch (Throwable $e) {}
-        }
+        // NOTE: live node stats sync intentionally NOT done here.
+        // A driver getUser() call can block up to ~12s (curl timeout) and
+        // pushed the whole login past the app's HTTP timeout, producing
+        // "خطا در برقراری ارتباط با سرور" even with correct credentials.
+        // The app calls /api/v1/app/profile immediately after login (and on
+        // every dashboard open), which performs the same live sync — the
+        // user still gets fresh stats within seconds of login.
 
         // Generate App Token
         $appToken = 'app_' . hash_hmac('sha256', $client['sub_token'] . '_' . $client['id'], 'connectix_app_key_2026');
@@ -527,6 +510,19 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
         if (file_exists(__DIR__ . '/SublinkController.php')) {
             require_once __DIR__ . '/SublinkController.php';
         }
+
+        // 90s per-client cache: the live node query (driver getUser) can take
+        // several seconds when cold; inbounds change rarely, so caching keeps
+        // BOTH login and /app/configs fast enough for the app's timeouts.
+        $clientIdCache = (int)($client['id'] ?? 0);
+        if ($clientIdCache > 0) {
+            $cacheKeyList = 'server_list_cache_' . $clientIdCache;
+            $cachedList = json_decode((string)Setting::get($cacheKeyList, ''), true);
+            if (is_array($cachedList) && (int)($cachedList['at'] ?? 0) > time() - 90 && !empty($cachedList['servers'])) {
+                return $cachedList['servers'];
+            }
+        }
+
         $realLinks = [];
 
         // 1. Ensure client is bound to an active real server node
@@ -724,6 +720,15 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
                 'is_online' => true
             ];
             $idx++;
+        }
+
+        if ($clientIdCache > 0) {
+            try {
+                Setting::set('server_list_cache_' . $clientIdCache, json_encode([
+                    'at' => time(),
+                    'servers' => $serverList,
+                ]));
+            } catch (Throwable $e) {}
         }
 
         return $serverList;

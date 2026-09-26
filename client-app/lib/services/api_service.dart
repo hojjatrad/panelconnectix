@@ -80,7 +80,7 @@ class ApiService {
         url,
         headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
         body: jsonEncode({'username': username, 'password': password}),
-      ).timeout(const Duration(seconds: 12));
+      ).timeout(const Duration(seconds: 30));
 
       final data = jsonDecode(utf8.decode(response.bodyBytes));
       if (data['success'] == true) {
@@ -123,6 +123,10 @@ class ApiService {
         };
       }
     } catch (e) {
+      log('login error: $e');
+      if (e is TimeoutException) {
+        return {'success': false, 'error': 'اتصال به سرور طول کشید. اتصال اینترنت خود را بررسی کنید و دوباره تلاش کنید.'};
+      }
       return {'success': false, 'error': 'خطا در برقراری ارتباط با سرور: $e'};
     }
   }
