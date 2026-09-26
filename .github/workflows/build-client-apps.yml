@@ -489,7 +489,12 @@ jobs:
           # the Xray zip does NOT ship it.
           Invoke-WebRequest -Uri "https://www.wintun.net/builds/wintun-0.14.1.zip" -OutFile "wintun.zip"
           Expand-Archive -Path "wintun.zip" -DestinationPath "wintun" -Force
-          Copy-Item "wintun\bin\amd64\wintun.dll" "xray\wintun.dll" -Force
+          # Archive nests a top-level folder (wintun\wintun\bin\amd64\...) -
+          # locate the amd64 dll instead of hardcoding the depth.
+          $wintunDll = Get-ChildItem -Path "wintun" -Recurse -Filter "wintun.dll" |
+              Where-Object { $_.FullName -match 'amd64' } | Select-Object -First 1
+          if (-not $wintunDll) { throw "wintun.dll (amd64) not found in archive" }
+          Copy-Item $wintunDll.FullName "xray\wintun.dll" -Force
           Write-Host "wintun.dll staged: $((Get-Item 'xray\wintun.dll').Length) bytes"
           Get-ChildItem "xray" | Select-Object Name
 
