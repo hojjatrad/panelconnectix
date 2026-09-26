@@ -27,6 +27,11 @@ bool FlutterWindow::OnCreate() {
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
+  // Keep the window phone-sized: this app is a mobile-first UI. Without
+  // these limits Windows lets it stretch to full screen.
+  SetMinSize({390, 640});
+  SetMaxSize({520, 880});
+
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
     this->Show();
   });

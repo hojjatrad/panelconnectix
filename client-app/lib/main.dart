@@ -166,6 +166,115 @@ class ConnectixApp extends StatefulWidget {
   State<ConnectixApp> createState() => _ConnectixAppState();
 }
 
+/// Brand palette (shared by every screen).
+class C {
+  static const Color seed = Color(0xFF9333EA); // purple
+  static const Color accent = Color(0xFF6366F1); // indigo
+  static const Color ok = Color(0xFF10B981); // green
+  static const Color warn = Color(0xFFF59E0B); // amber
+  static const Color danger = Color(0xFFF87171); // red
+  static const Color bg = Color(0xFF090D16);
+  static const Color surface = Color(0xFF111827);
+  static const Color surface2 = Color(0xFF0F172A);
+  static const Color border = Color(0xFF1E293B);
+  static const Color textMain = Color(0xFFF1F5F9);
+  static const Color textDim = Color(0xFF94A3B8);
+}
+
+/// App-wide Material 3 dark theme with the Vazirmatn Persian font.
+/// NOTE: only uses theme APIs that exist in BOTH Flutter 3.22 (Android CI)
+/// and Flutter 3.47 (Windows CI).
+ThemeData buildConnectixTheme() {
+  final base = ThemeData(
+    useMaterial3: true,
+    brightness: Brightness.dark,
+    scaffoldBackgroundColor: C.bg,
+    fontFamily: 'Vazirmatn',
+    colorScheme: const ColorScheme.dark(
+      primary: C.seed,
+      onPrimary: Colors.white,
+      secondary: C.accent,
+      onSecondary: Colors.white,
+      surface: C.surface,
+      onSurface: C.textMain,
+      onSurfaceVariant: C.textDim,
+      outline: C.border,
+      error: C.danger,
+    ),
+  );
+  return base.copyWith(
+    appBarTheme: const AppBarTheme(
+      backgroundColor: C.bg,
+      elevation: 0,
+      centerTitle: true,
+    ),
+    snackBarTheme: SnackBarThemeData(
+      backgroundColor: const Color(0xFF1E293B),
+      contentTextStyle: const TextStyle(color: C.textMain, fontSize: 13),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: C.seed,
+        foregroundColor: Colors.white,
+        disabledBackgroundColor: const Color(0xFF334155),
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: C.textMain,
+        side: const BorderSide(color: C.border),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(foregroundColor: C.textDim),
+    ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: C.surface2,
+      hintStyle: const TextStyle(color: C.textDim, fontSize: 13),
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: C.border),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: C.border),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: C.seed, width: 1.4),
+      ),
+    ),
+    progressIndicatorTheme: const ProgressIndicatorThemeData(color: C.seed),
+    switchTheme: SwitchThemeData(
+      thumbColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? Colors.white
+              : C.textDim),
+      trackColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? C.seed
+              : const Color(0xFF334155)),
+    ),
+    textTheme: base.textTheme.apply(
+      bodyColor: C.textMain,
+      displayColor: C.textMain,
+    ),
+    iconTheme: const IconThemeData(color: C.textDim),
+    dividerColor: C.border,
+  );
+}
+
 class _ConnectixAppState extends State<ConnectixApp> {
   /// Timestamp of the last crash the user dismissed/sent — the StreamBuilder
   /// keeps its last snapshot, so we compare by timestamp to dismiss it.
@@ -185,7 +294,7 @@ class _ConnectixAppState extends State<ConnectixApp> {
           if (crash != null && crash.at != _dismissedCrashAt) {
             return MaterialApp(
               debugShowCheckedModeBanner: false,
-              theme: ThemeData.dark(),
+              theme: buildConnectixTheme(),
               home: _CrashScreen(
                 info: crash,
                 onDismiss: () => _dismiss(crash),
@@ -195,14 +304,7 @@ class _ConnectixAppState extends State<ConnectixApp> {
           return MaterialApp(
             title: 'Connectix VPN',
             debugShowCheckedModeBanner: false,
-            theme: ThemeData.dark().copyWith(
-              scaffoldBackgroundColor: const Color(0xFF090D16),
-              primaryColor: const Color(0xFF9333EA),
-              colorScheme: const ColorScheme.dark(
-                primary: Color(0xFF9333EA),
-                secondary: Color(0xFF10B981),
-              ),
-            ),
+            theme: buildConnectixTheme(),
             localizationsDelegates: const [
               GlobalMaterialLocalizations.delegate,
               GlobalWidgetsLocalizations.delegate,

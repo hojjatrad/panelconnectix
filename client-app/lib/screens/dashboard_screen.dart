@@ -49,6 +49,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   // New Pro Features States
   bool _splitTunnelingEnabled = true;
+
+  // Windows-only tunnel flavor: 'proxy' (system proxy, Phase 1) or
+  // 'tun' (full Wintun VPN, Phase 2). Ignored on Android.
+  String _winTunnelMode = 'proxy';
   bool _autoReconnectEnabled = true;
   int _reconnectAttempts = 0;
   bool _isSmartConnecting = false;
@@ -58,7 +62,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   bool _hasAppUpdate = false;
   Map<String, dynamic>? _updateInfo;
 
-  static const String currentAppVersion = '3.3.3';
+  static const String currentAppVersion = '3.3.4';
 
   // "Download over Wi-Fi only" for update packages
   bool _updateWifiOnly = false;
@@ -111,7 +115,57 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       _splitTunnelingEnabled = prefs.getBool('split_tunneling_enabled') ?? true;
       _autoReconnectEnabled = prefs.getBool('auto_reconnect_enabled') ?? true;
       _updateWifiOnly = prefs.getBool('update_wifi_only') ?? false;
+      _winTunnelMode = prefs.getString('windows_tunnel_mode') ?? 'proxy';
     });
+  }
+
+  Future<void> _setWinTunnelMode(String value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('windows_tunnel_mode', value);
+    if (mounted) setState(() => _winTunnelMode = value);
+  }
+
+  void _pickWinTunnelMode(String value) {
+    if (value == _winTunnelMode) return;
+    _setWinTunnelMode(value);
+    if (_isConnected) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('حالت جدید در اتصال بعدی اعمال می‌شود (یک‌بار قطع و دوباره وصل شوید).')),
+      );
+    }
+  }
+
+  Widget _winModeChip({
+    required BuildContext context,
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFF9333EA) : const Color(0xFF0F172A),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: selected ? const Color(0xFF9333EA) : const Color(0xFF334155),
+          ),
+        ),
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: selected ? Colors.white : const Color(0xFF94A3B8),
+            fontSize: 11,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _setUpdateWifiOnly(bool value) async {
@@ -796,6 +850,26 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         return;
       }
 
+      // Windows Phase 2: full TUN mode needs admin on the FIRST run only
+      // (creates the Wintun TAP adapter); afterwards the adapter persists.
+      final tunMode =
+          Platform.isWindows && _winTunnelMode == 'tun';
+      if (tunMode && !await _flutterV2ray.isElevated()) {
+        setState(() {
+          _isConnecting = false;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                  'حالت «VPN کامل» فقط در اولین اجرا به دسترسی ادمین نیاز دارد: روی آیکون برنامه راست‌کلیک کنید و «Run as administrator» را بزنید. در بارگذاری‌های بعدی دیگر لازم نیست.'),
+              duration: Duration(seconds: 9),
+            ),
+          );
+        }
+        return;
+      }
+
       final configUri = _selectedServer!.configUri;
       final parser = FlutterV2ray.parseFromURL(configUri);
 
@@ -805,6 +879,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         config: parser.getFullConfiguration(),
         blockedApps: _splitTunnelingEnabled ? defaultDomesticBypassApps : null,
         proxyOnly: false, // Full device-wide VPN tunnel
+        tunMode: tunMode,
       );
 
       _connectedSeconds = 0;
@@ -1695,6 +1770,56 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     : (_isConnecting ? 'در حال برقراری تونل امن...' : 'جهت برقراری تونل امن لمس نمایید'),
                 style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
               ),
+
+              if (Platform.isWindows) ...[
+                const SizedBox(height: 18),
+                // Windows tunnel flavor selector (Phase 1: system proxy,
+                // Phase 2: full TUN VPN).
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF111827),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFF1E293B)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.router_rounded,
+                              size: 16, color: Color(0xFF9333EA)),
+                          const SizedBox(width: 8),
+                          const Text('حالت اتصال در ویندوز',
+                              style: TextStyle(color: Color(0xFFE2E8F0), fontSize: 12, fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _winModeChip(
+                              context: context,
+                              label: 'پروکسی سیستمی',
+                              selected: _winTunnelMode == 'proxy',
+                              onTap: () => _pickWinTunnelMode('proxy'),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _winModeChip(
+                              context: context,
+                              label: 'VPN کامل (TUN)',
+                              selected: _winTunnelMode == 'tun',
+                              onTap: () => _pickWinTunnelMode('tun'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
 
               const SizedBox(height: 22),
 

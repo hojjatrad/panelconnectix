@@ -50,10 +50,29 @@ class XrayService {
     return File(_xrayExe).existsSync() ? 'ok' : 'missing';
   }
 
+  /// Whether the app runs elevated (admin). TUN mode needs admin on the
+  /// FIRST run (creates the Wintun TAP adapter + installs the driver);
+  /// afterwards the adapter persists and no elevation is needed.
+  Future<bool> isElevated() async {
+    try {
+      final r = await Process.run('net', ['session']);
+      return r.exitCode == 0;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  bool _lastTunMode = false;
+
   /// Start Xray with the full V2Ray/Xray JSON config (as produced by
-  /// flutter_v2ray's getFullConfiguration) — inbounds are replaced with
-  /// local SOCKS+HTTP listeners for Windows system-proxy routing.
-  Future<bool> start(String configJson) async {
+  /// flutter_v2ray's getFullConfiguration).
+  ///
+  /// Inbound mode:
+  ///  - [tunMode] false → SOCKS5+HTTP localhost listeners + Windows system
+  ///    proxy (Phase 1, no admin needed).
+  ///  - [tunMode] true  → Xray TUN inbound (Wintun TAP adapter): every app
+  ///    on the machine routes through the tunnel, incl. UDP/games (Phase 2).
+  Future<bool> start(String configJson, {bool tunMode = false}) async {
     if (!File(_xrayExe).existsSync()) {
       throw Exception('هسته Xray پیدا نشد (data/xray/Xray.exe)');
     }
@@ -66,22 +85,48 @@ class XrayService {
       throw Exception('کانفیگ نامعتبر است');
     }
 
-    // Windows listeners: SOCKS5 + HTTP on localhost.
-    cfg['inbounds'] = [
-      {
-        'tag': 'socks-in',
-        'listen': '127.0.0.1',
-        'port': socksPort,
-        'protocol': 'socks',
-        'settings': {'auth': 'noauth', 'udp': true},
-      },
-      {
-        'tag': 'http-in',
-        'listen': '127.0.0.1',
-        'port': httpPort,
-        'protocol': 'http',
-      },
-    ];
+    if (tunMode) {
+      // Full-tunnel mode: Xray owns a Wintun TAP adapter; all packets
+      // (IPv4/IPv6, TCP/UDP, DNS) enter the tunnel. The adapter is created
+      // on first run (needs admin once) and torn down when the core exits.
+      cfg['inbounds'] = [
+        {
+          'tag': 'tun-in',
+          'listen': '127.0.0.1',
+          'port': 0,
+          'protocol': 'dokodemo-door',
+          'settings': {'address': '127.0.0.1', 'followRedirect': true},
+          'sniffing': {
+            'enabled': true,
+            'destOverride': ['http', 'tls', 'fqdn'],
+          },
+          'tun': {
+            'mtu': 1500,
+            'gso': true,
+            'domainStrategy': 'AsIs',
+            'stack': 'system',
+            'dns': false,
+          },
+        }
+      ];
+    } else {
+      // Windows listeners: SOCKS5 + HTTP on localhost (system proxy mode).
+      cfg['inbounds'] = [
+        {
+          'tag': 'socks-in',
+          'listen': '127.0.0.1',
+          'port': socksPort,
+          'protocol': 'socks',
+          'settings': {'auth': 'noauth', 'udp': true},
+        },
+        {
+          'tag': 'http-in',
+          'listen': '127.0.0.1',
+          'port': httpPort,
+          'protocol': 'http',
+        },
+      ];
+    }
     cfg['log'] = {'loglevel': 'warning'};
 
     _pid = math.Random().nextInt(100000);
@@ -108,7 +153,10 @@ class XrayService {
       }
     });
 
-    await _applyProxy();
+    _lastTunMode = tunMode;
+    if (!tunMode) {
+      await _applyProxy();
+    }
     _startedAt = DateTime.now();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       final alive = _proc != null;

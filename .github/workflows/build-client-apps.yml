@@ -497,6 +497,9 @@ jobs:
           $dest = "client-app\build\windows\x64\runner\Release\data\xray"
           New-Item -ItemType Directory -Force -Path $dest | Out-Null
           Copy-Item "xray\Xray.exe" "$dest\Xray.exe" -Force
+          # wintun.dll = TUN (full-VPN) mode support, ships in the official zip
+          if (Test-Path "xray\wintun.dll") { Copy-Item "xray\wintun.dll" "$dest\wintun.dll" -Force }
+          else { Write-Host "WARNING: wintun.dll missing - TUN mode will not work" }
           if (-not (Test-Path "xray\geoip.dat")) { Write-Host "geoip.dat not present (ok for client)" }
           else { Copy-Item "xray\geoip.dat" "$dest\geoip.dat" -Force }
           if (-not (Test-Path "xray\geosite.dat")) { Write-Host "geosite.dat not present (ok for client)" }

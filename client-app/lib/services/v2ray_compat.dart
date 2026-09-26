@@ -25,6 +25,9 @@ class V2RayCompat {
 
   bool get isWindows => Platform.isWindows;
 
+  /// Windows: is the app running elevated (admin)?
+  Future<bool> isElevated() async => _xray.isElevated();
+
   Future<void> initializeV2Ray() async {
     if (isWindows) {
       await _xray.initialize();
@@ -48,16 +51,18 @@ class V2RayCompat {
     return _v2ray!.requestPermission();
   }
 
+  /// Windows-only tunnel flavor: false = system proxy (Phase 1),
+  /// true = full TUN VPN via Wintun (Phase 2). Ignored on Android.
   Future<void> startV2Ray({
     required String remark,
     required String config,
     List<String>? blockedApps,
     List<String>? bypassSubnets,
     bool proxyOnly = false,
+    bool tunMode = false,
   }) async {
     if (isWindows) {
-      // Proxy mode: Xray core + Windows system proxy.
-      await _xray.start(config);
+      await _xray.start(config, tunMode: tunMode);
       return;
     }
     await _v2ray!.startV2Ray(
