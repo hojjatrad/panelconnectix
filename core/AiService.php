@@ -520,6 +520,97 @@ PROMPT;
              . "پاسخ را فقط به‌صورت JSON بده.";
     }
 
+    /** System prompt for END-CUSTOMER questions arriving via the Telegram bot. */
+    public static function buildBotSystemPrompt(string $brandName = ''): string {
+        return <<<PROMPT
+تو «دستیار هوشمند" . ($brandName !== '' ? ' ' . $brandName : ' Connectix') . "» هستی: پاسخ‌دهندهٔ خودکار ربات تلگرام برای **مشتریان عادی** یک سرویس VPN/پروکسی (نه نماینده‌ها).
+زبان: فقط فارسی، لحن صمیم و کوتاه (حداکثر ۴ جمله — این پاسخ در تلگرام نمایش داده می‌شود).
+قوانین:
+۱) فقط با «پایگاه دانش» جواب بده؛ اگر سؤال در آن نبود یا مبهم بود: needs_human=true و answer خالی.
+۲) هرگز قیمت یا تخفیف نگو؛ برای قیمت‌ها بگو «از منوی خرید ربات قابل مشاهده است».
+۳) موضوعات مالی/استرداد/شکایت/امنیتی: is_sensitive=true و needs_human=true.
+۴) اطلاعات سرور، کلید، IP یا دادهٔ مشتری‌های دیگر را نده.
+۵) سلام/خداحافظ و پیام‌های بی‌محتوا را هم به‌صورت کوتاه و محترمانه جواب بده (needs_human=false).
+خروجی فقط یک JSON معتبر با این ساختار:
+{"category":"فنی|پولی|گزارش خطا|سایر","priority":"low|medium|high","is_sensitive":false,"needs_human":false,"confidence":0.0,"answer":"..."}
+PROMPT;
+    }
+
+    /**
+     * Handle a free-text customer question from the Telegram bot.
+     * Returns:
+     *   ['handled' => false]                      -> caller keeps original behavior
+     *   ['handled' => true, 'auto' => true, 'answer' => ...]
+     *   ['handled' => true, 'auto' => false, 'reason' => ...] (human handover)
+     */
+    public static function handleBotQuestion(int $resellerId, string $brandName, string $text, string $fromName = '', string $fromTgId = ''): array {
+        $text = trim($text);
+        if (!self::enabled() || $text === '') return ['handled' => false];
+
+        // Very short / emoji-only chatter -> skip AI, keep menu behavior
+        $clean = preg_replace('/[^\p{L}\p{N}]/u', '', $text) ?? '';
+        if (mb_strlen((string)$clean) < 3) return ['handled' => false];
+
+        // Main brand bot (owner, reseller_id 1) is always allowed; others need a valid charge
+        if ($resellerId !== 1 && self::subscriptionFor($resellerId) === null) {
+            return ['handled' => false];
+        }
+
+        self::ensureSeedKnowledge();
+        $knowledge = self::searchKnowledge($text, 4);
+        $kb = '';
+        foreach ($knowledge as $k) {
+            $kb .= "\n### {$k['title']} (دسته: {$k['category']})\n" . $k['content'] . "\n";
+        }
+        if (trim($kb) === '') $kb = "\n(مورد مرتبط پیدا نشد — برای سؤال‌های مبهم needs_human=true بگذار.)\n";
+
+        $prompt = "پایگاه دانش (فقط از این استفاده کن):\n{$kb}\n\n"
+                . "سؤال مشتری: " . self::maskPii($text) . "\n"
+                . "پاسخ را فقط به‌صورت JSON بده.";
+
+        $llm = self::complete(self::buildBotSystemPrompt($brandName), $prompt);
+        $parsed = $llm['ok'] ? self::parseAnswer((string)$llm['content']) : [
+            'category' => 'سایر', 'priority' => 'medium', 'is_sensitive' => false,
+            'needs_human' => true, 'confidence' => 0.0, 'answer' => '', 'raw' => $llm['error'],
+        ];
+
+        $canAuto = $llm['ok'] && !$parsed['is_sensitive'] && !$parsed['needs_human']
+            && $parsed['confidence'] >= (float)self::cfg('ai_min_confidence')
+            && $parsed['answer'] !== '';
+
+        try {
+            Database::getConnection()->prepare("INSERT INTO ai_logs (ticket_id, stage, provider, model, status, category, confidence,
+                                        is_sensitive, needs_human, answer, latency_ms, error, accepted, created_at)
+                                       VALUES (0, 'bot', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP)")
+                ->execute([
+                    $llm['provider'], $llm['model'],
+                    $canAuto ? 'auto_replied' : ($llm['ok'] ? 'handover' : 'failed'),
+                    $parsed['category'], $parsed['confidence'], $parsed['is_sensitive'] ? 1 : 0,
+                    $parsed['needs_human'] ? 1 : 0,
+                    $canAuto ? $parsed['answer'] : self::maskPii(mb_substr($text, 0, 200)),
+                    $llm['latency_ms'], $llm['error'],
+                ]);
+        } catch (Throwable $e) {}
+
+        if ($canAuto) {
+            return ['handled' => true, 'auto' => true, 'answer' => $parsed['answer']];
+        }
+
+        // Human handover: alert supergroup with customer context
+        try {
+            $who = trim(($fromName !== '' ? $fromName : '') . ' (' . ($fromTgId !== '' ? $fromTgId : 'ناشناس') . ')');
+            $reason = $parsed['is_sensitive'] ? 'موضوع حساس' : (!$llm['ok'] ? 'خطای همهٔ Providerها' : 'اطمینان پایین/بیرون از دانش');
+            TelegramBot::sendCategorizedReport('users',
+                "🤖 <b>سؤال مشتری ربات — نیاز به پاسخ انسانی</b>\n\n"
+                . "برند: <b>" . htmlspecialchars($brandName ?: ('نماینده #' . $resellerId), ENT_QUOTES) . "</b>\n"
+                . "مشتری: {$who}\n"
+                . "دلیل: {$reason}\n"
+                . "سؤال: <i>" . htmlspecialchars(mb_substr(self::maskPii($text), 0, 300), ENT_QUOTES) . "</i>");
+        } catch (Throwable $e) {}
+
+        return ['handled' => true, 'auto' => false, 'reason' => $parsed['is_sensitive'] ? 'sensitive' : (!$llm['ok'] ? 'llm_error' : 'low_confidence')];
+    }
+
     /** Robust JSON extraction from model output. */
     public static function parseAnswer(string $content): array {
         $out = [

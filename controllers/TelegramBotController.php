@@ -1799,6 +1799,49 @@ class TelegramBotController {
             }
         }
 
+        // AI support: free-text customer questions (owner bot always; reseller bots with valid AI charge)
+        if ($text !== '') {
+            require_once __DIR__ . '/../core/AiService.php';
+            $ctxAi = self::getContext($pdo);
+            $fromName = trim(($msg['from']['first_name'] ?? '') . ' ' . ($msg['from']['last_name'] ?? ''));
+            $ai = AiService::handleBotQuestion(
+                (int)($ctxAi['reseller_id'] ?? 1),
+                (string)($ctxAi['brand_name'] ?? ''),
+                $text,
+                $fromName,
+                $fromId
+            );
+            if ($ai['handled']) {
+                if ($ai['auto']) {
+                    TelegramBot::sendMessage(
+                        "🤖 <b>دستیار هوشمند</b>\n\n" . nl2br(htmlspecialchars($ai['answer'], ENT_QUOTES))
+                        . "\n\n<i>اگر این پاسخ مشکلتان را حل نکرد، از دکمهٔ «پشتیبانی» با پشتیبان انسانی تماس بگیرید.</i>",
+                        $chatId,
+                        self::getMainMenuInlineKeyboard($pdo, $fromId),
+                        $ctxAi['bot_token']
+                    );
+                } else {
+                    $support = ltrim((string)($ctxAi['support_username'] ?: Setting::get('support_telegram', '')), '@');
+                    $kbAi = [
+                        'inline_keyboard' => [
+                            [['text' => '🔙 منوی اصلی', 'callback_data' => 'menu_main']],
+                        ],
+                    ];
+                    if ($support !== '') {
+                        $kbAi['inline_keyboard'][] = [['text' => '👤 پیام مستقیم به پشتیبان', 'url' => 'https://t.me/' . rawurlencode($support)]];
+                    }
+                    TelegramBot::sendMessage(
+                        "📮 <b>درخواست شما ثبت شد</b>\n\n"
+                        . "پشتیبان ما به‌زودی در گفتگوی خصوصی پاسخ می‌دهد. اگر فوری است، می‌توانید مستقیماً با آیدی پشتیبانی پیام دهید.",
+                        $chatId,
+                        $kbAi,
+                        $ctxAi['bot_token']
+                    );
+                }
+                return;
+            }
+        }
+
         // Fallback default
         self::sendMainMenu($pdo, $chatId, $fromId);
     }
