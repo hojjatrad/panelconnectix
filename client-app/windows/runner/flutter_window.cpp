@@ -71,11 +71,12 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
     // CLIENT area; ptMin/MaxTrackSize include the window frame.
     case WM_GETMINMAXINFO: {
       MINMAXINFO* mmi = reinterpret_cast<MINMAXINFO*>(lparam);
+      // (There is no SM_CYPADDEDBORDER; the padded border is isotropic.)
       const int frameX = 2 * (GetSystemMetrics(SM_CXSIZEFRAME) +
                               GetSystemMetrics(SM_CXPADDEDBORDER));
       const int frameY = GetSystemMetrics(SM_CYCAPTION) +
                          2 * (GetSystemMetrics(SM_CYSIZEFRAME) +
-                              GetSystemMetrics(SM_CYPADDEDBORDER));
+                              GetSystemMetrics(SM_CXPADDEDBORDER));
       mmi->ptMinTrackSize.x = 390 + frameX;
       mmi->ptMinTrackSize.y = 640 + frameY;
       mmi->ptMaxTrackSize.x = 520 + frameX;
