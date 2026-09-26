@@ -417,6 +417,9 @@ class TelegramBotController {
         $data = $cb['data'] ?? '';
         $messageId = $cb['message']['message_id'] ?? null;
         $chatId = (string)($cb['message']['chat']['id'] ?? $fromId);
+        // Multi-bot: always answer/send with THIS bot's token (not the default main-bot token)
+        $ctxCb = self::getContext($pdo);
+        $cbToken = $ctxCb['bot_token'] ?? null;
 
         // Defer answerCallbackQuery for actions that provide custom alerts/toasts
         $customAnswerPrefixes = [
@@ -434,7 +437,7 @@ class TelegramBotController {
             }
         }
         if (!$isCustomAction) {
-            TelegramBot::answerCallbackQuery($cbId);
+            TelegramBot::answerCallbackQuery($cbId, null, false, $cbToken);
         }
 
         // Force Join Check handler
@@ -450,10 +453,10 @@ class TelegramBotController {
             }
 
             if ($isMember) {
-                TelegramBot::answerCallbackQuery($cbId, '✅ عضویت شما در کانال تایید شد. خوش آمدید!', false);
+                TelegramBot::answerCallbackQuery($cbId, '✅ عضویت شما در کانال تایید شد. خوش آمدید!', false, $cbToken);
                 self::sendMainMenu($pdo, $chatId, $fromId, $cb['from']['first_name'] ?? '', $messageId);
             } else {
-                TelegramBot::answerCallbackQuery($cbId, '❌ شما هنوز در کانال عضو نشده‌اید! لطفاً ابتدا عضو شوید.', true);
+                TelegramBot::answerCallbackQuery($cbId, '❌ شما هنوز در کانال عضو نشده‌اید! لطفاً ابتدا عضو شوید.', true, $cbToken);
             }
             return;
         }
@@ -467,7 +470,7 @@ class TelegramBotController {
                 $fileId = $fileInfo['file_id'] ?? '';
                 $fileName = $fileInfo['file_name'] ?? 'backup.sql';
 
-                TelegramBot::answerCallbackQuery($cbId, 'درحال دانلود و اجرای فایل دیتابیس...', false);
+                TelegramBot::answerCallbackQuery($cbId, 'درحال دانلود و اجرای فایل دیتابیس...', false, $cbToken);
                 if ($messageId) {
                     TelegramBot::editMessageText("⏳ <b>درحال پردازش و بازگردانی دیتابیس...</b>\nلطفاً چند ثانیه شکیبا باشید.", $chatId, $messageId, null, $ctx['bot_token']);
                 }
@@ -507,7 +510,7 @@ class TelegramBotController {
                     TelegramBot::sendMessage("❌ دسترسی به اطلاعات فایل تلگرام مقدور نبود.", $chatId, null, $ctx['bot_token']);
                 }
             } else {
-                TelegramBot::answerCallbackQuery($cbId, 'درخواست منقضی شده است.', true);
+                TelegramBot::answerCallbackQuery($cbId, 'درخواست منقضی شده است.', true, $cbToken);
             }
             return;
         }
@@ -515,7 +518,7 @@ class TelegramBotController {
         if ($data === 'cancel_db_restore') {
             $ctx = self::getContext($pdo);
             self::clearSession($pdo, $fromId);
-            TelegramBot::answerCallbackQuery($cbId, 'عملیات لغو شد.', false);
+            TelegramBot::answerCallbackQuery($cbId, 'عملیات لغو شد.', false, $cbToken);
             if ($messageId) {
                 TelegramBot::editMessageText("❌ عملیات بازگردانی دیتابیس لغو شد.", $chatId, $messageId, self::getMainMenuInlineKeyboard($pdo, $fromId), $ctx['bot_token']);
             }
@@ -524,7 +527,7 @@ class TelegramBotController {
 
         // Before executing other actions, verify channel membership if enabled
         if (!self::checkForceJoin($pdo, $chatId, $fromId)) {
-            TelegramBot::answerCallbackQuery($cbId, '⚠️ عضویت در کانال جهت استفاده از ربات الزامی است.', true);
+            TelegramBot::answerCallbackQuery($cbId, '⚠️ عضویت در کانال جهت استفاده از ربات الزامی است.', true, $cbToken);
             return;
         }
 
@@ -846,7 +849,12 @@ class TelegramBotController {
             return;
         }
         if ($data === 'menu_support') {
-            self::showSupportInfo($chatId, $messageId);
+            self::enterAiSupport($pdo, $chatId, $fromId, $messageId);
+            return;
+        }
+        if ($data === 'exit_ai_support') {
+            self::clearSession($pdo, $fromId);
+            self::sendMainMenu($pdo, $chatId, $fromId, $cb['from']['first_name'] ?? '', $messageId);
             return;
         }
 
@@ -1226,6 +1234,71 @@ class TelegramBotController {
             return;
         }
 
+        // 🤖 AI Smart Support Mode — entered ONLY via the «پشتیبانی» button.
+        // While active, free text goes to the AI (not the free-text menu fallback).
+        if ($session && $session['step'] === 'ai_support') {
+            $supportTextGate = Setting::get('btn_support_text', '☎️ پشتیبانی');
+            $knownShortcuts = [
+                Setting::get('btn_buy_text', '🛒 خرید اشتراک'), '🛒 خرید اشتراک جدید', '🛒 خرید اشتراک',
+                Setting::get('btn_renew_text', '🔄 تمدید اشتراک'), '🔄 تمدید اشتراک',
+                Setting::get('btn_my_accounts_text', '👤 حساب‌های من'), '👤 حساب‌های من', '🔗 ورود و اتصال حساب',
+                Setting::get('btn_trial_text', '🎁 تست رایگان'), '🎁 دریافت تست رایگان', '/test', 'تست رایگان',
+                Setting::get('btn_wheel_text', '🎰 گردونه شانس و هدیه'), '🎰 گردونه شانس', 'گردونه شانس', '/wheel', 'هدیه روزانه',
+                Setting::get('btn_wallet_text', '💳 کیف‌پول و شارژ'), '💳 کیف‌پول و شارژ', '💳 کیف پول', 'کیف پول', '/wallet', 'شارژ حساب',
+                Setting::get('btn_referral_text', '🤝 کسب درآمد'), '🤝 زیرمجموعه‌گیری و درآمد', '🤝 زیرمجموعه‌گیری و درآمدزایی', '/referral', 'زیرمجموعه‌گیری',
+                Setting::get('btn_apps_text', '📱 دانلود و آموزش'), '📱 دانلود نرم‌افزارها',
+                $supportTextGate, '☎️ پشتیبانی تلگرام',
+                Setting::get('btn_reseller_text', '💼 اخذ نمایندگی'), '🤝 درخواست نمایندگی', '🤝 درخواست پنل نمایندگی', '/reseller', '💼 اخذ نمایندگی',
+                '🔐 ورود به پنل وب', '/panel', '/login', 'پنل', 'ورود به پنل',
+                'شروع', 'منو', 'دکمه ها', 'دکمه‌ها',
+            ];
+            $isShortcut = ($text !== '' && (in_array($text, $knownShortcuts, true) || str_starts_with($text, '/start') || str_starts_with($text, '/menu')));
+            if ($isShortcut) {
+                // Leaving support mode — fall through to normal button handling below
+                self::clearSession($pdo, $fromId);
+            } elseif ($text !== '') {
+                require_once __DIR__ . '/../core/AiService.php';
+                $ctxAi = self::getContext($pdo);
+                $fromNameAi = trim(($msg['from']['first_name'] ?? '') . ' ' . ($msg['from']['last_name'] ?? ''));
+                $ai = AiService::handleBotQuestion(
+                    (int)($ctxAi['reseller_id'] ?? 1),
+                    (string)($ctxAi['brand_name'] ?? ''),
+                    $text,
+                    $fromNameAi,
+                    (int)$fromId
+                );
+                if ($ai['handled']) {
+                    if ($ai['auto']) {
+                        TelegramBot::sendMessage(
+                            "🤖 <b>دستیار هوشمند</b>\n\n" . nl2br(htmlspecialchars($ai['answer'], ENT_QUOTES))
+                            . "\n\n<i>اگر پاسخ مورد نظرتان نبود، از منوی اصلی دکمهٔ «پشتیبانی» را دوباره بزنید.</i>",
+                            $chatId,
+                            null,
+                            $ctxAi['bot_token']
+                        );
+                    } else {
+                        $supportUser = ltrim((string)($ctxAi['support_username'] ?: Setting::get('support_telegram', '')), '@');
+                        $kbAi = null;
+                        if ($supportUser !== '') {
+                            $kbAi = ['inline_keyboard' => [[['text' => '👤 پیام مستقیم به پشتیبان', 'url' => 'https://t.me/' . rawurlencode($supportUser)]]]];
+                        }
+                        TelegramBot::sendMessage(
+                            "📮 <b>درخواست شما ثبت شد</b>\n\n"
+                            . "پشتیبان ما به‌زودی در گفتگوی خصوصی پاسخ می‌دهد. اگر فوری است، می‌توانید مستقیماً با آیدی پشتیبانی پیام دهید.",
+                            $chatId,
+                            $kbAi,
+                            $ctxAi['bot_token']
+                        );
+                        self::clearSession($pdo, $fromId);
+                    }
+                    return;
+                }
+                // AI did not handle it (e.g. reseller bot without active AI charge) — human support card
+                self::showSupportInfo($chatId);
+                return;
+            }
+        }
+
         // Command /start or /menu
         if (str_starts_with($text, '/start') || str_starts_with($text, '/menu') || $text === 'شروع' || $text === 'منو' || $text === 'دکمه ها' || $text === 'دکمه‌ها') {
             self::clearSession($pdo, $fromId);
@@ -1288,7 +1361,7 @@ class TelegramBotController {
             return;
         }
         if ($text === $supportText || $text === '☎️ پشتیبانی تلگرام') {
-            self::showSupportInfo($chatId);
+            self::enterAiSupport($pdo, $chatId, $fromId);
             return;
         }
         if ($text === $resellerText || $text === '🤝 درخواست نمایندگی' || $text === '🤝 درخواست پنل نمایندگی' || $text === '/reseller' || $text === '💼 اخذ نمایندگی') {
@@ -1795,50 +1868,6 @@ class TelegramBotController {
                 TelegramBot::sendMessage("❌ کلمه عبور وارد شده نادرست است.\nلطفاً کلمه عبور صحیح را مجدداً وارد فرمایید:", $chatId, [
                     'inline_keyboard' => [[['text' => '🔙 انصراف و بازگشت', 'callback_data' => 'menu_main']]]
                 ]);
-                return;
-            }
-        }
-
-        // AI support: free-text customer questions (owner bot always; reseller bots with valid AI charge)
-        if ($text !== '') {
-            require_once __DIR__ . '/../core/AiService.php';
-            $ctxAi = self::getContext($pdo);
-            $fromName = trim(($msg['from']['first_name'] ?? '') . ' ' . ($msg['from']['last_name'] ?? ''));
-            $ai = AiService::handleBotQuestion(
-                (int)($ctxAi['reseller_id'] ?? 1),
-                (string)($ctxAi['brand_name'] ?? ''),
-                $text,
-                $fromName,
-                $fromId
-            );
-            if ($ai['handled']) {
-                if ($ai['auto']) {
-                    // No inline keyboard on AI replies — menu buttons stay only on the main-menu message (bottom of chat)
-                    TelegramBot::sendMessage(
-                        "🤖 <b>دستیار هوشمند</b>\n\n" . nl2br(htmlspecialchars($ai['answer'], ENT_QUOTES))
-                        . "\n\n<i>اگر این پاسخ مشکلتان را حل نکرد، از منوی اصلی دکمهٔ «پشتیبانی» را بزنید تا با پشتیبان انسانی تماس بگیرید.</i>",
-                        $chatId,
-                        null,
-                        $ctxAi['bot_token']
-                    );
-                } else {
-                    $support = ltrim((string)($ctxAi['support_username'] ?: Setting::get('support_telegram', '')), '@');
-                    $kbAi = null;
-                    if ($support !== '') {
-                        $kbAi = [
-                            'inline_keyboard' => [
-                                [['text' => '👤 پیام مستقیم به پشتیبان', 'url' => 'https://t.me/' . rawurlencode($support)]],
-                            ],
-                        ];
-                    }
-                    TelegramBot::sendMessage(
-                        "📮 <b>درخواست شما ثبت شد</b>\n\n"
-                        . "پشتیبان ما به‌زودی در گفتگوی خصوصی پاسخ می‌دهد. اگر فوری است، می‌توانید مستقیماً با آیدی پشتیبانی پیام دهید.",
-                        $chatId,
-                        $kbAi,
-                        $ctxAi['bot_token']
-                    );
-                }
                 return;
             }
         }
@@ -2364,6 +2393,39 @@ class TelegramBotController {
     /**
      * Show Support Info
      */
+    /**
+     * Enter the AI Smart Support mode — the user has pressed the «پشتیبانی» button.
+     * When the AI feature is enabled for this bot (owner always; resellers need
+     * an active AI charge), the user enters a short AI support session where
+     * their free-text questions are answered by the AI. Otherwise we fall back
+     * to the classic human-support card (unchanged behavior).
+     */
+    private static function enterAiSupport(PDO $pdo, string $chatId, string $fromId, ?int $messageId = null): void {
+        require_once __DIR__ . '/../core/AiService.php';
+        $ctx = self::getContext($pdo);
+        $resellerId = (int)($ctx['reseller_id'] ?? 1);
+
+        $aiAvailable = AiService::enabled() && ($resellerId === 1 || AiService::subscriptionFor($resellerId) !== null);
+        if (!$aiAvailable) {
+            self::showSupportInfo($chatId, $messageId);
+            return;
+        }
+
+        self::setSession($pdo, $fromId, 'ai_support', []);
+        $msg = "🤖 <b>دستیار هوشمند</b>\n\n"
+             . "شما در بخش <b>پشتیبانی هوشمند</b> هستید.\n"
+             . "سؤال یا مشکل خود را به‌صورت <b>متن</b> بفرستید تا فوراً پاسخ بگیرید.\n\n"
+             . "برای خروج و بازگشت به منوی اصلی، دکمهٔ پایین را بزنید.";
+        $kb = ['inline_keyboard' => [[['text' => '🔙 بازگشت به منوی اصلی', 'callback_data' => 'exit_ai_support']]]];
+        $edited = false;
+        if ($messageId) {
+            $edited = TelegramBot::editMessageText($msg, $chatId, $messageId, $kb, $ctx['bot_token']);
+        }
+        if (!$edited) {
+            TelegramBot::sendMessage($msg, $chatId, $kb, $ctx['bot_token']);
+        }
+    }
+
     private static function showSupportInfo(string $chatId, ?int $messageId = null): void {
         $supportId = Setting::get('support_telegram', '@Connectix_Admin');
         $msg = "☎️ <b>پشتیبانی و ارتباط با مدیریت</b>\n\n"

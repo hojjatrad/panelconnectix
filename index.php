@@ -511,6 +511,9 @@ $router->get('monitor/heartbeat', function() {
     echo json_encode($out, JSON_UNESCAPED_UNICODE);
 });
 
+// Server-side diagnostics (key-protected; temporary — used for production debugging)
+$router->get('monitor/diag', [DiagController::class, 'run']);
+
 // Cron Job Execution Endpoints
 $router->get('sync', function() {
     require_once __DIR__ . '/cron/sync.php';
