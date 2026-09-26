@@ -17,21 +17,33 @@ require_once __DIR__ . '/TelegramBot.php';
 
 class AiService {
 
-    private const PROVIDERS = ['groq', 'gemini', 'openrouter'];
+    public const PROVIDERS = ['groq', 'gemini', 'openrouter'];
     private const DEFAULTS = [
         'ai_enabled'        => '0',
         'ai_auto_reply'     => '0',
         'ai_groq_key'       => '',
-        'ai_groq_model'     => 'llama-3.3-70b-versatile',
+        'ai_groq_model'     => 'openai/gpt-oss-120b',
         'ai_gemini_key'     => '',
         'ai_gemini_model'   => 'gemini-2.5-flash',
         'ai_openrouter_key' => '',
-        'ai_openrouter_model' => 'meta-llama/llama-3.3-70b-instruct:free',
+        'ai_openrouter_model' => 'qwen/qwen3.8-27b:free',
         'ai_temperature'    => '0.4',
         'ai_min_confidence' => '0.6',
         'ai_daily_quota'    => '150',
         'ai_monthly_price'  => '500000',
     ];
+
+    /** Preferred model per provider (rosters change — used for auto-fix). */
+    private static function modelPreferences(string $provider): array {
+        return match ($provider) {
+            'groq'       => ['openai/gpt-oss-120b', 'qwen/qwen3.6-27b', 'openai/gpt-oss-20b', 'groq/compound-mini',
+                             'llama-3.3-70b-versatile', 'llama-3.1-8b-instant'],
+            'openrouter' => ['qwen/qwen3.8-27b:free', 'nvidia/nemotron-3-super-120b-a12b:free',
+                             'google/gemma-4-31b-it:free', 'meta-llama/llama-3.3-70b-instruct:free'],
+            'gemini'     => ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash'],
+            default      => [],
+        };
+    }
 
     // ------------------------------------------------------------------
     // Settings
@@ -323,6 +335,85 @@ class AiService {
         return "HTTP {$r['http']}: " . $msg;
     }
 
+    private static function httpGetJson(string $url, array $headers, int $timeout = 8): array {
+        $ch = curl_init($url);
+        $headers[] = 'Accept: application/json';
+        curl_setopt_array($ch, [
+            CURLOPT_HTTPHEADER => $headers,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => $timeout,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_SSL_VERIFYPEER => true,
+        ]);
+        $raw = curl_exec($ch);
+        $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err = curl_error($ch);
+        curl_close($ch);
+        $json = $raw ? json_decode((string)$raw, true) : null;
+        return ['http' => $code, 'json' => is_array($json) ? $json : null, 'curl_err' => $err];
+    }
+
+    /** List model ids available to this provider (empty on failure). */
+    public static function listModels(string $provider): array {
+        if (!in_array($provider, self::PROVIDERS, true)) return [];
+        try {
+            if ($provider === 'openrouter') {
+                // public endpoint, no key needed
+                $r = self::httpGetJson('https://openrouter.ai/api/v1/models', []);
+                return array_values(array_filter(array_map('strval', array_column($r['json']['data'] ?? [], 'id'))));
+            }
+            $key = self::cfg("ai_{$provider}_key");
+            if ($key === '') return [];
+            if ($provider === 'groq') {
+                $r = self::httpGetJson('https://api.groq.com/openai/v1/models', ['Authorization: Bearer ' . $key]);
+                return array_values(array_filter(array_map('strval', array_column($r['json']['data'] ?? [], 'id'))));
+            }
+            // gemini
+            $r = self::httpGetJson('https://generativelanguage.googleapis.com/v1beta/models?key=' . rawurlencode($key), []);
+            $ids = [];
+            foreach (($r['json']['models'] ?? []) as $m) {
+                $name = (string)($m['name'] ?? '');
+                if ($name !== '') $ids[] = substr($name, 7); // strip "models/"
+            }
+            return array_values(array_filter($ids));
+        } catch (Throwable $e) {
+            return [];
+        }
+    }
+
+    /**
+     * Verify the configured model against the provider's live roster.
+     * If it's gone, auto-pick the best available one and save it.
+     * Returns [currentModel, list] or [null, []] when it cannot be verified.
+     */
+    public static function resolveModel(string $provider): array {
+        $list = self::listModels($provider);
+        $current = self::cfg("ai_{$provider}_model");
+        if ($list === []) return [$current, []];
+        if (in_array($current, $list, true)) return [$current, $list];
+        foreach (self::modelPreferences($provider) as $pref) {
+            if (in_array($pref, $list, true)) {
+                Setting::set("ai_{$provider}_model", $pref);
+                return [$pref, $list];
+            }
+        }
+        // last resort: first :free (openrouter) or first model at all
+        $pick = null;
+        if ($provider === 'openrouter') {
+            foreach ($list as $m) if (str_ends_with($m, ':free')) { $pick = $m; break; }
+        }
+        if ($pick === null) $pick = $list[0];
+        Setting::set("ai_{$provider}_model", $pick);
+        return [$pick, $list];
+    }
+
+    private static function isModelError(array $res): bool {
+        $http = (int)($res['http'] ?? 0);
+        $err = (string)($res['error'] ?? '');
+        if ($http === 404) return true;
+        return (stripos($err, 'model') !== false && (stripos($err, 'not exist') !== false || stripos($err, 'does not exist') !== false || stripos($err, 'no access') !== false || stripos($err, 'not found') !== false));
+    }
+
     /**
      * Try providers in fixed priority order until one succeeds.
      * Returns [ok, provider, model, content, error, latency_ms, tokens]
@@ -338,19 +429,33 @@ class AiService {
                 continue;
             }
             $model = self::cfg("ai_{$p}_model");
+            $autofixed = false;
             $t0 = microtime(true);
-            try {
-                if ($p === 'groq') $res = self::callGroq($key, $model, $system, $user, $temp);
-                elseif ($p === 'gemini') $res = self::callGemini($key, $model, $system, $user, $temp);
-                else $res = self::callOpenRouter($key, $model, $system, $user, $temp);
-            } catch (Throwable $e) {
-                $res = ['ok' => false, 'error' => $e->getMessage()];
+            $callOnce = function (string $m) use ($p, $key, $system, $user, $temp): array {
+                try {
+                    if ($p === 'groq') return self::callGroq($key, $m, $system, $user, $temp);
+                    if ($p === 'gemini') return self::callGemini($key, $m, $system, $user, $temp);
+                    return self::callOpenRouter($key, $m, $system, $user, $temp);
+                } catch (Throwable $e) {
+                    return ['ok' => false, 'error' => $e->getMessage()];
+                }
+            };
+            $res = $callOnce($model);
+            // Roster drift (provider removed/renamed the model): auto-pick a live one and retry once
+            if (empty($res['ok']) && self::isModelError($res)) {
+                [$fixed, $liveList] = self::resolveModel($p);
+                if ($fixed !== null && $fixed !== $model && in_array($model, $liveList, true) === false) {
+                    $model = $fixed;
+                    $autofixed = true;
+                    $res = $callOnce($model);
+                }
             }
             $lat = (int)round((microtime(true) - $t0) * 1000);
             if (!empty($res['ok'])) {
                 self::bumpQuota($p);
                 return ['ok' => true, 'provider' => $p, 'model' => $model, 'content' => $res['content'],
-                        'error' => '', 'latency_ms' => $lat, 'tokens' => $res['tokens'] ?? []];
+                        'error' => '', 'latency_ms' => $lat, 'tokens' => $res['tokens'] ?? [],
+                        'autofixed' => $autofixed];
             }
             // 401/403 = bad key: no point trying further with same key, but continue to next provider
             $failures[$p] = $res['error'] ?? 'unknown';
@@ -370,7 +475,7 @@ class AiService {
         $lat = (int)round((microtime(true) - $t0) * 1000);
         if ($r['ok']) {
             return ['ok' => true, 'provider' => $r['provider'], 'model' => $r['model'], 'latency_ms' => $lat,
-                    'answer' => mb_substr(trim((string)$r['content']), 0, 120)];
+                    'answer' => mb_substr(trim((string)$r['content']), 0, 120), 'autofixed' => !empty($r['autofixed'])];
         }
         return ['ok' => false, 'error' => $r['error'], 'latency_ms' => $lat];
     }

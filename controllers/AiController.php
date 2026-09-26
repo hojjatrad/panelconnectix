@@ -80,10 +80,32 @@ class AiController {
         $provider = (string)($_POST['provider'] ?? '');
         $res = AiService::testProvider($provider);
         if ($res['ok']) {
-            Helpers::flash('success', "اتصال {$provider} موفق بود ✓ (مدل: " . ($res['model'] ?? '') . " — {$res['latency_ms']}ms)");
+            $note = !empty($res['autofixed']) ? ' — ⚠ مدل قدیمی حذف شده بود و به‌صورت خودکار به مدل زنده اصلاح شد' : '';
+            Helpers::flash('success', "اتصال {$provider} موفق بود ✓ (مدل: " . ($res['model'] ?? '') . " — {$res['latency_ms']}ms){$note}");
         } else {
             Helpers::flash('error', "اتصال {$provider} ناموفق: " . ($res['error'] ?? 'خطای ناشناخته'));
         }
+        Helpers::redirect('settings/ai');
+    }
+
+    /** Fetch live model rosters and auto-fix any stale configured model. */
+    public function refreshModels(): void {
+        self::adminOnly();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
+            Helpers::redirect('settings/ai');
+        }
+        $parts = [];
+        foreach (AiService::PROVIDERS as $p) {
+            if (AiService::cfg("ai_{$p}_key") === '' && $p !== 'openrouter') continue;
+            [$model, $list] = AiService::resolveModel($p);
+            if ($list === []) {
+                $parts[] = "{$p}: ❌ فهرست مدل‌ها دریافت نشد (کلید/ارتباط)";
+            } else {
+                $parts[] = "{$p}: ✓ " . count($list) . " مدل — انتخاب: " . $model;
+            }
+        }
+        Helpers::flash('info', 'به‌روزرسانی فهرست مدل‌ها: ' . implode(' | ', $parts ?: ['کلیدی پیکربندی نشده']));
         Helpers::redirect('settings/ai');
     }
 

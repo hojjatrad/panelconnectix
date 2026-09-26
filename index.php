@@ -458,6 +458,7 @@ $router->post('tickets/ai-draft/discard', [TicketController::class, 'aiDraftDisc
 $router->get('settings/ai', [AiController::class, 'index']);
 $router->post('settings/ai/save', [AiController::class, 'save']);
 $router->post('settings/ai/test', [AiController::class, 'testProvider']);
+$router->post('settings/ai/refresh-models', [AiController::class, 'refreshModels']);
 $router->get('settings/ai/knowledge', [AiController::class, 'knowledge']);
 $router->post('settings/ai/knowledge/store', [AiController::class, 'knowledgeStore']);
 $router->post('settings/ai/knowledge/update', [AiController::class, 'knowledgeUpdate']);

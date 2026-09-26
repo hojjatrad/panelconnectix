@@ -82,11 +82,21 @@ $maskKey = fn(string $k): string => $k !== '' ? str_repeat('•', 8) . substr($k
                 <h3 class="text-xs font-bold text-white flex items-center gap-2 mb-1"><i class="fa-solid fa-microchip text-cyan-400"></i> کلیدهای API (رایگان)</h3>
                 <p class="text-[11px] text-slate-500">اولویت خودکار: <b class="text-slate-300">Groq ← Gemini ← OpenRouter</b> — اگر یکی سقف روزانش پر شد یا خطا داد، بعدی امتحان می‌شود. کلیدها را از کنسول همان سرویس بگیرید (بدون کارت اعتباری).</p>
             </div>
+            <div class="flex items-center justify-between gap-3 bg-slate-950/50 border border-slate-800 rounded-xl p-3">
+                <span class="text-[11px] text-slate-400">فهرست مدل‌ها مدام عوض می‌شود؛ اگر خطای «model does not exist» گرفتید، این دکمه فهرست زنده را می‌کشد و مدل را خودکار اصلاح می‌کند.</span>
+                <form method="POST" action="<?= Helpers::url('settings/ai/refresh-models') ?>" class="m-0 shrink-0">
+                    <?= Helpers::csrfField() ?>
+                    <button type="submit" class="px-3.5 py-2 bg-slate-800 hover:bg-violet-900/50 text-violet-300 rounded-xl text-[11px] font-bold border border-slate-700 transition flex items-center gap-2">
+                        <i class="fa-solid fa-arrows-rotate"></i> دریافت فهرست مدل‌ها و اصلاح خودکار
+                    </button>
+                </form>
+            </div>
+
             <div class="grid grid-cols-1 gap-4">
                 <!-- Groq -->
                 <div class="bg-slate-950/50 border border-slate-800 rounded-xl p-4 space-y-2">
                     <div class="flex items-center justify-between">
-                        <span class="text-xs font-bold text-white">Groq <span class="text-[10px] text-emerald-400 font-normal">— ۱٬۰۰ درخواست/روز رایگان (llama-3.3-70b)</span></span>
+                        <span class="text-xs font-bold text-white">Groq <span class="text-[10px] text-emerald-400 font-normal">— لایه رایگان: gpt-oss-120b / qwen3.6 (مدل‌های llama از تیر ۱۴۰۵ از لایه رایگان حذف شدند)</span></span>
                         <a href="https://console.groq.com/keys" target="_blank" class="text-[10px] text-cyan-400 hover:underline"> دریافت کلید ↗</a>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
