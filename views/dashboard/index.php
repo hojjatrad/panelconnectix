@@ -210,6 +210,70 @@ require __DIR__ . '/../layout/header.php';
     </div>
 </div>
 
+<!-- 2a. 72h Trend (sparklines) -->
+<?php
+if (!function_exists('sparkline_svg')) {
+    function sparkline_svg(array $rows, string $key, string $color): string {
+        $vals = array_map(fn($r) => (float)($r[$key] ?? 0), $rows);
+        $n = count($vals);
+        if ($n === 0) return '';
+        $max = max($vals);
+        $min = min($vals);
+        $span = max(1.0, $max - $min);
+        $W = 600; $H = 80; $pad = 4;
+        $pts = [];
+        for ($i = 0; $i < $n; $i++) {
+            $x = $pad + ($W - 2 * $pad) * ($n === 1 ? 0 : $i / ($n - 1));
+            $y = $H - $pad - ($H - 2 * $pad) * (($vals[$i] - $min) / $span);
+            $pts[] = round($x, 1) . ',' . round($y, 1);
+        }
+        $area = $pts[0] . ' ' . implode(' ', $pts) . ' ' . round($W - $pad, 1) . ',' . ($H - $pad) . ' ' . $pad . ',' . ($H - $pad);
+        return '<svg viewBox="0 0 ' . $W . ' ' . $H . '" preserveAspectRatio="none" class="w-full h-20">'
+            . '<polygon points="' . $area . '" fill="' . $color . '18" />'
+            . '<polyline points="' . implode(' ', $pts) . '" fill="none" stroke="' . $color . '" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" /></svg>';
+    }
+}
+if (!empty($metrics72h) && count($metrics72h) >= 2) {
+    $firstTs = date('d/m H:i', strtotime((string)$metrics72h[0]['ts']));
+    $lastTs = date('d/m H:i', strtotime((string)end($metrics72h)['ts']));
+    $gbNow = number_format((float)end($metrics72h)['traffic_used_total'] / 1073741824, 1);
+    $actNow = (int)end($metrics72h)['active_clients'];
+    $nodesNow = (int)end($metrics72h)['online_nodes'] . '/' . (int)end($metrics72h)['total_nodes'];
+    ?>
+<div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-sm">
+    <div class="flex items-center justify-between mb-4">
+        <div>
+            <h3 class="font-bold text-sm text-white">روند ۷۲ ساعت اخیر</h3>
+            <p class="text-xs text-slate-400 mt-0.5">برآورد زنده از موتور همگام‌سازی (هر ۳۰ دقیقه)</p>
+        </div>
+        <span class="text-[11px] font-mono text-slate-500" dir="ltr"><?= $firstTs ?> ← <?= $lastTs ?></span>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
+        <div>
+            <div class="flex justify-between items-end mb-1">
+                <span class="text-xs text-slate-400">مصرف تراکم کل</span>
+                <span class="text-sm font-black text-cyan-300" dir="ltr"><?= $gbNow ?> GB</span>
+            </div>
+            <?= sparkline_svg($metrics72h, 'traffic_used_total', '#22D3EE') ?>
+        </div>
+        <div>
+            <div class="flex justify-between items-end mb-1">
+                <span class="text-xs text-slate-400">کلاینت‌های فعال</span>
+                <span class="text-sm font-black text-emerald-300" dir="ltr"><?= number_format($actNow) ?></span>
+            </div>
+            <?= sparkline_svg($metrics72h, 'active_clients', '#34D399') ?>
+        </div>
+        <div>
+            <div class="flex justify-between items-end mb-1">
+                <span class="text-xs text-slate-400">نودهای برخط</span>
+                <span class="text-sm font-black text-purple-300" dir="ltr"><?= $nodesNow ?></span>
+            </div>
+            <?= sparkline_svg($metrics72h, 'online_nodes', '#A78BFA') ?>
+        </div>
+    </div>
+</div>
+<?php } ?>
+
 <!-- 2b. Top Resellers (admin) -->
 <?php if (!empty($topResellers)): ?>
 <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-sm">

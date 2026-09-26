@@ -4,7 +4,7 @@ require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Setting.php';
 
 class Updater {
-    public const CURRENT_VERSION = '5.2.2';
+    public const CURRENT_VERSION = '5.2.3';
 
     public static function getCurrentVersion(): string {
         $dbVer = Setting::get('current_version', '');

@@ -58,6 +58,16 @@ class DashboardController {
         require_once __DIR__ . '/../core/Provisioner.php';
         $tierInfo = Provisioner::getResellerTier($userId);
 
+        // 7a. 72-hour metrics history (trend sparklines)
+        $metrics72h = [];
+        try {
+            $cutoff = $pdo->quote(date('Y-m-d H:i:s', strtotime('-72 hours')));
+            $metrics72h = $pdo->query("SELECT ts, traffic_used_total, active_clients, total_clients, online_nodes, total_nodes
+                                       FROM metrics WHERE ts >= {$cutoff} ORDER BY ts ASC LIMIT 400")->fetchAll();
+        } catch (Throwable $e) {
+            $metrics72h = [];
+        }
+
         // 7. Top Resellers (admin only): active clients + 7-day purchases
         $topResellers = [];
         if ($isAdmin) {

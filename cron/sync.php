@@ -29,7 +29,8 @@ $pdo = Database::getConnection();
 try {
     $lastRun = (int)Setting::get('last_cron_sync_at', '0');
     $lastAlert = (int)Setting::get('last_cron_dead_alert', '0');
-    if ($lastRun !== 0 && (time() - $lastRun > 300) && (time() - $lastAlert > 1800)) {
+    $deadSec = (int)Setting::get('cron_dead_alert_secs', '900'); // default 15 min (sync can be long)
+    if ($lastRun !== 0 && (time() - $lastRun > $deadSec) && (time() - $lastAlert > 1800)) {
         Setting::set('last_cron_dead_alert', (string)time());
         $minutes = round((time() - $lastRun) / 60);
         TelegramBot::sendCategorizedReport('servers', "🫀 <b>هشدار تپش کرون (Cron Heartbeat)</b>\n\n"
@@ -568,6 +569,26 @@ try {
     echo "[Digest Error] " . $e->getMessage() . $eol;
 }
 
+// 6d. Metrics Snapshot (every 30 min → dashboard 72h trend charts)
+try {
+    $lastSnap = (int)Setting::get('last_metrics_snapshot', '0');
+    if (time() - $lastSnap >= 1800) {
+        Setting::set('last_metrics_snapshot', (string)time());
+        $mActive = (int)$pdo->query("SELECT COUNT(*) FROM clients WHERE status = 'active'")->fetchColumn();
+        $mTotal = (int)$pdo->query("SELECT COUNT(*) FROM clients")->fetchColumn();
+        $mOnline = (int)$pdo->query("SELECT COUNT(*) FROM server_nodes WHERE is_active = 1 AND health_status = 'online'")->fetchColumn();
+        $mNodes = (int)$pdo->query("SELECT COUNT(*) FROM server_nodes WHERE is_active = 1")->fetchColumn();
+        $mTraffic = $pdo->query("SELECT COALESCE(SUM(traffic_used_bytes),0) AS u, COALESCE(SUM(traffic_limit_bytes),0) AS l FROM clients WHERE status = 'active'")->fetch();
+        $pdo->prepare("INSERT INTO metrics (ts, active_clients, total_clients, online_nodes, total_nodes, traffic_used_total, traffic_limit_total)
+                       VALUES (CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?)")
+            ->execute([$mActive, $mTotal, $mOnline, $mNodes, (int)$mTraffic['u'], (int)$mTraffic['l']]);
+        $pdo->prepare("DELETE FROM metrics WHERE ts < ?")->execute([date('Y-m-d H:i:s', strtotime('-14 days'))]);
+        echo "[Metrics] Snapshot saved (active={$mActive}, nodes={$mOnline}/{$mNodes})." . $eol;
+    }
+} catch (Throwable $e) {
+    echo "[Metrics Error] " . $e->getMessage() . $eol;
+}
+
 // 6c. Monthly Backup Restore Self-Test (validates the latest backup is restorable)
 try {
     $lastRestoreTest = (int)Setting::get('last_cron_restore_test', '0');
@@ -630,4 +651,10 @@ try {
 } catch (Throwable $e) {
     echo "[RestoreTest Error] " . $e->getMessage() . $eol;
 }
+
+// Mark successful full completion (heartbeat freshness = "cron finished cleanly")
+try {
+    Setting::set('last_cron_sync_at', (string)time());
+} catch (Throwable $e) {}
+echo "[" . date('Y-m-d H:i:s') . "] Sync engine completed cleanly." . $eol;
 

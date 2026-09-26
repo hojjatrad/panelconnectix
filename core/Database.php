@@ -287,6 +287,19 @@ class Database {
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )");
 
+            // Time-series snapshots for dashboard trend charts (72h sparklines)
+            $pdo->exec("CREATE TABLE IF NOT EXISTS metrics (
+                id $autoInc,
+                ts DATETIME NOT NULL,
+                active_clients INT DEFAULT 0,
+                total_clients INT DEFAULT 0,
+                online_nodes INT DEFAULT 0,
+                total_nodes INT DEFAULT 0,
+                traffic_used_total BIGINT DEFAULT 0,
+                traffic_limit_total BIGINT DEFAULT 0,
+                PRIMARY KEY (id)
+            )");
+
             // 2. Safe Column Additions for Core Tables
             $userCols = [
                 'telegram_bot_token' => 'VARCHAR(255) NULL',
