@@ -4,7 +4,7 @@ require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Setting.php';
 
 class Updater {
-    public const CURRENT_VERSION = '5.2.0';
+    public const CURRENT_VERSION = '5.2.2';
 
     public static function getCurrentVersion(): string {
         $dbVer = Setting::get('current_version', '');
@@ -114,23 +114,28 @@ class Updater {
         if ($res && isset($res['tag_name'])) {
             $latestTag = ltrim($res['tag_name'], 'vV');
             $hasUpdate = version_compare($latestTag, $currentVer, '>');
-            $downloadUrl = $res['zipball_url'] ?? "https://github.com/{$repo}/archive/refs/tags/{$res['tag_name']}.zip";
 
-            $result = [
-                'has_update' => $hasUpdate,
-                'current_version' => $currentVer,
-                'latest_version' => $latestTag,
-                'release_title' => $res['name'] ?? "Release v{$latestTag}",
-                'changelog' => $res['body'] ?? 'به‌روزرسانی‌های امنیتی و بهبود عملکرد پنل',
-                'download_url' => $downloadUrl,
-                'published_at' => $res['published_at'] ?? date('Y-m-d H:i:s'),
-                'checked_at' => date('Y-m-d H:i:s'),
-                'type' => 'release'
-            ];
+            // IMPORTANT: only short-circuit when the release is actually NEWER.
+            // App-release tags (e.g. v3.0.0) must NOT mask newer same-version
+            // commits on main — fall through to the commit SHA check below.
+            if ($hasUpdate) {
+                $downloadUrl = $res['zipball_url'] ?? "https://github.com/{$repo}/archive/refs/tags/{$res['tag_name']}.zip";
+                $result = [
+                    'has_update' => $hasUpdate,
+                    'current_version' => $currentVer,
+                    'latest_version' => $latestTag,
+                    'release_title' => $res['name'] ?? "Release v{$latestTag}",
+                    'changelog' => $res['body'] ?? 'به‌روزرسانی‌های امنیتی و بهبود عملکرد پنل',
+                    'download_url' => $downloadUrl,
+                    'published_at' => $res['published_at'] ?? date('Y-m-d H:i:s'),
+                    'checked_at' => date('Y-m-d H:i:s'),
+                    'type' => 'release'
+                ];
 
-            Setting::set('update_check_cache', json_encode($result));
-            Setting::set('update_check_time', (string)time());
-            return $result;
+                Setting::set('update_check_cache', json_encode($result));
+                Setting::set('update_check_time', (string)time());
+                return $result;
+            }
         }
 
         // 3. Fallback to branch commits API if no release tagged

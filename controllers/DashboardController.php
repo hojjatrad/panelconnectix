@@ -58,6 +58,25 @@ class DashboardController {
         require_once __DIR__ . '/../core/Provisioner.php';
         $tierInfo = Provisioner::getResellerTier($userId);
 
+        // 7. Top Resellers (admin only): active clients + 7-day purchases
+        $topResellers = [];
+        if ($isAdmin) {
+            try {
+                $weekAgo = date('Y-m-d H:i:s', strtotime('-7 days'));
+                $stmtTop = $pdo->prepare("SELECT u.id, u.full_name, u.username, u.wallet_balance,
+                        (SELECT COUNT(*) FROM clients c WHERE c.reseller_id = u.id AND c.status = 'active') AS active_clients,
+                        (SELECT COALESCE(SUM(t.amount),0) FROM transactions t WHERE t.user_id = u.id AND t.status = 'completed' AND t.amount > 0 AND t.created_at >= ?) AS week_sales
+                     FROM users u
+                     WHERE u.role = 'reseller' AND u.status = 'active'
+                     ORDER BY active_clients DESC, week_sales DESC
+                     LIMIT 5");
+                $stmtTop->execute([$weekAgo]);
+                $topResellers = $stmtTop->fetchAll();
+            } catch (Throwable $e) {
+                $topResellers = [];
+            }
+        }
+
         // 7. Net Profit & Sales Analytics
         $totalIncome = (int)$pdo->query("SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE amount > 0 AND $transWhere")->fetchColumn();
         $netProfit = max(0, (int)round($totalSpent * 0.45)); // Estimated profit margin

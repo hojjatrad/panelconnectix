@@ -515,6 +515,11 @@ $router->get('updater/webhook', [UpdateController::class, 'webhook']);
 // Public Subscription & Dynamic QR Landing Endpoint
 $router->get('sub/{token}', [SublinkControllerV2::class, 'show']);
 
+// Client Self-Service Portal (end-customers, username+password)
+$router->get('client', [ClientPortalController::class, 'index']);
+$router->post('client/login', [ClientPortalController::class, 'login']);
+$router->get('client/logout', [ClientPortalController::class, 'logout']);
+
 // Reseller & Bot REST API (v1)
 $router->get('api/v1/wallet', [ApiControllerV2::class, 'getWallet']);
 $router->get('api/v1/plans', [ApiControllerV2::class, 'getPlans']);

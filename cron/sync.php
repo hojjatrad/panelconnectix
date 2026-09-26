@@ -517,6 +517,57 @@ try {
     echo "[Capacity Error] " . $e->getMessage() . $eol;
 }
 
+// 6b2. Weekly Reseller Digest (sent via each reseller's own Telegram bot)
+try {
+    $lastDigest = (int)Setting::get('last_cron_reseller_digest', '0');
+    if (time() - $lastDigest >= 604800) { // 7 days
+        Setting::set('last_cron_reseller_digest', (string)time());
+        $weekAgo = date('Y-m-d H:i:s', strtotime('-7 days'));
+        $expSoonEnd = date('Y-m-d H:i:s', strtotime('+7 days'));
+        $resellers = $pdo->query("SELECT id, full_name, username, wallet_balance, telegram_bot_token, telegram_admin_chat_id, telegram_bot_username
+                                  FROM users WHERE role = 'reseller' AND status = 'active' AND telegram_bot_token IS NOT NULL AND telegram_bot_token != ''")->fetchAll();
+        $sentDigests = 0;
+        foreach ($resellers as $rs) {
+            if (empty($rs['telegram_admin_chat_id'])) continue;
+            try {
+                $stA = $pdo->prepare("SELECT COUNT(*) FROM clients WHERE reseller_id = ? AND status = 'active'");
+                $stA->execute([$rs['id']]);
+                $activeC = (int)$stA->fetchColumn();
+
+                $stS = $pdo->prepare("SELECT COALESCE(SUM(amount),0) FROM transactions WHERE user_id = ? AND status = 'completed' AND amount > 0 AND created_at >= ?");
+                $stS->execute([$rs['id'], $weekAgo]);
+                $weekSales = (int)$stS->fetchColumn();
+
+                $stE = $pdo->prepare("SELECT COUNT(*) FROM clients WHERE reseller_id = ? AND status = 'active' AND expire_at IS NOT NULL AND expire_at BETWEEN ? AND ?");
+                $stE->execute([$rs['id'], date('Y-m-d H:i:s'), $expSoonEnd]);
+                $expSoon = (int)$stE->fetchColumn();
+
+                $stNew = $pdo->prepare("SELECT COUNT(*) FROM clients WHERE reseller_id = ? AND created_at >= ?");
+                $stNew->execute([$rs['id'], $weekAgo]);
+                $newC = (int)$stNew->fetchColumn();
+
+                $digest = "📊 <b>گزارش هفتگی نمایندگی — کانکتیکس</b>\n\n"
+                    . "👤 نماینده: <b>" . htmlspecialchars((string)($rs['full_name'] ?: $rs['username'])) . "</b>\n"
+                    . "──────────────\n"
+                    . "🟢 کلاینت‌های فعال: <b>" . number_format($activeC) . "</b>\n"
+                    . "🆕 صدور جدید (۷ روز): <b>" . number_format($newC) . "</b>\n"
+                    . "🛒 خرید شما (۷ روز): <b>" . number_format($weekSales) . " تومان</b>\n"
+                    . "⏳ منقضی‌شونده تا ۷ روز دیگر: <b>" . number_format($expSoon) . "</b>\n"
+                    . "💳 موجودی کیف‌پول: <b>" . number_format((int)$rs['wallet_balance']) . " تومان</b>\n"
+                    . "──────────────\n"
+                    . "گزارش‌های کامل مالی: پنل → صورت‌حساب‌ها";
+                $sent = TelegramBot::sendMessage($digest, (string)$rs['telegram_admin_chat_id'], null, (string)$rs['telegram_bot_token']);
+                if ($sent) $sentDigests++;
+            } catch (Throwable $eR) {
+                echo "[Digest Error] reseller {$rs['id']}: " . $eR->getMessage() . $eol;
+            }
+        }
+        echo "[Digest] Weekly reseller digests sent: {$sentDigests} of " . count($resellers) . $eol;
+    }
+} catch (Throwable $e) {
+    echo "[Digest Error] " . $e->getMessage() . $eol;
+}
+
 // 6c. Monthly Backup Restore Self-Test (validates the latest backup is restorable)
 try {
     $lastRestoreTest = (int)Setting::get('last_cron_restore_test', '0');

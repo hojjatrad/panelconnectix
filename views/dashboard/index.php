@@ -210,6 +210,46 @@ require __DIR__ . '/../layout/header.php';
     </div>
 </div>
 
+<!-- 2b. Top Resellers (admin) -->
+<?php if (!empty($topResellers)): ?>
+<div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-sm">
+    <div class="flex items-center justify-between mb-4">
+        <div>
+            <h3 class="font-bold text-sm text-white">نمایندگان برتر</h3>
+            <p class="text-xs text-slate-400 mt-0.5">بر اساس کلاینت‌های فعال و خریدهای ۷ روز اخیر</p>
+        </div>
+        <a href="<?= Helpers::url('resellers') ?>" class="text-xs text-purple-400 hover:underline">مدیریت نمایندگان</a>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-right text-xs">
+            <thead>
+                <tr class="text-slate-400 border-b border-slate-800/80 pb-2">
+                    <th class="py-2 font-semibold">نماینده</th>
+                    <th class="py-2 font-semibold">کلاینت فعال</th>
+                    <th class="py-2 font-semibold">خرید ۷ روز اخیر</th>
+                    <th class="py-2 font-semibold">موجودی کیف‌پول</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800/60">
+                <?php foreach ($topResellers as $rank => $tr): ?>
+                <tr>
+                    <td class="py-2.5">
+                        <div class="flex items-center gap-2">
+                            <span class="w-5 h-5 rounded-md bg-purple-500/15 text-purple-300 text-[10px] font-black flex items-center justify-center"><?= $rank + 1 ?></span>
+                            <span class="font-bold text-white"><?= htmlspecialchars((string)($tr['full_name'] ?: $tr['username'])) ?></span>
+                        </div>
+                    </td>
+                    <td class="py-2.5 font-bold text-emerald-400"><?= number_format((int)$tr['active_clients']) ?></td>
+                    <td class="py-2.5 font-semibold text-purple-300"><?= Helpers::formatMoney((int)$tr['week_sales']) ?></td>
+                    <td class="py-2.5 text-slate-300"><?= Helpers::formatMoney((int)$tr['wallet_balance']) ?></td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
+<?php endif; ?>
+
 <!-- 3. Server Nodes Status & Recent Clients -->
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     <!-- Server Nodes Live List -->

@@ -59,13 +59,24 @@ class NodeSync {
 
         $adminId = (int)($pdo->query("SELECT id FROM users WHERE role = 'admin' ORDER BY id ASC LIMIT 1")->fetchColumn() ?: 1);
 
+        // Optional attribution for imported (node-direct) clients:
+        // node_sync_reseller_id / node_sync_plan_id (0/empty = admin/no plan)
+        $syncResellerId = (int)Setting::get('node_sync_reseller_id', '0');
+        $syncPlanId = (int)Setting::get('node_sync_plan_id', '0');
+        if ($syncResellerId > 0) {
+            $syncResellerId = (int)$pdo->query("SELECT id FROM users WHERE id = " . $syncResellerId . " LIMIT 1")->fetchColumn() ?: $adminId;
+        } else {
+            $syncResellerId = $adminId;
+        }
+        $planExists = $syncPlanId > 0 && (int)$pdo->query("SELECT COUNT(*) FROM plans WHERE id = {$syncPlanId}")->fetchColumn() > 0;
+
         $stFind = $pdo->prepare("SELECT id, node_sync FROM clients WHERE server_id = ? AND username = ?");
         $stIns  = $pdo->prepare(
             "INSERT INTO clients
                 (reseller_id, server_id, plan_id, username, password, uuid, sub_token,
                  traffic_limit_bytes, traffic_used_bytes, expire_at, status, node_sublink,
                  node_sync, custom_note, created_at)
-             VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'مستقیم سرور', CURRENT_TIMESTAMP)"
+             VALUES (?, ?, " . ($planExists ? '?' : 'NULL') . ", ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'مستقیم سرور', CURRENT_TIMESTAMP)"
         );
         $stUpd = $pdo->prepare(
             "UPDATE clients
@@ -96,9 +107,14 @@ class NodeSync {
                     $stUpd->execute([$limit, $used, $expireAt, $status, $nodeSub, (int)$row['id']]);
                     $stats['updated']++;
                 } else {
-                    $stIns->execute([
-                        $adminId,
+                    $insParams = [
+                        $syncResellerId,
                         (int)($server['id'] ?? 0),
+                    ];
+                    if ($planExists) {
+                        $insParams[] = $syncPlanId;
+                    }
+                    $insParams = array_merge($insParams, [
                         $username,
                         self::generatePassword(),
                         self::generateUuid(),
@@ -109,6 +125,7 @@ class NodeSync {
                         $status,
                         $nodeSub,
                     ]);
+                    $stIns->execute($insParams);
                     $stats['added']++;
                 }
             } catch (Throwable $e) {

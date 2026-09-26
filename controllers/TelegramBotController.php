@@ -1192,6 +1192,35 @@ class TelegramBotController {
             return;
         }
 
+        // Method 4b: Text command aliases — /status and /renew [username|sublink]
+        if (preg_match('/^\/(status|info|توضیح|وضعیت)\s*$/', $text)) {
+            self::setSession($pdo, $fromId, 'awaiting_guest_username', []);
+            TelegramBot::sendMessage("🔍 <b>استعلام و تمدید سریع اشتراک</b>\n\nلطفاً <b>نام کاربری</b> یا <b>لینک ساب‌لینک</b> اشتراک مورد نظر را ارسال فرمایید:", $chatId, [
+                'inline_keyboard' => [[['text' => '🔙 انصراف', 'callback_data' => 'menu_main']]]
+            ]);
+            return;
+        }
+        if (preg_match('/^\/(renew|تمدید)\s+(\S+)$/', $text, $mRenew)) {
+            $tokenR = trim($mRenew[2]);
+            if (str_contains($tokenR, 'sub/')) {
+                $partsR = explode('sub/', $tokenR);
+                $tokenR = trim($partsR[1] ?? '');
+                if (str_contains($tokenR, '?')) $tokenR = explode('?', $tokenR)[0];
+            }
+            $stmtR = $pdo->prepare("SELECT id, username FROM clients WHERE username = ? OR sub_token = ? LIMIT 1");
+            $stmtR->execute([$tokenR, $tokenR]);
+            $clientR = $stmtR->fetch();
+            if ($clientR) {
+                self::setSession($pdo, $fromId, 'awaiting_guest_password', ['guest_client_id' => $clientR['id'], 'guest_username' => $clientR['username']]);
+                TelegramBot::sendMessage("🔑 حساب <code>{$clientR['username']}</code> یافت شد. لطفاً <b>کلمه عبور</b> این اشتراک را ارسال فرمایید تا گزینه‌های تمدید نمایش داده شود:", $chatId, [
+                    'inline_keyboard' => [[['text' => '🔙 انصراف', 'callback_data' => 'menu_main']]]
+                ]);
+            } else {
+                TelegramBot::sendMessage("⚠️ اشتراکی با شناسه <code>{$tokenR}</code> یافت نشد.");
+            }
+            return;
+        }
+
         // Force Join Channel Verification (Before interactive actions)
         if (!self::checkForceJoin($pdo, $chatId, $fromId)) {
             return;
