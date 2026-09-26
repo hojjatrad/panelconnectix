@@ -485,6 +485,12 @@ jobs:
           $zip = "xray-windows-64.zip"
           Invoke-WebRequest -Uri "https://github.com/XTLS/Xray-core/releases/download/v25.3.6/$zip" -OutFile $zip
           Expand-Archive -Path $zip -DestinationPath "xray" -Force
+          # Wintun (required for TUN / full-VPN mode) - official builds;
+          # the Xray zip does NOT ship it.
+          Invoke-WebRequest -Uri "https://www.wintun.net/builds/wintun-0.14.1.zip" -OutFile "wintun.zip"
+          Expand-Archive -Path "wintun.zip" -DestinationPath "wintun" -Force
+          Copy-Item "wintun\bin\amd64\wintun.dll" "xray\wintun.dll" -Force
+          Write-Host "wintun.dll staged: $((Get-Item 'xray\wintun.dll').Length) bytes"
           Get-ChildItem "xray" | Select-Object Name
 
       - name: Build Windows release
