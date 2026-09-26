@@ -274,7 +274,7 @@ jobs:
               
               <application
                   android:label="Connectix VPN"
-                  android:name="io.flutter.embedding.android.FlutterApplication"
+                  android:name=".ConnectixApplication"
                   android:icon="@mipmap/ic_launcher"
                   android:extractNativeLibs="true"
                   android:usesCleartextTraffic="true">

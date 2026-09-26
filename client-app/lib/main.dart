@@ -72,6 +72,43 @@ void main() async {
   });
 }
 
+/// 3.3.5: reports a NATIVE (pre-Flutter) crash captured by
+/// ConnectixApplication's uncaught-exception handler. The report file
+/// survives process death; MainActivity exposes it over the updater channel.
+/// Shows the crash screen (so the user can re-send manually) and auto-sends
+/// each distinct crash once.
+Future<void> _autoReportNativeCrash() async {
+  try {
+    final channel = MethodChannel('com.connectix.vpn/updater');
+    final report = await channel.invokeMethod('getLastCrashReport');
+    final text = (report ?? '').toString().trim();
+    if (text.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    // Distinct-crash marker: the "Time: ..." line of the report.
+    final timeLine = text.split('\n').firstWhere(
+        (l) => l.startsWith('Time:'),
+        orElse: () => text.substring(0, text.length.clamp(0, 60)));
+    final reported = prefs.getString('last_native_crash_reported') ?? '';
+    if (timeLine == reported) return;
+
+    final os = Platform.operatingSystem.toUpperCase() + ' ' + Platform.version;
+    final ok = await ApiService.sendFeedback(
+      subject: 'کرش بومی (Native Crash — قبل از شروع Flutter)',
+      message: '$text\n\nدستگاه: $os',
+      version: DashboardScreen.currentAppVersion,
+    );
+    if (ok) {
+      await prefs.setString('last_native_crash_reported', timeLine);
+    }
+    // Surface the crash so the user sees details + a manual send button.
+    _crashController.add(CrashInfo(
+      'NativeCrash',
+      'خطا در لایه اندروید (قبل از آماده‌شدن برنامه)',
+      text,
+    ));
+  } catch (_) {}
+}
+
 /// Auto-reports a previous abnormal exit (native crash / killed process)
 /// once per 24h, fire-and-forget, never throws.
 Future<void> _autoReportPreviousCrash() async {
@@ -129,9 +166,10 @@ class _SessionMarkerState extends State<_SessionMarker>
     if (_started) return;
     _started = true;
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await _autoReportPreviousCrash();
-      await prefs.setString('session_started_at', DateTime.now().toIso8601String());
+    final prefs = await SharedPreferences.getInstance();
+    await _autoReportNativeCrash();
+    await _autoReportPreviousCrash();
+    await prefs.setString('session_started_at', DateTime.now().toIso8601String());
     } catch (_) {}
   }
 

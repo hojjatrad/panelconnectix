@@ -100,6 +100,15 @@ class MainActivity: FlutterActivity() {
                         result.error("INVALID_ARGUMENT", "filePath is null", null)
                     }
                 }
+                "getLastCrashReport" -> {
+                    try {
+                        val dir = context.externalFilesDir ?: context.filesDir
+                        val f = File(dir, "connectix_last_crash.txt")
+                        result.success(if (f.exists()) f.readText() else "")
+                    } catch (e: Exception) {
+                        result.success("")
+                    }
+                }
                 else -> {
                     result.notImplemented()
                 }
