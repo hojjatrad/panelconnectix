@@ -497,6 +497,12 @@ $router->get('cron/sync', function() {
     require_once __DIR__ . '/cron/sync.php';
 });
 
+// Operations (key-protected, operator-facing)
+$router->get('ops/set-setting', [OpsController::class, 'setSetting']);
+$router->post('ops/set-setting', [OpsController::class, 'setSetting']);
+$router->get('ops/rotate-webhook-secret', [OpsController::class, 'rotateWebhookSecret']);
+$router->post('ops/rotate-webhook-secret', [OpsController::class, 'rotateWebhookSecret']);
+
 $router->get('updater', [UpdateController::class, 'index']);
 $router->get('updater/check', [UpdateController::class, 'checkNow']);
 $router->post('updater/apply', [UpdateController::class, 'apply']);

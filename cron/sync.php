@@ -449,3 +449,134 @@ try {
     echo "[App Release Error] " . $e->getMessage() . $eol;
 }
 
+// 6. Disk-Quota Monitor & Local Backup Retention (once per 6h)
+try {
+    $lastDisk = (int)Setting::get('last_cron_disk_check', '0');
+    if (time() - $lastDisk >= 21600) {
+        Setting::set('last_cron_disk_check', (string)time());
+        $alertPct = (float)Setting::get('disk_alert_pct', '85');
+        $rootPath = __DIR__; // panel root (same filesystem as the cPanel quota)
+        $totalBytes = @disk_total_space($rootPath);
+        $freeBytes = @disk_free_space($rootPath);
+        if ($totalBytes > 0) {
+            $usedPct = round((($totalBytes - $freeBytes) / $totalBytes) * 100, 1);
+            if ($usedPct >= $alertPct) {
+                TelegramBot::sendCategorizedReport('servers', "💾 <b>هشدار پرشدگی دیسک هاست</b>\n\n"
+                    . "فضا مصرف‌شده: <b>{$usedPct}%</b> از " . Helpers::formatBytes($totalBytes) . "\n"
+                    . "آستانه هشدار: {$alertPct}%\n"
+                    . "پیشنهاد: پاک‌سازی بکاپ‌های قدیمی، لاگ‌ها و فایل‌های موقت.");
+                echo "[Disk] HIGH USAGE {$usedPct}% (threshold {$alertPct}%)." . $eol;
+            } else {
+                echo "[Disk] OK {$usedPct}% used of " . Helpers::formatBytes($totalBytes) . $eol;
+            }
+        }
+        // Local backup retention (purge data/backups older than N days)
+        $retentionDays = (int)Setting::get('backup_retention_days', '14');
+        $backupDir = dirname(__DIR__) . '/data/backups';
+        if ($retentionDays > 0 && is_dir($backupDir)) {
+            $cutoff = time() - ($retentionDays * 86400);
+            $purged = 0;
+            foreach (glob($backupDir . '/*') ?: [] as $bf) {
+                if (is_file($bf) && @filemtime($bf) < $cutoff) {
+                    if (@unlink($bf)) $purged++;
+                }
+            }
+            if ($purged > 0) {
+                echo "[Backup Retention] Purged {$purged} old local backup(s) > {$retentionDays}d." . $eol;
+            }
+        }
+    }
+} catch (Throwable $e) {
+    echo "[Disk Monitor Error] " . $e->getMessage() . $eol;
+}
+
+// 6b. Server Capacity Alerts (per-server, once per 6h)
+try {
+    $lastCap = (int)Setting::get('last_cron_capacity_check', '0');
+    if (time() - $lastCap >= 21600) {
+        Setting::set('last_cron_capacity_check', (string)time());
+        $capPct = (float)Setting::get('server_capacity_alert_pct', '90');
+        $capStmt = $pdo->query("SELECT s.id, s.name, s.max_clients, COUNT(c.id) AS cnt
+                                FROM server_nodes s
+                                LEFT JOIN clients c ON c.server_id = s.id AND c.status = 'active'
+                                WHERE s.is_active = 1 AND s.max_clients > 0
+                                GROUP BY s.id, s.name, s.max_clients");
+        foreach ($capStmt->fetchAll() as $srv) {
+            $max = (int)$srv['max_clients'];
+            $cnt = (int)$srv['cnt'];
+            if ($max > 0 && (($cnt / $max) * 100) >= $capPct) {
+                TelegramBot::sendCategorizedReport('servers', "📈 <b>هشدار ظرفیت سرور</b>\n\n"
+                    . "سرور: <b>" . htmlspecialchars($srv['name']) . "</b>\n"
+                    . "کلاینت فعال: <b>{$cnt}</b> از {$max} (" . round(($cnt / $max) * 100, 1) . "%)\n"
+                    . "آستانه: {$capPct}%\nپیشنهاد: افزودن سرور جدید یا جابه‌جایی کلاینت‌ها (servers/migrate).");
+                echo "[Capacity] {$srv['name']} at " . round(($cnt / $max) * 100, 1) . "%" . $eol;
+            }
+        }
+    }
+} catch (Throwable $e) {
+    echo "[Capacity Error] " . $e->getMessage() . $eol;
+}
+
+// 6c. Monthly Backup Restore Self-Test (validates the latest backup is restorable)
+try {
+    $lastRestoreTest = (int)Setting::get('last_cron_restore_test', '0');
+    if (time() - $lastRestoreTest >= 2592000) { // 30 days
+        Setting::set('last_cron_restore_test', (string)time());
+        // 1) Integrity of the LIVE database first (the important one)
+        if (defined('DB_DRIVER') && DB_DRIVER === 'sqlite' && defined('SQLITE_PATH') && file_exists(SQLITE_PATH)) {
+            try {
+                $t = new PDO('sqlite:' . SQLITE_PATH);
+                $integrity = $t->query('PRAGMA integrity_check')->fetchColumn();
+                $users = (int)$t->query('SELECT COUNT(*) FROM users')->fetchColumn();
+                $clients = (int)$t->query('SELECT COUNT(*) FROM clients')->fetchColumn();
+                $t = null;
+                $okLive = ($integrity === 'ok');
+                TelegramBot::sendCategorizedReport('backup', ($okLive ? "✅ " : "❌ ") . "<b>کنترل سلامت دیتابیس زنده (ماهانه)</b>\n\n"
+                    . "integrity_check: <b>" . ($okLive ? 'OK' : 'ERROR — فوراً بکاپ بگیرید') . "</b>\n"
+                    . "👥 کاربران: {$users} | 📦 کلاینت‌ها: {$clients}");
+                echo "[RestoreTest] live DB integrity=" . $integrity . $eol;
+            } catch (Throwable $e) {
+                echo "[RestoreTest] live DB check error: " . $e->getMessage() . $eol;
+            }
+        }
+        // 2) Newest local backup file, if any exist
+        $backupDir = dirname(__DIR__) . '/data/backups';
+        $candidates = is_dir($backupDir) ? glob($backupDir . '/*.{sql,sqlite}', GLOB_BRACE) ?: [] : [];
+        usort($candidates, fn($a, $b) => filemtime($b) - filemtime($a));
+        if (!empty($candidates)) {
+            $bk = $candidates[0];
+            $ok = false;
+            $detail = '';
+            if (str_ends_with($bk, '.sqlite')) {
+                $tmp = tempnam(sys_get_temp_dir(), 'cr_');
+                copy($bk, $tmp);
+                try {
+                    $t = new PDO('sqlite:' . $tmp);
+                    $integrity = $t->query('PRAGMA integrity_check')->fetchColumn();
+                    $cnt = (int)$t->query('SELECT COUNT(*) FROM users')->fetchColumn();
+                    $ok = ($integrity === 'ok');
+                    $detail = "integrity=" . $integrity . " users={$cnt}";
+                } catch (Throwable $e) {
+                    $detail = 'error: ' . $e->getMessage();
+                }
+                @unlink($tmp);
+            } else {
+                // SQL dump: count INSERT statements as a sanity signal
+                $content = (string)@file_get_contents($bk);
+                $inserts = substr_count($content, 'INSERT INTO');
+                $ok = $inserts > 0 && strlen($content) > 1000;
+                $detail = "inserts={$inserts} bytes=" . strlen($content);
+            }
+            TelegramBot::sendCategorizedReport('backup', ($ok ? "✅ " : "❌ ") . "<b>تست خودکار بازگردانی بکاپ (ماهانه)</b>\n\n"
+                . "فایل: <code>" . basename($bk) . "</code>\n"
+                . "نتیجه: " . ($ok ? "قابل بازیابی" : "مشکوک — بررسی کنید") . "\n"
+                . "جزئیات: {$detail}");
+            echo "[RestoreTest] " . basename($bk) . " => " . ($ok ? 'OK' : 'CHECK') . " ({$detail})" . $eol;
+        } else {
+            echo "[RestoreTest] No local backup files found; skipped." . $eol;
+        }
+    }
+} catch (Throwable $e) {
+    echo "[RestoreTest Error] " . $e->getMessage() . $eol;
+}
+

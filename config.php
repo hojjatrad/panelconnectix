@@ -4,6 +4,17 @@
  * Date: 2026-09-21 16:32:43
  */
 
+/**
+ * Optional local secrets override (kept OUT of git — see .gitignore).
+ * Create config.secrets.php returning an array; any key present here
+ * overrides the value defined below (e.g. APP_SECRET, DB_PASS).
+ */
+$__connectix_secrets = is_file(__DIR__ . '/config.secrets.php') ? (array)require __DIR__ . '/config.secrets.php' : [];
+function __connectix_secret(string $key, $fallback) {
+    global $__connectix_secrets;
+    return isset($__connectix_secrets[$key]) && $__connectix_secrets[$key] !== '' ? $__connectix_secrets[$key] : $fallback;
+}
+
 define('APP_NAME', 'نوین نت پرو');
 define('APP_ENV', 'production');
 define('APP_URL', 'http://127.0.0.1:8000');
@@ -18,7 +29,7 @@ define('DB_PASS', '');
 define('SQLITE_PATH', __DIR__ . '/data/panel.sqlite');
 
 // Application Encryption Secret
-define('APP_SECRET', '0b17bce475b83aa3b154c7311f28ea8e76e51b874b5cf05b');
+define('APP_SECRET', __connectix_secret('APP_SECRET', '0b17bce475b83aa3b154c7311f28ea8e76e51b874b5cf05b'));
 
 // Telegram Bot Integration
 define('TELEGRAM_BOT_TOKEN', '123456:FAKE');
