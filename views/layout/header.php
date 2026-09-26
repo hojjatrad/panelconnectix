@@ -221,6 +221,10 @@ if (!function_exists('isActiveRoute')) {
                             <i class="fa-solid fa-sitemap w-4 text-center text-purple-400"></i>
                             <span>ساب‌نمایندگان و شبکه فروش</span>
                         </a>
+                        <a href="<?= Helpers::url('reseller/ai') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('reseller/ai', $currentUri) ? 'bg-indigo-600/15 text-indigo-300 font-bold border-r-2 border-indigo-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
+                            <i class="fa-solid fa-robot w-4 text-center text-violet-400"></i>
+                            <span>دستیار هوشمند (شارژ)</span>
+                        </a>
                     <?php endif; ?>
                 </div>
             </div>
@@ -317,6 +321,10 @@ if (!function_exists('isActiveRoute')) {
                     <a href="<?= Helpers::url('logs') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('logs', $currentUri) ? 'bg-teal-600/15 text-teal-300 font-bold border-r-2 border-teal-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
                         <i class="fa-solid fa-shield-halved w-4 text-center text-amber-400"></i>
                         <span>لاگ‌های امنیتی</span>
+                    </a>
+                    <a href="<?= Helpers::url('settings/ai') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('settings/ai', $currentUri) ? 'bg-violet-600/15 text-violet-300 font-bold border-r-2 border-violet-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
+                        <i class="fa-solid fa-robot w-4 text-center text-violet-400"></i>
+                        <span>دستیار هوش مصنوعی</span>
                     </a>
                     <?php endif; ?>
                     <a href="<?= Helpers::url('profile') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('profile', $currentUri) ? 'bg-teal-600/15 text-teal-300 font-bold border-r-2 border-teal-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">

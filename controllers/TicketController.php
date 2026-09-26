@@ -83,6 +83,17 @@ class TicketController {
             $stmtMsg->execute([$ticketId, $userId, $message]);
             $pdo->commit();
 
+            // AI assistant: classify + draft (or auto-reply for charged resellers).
+            // Never allowed to break ticket creation.
+            try {
+                require_once __DIR__ . '/../core/AiService.php';
+                if (AiService::enabled()) {
+                    AiService::processTicket($ticketId);
+                }
+            } catch (Throwable $aiE) {
+                error_log('AI ticket processing failed: ' . $aiE->getMessage());
+            }
+
             // Notify Admin via Telegram
             $user = Auth::user();
             $tgNotice = "📩 <b>تیکت پشتیبانی جدید (#{$ticketId})</b>\n\n"
@@ -129,15 +140,71 @@ class TicketController {
             Helpers::redirect('tickets');
         }
 
-        $stmtMsg = $pdo->prepare("SELECT m.*, u.username, u.role, u.full_name 
-                                  FROM ticket_messages m 
-                                  JOIN users u ON m.sender_id = u.id 
-                                  WHERE m.ticket_id = ? 
+        $stmtMsg = $pdo->prepare("SELECT m.*, u.id AS u_id, u.username, u.role, u.full_name
+                                  FROM ticket_messages m
+                                  LEFT JOIN users u ON u.id = m.sender_id
+                                  WHERE m.ticket_id = ?
                                   ORDER BY m.id ASC");
         $stmtMsg->execute([$id]);
         $messages = $stmtMsg->fetchAll();
 
+        // Pending AI draft for admin review
+        $aiDraft = null;
+        if (Auth::isAdmin()) {
+            $stD = $pdo->prepare("SELECT * FROM ai_logs WHERE ticket_id = ? AND stage = 'draft' AND accepted = 0
+                                  ORDER BY id DESC LIMIT 1");
+            $stD->execute([$id]);
+            $aiDraft = $stD->fetch() ?: null;
+        }
+
         require __DIR__ . '/../views/tickets/show.php';
+    }
+
+    /** Admin accepts the AI draft: posts it as an admin message. */
+    public function aiDraftSend(): void {
+        Auth::requireAdmin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
+            Helpers::redirect('tickets');
+        }
+        $logId = (int)($_POST['log_id'] ?? 0);
+        $pdo = Database::getConnection();
+        $st = $pdo->prepare("SELECT * FROM ai_logs WHERE id = ? AND stage = 'draft' AND accepted = 0");
+        $st->execute([$logId]);
+        $log = $st->fetch();
+        if (!$log || empty($log['answer'])) {
+            Helpers::flash('error', 'پیش‌نویس یافت نشد.');
+            Helpers::redirect('tickets');
+        }
+        $ticketId = (int)$log['ticket_id'];
+        $stT = $pdo->prepare("SELECT * FROM tickets WHERE id = ?");
+        $stT->execute([$ticketId]);
+        $ticket = $stT->fetch();
+        if (!$ticket) {
+            Helpers::flash('error', 'تیکت یافت نشد.');
+            Helpers::redirect('tickets');
+        }
+        $text = $log['answer'] . "\n\n— 🤖 پیشنهاد توسط دستیار هوش مصنوعی (تأیید و ارسال توسط پشتیبان)";
+        $pdo->prepare("INSERT INTO ticket_messages (ticket_id, sender_id, message, created_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)")
+            ->execute([$ticketId, Auth::id(), $text]);
+        $pdo->prepare("UPDATE tickets SET status='answered', updated_at=CURRENT_TIMESTAMP WHERE id=?")->execute([$ticketId]);
+        $pdo->prepare("UPDATE ai_logs SET accepted = 1 WHERE id = ?")->execute([$logId]);
+        Helpers::flash('success', 'پاسخ هوش مصنوعی به نام شما ارسال شد.');
+        Helpers::redirect('tickets/show?id=' . $ticketId);
+    }
+
+    /** Admin discards the AI draft. */
+    public function aiDraftDiscard(): void {
+        Auth::requireAdmin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
+            Helpers::redirect('tickets');
+        }
+        $logId = (int)($_POST['log_id'] ?? 0);
+        $pdo = Database::getConnection();
+        $pdo->prepare("UPDATE ai_logs SET accepted = 2 WHERE id = ? AND stage = 'draft' AND accepted = 0")->execute([$logId]);
+        Helpers::flash('info', 'پیش‌نویس رد شد.');
+        Helpers::redirect('tickets/show?id=' . (int)($_POST['ticket_id'] ?? 0));
     }
 
     public function reply(): void {

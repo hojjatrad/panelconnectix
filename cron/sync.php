@@ -680,6 +680,15 @@ try {
     echo "[RestoreTest Error] " . $e->getMessage() . $eol;
 }
 
+// AI Assistant maintenance: expire overdue reseller charges + daily digest + log pruning
+try {
+    require_once __DIR__ . '/../core/AiService.php';
+    AiService::runMaintenance();
+    echo "[AI] Maintenance OK (sub expiry check + daily digest + log prune)." . $eol;
+} catch (Throwable $e) {
+    echo "[AI Error] " . $e->getMessage() . $eol;
+}
+
 // Mark successful full completion (heartbeat freshness = "cron finished cleanly")
 try {
     Setting::set('last_cron_sync_at', (string)time());

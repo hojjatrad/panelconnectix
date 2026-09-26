@@ -296,8 +296,7 @@ class Database {
                 online_nodes INT DEFAULT 0,
                 total_nodes INT DEFAULT 0,
                 traffic_used_total BIGINT DEFAULT 0,
-                traffic_limit_total BIGINT DEFAULT 0,
-                PRIMARY KEY (id)
+                traffic_limit_total BIGINT DEFAULT 0
             )");
 
             // 2. Safe Column Additions for Core Tables
@@ -529,6 +528,61 @@ class Database {
             foreach ($txCols as $c => $d) {
                 self::safeAddColumn($pdo, 'transactions', $c, $d);
             }
+
+            // AI Assistant (v5.4.0): knowledge base, call logs, reseller charged subscriptions
+            $pdo->exec("CREATE TABLE IF NOT EXISTS ai_knowledge (
+                id $autoInc,
+                title VARCHAR(191) NOT NULL,
+                keywords VARCHAR(255) NULL,
+                category VARCHAR(64) DEFAULT 'فنی',
+                content TEXT NULL,
+                is_active TINYINT(1) DEFAULT 1,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )");
+
+            $pdo->exec("CREATE TABLE IF NOT EXISTS ai_logs (
+                id $autoInc,
+                ticket_id INT NULL,
+                stage VARCHAR(32) DEFAULT 'draft',
+                provider VARCHAR(32) NULL,
+                model VARCHAR(128) NULL,
+                status VARCHAR(32) DEFAULT 'draft',
+                category VARCHAR(64) NULL,
+                confidence FLOAT DEFAULT 0,
+                is_sensitive TINYINT(1) DEFAULT 0,
+                needs_human TINYINT(1) DEFAULT 0,
+                answer TEXT NULL,
+                latency_ms INT DEFAULT 0,
+                error TEXT NULL,
+                accepted TINYINT(1) DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )");
+            foreach (['idx_ai_logs_ticket', 'idx_ai_logs_created'] as $aiIdx) {
+                $col = ($aiIdx === 'idx_ai_logs_ticket') ? 'ticket_id' : 'created_at';
+                try {
+                    $pdo->exec("CREATE INDEX IF NOT EXISTS {$aiIdx} ON ai_logs ({$col})");
+                } catch (Throwable $e) {
+                    try { $pdo->exec("CREATE INDEX {$aiIdx} ON ai_logs ({$col})"); } catch (Throwable $e2) {}
+                }
+            }
+
+            $pdo->exec("CREATE TABLE IF NOT EXISTS ai_subscriptions (
+                id $autoInc,
+                reseller_id INT NOT NULL,
+                status VARCHAR(32) DEFAULT 'active',
+                activated_at DATETIME NULL,
+                expires_at DATETIME NULL,
+                price_paid BIGINT DEFAULT 0,
+                last_price BIGINT DEFAULT 0,
+                note VARCHAR(255) NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (reseller_id)
+            )");
+
+            // AI-generated ticket messages (sender_id = 0)
+            self::safeAddColumn($pdo, 'ticket_messages', 'is_ai', 'TINYINT(1) DEFAULT 0');
 
             // Ensure Default Referral Codes for users
             try {

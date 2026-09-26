@@ -466,4 +466,90 @@ class ResellerPortalController {
 
         Helpers::redirect('reseller/sub-resellers');
     }
+
+    /**
+     * AI Assistant — reseller's own feature status (charge with expiry)
+     */
+    public function ai(): void {
+        $userId = self::checkResellerAccess();
+        $pdo = Database::getConnection();
+        require_once __DIR__ . '/../core/AiService.php';
+
+        $st = $pdo->prepare("SELECT * FROM users WHERE id = ?");
+        $st->execute([$userId]);
+        $me = $st->fetch();
+
+        $sub = null;
+        $status = 'none';
+        if (!Auth::isAdmin()) {
+            $stSub = $pdo->prepare("SELECT * FROM ai_subscriptions WHERE reseller_id = ?");
+            $stSub->execute([$userId]);
+            $sub = $stSub->fetch() ?: null;
+            if ($sub && $sub['status'] === 'active' && $sub['expires_at'] > date('Y-m-d H:i:s')) {
+                $status = 'active';
+            } elseif ($sub && $sub['status'] === 'active') {
+                $status = 'expired';
+            } else {
+                $status = $sub ? 'expired' : 'none';
+            }
+        } else {
+            $status = 'admin';
+        }
+
+        $daysLeft = 0;
+        if ($status === 'active') {
+            $daysLeft = (int)ceil((strtotime((string)$sub['expires_at']) - time()) / 86400);
+        }
+
+        $price = (int)AiService::cfg('ai_monthly_price');
+        $aiMsgCount = 0;
+        if ($status !== 'admin') {
+            $stM = $pdo->prepare("SELECT COUNT(*) FROM ticket_messages m JOIN tickets t ON t.id = m.ticket_id
+                                  WHERE t.user_id = ? AND m.is_ai = 1");
+            $stM->execute([$userId]);
+            $aiMsgCount = (int)$stM->fetchColumn();
+        }
+
+        require __DIR__ . '/../views/reseller/ai.php';
+    }
+
+    /**
+     * Reseller requests the AI feature -> creates a ticket for admin activation
+     */
+    public function aiRequest(): void {
+        $userId = self::checkResellerAccess();
+        if (Auth::isAdmin()) {
+            Helpers::redirect('settings/ai/resellers');
+        }
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
+            Helpers::redirect('reseller/ai');
+        }
+        $pdo = Database::getConnection();
+        $price = (int)AiService::cfg('ai_monthly_price');
+        $msg = "سلام، من می‌خواهم سرویس «دستیار هوش مصنوعی» را فعال کنم.\n"
+             . "هزینه ماهیانه: " . Helpers::formatMoney($price) . " تومان\n"
+             . "بعد از پرداخت با مدیریت هماهنگ می‌کنم. لطفاً پس از پرداخت، سرویس را برای من فعال کنید.";
+        try {
+            $pdo->prepare("INSERT INTO tickets (user_id, subject, department, priority, status, created_at, updated_at)
+                           VALUES (?, 'درخواست خرید سرویس هوش مصنوعی', 'فروش', 'medium', 'open', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)")
+                ->execute([$userId]);
+            $ticketId = (int)$pdo->lastInsertId();
+            $pdo->prepare("INSERT INTO ticket_messages (ticket_id, sender_id, message, created_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)")
+                ->execute([$ticketId, $userId, $msg]);
+            // Notify supergroup so the admin can activate it after payment
+            try {
+                $me = Auth::user();
+                TelegramBot::sendCategorizedReport('users',
+                    "🤖 <b>درخواست خرید سرویس هوش مصنوعی</b>\n\n"
+                    . "نماینده: <b>" . htmlspecialchars($me['brand_name'] ?: ($me['full_name'] ?: $me['username']), ENT_QUOTES) . "</b> (@{$me['username']})\n"
+                    . "هزینه ماهیانه فعلی: " . Helpers::formatMoney($price) . " تومان\n"
+                    . "تیکت #{$ticketId} — پس از دریافت پرداخت، از بخش «تنظیمات ← دستیار هوش مصنوعی ← نمایندگان» فعال کنید.");
+            } catch (Throwable $e) {}
+            Helpers::flash('success', "درخواست شما ثبت شد (تیکت #{$ticketId}). پس از پرداخت و فعال‌سازی توسط مدیریت، سرویس شروع می‌شود.");
+        } catch (Throwable $e) {
+            Helpers::flash('error', 'خطا در ثبت درخواست: ' . $e->getMessage());
+        }
+        Helpers::redirect('reseller/ai');
+    }
 }

@@ -54,24 +54,64 @@ require __DIR__ . '/../layout/header.php';
         </div>
     </div>
 
+    <!-- AI Draft Card (admin only) -->
+    <?php if (!empty($aiDraft) && !empty($aiDraft['answer'])): ?>
+        <div class="bg-violet-950/30 border border-violet-800/50 rounded-2xl p-5 shadow-sm space-y-3">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-robot text-violet-400"></i>
+                    <span class="text-xs font-bold text-violet-200">پیش‌نویس هوش مصنوعی</span>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-300 border border-violet-500/30 font-mono">
+                        اطمینان <?= number_format((float)$aiDraft['confidence'] * 100, 0) ?>% — <?= htmlspecialchars((string)$aiDraft['category']) ?>
+                    </span>
+                </div>
+                <span class="text-[10px] text-slate-500 font-mono"><?= substr((string)$aiDraft['created_at'], 0, 16) ?></span>
+            </div>
+            <div class="text-xs text-slate-200 leading-relaxed whitespace-pre-wrap bg-slate-950/50 border border-slate-800 rounded-xl p-4"><?= htmlspecialchars((string)$aiDraft['answer']) ?></div>
+            <?php if ($ticket['status'] !== 'closed'): ?>
+            <div class="flex items-center gap-2 justify-end">
+                <form action="<?= Helpers::url('tickets/ai-draft/discard') ?>" method="POST" class="m-0">
+                    <?= Helpers::csrfField() ?>
+                    <input type="hidden" name="log_id" value="<?= (int)$aiDraft['id'] ?>">
+                    <input type="hidden" name="ticket_id" value="<?= (int)$ticket['id'] ?>">
+                    <button type="submit" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-medium border border-slate-700 transition">رد پیش‌نویس</button>
+                </form>
+                <form action="<?= Helpers::url('tickets/ai-draft/send') ?>" method="POST" class="m-0">
+                    <?= Helpers::csrfField() ?>
+                    <input type="hidden" name="log_id" value="<?= (int)$aiDraft['id'] ?>">
+                    <button type="submit" class="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-2">
+                        <i class="fa-solid fa-paper-plane"></i> تأیید و ارسال به نام من
+                    </button>
+                </form>
+            </div>
+            <?php endif; ?>
+        </div>
+    <?php endif; ?>
+
     <!-- Message Thread -->
     <div class="space-y-4">
-        <?php foreach ($messages as $msg): 
-            $isAdminMsg = ($msg['role'] === 'admin');
+        <?php foreach ($messages as $msg):
+            $isAiMsg = !empty($msg['is_ai']) || empty($msg['u_id']);
+            $isAdminMsg = !$isAiMsg && ($msg['role'] === 'admin');
         ?>
-            <div class="bg-slate-900/80 border <?= $isAdminMsg ? 'border-purple-800/60 bg-purple-950/10' : 'border-slate-800' ?> rounded-2xl p-5 shadow-sm space-y-3">
+            <div class="bg-slate-900/80 border <?= $isAiMsg ? 'border-emerald-800/60 bg-emerald-950/10' : ($isAdminMsg ? 'border-purple-800/60 bg-purple-950/10' : 'border-slate-800') ?> rounded-2xl p-5 shadow-sm space-y-3">
                 <div class="flex items-center justify-between border-b border-slate-800/80 pb-3">
                     <div class="flex items-center gap-2.5">
-                        <div class="w-8 h-8 rounded-xl <?= $isAdminMsg ? 'bg-purple-600 text-white' : 'bg-slate-800 text-cyan-400' ?> flex items-center justify-center text-xs font-bold shrink-0">
-                            <i class="fa-solid <?= $isAdminMsg ? 'fa-shield-halved' : 'fa-user' ?>"></i>
+                        <div class="w-8 h-8 rounded-xl <?= $isAiMsg ? 'bg-emerald-600 text-white' : ($isAdminMsg ? 'bg-purple-600 text-white' : 'bg-slate-800 text-cyan-400') ?> flex items-center justify-center text-xs font-bold shrink-0">
+                            <i class="fa-solid <?= $isAiMsg ? 'fa-robot' : ($isAdminMsg ? 'fa-shield-halved' : 'fa-user') ?>"></i>
                         </div>
                         <div>
                             <div class="font-bold text-xs text-white">
-                                <?= htmlspecialchars($msg['full_name'] ?: $msg['username']) ?>
-                                <?php if ($isAdminMsg): ?>
-                                    <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 mr-1.5">پشتیبان رسمی</span>
+                                <?php if ($isAiMsg): ?>
+                                    دستیار هوش مصنوعی
+                                    <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 mr-1.5">🤖 پاسخ خودکار</span>
                                 <?php else: ?>
-                                    <span class="px-1.5 py-0.2 rounded text-[10px] font-medium bg-slate-800 text-slate-400 mr-1.5">نماینده فروش</span>
+                                    <?= htmlspecialchars($msg['full_name'] ?: $msg['username']) ?>
+                                    <?php if ($isAdminMsg): ?>
+                                        <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 mr-1.5">پشتیبان رسمی</span>
+                                    <?php else: ?>
+                                        <span class="px-1.5 py-0.2 rounded text-[10px] font-medium bg-slate-800 text-slate-400 mr-1.5">نماینده فروش</span>
+                                    <?php endif; ?>
                                 <?php endif; ?>
                             </div>
                         </div>

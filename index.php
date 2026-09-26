@@ -451,6 +451,27 @@ $router->post('tickets/store', [TicketController::class, 'store']);
 $router->get('tickets/show', [TicketController::class, 'show']);
 $router->post('tickets/reply', [TicketController::class, 'reply']);
 $router->post('tickets/close', [TicketController::class, 'close']);
+$router->post('tickets/ai-draft/send', [TicketController::class, 'aiDraftSend']);
+$router->post('tickets/ai-draft/discard', [TicketController::class, 'aiDraftDiscard']);
+
+// AI Assistant (Admin only — مدیرکل)
+$router->get('settings/ai', [AiController::class, 'index']);
+$router->post('settings/ai/save', [AiController::class, 'save']);
+$router->post('settings/ai/test', [AiController::class, 'testProvider']);
+$router->get('settings/ai/knowledge', [AiController::class, 'knowledge']);
+$router->post('settings/ai/knowledge/store', [AiController::class, 'knowledgeStore']);
+$router->post('settings/ai/knowledge/update', [AiController::class, 'knowledgeUpdate']);
+$router->post('settings/ai/knowledge/toggle', [AiController::class, 'knowledgeToggle']);
+$router->post('settings/ai/knowledge/delete', [AiController::class, 'knowledgeDelete']);
+$router->get('settings/ai/resellers', [AiController::class, 'resellers']);
+$router->post('settings/ai/resellers/activate', [AiController::class, 'activate']);
+$router->post('settings/ai/resellers/renew', [AiController::class, 'renew']);
+$router->post('settings/ai/resellers/revoke', [AiController::class, 'revoke']);
+$router->get('settings/ai/logs', [AiController::class, 'logs']);
+
+// AI feature for resellers (charge with expiry)
+$router->get('reseller/ai', [ResellerPortalController::class, 'ai']);
+$router->post('reseller/ai/request', [ResellerPortalController::class, 'aiRequest']);
 
 // Online Payments
 $router->get('payment/pay', [PaymentController::class, 'payBotOrder']);
