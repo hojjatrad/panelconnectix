@@ -265,13 +265,6 @@ jobs:
           cat << 'EOF' > android/app/src/main/AndroidManifest.xml
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"
               xmlns:tools="http://schemas.android.com/tools">
-              <!-- 3.3.3: disable androidx auto-startup initializers (ProcessLifecycle /
-                   EmojiCompat / ProfileInstaller). Their transitive version drift with
-                   flutter_v2ray's dependency tree caused an instant launch crash on
-                   Android 14 (Application.onCreate, before the first frame). They are
-                   optional optimizations; the app does not use them. -->
-              <provider android:name="androidx.startup.InitializationProvider"
-                  tools:node="remove" />
               <uses-permission android:name="android.permission.INTERNET"/>
               <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
               <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
@@ -285,6 +278,13 @@ jobs:
                   android:icon="@mipmap/ic_launcher"
                   android:extractNativeLibs="true"
                   android:usesCleartextTraffic="true">
+                  <!-- 3.3.3: disable androidx auto-startup initializers (ProcessLifecycle /
+                       EmojiCompat / ProfileInstaller). Their transitive version drift with
+                       flutter_v2ray's dependency tree caused an instant launch crash
+                       (Application.onCreate, before the first frame). They are optional
+                       optimizations; the app does not use them. -->
+                  <provider android:name="androidx.startup.InitializationProvider"
+                      tools:node="remove" />
                   <activity
                       android:name=".MainActivity"
                       android:exported="true"
