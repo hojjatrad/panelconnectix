@@ -158,6 +158,12 @@ class AppReleasePublisher
 
     private static function fetchJson(string $url): ?array
     {
+        // Unique bust per call: GitHub release-asset URLs do NOT change when CI
+        // re-uploads the same asset name, so transparent egress caches may
+        // serve the previous manifest (same trap that bit the APK mirror).
+        $sep = (strpos($url, '?') === false) ? '?' : '&';
+        $url = $url . $sep . 'cb=' . (string)time() . rand(1000, 9999);
+
         $ch = curl_init($url);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
@@ -166,6 +172,7 @@ class AppReleasePublisher
             CURLOPT_SSL_VERIFYPEER => false,
             CURLOPT_SSL_VERIFYHOST => false,
             CURLOPT_USERAGENT => 'Connectix-App-Release-Sync/1.0',
+            CURLOPT_HTTPHEADER => ['Cache-Control: no-cache, no-store', 'Pragma: no-cache'],
         ]);
         $body = curl_exec($ch);
         $http = curl_getinfo($ch, CURLINFO_HTTP_CODE);
