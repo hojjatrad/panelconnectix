@@ -521,6 +521,7 @@ $router->post('client/login', [ClientPortalController::class, 'login']);
 $router->get('client/logout', [ClientPortalController::class, 'logout']);
 
 // Reseller & Bot REST API (v1)
+$router->get('api/v1/reseller/brand/{id}', [ApiControllerV2::class, 'resellerBrand']);
 $router->get('api/v1/wallet', [ApiControllerV2::class, 'getWallet']);
 $router->get('api/v1/plans', [ApiControllerV2::class, 'getPlans']);
 $router->post('api/v1/client/create', [ApiControllerV2::class, 'createClient']);

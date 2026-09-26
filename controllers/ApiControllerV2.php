@@ -865,6 +865,50 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
     }
 
     /**
+     * GET /api/v1/reseller/brand/{id}?key=<brand_api_key>
+     *
+     * Key-protected branding feed for CI (branded per-reseller APK builds).
+     * Returns the reseller's white-label identity: brand_name, logo_url,
+     * theme_color, support contacts, renewal URL.
+     */
+    public function resellerBrand(string $id): void {
+        require_once __DIR__ . '/../core/Setting.php';
+        $key = trim((string)($_GET['key'] ?? ''));
+        $expected = trim((string)Setting::get('brand_api_key', ''));
+        if ($expected === '' || !hash_equals($expected, $key)) {
+            self::jsonError('دسترسی غیرمجاز (کلید برندینگ نامعتبر).', 403);
+        }
+
+        $pdo = Database::getConnection();
+        $stmt = $pdo->prepare("SELECT u.id, u.full_name, u.username,
+                                      COALESCE(u.brand_name, b.brand_name) as brand_name,
+                                      COALESCE(u.logo_url, b.logo_url) as logo_url,
+                                      COALESCE(u.theme_color, b.theme_color, 'violet') as theme_color,
+                                      COALESCE(u.support_username, b.telegram_support) as telegram_support,
+                                      b.whatsapp_support, b.renewal_url, b.welcome_message,
+                                      COALESCE(u.telegram_bot_username, '') as reseller_bot_username
+                               FROM users u
+                               LEFT JOIN branding_metadata b ON b.user_id = u.id
+                               WHERE u.id = ? AND u.role = 'reseller' LIMIT 1");
+        $stmt->execute([(int)$id]);
+        $rs = $stmt->fetch();
+        if (!$rs) {
+            self::jsonError('نماینده یافت نشد.', 404);
+        }
+        self::jsonSuccess([
+            'id' => (int)$rs['id'],
+            'brand_name' => (string)($rs['brand_name'] ?: $rs['full_name'] ?: $rs['username']),
+            'logo_url' => (string)($rs['logo_url'] ?? ''),
+            'theme_color' => (string)$rs['theme_color'],
+            'telegram_support' => (string)($rs['telegram_support'] ?? ''),
+            'whatsapp_support' => (string)($rs['whatsapp_support'] ?? ''),
+            'renewal_url' => (string)($rs['renewal_url'] ?? ''),
+            'welcome_message' => (string)($rs['welcome_message'] ?? ''),
+            'reseller_bot_username' => (string)$rs['reseller_bot_username'],
+        ]);
+    }
+
+    /**
      * Admin View: App API Documentation & Interactive Simulator
      */
     public function showAppApiDoc(): void {

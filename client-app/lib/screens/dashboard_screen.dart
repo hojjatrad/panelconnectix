@@ -56,7 +56,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   bool _hasAppUpdate = false;
   Map<String, dynamic>? _updateInfo;
 
-  static const String currentAppVersion = '3.3.1';
+  static const String currentAppVersion = '3.3.2';
+
+  // "Download over Wi-Fi only" for update packages
+  bool _updateWifiOnly = false;
 
   // Iranian & Banking Apps Bypass List (Snapp, Divar, Rubika, Neshan, Torob, Digikala, Banking)
   static const List<String> defaultDomesticBypassApps = [
@@ -105,7 +108,28 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     setState(() {
       _splitTunnelingEnabled = prefs.getBool('split_tunneling_enabled') ?? true;
       _autoReconnectEnabled = prefs.getBool('auto_reconnect_enabled') ?? true;
+      _updateWifiOnly = prefs.getBool('update_wifi_only') ?? false;
     });
+  }
+
+  Future<void> _setUpdateWifiOnly(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('update_wifi_only', value);
+    if (mounted) setState(() => _updateWifiOnly = value);
+  }
+
+  /// Sends the current device log as a support ticket (never throws).
+  Future<void> _sendUpdateErrorReport(String context) async {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(this.context);
+    final ok = await ApiService.sendFeedback(
+      subject: 'خطای دانلود/نصب بروزرسانی',
+      message: 'بروزرسانی ${_updateInfo?['latest_version'] ?? ''}\n$context',
+      version: currentAppVersion,
+    );
+    messenger.showSnackBar(SnackBar(
+      content: Text(ok ? '✓ گزارش فنی برای پشتیبانی ارسال شد.' : 'ارسال گزارش ممکن نشد؛ لطفاً دوباره تلاش کنید.'),
+    ));
   }
 
   static bool isNewerVersion(String latest, String current) {
@@ -476,12 +500,40 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           ],
         ),
         actions: [
+          // Wi-Fi-only toggle (data-saver for cellular plans)
+          SizedBox(
+            width: double.infinity,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'دانلود فقط روی Wi-Fi (صرفه‌جویی در اینترنت)',
+                    style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                  ),
+                ),
+                Switch(
+                  value: _updateWifiOnly,
+                  activeColor: const Color(0xFF10B981),
+                  onChanged: (v) => _setUpdateWifiOnly(v),
+                ),
+              ],
+            ),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('بعداً', style: TextStyle(color: Color(0xFF64748B))),
           ),
           ElevatedButton.icon(
-            onPressed: () {
+            onPressed: () async {
+              if (_updateWifiOnly) {
+                final onWifi = await ApiService.isOnWifi();
+                if (!onWifi) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
+                    content: Text('شما گزینه «فقط روی Wi-Fi» را فعال کرده‌اید. برای دانلود، به شبکه Wi-Fi متصل شوید (یا این گزینه را غیرفعال کنید).'),
+                  ));
+                  return;
+                }
+              }
               Navigator.pop(ctx);
               _startInAppDownloadAndInstall(downloadUrl, latestVer, fallbackUrl: fallbackUrl);
             },
@@ -637,32 +689,51 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   ),
                   const SizedBox(height: 24),
                   if (isFailed)
-                    Row(
+                    Column(
                       children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => Navigator.pop(bottomSheetContext),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFF94A3B8),
-                              side: const BorderSide(color: Color(0xFF334155)),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () => Navigator.pop(bottomSheetContext),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: const Color(0xFF94A3B8),
+                                  side: const BorderSide(color: Color(0xFF334155)),
+                                ),
+                                child: const Text('انصراف'),
+                              ),
                             ),
-                            child: const Text('انصراف'),
-                          ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () {
+                                  _sendUpdateErrorReport(statusText);
+                                },
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: const Color(0xFF818CF8),
+                                  side: const BorderSide(color: Color(0xFF4F46E5)),
+                                ),
+                                icon: const Icon(Icons.report_problem_rounded, size: 16),
+                                label: const Text('ارسال گزارش فنی'),
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () async {
-                              Navigator.pop(bottomSheetContext);
-                              final uri = Uri.parse(downloadUrl);
-                              if (await canLaunchUrl(uri)) {
-                                await launchUrl(uri, mode: LaunchMode.externalApplication);
-                              }
-                            },
-                            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366F1)),
-                            icon: const Icon(Icons.open_in_browser, size: 16),
-                            label: const Text('دانلود با مرورگر'),
+                        const SizedBox(height: 12),
+                        ElevatedButton.icon(
+                          onPressed: () async {
+                            Navigator.pop(bottomSheetContext);
+                            final uri = Uri.parse(downloadUrl);
+                            if (await canLaunchUrl(uri)) {
+                              await launchUrl(uri, mode: LaunchMode.externalApplication);
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF6366F1),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
                           ),
+                          icon: const Icon(Icons.open_in_browser, size: 16),
+                          label: const Text('دانلود با مرورگر', style: TextStyle(fontWeight: FontWeight.bold)),
                         ),
                       ],
                     )

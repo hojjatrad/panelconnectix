@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -12,6 +13,26 @@ import '../models/server_model.dart';
 class ApiService {
   static String baseUrl = "https://vpbotn.ir/contax";
   static const MethodChannel _updaterChannel = MethodChannel('com.connectix.vpn/updater');
+
+  // ---------------- Diagnostic Log Ring Buffer ----------------
+  // Kept in memory; attached to error reports so support sees exactly
+  // what happened (URLs, sizes, retry counts, errors) without screenshots.
+  static final List<String> _logLines = <String>[];
+
+  static void log(String msg) {
+    try {
+      _logLines.add('${DateTime.now().toIso8601String().substring(11, 19)} $msg');
+      if (_logLines.length > 60) {
+        _logLines.removeAt(0);
+      }
+    } catch (_) {}
+  }
+
+  static String get logDump => _logLines.join('\n');
+
+  static final Connectivity _connectivity = Connectivity();
+
+  // ----------------------------------------------------------
 
   static Future<void> initBaseUrl() async {
     final prefs = await SharedPreferences.getInstance();
@@ -373,6 +394,7 @@ class ApiService {
               final resp = await client.send(req).timeout(const Duration(seconds: 45));
               if (resp.statusCode != 206) {
                 await resp.stream.drain<void>();
+                ApiService.log('chunk ${offset}-$end HTTP ${resp.statusCode} (unexpected)');
                 throw Exception('HTTP ${resp.statusCode}');
               }
               await resp.stream.listen((c) {
@@ -380,10 +402,12 @@ class ApiService {
                 offset += c.length;
                 onProgress(offset / totalBytes, offset, totalBytes);
               }).asFuture<void>();
+              ApiService.log('chunk ..$end ok (now $offset/$totalBytes)');
               got = true;
-            } catch (_) {
+            } catch (err) {
               // Interrupted — recycle the client (a timed-out stream may leave
               // the pooled socket broken), back off, resume from same offset
+              ApiService.log('chunk retry $attempt from offset $offset: $err');
               try { client.close(); } catch (_) {}
               client = http.Client();
               await Future<void>.delayed(Duration(milliseconds: 1500 * (attempt + 1)));
@@ -468,5 +492,65 @@ class ApiService {
     await prefs.remove('cached_client');
     await prefs.remove('cached_branding');
     await prefs.remove('sub_url');
+  }
+
+  /**
+   * Send a diagnostic error report (device log + context) to support.
+   * Creates a support ticket on the panel side; never throws.
+   */
+  static Future<bool> sendFeedback({
+    required String subject,
+    required String message,
+    String? version,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token') ?? '';
+      if (token.isEmpty) return false;
+
+      final deviceInfo = Platform.operatingSystem.toUpperCase() + ' ' + Platform.version;
+      final body = <String, dynamic>{
+        'subject': subject,
+        'message': message,
+        'device_log': [
+          'نسخه: ${version ?? 'unknown'}',
+          'دستگاه: $deviceInfo',
+          'بازه زمانی: ${DateTime.now().toIso8601String()}',
+          '',
+          '--- لاگ آخرین فعالیت‌ها ---',
+          logDump,
+        ].join('\n'),
+      };
+
+      final resp = await http.post(
+        Uri.parse('$baseUrl/api/v1/app/feedback'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(body),
+      ).timeout(const Duration(seconds: 20));
+
+      final data = jsonDecode(utf8.decode(resp.bodyBytes));
+      return data['success'] == true;
+    } catch (e) {
+      debugPrint('sendFeedback error: $e');
+      return false;
+    }
+  }
+
+  /**
+   * Returns true when the device is on Wi-Fi (used for the
+   * "download over Wi-Fi only" update option).
+   */
+  static Future<bool> isOnWifi() async {
+    try {
+      final conn = await _connectivity.checkConnectivity();
+      final list = conn is List ? conn : [conn];
+      return list.any((c) => c.toString() == 'ConnectivityResult.wifi');
+    } catch (_) {
+      return false;
+    }
   }
 }

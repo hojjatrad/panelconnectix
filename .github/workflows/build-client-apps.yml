@@ -2,6 +2,11 @@ name: Build Connectix Client Apps (Android & Windows)
 
 on:
   workflow_dispatch:
+    inputs:
+      reseller_id:
+        description: 'Reseller user ID for a branded APK build (empty = normal build only)'
+        required: false
+        default: ''
   push:
     branches:
       - main
@@ -200,9 +205,10 @@ jobs:
                   applicationId = "com.connectix.vpn"
                   minSdk = 21
                   targetSdk = 34
-                  versionCode = 6
-                  versionName = "3.0.0"
+                  versionCode = __VERSION_CODE__
+                  versionName = "__VERSION_NAME__"
                   multiDexEnabled = true
+                  manifestPlaceholders = [appName: (project.hasProperty('BRAND_LABEL') ? project.property('BRAND_LABEL') : 'Connectix VPN')]
               }
 
               packagingOptions {
@@ -243,6 +249,19 @@ jobs:
           }
           EOF
 
+          # Inject the real version: versionCode from pubspec build number,
+          # versionName from the in-app version constant (dashboard_screen.dart),
+          # so Android gets proper upgrade semantics instead of a frozen 3.0.0.
+          PUB_CODE=$(grep -E '^version:' pubspec.yaml | sed -E 's/.*\+([0-9]+).*/\1/')
+          APP_VER=$(grep -oE "currentAppVersion[[:space:]]*=[[:space:]]*'[0-9]+\.[0-9]+\.[0-9]+'" lib/screens/dashboard_screen.dart | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          if [ -z "$PUB_CODE" ] || [ -z "$APP_VER" ]; then
+            echo "ERROR: could not derive version (PUB_CODE='$PUB_CODE' APP_VER='$APP_VER')"
+            exit 1
+          fi
+          echo "Injecting versionCode=$PUB_CODE versionName=$APP_VER"
+          sed -i "s/__VERSION_CODE__/${PUB_CODE}/; s/__VERSION_NAME__/${APP_VER}/" android/app/build.gradle
+          grep -n "versionCode\|versionName" android/app/build.gradle
+
           # Ensure AndroidManifest has extractNativeLibs, VPN permissions, package installer and launcher activity
           cat << 'EOF' > android/app/src/main/AndroidManifest.xml
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
@@ -254,7 +273,7 @@ jobs:
               <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
               
               <application
-                  android:label="Connectix VPN"
+                  android:label="$(appName)"
                   android:name="${applicationName}"
                   android:icon="@mipmap/ic_launcher"
                   android:extractNativeLibs="true"
@@ -308,6 +327,26 @@ jobs:
           flutter build apk --split-per-abi --release
           cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk ../Connectix-ARM64-v8a.apk 2>/dev/null || true
           cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk ../Connectix-ARM32-v7a.apk 2>/dev/null || true
+
+      - name: Build Branded Reseller APK (optional, workflow_dispatch only)
+        if: github.event_name == 'workflow_dispatch' && inputs.reseller_id != ''
+        env:
+          PANEL_BRAND_KEY: ${{ secrets.PANEL_BRAND_KEY }}
+        run: |
+          set -e
+          cd client-app
+          curl -fsSL "https://vpbotn.ir/contax/index.php?route=api/v1/reseller/brand/${{ inputs.reseller_id }}&key=${PANEL_BRAND_KEY}" -o /tmp/brand.json
+          LABEL=$(python3 -c "import json;d=json.load(open('/tmp/brand.json'));print((d.get('data') or d).get('brand_name') or 'Connectix VPN')")
+          echo "Branded build label: $LABEL"
+          flutter build apk --release -PBRAND_LABEL="$LABEL"
+          cp build/app/outputs/flutter-apk/app-release.apk "../Connectix-Branded-${{ inputs.reseller_id }}.apk"
+
+      - name: Upload Branded APK Artifact
+        if: github.event_name == 'workflow_dispatch' && inputs.reseller_id != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: Connectix-Branded-APK
+          path: Connectix-Branded-*.apk
 
       - name: Rigorous Automated APK Verification Test
         run: |
