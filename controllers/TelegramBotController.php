@@ -1813,22 +1813,23 @@ class TelegramBotController {
             );
             if ($ai['handled']) {
                 if ($ai['auto']) {
+                    // No inline keyboard on AI replies — menu buttons stay only on the main-menu message (bottom of chat)
                     TelegramBot::sendMessage(
                         "🤖 <b>دستیار هوشمند</b>\n\n" . nl2br(htmlspecialchars($ai['answer'], ENT_QUOTES))
-                        . "\n\n<i>اگر این پاسخ مشکلتان را حل نکرد، از دکمهٔ «پشتیبانی» با پشتیبان انسانی تماس بگیرید.</i>",
+                        . "\n\n<i>اگر این پاسخ مشکلتان را حل نکرد، از منوی اصلی دکمهٔ «پشتیبانی» را بزنید تا با پشتیبان انسانی تماس بگیرید.</i>",
                         $chatId,
-                        self::getMainMenuInlineKeyboard($pdo, $fromId),
+                        null,
                         $ctxAi['bot_token']
                     );
                 } else {
                     $support = ltrim((string)($ctxAi['support_username'] ?: Setting::get('support_telegram', '')), '@');
-                    $kbAi = [
-                        'inline_keyboard' => [
-                            [['text' => '🔙 منوی اصلی', 'callback_data' => 'menu_main']],
-                        ],
-                    ];
+                    $kbAi = null;
                     if ($support !== '') {
-                        $kbAi['inline_keyboard'][] = [['text' => '👤 پیام مستقیم به پشتیبان', 'url' => 'https://t.me/' . rawurlencode($support)]];
+                        $kbAi = [
+                            'inline_keyboard' => [
+                                [['text' => '👤 پیام مستقیم به پشتیبان', 'url' => 'https://t.me/' . rawurlencode($support)]],
+                            ],
+                        ];
                     }
                     TelegramBot::sendMessage(
                         "📮 <b>درخواست شما ثبت شد</b>\n\n"
