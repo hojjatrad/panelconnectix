@@ -546,9 +546,10 @@ class ApiService {
    */
   static Future<bool> isOnWifi() async {
     try {
+      // connectivity_plus 5.x: checkConnectivity() returns a single
+      // ConnectivityResult (pinned to ^5.0.0).
       final conn = await _connectivity.checkConnectivity();
-      final list = conn is List ? conn : [conn];
-      return list.any((c) => c.toString() == 'ConnectivityResult.wifi');
+      return conn.toString() == 'ConnectivityResult.wifi';
     } catch (_) {
       return false;
     }

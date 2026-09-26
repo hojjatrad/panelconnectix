@@ -53,7 +53,8 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   FlutterError.onError = (details) {
-    _captureCrash('FlutterError', details.exceptionAsString(), details.stack);
+    _captureCrash(
+        'FlutterError', details.exceptionAsString(), details.stack ?? StackTrace.empty);
   };
   PlatformDispatcher.instance.onError = (error, stack) {
     _captureCrash('UncaughtError', error, stack);
