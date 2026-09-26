@@ -208,7 +208,6 @@ jobs:
                   versionCode = __VERSION_CODE__
                   versionName = "__VERSION_NAME__"
                   multiDexEnabled = true
-                  manifestPlaceholders = [appName: (project.hasProperty('BRAND_LABEL') ? project.property('BRAND_LABEL') : 'Connectix VPN')]
               }
 
               packagingOptions {
@@ -273,7 +272,7 @@ jobs:
               <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
               
               <application
-                  android:label="$(appName)"
+                  android:label="Connectix VPN"
                   android:name="io.flutter.embedding.android.FlutterApplication"
                   android:icon="@mipmap/ic_launcher"
                   android:extractNativeLibs="true"
@@ -336,9 +335,19 @@ jobs:
           set -e
           cd client-app
           curl -fsSL "https://vpbotn.ir/contax/index.php?route=api/v1/reseller/brand/${{ inputs.reseller_id }}&key=${PANEL_BRAND_KEY}" -o /tmp/brand.json
-          LABEL=$(python3 -c "import json;d=json.load(open('/tmp/brand.json'));print((d.get('data') or d).get('brand_name') or 'Connectix VPN')")
-          echo "Branded build label: $LABEL"
-          flutter build apk --release -PBRAND_LABEL="$LABEL"
+          # Rewrite the app label directly in the generated manifest (deterministic;
+          # avoids AGP manifestPlaceholders quirks with the Flutter gradle plugin).
+          python3 - <<'PY'
+          import json
+          d = json.load(open('/tmp/brand.json'))
+          label = (d.get('data') or d).get('brand_name') or 'Connectix VPN'
+          p = 'android/app/src/main/AndroidManifest.xml'
+          s = open(p, encoding='utf-8').read()
+          s = s.replace('android:label="Connectix VPN"', f'android:label="{label}"', 1)
+          open(p, 'w', encoding='utf-8').write(s)
+          print('Branded build label:', label)
+          PY
+          flutter build apk --release
           cp build/app/outputs/flutter-apk/app-release.apk "../Connectix-Branded-${{ inputs.reseller_id }}.apk"
 
       - name: Upload Branded APK Artifact
