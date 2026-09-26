@@ -235,6 +235,7 @@ if (!function_exists('isActiveRoute')) {
                     <i id="chevron-bot" class="fa-solid fa-chevron-down chevron-icon text-[9px] text-slate-500"></i>
                 </button>
                 <div id="content-bot" class="accordion-content space-y-0.5 mt-0.5 pr-2">
+                    <?php if (Auth::isAdmin()): ?>
                     <a href="<?= Helpers::url('settings/bot') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('settings/bot', $currentUri) && !isActiveRoute('bot-users', $currentUri) ? 'bg-sky-600/15 text-sky-300 font-bold border-r-2 border-sky-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
                         <i class="fa-solid fa-robot w-4 text-center text-sky-400"></i>
                         <span>تنظیمات ربات تلگرام</span>
@@ -251,6 +252,7 @@ if (!function_exists('isActiveRoute')) {
                         <i class="fa-solid fa-gift w-4 text-center text-purple-400"></i>
                         <span>سیستم معرف و پورسانت</span>
                     </a>
+                    <?php endif; ?>
                     <a href="<?= Helpers::url('notifications') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('notifications', $currentUri) ? 'bg-sky-600/15 text-sky-300 font-bold border-r-2 border-sky-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
                         <i class="fa-solid fa-bullhorn w-4 text-center text-yellow-400"></i>
                         <span>پیام همگانی و اعلان‌ها</span>
@@ -299,6 +301,7 @@ if (!function_exists('isActiveRoute')) {
                     <i id="chevron-system" class="fa-solid fa-chevron-down chevron-icon text-[9px] text-slate-500"></i>
                 </button>
                 <div id="content-system" class="accordion-content space-y-0.5 mt-0.5 pr-2">
+                    <?php if (Auth::isAdmin()): ?>
                     <a href="<?= Helpers::url('settings/app-api') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('app-api', $currentUri) ? 'bg-cyan-600/15 text-cyan-300 font-bold border-r-2 border-cyan-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
                         <i class="fa-solid fa-code w-4 text-center text-cyan-400"></i>
                         <span>وب‌سرویس و اپلیکیشن اختصاصی</span>
@@ -315,6 +318,7 @@ if (!function_exists('isActiveRoute')) {
                         <i class="fa-solid fa-shield-halved w-4 text-center text-amber-400"></i>
                         <span>لاگ‌های امنیتی</span>
                     </a>
+                    <?php endif; ?>
                     <a href="<?= Helpers::url('profile') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('profile', $currentUri) ? 'bg-teal-600/15 text-teal-300 font-bold border-r-2 border-teal-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
                         <i class="fa-solid fa-user-shield w-4 text-center text-teal-400"></i>
                         <span>حساب کاربری و 2FA</span>

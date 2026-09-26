@@ -19,6 +19,19 @@ class TelegramBot {
         return defined('TELEGRAM_ADMIN_CHAT_ID') ? trim(TELEGRAM_ADMIN_CHAT_ID) : '';
     }
 
+    /**
+     * Default destination for ALL reports & panel messages: the supergroup
+     * log channel (forum). Falls back to the admin's personal chat only when
+     * no supergroup is configured. Per-user messages (login codes, replies)
+     * always pass an explicit chat_id and are unaffected.
+     */
+    public static function getLogChatId(): string {
+        $chat = trim((string)Setting::get('bot_log_channel', ''));
+        if ($chat === '') $chat = trim((string)Setting::get('telegram_log_channel_id', ''));
+        if ($chat !== '') return $chat;
+        return self::getAdminChatId();
+    }
+
     public static function isActive(): bool {
         $active = Setting::get('telegram_bot_active', '1');
         return ($active === '1' || $active === 'true' || $active === 'on');
@@ -60,7 +73,7 @@ class TelegramBot {
     }
 
     public static function sendMessage(string $text, ?string $chatId = null, $replyMarkup = null, ?string $customToken = null, ?int $messageThreadId = null): bool {
-        $targetChat = $chatId ?: self::getAdminChatId();
+        $targetChat = $chatId ?: self::getLogChatId();
         if (empty($targetChat)) {
             return false;
         }
@@ -85,7 +98,7 @@ class TelegramBot {
     }
 
     public static function sendPhoto(string $photo, string $caption = '', ?string $chatId = null, $replyMarkup = null, ?string $customToken = null, ?int $messageThreadId = null): bool {
-        $targetChat = $chatId ?: self::getAdminChatId();
+        $targetChat = $chatId ?: self::getLogChatId();
         if (empty($targetChat)) {
             return false;
         }
@@ -110,7 +123,7 @@ class TelegramBot {
     }
 
     public static function sendDocument(string $filePath, string $caption = '', ?string $chatId = null, ?string $customToken = null, ?int $messageThreadId = null): bool {
-        $targetChat = $chatId ?: self::getAdminChatId();
+        $targetChat = $chatId ?: self::getLogChatId();
         $token = !empty($customToken) ? trim($customToken) : self::getToken();
         if (empty($targetChat) || empty($token) || !file_exists($filePath)) {
             return false;
