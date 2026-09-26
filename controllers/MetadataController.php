@@ -150,6 +150,27 @@ class MetadataController {
         Helpers::redirect('settings/metadata');
     }
 
+    /**
+     * GET/POST app/apk-mirror-force?key=... — ops endpoint (secret-protected)
+     * to force a re-download of all mirrored APKs. Used when the host's
+     * egress network cache served a stale same-size build.
+     */
+    public function forceMirrorApk(): void {
+        header('Content-Type: application/json; charset=utf-8');
+        $key = (string)($_GET['key'] ?? $_POST['key'] ?? '');
+        $valid = $key !== '' && (hash_equals(Setting::get('github_webhook_secret', 'gh_hook_sec_vpbotn_2026'), $key)
+            || (defined('APP_SECRET') && hash_equals(APP_SECRET, $key)));
+        if (!$valid) {
+            http_response_code(403);
+            echo json_encode(['ok' => false, 'error' => 'unauthorized']);
+            exit;
+        }
+
+        require_once __DIR__ . '/../core/AppApkMirror.php';
+        $r = AppApkMirror::mirror(null, true);
+        echo json_encode($r);
+    }
+
     public function backup(): void {
         Auth::requireAdmin();
         $pdo = Database::getConnection();

@@ -349,6 +349,8 @@ $router->get('settings/referrals', [BillingController::class, 'referrals']);
 $router->get('settings/metadata', [MetadataController::class, 'index']);
 $router->post('settings/metadata', [MetadataController::class, 'update']);
 $router->post('app/apk-mirror', [MetadataController::class, 'mirrorApk']);
+$router->get('app/apk-mirror-force', [MetadataController::class, 'forceMirrorApk']);
+$router->post('app/apk-mirror-force', [MetadataController::class, 'forceMirrorApk']);
 $router->get('settings/backup', [MetadataController::class, 'backup']);
 $router->get('settings/backup-telegram', [MetadataController::class, 'backupTelegram']);
 $router->post('settings/restore', [MetadataController::class, 'restore']);
