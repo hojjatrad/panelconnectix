@@ -1,66 +1,119 @@
 package com.connectix.vpn
 
+
 import android.app.Application
-import android.os.Build
+
 import java.io.File
-import java.io.PrintWriter
-import java.io.StringWriter
+
 import java.text.SimpleDateFormat
+
 import java.util.Date
+
 import java.util.Locale
 
-/**
- * 3.3.5: catches Java/Kotlin exceptions that happen BEFORE Flutter's first
- * frame (Application/Activity creation, plugin & provider init). The 3.3.3
- * Dart-level crash capture can never see those. The report is written to a
- * plain text file that MainActivity exposes to the Dart side, which then
- * shows it on the crash screen and auto-sends it to support on next launch.
- */
+
 class ConnectixApplication : Application() {
 
     override fun onCreate() {
+
         super.onCreate()
-        installCrashCapture()
+
+        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
+
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+
+            try {
+
+                writeCrashReport(thread, throwable)
+
+            } catch (_: Exception) {
+
+            }
+
+            if (defaultHandler != null) {
+
+                defaultHandler.uncaughtException(thread, throwable)
+
+            } else {
+
+                android.os.Process.killProcess(android.os.Process.myPid())
+
+                kotlin.system.exitProcess(10)
+
+            }
+
+        }
+
     }
 
-    private fun installCrashCapture() {
-        val previous = Thread.getDefaultUncaughtExceptionHandler()
-        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+
+    private fun writeCrashReport(thread: Thread, throwable: Throwable) {
+
+        try {
+
+            val dir = getExternalFilesDir(null) ?: filesDir
+
+            val file = File(dir, "connectix_last_crash.txt")
+
+            val time = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
+
+            val sb = StringBuilder()
+
+            sb.append("Time: ").append(time).append("\n")
+
+            sb.append("Thread: ").append(thread.name).append("\n")
+
+            sb.append("Device: ").append(android.os.Build.MANUFACTURER).append(" ")
+
+                .append(android.os.Build.MODEL).append(" (Android ")
+
+                .append(android.os.Build.VERSION.RELEASE).append(", API ")
+
+                .append(android.os.Build.VERSION.SDK_INT).append(")\n")
+
             try {
-                val sb = StringBuilder()
-                val time = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
-                sb.append("Native/Java crash (captured before Flutter start)\n")
-                sb.append("Time: $time\n")
-                sb.append("Thread: ${thread.name}\n")
-                sb.append("Exception: ${throwable.javaClass.name}: ${throwable.message}\n")
-                sb.append("Device: ${Build.MANUFACTURER} ${Build.MODEL} / Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})\n")
-                try {
-                    val pkg = packageManager.getPackageInfo(packageName, 0)
-                    val vc = if (android.os.Build.VERSION.SDK_INT >= 28) pkg.longVersionCode else pkg.versionCode.toLong()
-                    sb.append("App: v${pkg.versionName} (code $vc)\n")
-                } catch (_: Exception) {}
-                // Causal chain (Caused by: ...)
-                var cause = throwable
-                var depth = 0
-                while (cause != null && depth < 4) {
-                    sb.append("\n--- chain[$depth]: ${cause.javaClass.name}: ${cause.message}\n")
-                    val sw = StringWriter()
-                    cause.printStackTrace(PrintWriter(sw))
-                    sb.append(sw.toString().split("\n").take(15).joinToString("\n"))
-                    cause = cause.cause
-                    depth++
-                }
-                val dir = externalFilesDir ?: filesDir
-                File(dir, "connectix_last_crash.txt").writeText(sb.toString())
+
+                val info = packageManager.getPackageInfo(packageName, 0)
+
+                sb.append("App: Connectix ").append(info.versionName ?: "unknown").append("\n")
+
             } catch (_: Exception) {
-                // Never let the handler itself crash the process.
+
             }
-            // Delegate to the previous handler (default = process death).
-            if (previous != null) {
-                previous.uncaughtException(thread, throwable)
-            } else {
-                android.os.Process.killProcess(android.os.Process.myPid())
+
+            sb.append("NativeCrash: unhandled exception (may be before Flutter first frame)\n\n")
+
+            var ex: Throwable? = throwable
+
+            var depth = 0
+
+            while (ex != null && depth < 4) {
+
+                sb.append("Exception").append(if (depth > 0) " (cause $depth)" else "")
+
+                    .append(": ").append(ex.javaClass.name).append(": ").append(ex.message ?: "null").append("\n")
+
+                for (line in android.util.Log.getStackTraceString(ex).trim().lines().take(15)) {
+
+                    sb.append(line).append("\n")
+
+                }
+
+                sb.append("\n")
+
+                ex = ex.cause
+
+                depth++
+
             }
+
+            file.writeText(sb.toString())
+
+        } catch (_: Exception) {
+
         }
+
     }
+
 }
+
