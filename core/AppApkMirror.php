@@ -35,12 +35,18 @@ class AppApkMirror {
     /**
      * Mirror all release APKs to the panel root.
      *
-     * @param array|null $release Optional pre-fetched GitHub release object
-     *                            (avoids a duplicate API call).
-     * @param bool       $force   Re-download even if the local file looks right.
+     * @param array|null  $release         Optional pre-fetched GitHub release
+     *                                     object (avoids a duplicate API call).
+     * @param bool        $force           Re-download even if the local file
+     *                                     looks right.
+     * @param string      $manifestVersion Manifest version (e.g. "3.3.1").
+     *                                     A changed version forces re-download —
+     *                                     CI rebuilds can produce identical
+     *                                     file SIZES with different content.
+     * @param string      $manifestCode    Manifest build number (e.g. "11").
      * @return array ['ok'=>bool, 'files'=>[name=>state], 'changed'=>bool, 'error'=>?string]
      */
-    public static function mirror(?array $release = null, bool $force = false): array {
+    public static function mirror(?array $release = null, bool $force = false, string $manifestVersion = '', string $manifestCode = ''): array {
         $res = ['ok' => true, 'files' => [], 'changed' => false, 'error' => null];
 
         if ($release === null) {
@@ -65,6 +71,15 @@ class AppApkMirror {
 
         $root = self::rootDir();
         @set_time_limit(600);
+
+        // Build changed since last mirror? (legacy state without a recorded
+        // version is treated as stale too — forces a one-time bootstrap)
+        $state = json_decode(Setting::get('app_apk_mirror_state', '{}'), true) ?: [];
+        if (!$force && $manifestVersion !== '') {
+            if ((string)($state['version'] ?? '') !== $manifestVersion) {
+                $force = true;
+            }
+        }
 
         foreach (self::APK_NAMES as $name) {
             $asset = $assets[$name] ?? null;
@@ -138,6 +153,10 @@ class AppApkMirror {
             'at' => date('Y-m-d H:i:s'),
             'files' => $res['files'],
             'ok' => $res['ok'],
+            // Keep the last known manifest identity when this run had none
+            // (e.g. a manual force-mirror without manifest context).
+            'version' => $manifestVersion !== '' ? $manifestVersion : (string)($state['version'] ?? ''),
+            'code' => $manifestCode !== '' ? $manifestCode : (string)($state['code'] ?? ''),
         ]));
         return $res;
     }

@@ -126,7 +126,7 @@ class AppReleasePublisher
         // where the GitHub fallback fails with a connection error).
         try {
             require_once __DIR__ . '/AppApkMirror.php';
-            $mirrorRes = AppApkMirror::mirror($release);
+            $mirrorRes = AppApkMirror::mirror($release, false, $remoteVer, (string)($manifest['code'] ?? ''));
             $status['apk_mirror'] = $mirrorRes['files'];
             if ($mirrorRes['changed']) {
                 $status['apk_mirror_changed'] = date('Y-m-d H:i:s');
