@@ -27,11 +27,6 @@ bool FlutterWindow::OnCreate() {
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
-  // Keep the window phone-sized: this app is a mobile-first UI. Without
-  // these limits Windows lets it stretch to full screen.
-  SetMinSize({390, 640});
-  SetMaxSize({520, 880});
-
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
     this->Show();
   });
@@ -70,6 +65,23 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
     case WM_FONTCHANGE:
       flutter_controller_->engine()->ReloadSystemFonts();
       break;
+
+    // Keep the window phone-sized: this app is a mobile-first UI. Without
+    // this Windows lets it stretch to full screen. Sizes below are for the
+    // CLIENT area; ptMin/MaxTrackSize include the window frame.
+    case WM_GETMINMAXINFO: {
+      MINMAXINFO* mmi = reinterpret_cast<MINMAXINFO*>(lparam);
+      const int frameX = 2 * (GetSystemMetrics(SM_CXSIZEFRAME) +
+                              GetSystemMetrics(SM_CXPADDEDBORDER));
+      const int frameY = GetSystemMetrics(SM_CYCAPTION) +
+                         2 * (GetSystemMetrics(SM_CYSIZEFRAME) +
+                              GetSystemMetrics(SM_CYPADDEDBORDER));
+      mmi->ptMinTrackSize.x = 390 + frameX;
+      mmi->ptMinTrackSize.y = 640 + frameY;
+      mmi->ptMaxTrackSize.x = 520 + frameX;
+      mmi->ptMaxTrackSize.y = 880 + frameY;
+      return 0;
+    }
   }
 
   return Win32Window::MessageHandler(hwnd, message, wparam, lparam);
