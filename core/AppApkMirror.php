@@ -104,7 +104,11 @@ class AppApkMirror {
                 continue;
             }
 
-            $ch = curl_init($asset['browser_download_url']);
+            // Unique cache-buster: the release-asset URL does NOT change
+            // between builds, so the host's egress network cache can serve a
+            // stale (same-size!) copy of the old APK without a fresh key.
+            $assetUrl = $asset['browser_download_url'] . '?cb=' . (string)time() . rand(1000, 9999);
+            $ch = curl_init($assetUrl);
             $headers = ['User-Agent: Connectix-Panel-AppApkMirror/1.0'];
             $token = Updater::getToken();
             if (!empty($token)) $headers[] = "Authorization: token {$token}";
@@ -165,6 +169,7 @@ class AppApkMirror {
         $tmp = $target . '.part';
         $fp = @fopen($tmp, 'wb');
         if (!$fp) return false;
+        $url .= (strpos($url, '?') === false ? '?' : '&') . 'cb=' . (string)time() . rand(1000, 9999);
         $ch = curl_init($url);
         $headers = ['User-Agent: Connectix-Panel-AppApkMirror/1.0'];
         $token = Updater::getToken();
