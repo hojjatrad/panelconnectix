@@ -425,8 +425,36 @@ try {
             . " added=" . $nodeSyncRes['added']
             . " updated=" . $nodeSyncRes['updated']
             . " skipped=" . $nodeSyncRes['skipped'] . $eol;
+
+        // Visible alert when node sync is broken or has nothing to sync.
+        // (Previously failures were only echoed to the cron log, so a deleted
+        // server row or a changed API key made node clients "vanish" silently.)
+        // De-duplicated by problem signature, at most once per 6 hours.
+        $problem = '';
         if (!empty($nodeSyncRes['errors'])) {
-            echo "[Node Sync] errors: " . implode(' | ', array_slice($nodeSyncRes['errors'], 0, 5)) . $eol;
+            $problem = 'errors: ' . implode(' | ', array_slice($nodeSyncRes['errors'], 0, 5));
+        } elseif ((int)$nodeSyncRes['servers'] === 0) {
+            $problem = 'no active non-mock servers to sync';
+        }
+        if ($problem !== '') {
+            $sig = substr(hash('sha1', $problem), 0, 16);
+            $lastSig = trim((string)Setting::get('last_node_sync_alert_sig', ''));
+            $lastAt  = (int)Setting::get('last_node_sync_alert_at', '0');
+            if ($sig !== $lastSig || (time() - $lastAt) >= 21600) {
+                $errList = !empty($nodeSyncRes['errors'])
+                    ? '- ' . implode("\n- ", array_slice($nodeSyncRes['errors'], 0, 5))
+                    : '- هیچ سرور فعال غیر-موشن (mock)ی برای همگام‌سازی وجود ندارد.\n- اگر انتظار همگام‌سازی کلاینت‌های سروری مثل پاسارگاد را دارید، مطمئن شوید آن سرور هنوز در «مدیریت سرورها» تعریف و فعال است (driver صحیح + آدرس/کلید API معتبر).';
+                TelegramBot::sendCategorizedReport('servers',
+                    "🔄 <b>هشدار همگام‌سازی کلاینت‌های سرور</b>\n\n" . $errList .
+                    "\n\nتا رفع مشکل، کلاینت‌های مستقیم سرور به‌صورت خودکار در پنل به‌روز نمی‌شوند.");
+                Setting::set('last_node_sync_alert_sig', $sig);
+                Setting::set('last_node_sync_alert_at', (string)time());
+            }
+        } elseif (trim((string)Setting::get('last_node_sync_alert_sig', '')) !== '') {
+            // Healthy sync again — clear the de-dupe state so the next
+            // problem alerts immediately.
+            Setting::set('last_node_sync_alert_sig', '');
+            Setting::set('last_node_sync_alert_at', '0');
         }
     } else {
         echo "[Node Sync] skipped (throttled, last run " . (time() - $lastNodeSync) . "s ago)." . $eol;
