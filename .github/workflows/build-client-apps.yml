@@ -460,10 +460,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # NOTE: Windows job uses a recent stable (VS 2022 detection). Flutter
+      # 3.22's toolchain prefers the stale VS 2019 install on the runner and
+      # fails CMake configure.
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.x'
+          flutter-version: '3.47.x'
           channel: 'stable'
           cache: true
 
