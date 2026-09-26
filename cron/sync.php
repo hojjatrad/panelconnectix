@@ -25,6 +25,24 @@ echo "[" . date('Y-m-d H:i:s') . "] Starting Sync & Reserved Subscriptions Engin
 
 $pdo = Database::getConnection();
 
+// 0. Cron Heartbeat — alert if the previous cron run was longer than 5 minutes ago
+try {
+    $lastRun = (int)Setting::get('last_cron_sync_at', '0');
+    $lastAlert = (int)Setting::get('last_cron_dead_alert', '0');
+    if ($lastRun !== 0 && (time() - $lastRun > 300) && (time() - $lastAlert > 1800)) {
+        Setting::set('last_cron_dead_alert', (string)time());
+        $minutes = round((time() - $lastRun) / 60);
+        TelegramBot::sendCategorizedReport('servers', "🫀 <b>هشدار تپش کرون (Cron Heartbeat)</b>\n\n"
+            . "آخرین اجرای موفق موتور همگام‌سازی بیش از <b>{$minutes} دقیقه</b> قبل بوده است.\n"
+            . "🕐 آخرین اجرای موفق: " . date('Y-m-d H:i:s', $lastRun) . "\n"
+            . "اگر ادامه داشت، Jobهای cron در cPanel (cron/sync.php) را بررسی کنید.");
+        echo "[Heartbeat] CRON DEAD ALERT (last successful run {$minutes} min ago)." . $eol;
+    }
+    Setting::set('last_cron_sync_at', (string)time());
+} catch (Throwable $e) {
+    echo "[Heartbeat Error] " . $e->getMessage() . $eol;
+}
+
 // 1. Automatic Server Health Check & Failover Ping
 try {
     $healthResults = ServerController::performHealthCheck();
@@ -307,6 +325,58 @@ if (time() - $lastNightlyReport >= 86400) {
 
 // GitHub Auto-Update Engine (همگام‌سازی و به‌روزرسانی خودکار با گیت‌هاب روی کرون جاب هاست)
 $isAutoApply = Setting::get('auto_apply_github_updates', '1') !== '0';
+
+// 4a. CI Quality Gate — apply the webhook-parked update once Panel CI goes green
+// (runs every minute, independent of the 180s update-check throttle below)
+try {
+    $pendingSha = (string)Setting::get('pending_ci_sha', '');
+    if ($pendingSha !== '' && (time() - (int)Setting::get('pending_ci_at', '0') >= 45)) {
+        require_once __DIR__ . '/../core/Updater.php';
+        $run = Updater::getActionsRunForSha($pendingSha);
+        $ciStatus = ($run && empty($run['not_found'])) ? (string)($run['status'] ?? '') : '';
+        $ciConclusion = ($run && empty($run['not_found'])) ? (string)($run['conclusion'] ?? '') : '';
+
+        if ($ciConclusion === 'success') {
+            Setting::set('pending_ci_sha', '');
+            $info = Updater::checkForUpdates(true);
+            if (!empty($info['has_update'])) {
+                $res = Updater::applyUpdate(false);
+                if (!empty($res['success'])) {
+                    $msg = "⚡️ <b>آپدیت آنی گیت‌هاب با وب‌هوک اعمال شد!</b>\n\n"
+                         . "تغییرات جدید مستقیماً از مخزن گیت‌هاب دریافت و روی پنل هاست مستقر گردید.\n"
+                         . "🏷 نسخه: <code>" . htmlspecialchars((string)($res['version'] ?? ''), ENT_QUOTES) . "</code>\n"
+                         . "🧪 درِ کیفیت CI: ✅ سبز\n"
+                         . "📅 زمان: " . date('Y-m-d H:i:s');
+                    TelegramBot::announcePanelUpdate($pendingSha, $msg);
+                    echo "[CI Gate] Applied " . substr($pendingSha, 0, 7) . " after Panel CI turned green." . $eol;
+                } else {
+                    echo "[CI Gate Error] Apply failed after green CI: " . ($res['error'] ?? 'unknown') . $eol;
+                }
+            } else {
+                echo "[CI Gate] CI green but no update pending (already up to date)." . $eol;
+            }
+        } elseif (in_array($ciConclusion, ['failure', 'cancelled', 'timeout'], true)) {
+            Setting::set('pending_ci_sha', '');
+            $link = (string)($run['html_url'] ?? '');
+            TelegramBot::sendCategorizedReport('general', "🚫 <b>درِ کیفیت CI — آپدیت مسدود شد</b>\n\n"
+                . "آزمایش‌های پنل روی کامیت <code>" . substr($pendingSha, 0, 7) . "</code> <b>شکست خوردند</b>؛ این آپدیت اعمال نشد.\n"
+                . "پنل روی نسخه پایدار قبلی باقی می‌ماند تا خرابی اصلاح شود."
+                . ($link !== '' ? "\n🔗 <a href=\"" . $link . "\">مشاهده جزئیات CI</a>" : ''));
+            echo "[CI Gate] CI failed for " . substr($pendingSha, 0, 7) . " — update blocked." . $eol;
+        } elseif (time() - (int)Setting::get('pending_ci_at', '0') > 1800) {
+            Setting::set('pending_ci_sha', '');
+            TelegramBot::sendCategorizedReport('general', "⏳ <b>CI بیش از ۳۰ دقیقه طول کشید</b>\n\n"
+                . "انتظار برای سبز شدن کامیت <code>" . substr($pendingSha, 0, 7) . "</code> لغو شد.\n"
+                . "در صورت نیاز، اعمال دستی از صفحه «بروزرسانی» پنل انجام شود.");
+            echo "[CI Gate] Timed out waiting for CI on " . substr($pendingSha, 0, 7) . "." . $eol;
+        } else {
+            echo "[CI Gate] Still waiting for Panel CI (status={$ciStatus}, conclusion=" . ($ciConclusion ?: '-') . ")." . $eol;
+        }
+    }
+} catch (Throwable $e) {
+    echo "[CI Gate Error] " . $e->getMessage() . $eol;
+}
+
 $lastUpdateCheck = (int)Setting::get('last_cron_update_check', '0');
 $forceCheck = isset($_GET['auto_update']) || isset($_GET['update_now']) || (php_sapi_name() === 'cli' && in_array('--update', $argv ?? []));
 

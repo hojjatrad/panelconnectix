@@ -182,6 +182,45 @@ class UpdateController {
             exit;
         }
 
+        // ---- CI Quality Gate (Panel CI workflow) ----
+        // A pushed commit is only installed once its CI run is green.
+        // While CI is still running the SHA is parked in 'pending_ci_sha'
+        // and the panel cron (every minute) applies it as soon as it turns
+        // green; a red CI blocks the update and alerts the supergroup.
+        try {
+            require_once __DIR__ . '/../core/TelegramBot.php';
+            $ciState = Updater::ciStateForSha($pushedSha);
+            if ($ciState === 'red') {
+                Setting::set('pending_ci_sha', '');
+                $run = Updater::getActionsRunForSha($pushedSha);
+                $link = (string)($run['html_url'] ?? '');
+                $msg = "🚫 <b>درِ کیفیت CI — آپدیت مسدود شد</b>\n\n"
+                     . "آزمایش‌های پنل (Lint + Smoke) روی کامیت <code>" . substr($pushedSha, 0, 7) . "</code> <b>شکست خوردند</b>؛ این آپدیت روی هاست اعمال نشد.\n"
+                     . "تا رفع خطا، پنل روی نسخه پایدار قبل باقی می‌ماند."
+                     . ($link !== '' ? "\n🔗 <a href=\"" . $link . "\">مشاهده جزئیات CI</a>" : '');
+                TelegramBot::sendCategorizedReport('general', $msg);
+                echo json_encode(['success' => false, 'status' => 'ci_failed', 'sha' => $pushedSha, 'message' => 'CI شکست خورد؛ آپدیت اعمال نشد.']);
+                exit;
+            }
+            if ($ciState === 'pending') {
+                $prevPending = (string)Setting::get('pending_ci_sha', '');
+                if ($prevPending !== $pushedSha) {
+                    Setting::set('pending_ci_sha', $pushedSha);
+                    Setting::set('pending_ci_at', (string)time());
+                    TelegramBot::sendCategorizedReport('general', "🧪 <b>درِ کیفیت CI فعال شد</b>\n\nکامیت <code>" . substr($pushedSha, 0, 7) . "</code> در صف آزمایش است؛ به‌محض سبز شدن، آپدیت به‌صورت <b>خودکار</b> اعمال می‌شود.");
+                }
+                echo json_encode(['success' => true, 'status' => 'waiting_ci', 'sha' => $pushedSha, 'message' => 'CI در حال اجراست؛ اعمال خودکار پس از سبز شدن.']);
+                exit;
+            }
+            // 'green' or 'unknown' → proceed to apply now
+            if (Setting::get('pending_ci_sha', '') === $pushedSha) {
+                Setting::set('pending_ci_sha', '');
+            }
+        } catch (Throwable $e) {
+            // Gate failure must never block updates: fall through to apply
+            error_log('CI gate error: ' . $e->getMessage());
+        }
+
         $res = Updater::applyUpdate(false);
         if ($res['success']) {
             try {

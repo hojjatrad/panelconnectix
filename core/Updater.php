@@ -4,7 +4,7 @@ require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Setting.php';
 
 class Updater {
-    public const CURRENT_VERSION = '5.1.4';
+    public const CURRENT_VERSION = '5.2.0';
 
     public static function getCurrentVersion(): string {
         $dbVer = Setting::get('current_version', '');
@@ -563,6 +563,55 @@ class Updater {
             $pdo = Database::getConnection();
             Database::ensureExtendedTablesExist($pdo);
         } catch (Throwable $e) {}
+    }
+
+    /**
+     * Quality gate: find the CI workflow run for a given commit SHA.
+     * Returns the matching run array (with status/conclusion/html_url),
+     * ['not_found' => true] when no run exists for the workflow on this SHA,
+     * or null when the API itself could not be reached.
+     */
+    public static function getActionsRunForSha(string $sha, string $workflowPath = '.github/workflows/panel-ci.yml'): ?array {
+        if (strlen($sha) < 7 || !preg_match('/^[0-9a-f]{7,40}$/i', $sha)) {
+            return null;
+        }
+        $repo = self::getRepo();
+        $token = self::getToken();
+        $url = "https://api.github.com/repos/{$repo}/actions/runs?head_sha={$sha}&per_page=20";
+        $res = self::githubRequest($url, $token);
+        if (!is_array($res) || !isset($res['workflow_runs']) || !is_array($res['workflow_runs'])) {
+            return null;
+        }
+        foreach ($res['workflow_runs'] as $run) {
+            if (($run['path'] ?? '') === $workflowPath) {
+                return $run;
+            }
+        }
+        return ['not_found' => true];
+    }
+
+    /**
+     * Resolve the CI state for a SHA: 'green' | 'red' | 'pending' | 'unknown'.
+     * 'unknown' (no CI run found / API unreachable) keeps the legacy
+     * apply-now behavior so a missing workflow never bricks the pipeline.
+     */
+    public static function ciStateForSha(string $sha): string {
+        $run = self::getActionsRunForSha($sha);
+        if ($run === null || !empty($run['not_found'])) {
+            return 'unknown';
+        }
+        $status = (string)($run['status'] ?? '');
+        if (in_array($status, ['queued', 'in_progress'], true)) {
+            return 'pending';
+        }
+        $conclusion = (string)($run['conclusion'] ?? '');
+        if ($conclusion === 'success') {
+            return 'green';
+        }
+        if ($conclusion !== '') {
+            return 'red';
+        }
+        return 'pending';
     }
 
     public static function githubRequest(string $url, string $token = ''): ?array {

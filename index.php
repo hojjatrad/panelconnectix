@@ -463,6 +463,32 @@ $router->post('notifications/store', [NotificationController::class, 'store']);
 $router->get('logs', [LogController::class, 'index']);
 $router->post('logs/clear', [LogController::class, 'clear']);
 
+// External Monitoring Heartbeat (lightweight, for uptime monitors)
+$router->get('monitor/heartbeat', function() {
+    header('Content-Type: application/json; charset=utf-8');
+    require_once __DIR__ . '/core/Setting.php';
+    $out = ['ok' => true, 'service' => 'connectix-panel', 'time' => date('c'), 'version' => ''];
+    try {
+        require_once __DIR__ . '/core/Database.php';
+        $pdo = Database::getConnection();
+        $pdo->query("SELECT 1")->fetchColumn();
+        $out['db'] = 'ok';
+    } catch (Throwable $e) {
+        $out['ok'] = false;
+        $out['db'] = 'error: ' . substr($e->getMessage(), 0, 120);
+    }
+    try {
+        $last = (int)Setting::get('last_cron_sync_at', '0');
+        $out['cron_age_sec'] = $last > 0 ? time() - $last : null;
+        $out['cron_ok'] = $last > 0 && (time() - $last <= 600);
+    } catch (Throwable $e) {}
+    try {
+        require_once __DIR__ . '/core/Updater.php';
+        $out['version'] = Updater::getCurrentVersion();
+    } catch (Throwable $e) {}
+    echo json_encode($out, JSON_UNESCAPED_UNICODE);
+});
+
 // Cron Job Execution Endpoints
 $router->get('sync', function() {
     require_once __DIR__ . '/cron/sync.php';

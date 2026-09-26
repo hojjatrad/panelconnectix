@@ -1,0 +1,52 @@
+name: Panel CI
+
+# Quality gate for the auto-apply pipeline:
+# the panel webhook (and its cron fallback) will only install a commit
+# after this workflow reports success for that exact SHA.
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  panel-check:
+    name: Lint + Smoke (PHP panel)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite, sqlite3, curl, zip
+          coverage: none
+
+      - name: Point dev config at a throwaway SQLite file
+        run: |
+          sed -i "s|__DIR__ . '/data/panel.sqlite'|sys_get_temp_dir() . '/connectix_ci.sqlite'|" config.php
+          rm -f /tmp/connectix_ci.sqlite
+
+      - name: PHP Syntax Lint (all panel PHP files)
+        run: |
+          fail=0
+          while IFS= read -r f; do
+            if ! php -l "$f" > /dev/null 2>&1; then
+              echo "SYNTAX ERROR: $f"
+              php -l "$f" || true
+              fail=1
+            fi
+          done < <(find . -name '*.php' -not -path './client-app/*' -not -path './.git/*' -type f)
+          if [ "$fail" -ne 0 ]; then
+            echo "PHP lint failed — commit blocked from auto-apply."
+            exit 1
+          fi
+          echo "All PHP files passed lint."
+
+      - name: Bootstrap Smoke Test
+        run: php tests/ci_smoke.php

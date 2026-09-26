@@ -8,3 +8,7 @@
 # OS Files
 .DS_Store
 Thumbs.db
+
+# Local secrets override (never commit real credentials)
+/config.secrets.php
+/scripts/mysql-credentials.json
