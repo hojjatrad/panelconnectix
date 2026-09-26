@@ -508,7 +508,7 @@ jobs:
           Get-Item "Connectix-Windows-x64.zip" | Select-Object Name,Length
 
       - name: Generate app_release.json (with Windows section)
-        shell: pwsh
+        shell: bash
         run: |
           python - <<'PY'
           import json, re, datetime, pathlib

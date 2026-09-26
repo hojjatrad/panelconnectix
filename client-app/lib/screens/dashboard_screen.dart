@@ -347,7 +347,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     try {
       final parser = FlutterV2ray.parseFromURL(_selectedServer!.configUri);
       final delay = await _flutterV2ray.getServerDelay(config: parser.getFullConfiguration());
-      if (mounted && delay > 0) {
+      if (mounted && delay != null && delay > 0) {
         setState(() {
           _currentServerPing = delay;
         });
@@ -386,7 +386,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       try {
         final parser = FlutterV2ray.parseFromURL(s.configUri);
         final delay = await _flutterV2ray.getServerDelay(config: parser.getFullConfiguration());
-        if (delay > 0 && delay < lowestPing) {
+        if (delay != null && delay > 0 && delay < lowestPing) {
           lowestPing = delay;
           bestServer = s;
         }

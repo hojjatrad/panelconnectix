@@ -12,12 +12,14 @@ import 'xray_service.dart';
 /// The dashboard only swaps `FlutterV2ray` -> `V2RayCompat`; everything
 /// else (status model, parseFromURL, config JSON) stays identical.
 class V2RayCompat {
-  V2RayCompat({required void Function(V2RayStatus) onStatusChanged})
-      : _onStatusChanged = onStatusChanged {
+  V2RayCompat({void Function(V2RayStatus)? onStatusChanged}) {
+    _onStatusChanged = onStatusChanged ?? _noop;
     _xray.onStatusChanged = (s) => _onStatusChanged(s);
   }
 
-  final void Function(V2RayStatus) _onStatusChanged;
+  late final void Function(V2RayStatus) _onStatusChanged;
+
+  static void _noop(V2RayStatus status) {}
   final XrayService _xray = XrayService.instance;
   FlutterV2ray? _v2ray;
 
