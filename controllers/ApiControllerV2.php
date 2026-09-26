@@ -737,6 +737,22 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
         $client = self::authenticateClientApp();
         $pdo = Database::getConnection();
 
+        // Short cache: the live node query can take several seconds on a cold
+        // call; the client's inbounds change rarely, so 90s keeps the Android
+        // app well inside its request timeout on slow mobile networks.
+        $cacheKey = 'app_configs_cache_' . (int)$client['id'];
+        $cached = json_decode((string)Setting::get($cacheKey, ''), true);
+        if (is_array($cached) && (int)($cached['at'] ?? 0) > time() - 90 && !empty($cached['servers'])) {
+            self::jsonSuccess([
+                'servers' => $cached['servers'],
+                'raw_sublink_base64' => $cached['raw_sublink_base64'] ?? '',
+                'sub_url' => Helpers::subUrl($client['sub_token']),
+                'total_servers' => count($cached['servers']),
+                'cached' => true,
+            ]);
+            return;
+        }
+
         $serverList = self::extractServerList($client, $pdo);
 
         if (empty($serverList)) {
@@ -745,6 +761,14 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
         }
 
         $rawSublink = base64_encode(implode("\n", array_column($serverList, 'config_uri')));
+
+        try {
+            Setting::set($cacheKey, json_encode([
+                'at' => time(),
+                'servers' => $serverList,
+                'raw_sublink_base64' => $rawSublink,
+            ]));
+        } catch (Throwable $e) {}
 
         self::jsonSuccess([
             'servers' => $serverList,

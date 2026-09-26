@@ -178,8 +178,8 @@ class TelegramBot {
     /**
      * Resolve forum topic thread ID for any category among the 11 specialized topics
      */
-    public static function getTopicThreadId(string $category): ?int {
-        $key = match(strtolower(trim($category))) {
+    public static function mapTopicKey(string $category): string {
+        return match(strtolower(trim($category))) {
             'nightly' => 'nightly',
             'backup_reseller' => 'backup_reseller',
             'backup', 'backup_all' => 'backup_all',
@@ -192,20 +192,41 @@ class TelegramBot {
             'errors', 'error', 'servers' => 'errors',
             default => 'general'
         };
+    }
+
+    public static function getTopicThreadId(string $category): ?int {
+        $key = self::mapTopicKey($category);
 
         $id = (int)Setting::get("bot_topic_{$key}", 0);
         if ($id > 0) return $id;
 
         // Fallback to legacy keys if configured
-        $legacyKey = match($key) {
+        $legacyKey = self::legacyTopicKey($key);
+        $legacyId = (int)Setting::get($legacyKey, 0);
+        return $legacyId > 0 ? $legacyId : null;
+    }
+
+    private static function legacyTopicKey(string $key): string {
+        return match($key) {
             'sales' => 'topic_sales_id',
             'backup_all' => 'topic_backup_id',
             'errors' => 'topic_servers_id',
             'finance' => 'topic_crypto_id',
             default => 'topic_general_id'
         };
-        $legacyId = (int)Setting::get($legacyKey, 0);
-        return $legacyId > 0 ? $legacyId : null;
+    }
+
+    /**
+     * Clear a stale topic thread id after Telegram rejected it
+     * ("message thread not found") so subsequent sends go straight to
+     * the General topic instead of failing-and-retrying every time.
+     */
+    public static function invalidateTopicThread(string $category): void {
+        try {
+            $key = self::mapTopicKey($category);
+            Setting::set("bot_topic_{$key}", '0');
+            Setting::set(self::legacyTopicKey($key), '0');
+        } catch (Throwable $e) {}
     }
 
     /**
@@ -223,6 +244,7 @@ class TelegramBot {
             // Self-heal: invalid/placeholder topic id -> post without thread (General topic)
             if (!$ok && $hasThread) {
                 $ok = self::sendDocument($documentPath, $message, $logChat, $customToken, null);
+                if ($ok) self::invalidateTopicThread($topicKey);
             }
             return $ok;
         }
@@ -230,12 +252,14 @@ class TelegramBot {
             $ok = self::sendPhoto($photoUrl, $message, $logChat, $keyboard, $customToken, $threadId);
             if (!$ok && $hasThread) {
                 $ok = self::sendPhoto($photoUrl, $message, $logChat, $keyboard, $customToken, null);
+                if ($ok) self::invalidateTopicThread($topicKey);
             }
             return $ok;
         }
         $ok = self::sendMessage($message, $logChat, $keyboard, $customToken, $threadId);
         if (!$ok && $hasThread) {
             $ok = self::sendMessage($message, $logChat, $keyboard, $customToken, null);
+            if ($ok) self::invalidateTopicThread($topicKey);
         }
         return $ok;
     }

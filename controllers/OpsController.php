@@ -13,8 +13,12 @@ require_once __DIR__ . '/../core/Updater.php';
 class OpsController {
     private const ALLOWED_SETTING_KEYS = [
         'github_webhook_secret',
+        'app_latest_version',
         'app_download_url',
         'app_universal_url',
+        'app_update_title',
+        'app_update_changelog',
+        'app_update_enabled',
         'app_download_url_windows',
         'app_latest_version_windows',
         'disk_alert_pct',

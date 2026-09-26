@@ -28,6 +28,12 @@ class DiagController {
             return;
         }
 
+        // One-shot repair action: re-register broken bot webhooks
+        if (($_GET['action'] ?? '') === 'fix-webhooks') {
+            echo json_encode($this->fixWebhooks(), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+            return;
+        }
+
         $out = ['ok' => true, 'time' => date('c'), 'version' => ''];
         try {
             require_once __DIR__ . '/../core/Updater.php';
@@ -235,6 +241,62 @@ class DiagController {
             $res['error'] = get_class($e) . ': ' . $e->getMessage();
         }
         return $res;
+    }
+
+    // ------------------------------------------------------------------
+
+    /**
+     * One-shot repair: re-register every bot webhook that is missing,
+     * stale or erroring. Main bot -> bare webhook.php; each user bot ->
+     * webhook.php?bot_token=<token> (same contract as ResellerPortalController).
+     */
+    private function fixWebhooks(): array {
+        $report = [];
+        try {
+            $pdo = Database::getConnection();
+            $base = Helpers::fullFileUrl('webhook.php');
+
+            // Main bot (webhook without token param)
+            $info = TelegramBot::getWebhookInfo();
+            $cur = (string)(($info['result']['url'] ?? null) ?: '');
+            $err = ($info['result']['last_error_message'] ?? null) ?: ($info['description'] ?? null);
+            $needed = ($cur !== $base) || ($err !== null);
+            $res = $needed ? TelegramBot::setWebhook($base, null, true) : null;
+            $report[] = [
+                'bot' => 'main',
+                'before_url' => $this->maskUrl($cur),
+                'before_error' => $err,
+                'action' => $needed ? 're-registered' : 'ok',
+                'result' => $res ? ($res['ok'] ? 'ok' : ($res['description'] ?? 'error')) : 'not needed',
+            ];
+
+            // Per-user bots
+            $users = $pdo->query("SELECT id, username, telegram_bot_token FROM users WHERE telegram_bot_token != '' ORDER BY id ASC LIMIT 10")->fetchAll();
+            foreach ($users as $u) {
+                $token = (string)$u['telegram_bot_token'];
+                $expected = Helpers::fullUrl('webhook.php?bot_token=' . urlencode($token));
+                $info = TelegramBot::getWebhookInfo($token);
+                if (!empty($info['description'])) {
+                    // token itself invalid (Unauthorized) — cannot fix from here
+                    $report[] = ['bot' => "user #{$u['id']} ({$u['username']})", 'action' => 'skip', 'result' => 'invalid token: ' . $info['description']];
+                    continue;
+                }
+                $cur = (string)(($info['result']['url'] ?? null) ?: '');
+                $err = $info['result']['last_error_message'] ?? null;
+                $needed = ($cur !== $expected) || ($err !== null);
+                $res = $needed ? TelegramBot::setWebhook($expected, $token, true) : null;
+                $report[] = [
+                    'bot' => "user #{$u['id']} ({$u['username']})",
+                    'before_url' => $this->maskUrl($cur),
+                    'before_error' => $err,
+                    'action' => $needed ? 're-registered' : 'ok',
+                    'result' => $res ? ($res['ok'] ? 'ok' : ($res['description'] ?? 'error')) : 'not needed',
+                ];
+            }
+        } catch (Throwable $e) {
+            $report[] = ['error' => $e->getMessage()];
+        }
+        return ['ok' => true, 'time' => date('c'), 'fixed' => $report];
     }
 
     // ------------------------------------------------------------------

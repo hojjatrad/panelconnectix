@@ -2006,8 +2006,8 @@ class TelegramBotController {
         $kb = [
             'inline_keyboard' => [
                 [
-                    ['text' => '⚡ اتصال با V2rayNG', 'url' => 'v2rayng://install-config?url=' . urlencode($primarySub)],
-                    ['text' => '🚀 اتصال با Hiddify / Streisand', 'url' => 'hiddify://install-sub?url=' . urlencode($primarySub)]
+                    ['text' => '⚡ اتصال با V2rayNG', 'url' => $primarySub],
+                    ['text' => '🚀 اتصال با Hiddify / Streisand', 'url' => $primarySub]
                 ],
                 [
                     ['text' => '🔄 تمدید این اشتراک', 'callback_data' => 'renew_acc_' . $c['id']],
@@ -2074,8 +2074,8 @@ class TelegramBotController {
 
         $kb = [
             'inline_keyboard' => [
-                [['text' => '⚡ اتصال با V2rayNG', 'url' => 'v2rayng://install-config?url=' . urlencode($primarySub)]],
-                [['text' => '🚀 اتصال با Hiddify', 'url' => 'hiddify://install-sub?url=' . urlencode($primarySub)]],
+                [['text' => '⚡ اتصال با V2rayNG', 'url' => $primarySub]],
+                [['text' => '🚀 اتصال با Hiddify', 'url' => $primarySub]],
                 [['text' => '🔙 بازگشت به جزئیات حساب', 'callback_data' => 'view_acc_' . $client['id']]]
             ]
         ];
@@ -2661,8 +2661,8 @@ class TelegramBotController {
 
             TelegramBot::sendPhoto($qrUrl, $customerMsg, $order['user_tg_id'], [
                 'inline_keyboard' => [
-                    [['text' => '⚡ اتصال مستقیم با V2rayNG', 'url' => 'v2rayng://install-config?url=' . urlencode($primarySub)]],
-                    [['text' => '🚀 اتصال با Streisand / Hiddify', 'url' => 'hiddify://install-sub?url=' . urlencode($primarySub)]],
+                    [['text' => '⚡ اتصال مستقیم با V2rayNG', 'url' => $primarySub]],
+                    [['text' => '🚀 اتصال با Streisand / Hiddify', 'url' => $primarySub]],
                     [['text' => '📊 مشاهده وضعیت اشتراک', 'callback_data' => 'view_acc_' . $client['id']]],
                     [['text' => '🔙 منوی اصلی', 'callback_data' => 'menu_main']]
                 ]
@@ -2725,8 +2725,8 @@ class TelegramBotController {
 
         $customerKeyboard = [
             'inline_keyboard' => [
-                [['text' => '⚡ اتصال مستقیم با V2rayNG', 'url' => 'v2rayng://install-config?url=' . urlencode($primarySub)]],
-                [['text' => '🚀 اتصال با Streisand / Hiddify', 'url' => 'hiddify://install-sub?url=' . urlencode($primarySub)]],
+                [['text' => '⚡ اتصال مستقیم با V2rayNG', 'url' => $primarySub]],
+                [['text' => '🚀 اتصال با Streisand / Hiddify', 'url' => $primarySub]],
                 [['text' => '📊 صفحه وب وضعیت اشتراک', 'url' => $prov['sub_url']]],
                 [['text' => '🔙 منوی اصلی', 'callback_data' => 'menu_main']]
             ]
@@ -4034,8 +4034,8 @@ class TelegramBotController {
 
         $kb = [
             'inline_keyboard' => [
-                [['text' => '⚡ اتصال مستقیم با V2rayNG', 'url' => 'v2rayng://install-config?url=' . urlencode($primarySub)]],
-                [['text' => '🚀 اتصال با Streisand / Hiddify', 'url' => 'hiddify://install-sub?url=' . urlencode($primarySub)]],
+                [['text' => '⚡ اتصال مستقیم با V2rayNG', 'url' => $primarySub]],
+                [['text' => '🚀 اتصال با Streisand / Hiddify', 'url' => $primarySub]],
                 [['text' => '🛒 خرید اشتراک کامل و پرسرعت', 'callback_data' => 'menu_buy']],
                 [['text' => '🔙 بازگشت به منوی اصلی', 'callback_data' => 'menu_main']]
             ]

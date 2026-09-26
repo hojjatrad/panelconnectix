@@ -166,10 +166,16 @@ class ServerListModal extends StatelessWidget {
                   ? Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Icon(Icons.cloud_off, color: Color(0xFF64748B), size: 48),
-                          SizedBox(height: 12),
-                          Text('هیچ کانکشنی یافت نشد.', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
+                        children: [
+                          const Icon(Icons.cloud_off, color: Color(0xFF64748B), size: 48),
+                          const SizedBox(height: 12),
+                          const Text('هیچ کانکشنی یافت نشد.', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'اگر ادامه یافت: دکمهٔ تازه‌سازی را بزنید،\nیا یک‌بار از حساب خارج و دوباره وارد شوید.',
+                            style: TextStyle(color: Color(0xFF64748B), fontSize: 11),
+                            textAlign: TextAlign.center,
+                          ),
                         ],
                       ),
                     )

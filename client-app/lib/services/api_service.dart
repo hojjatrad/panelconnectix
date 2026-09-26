@@ -151,30 +151,42 @@ class ApiService {
             'X-Auth-Token': token,
             'Accept': 'application/json'
           },
-        ).timeout(const Duration(seconds: 8));
-
+        ).timeout(const Duration(seconds: 20));
+        log('configs API: base=$baseUrl HTTP ${response.statusCode}');
+        if (response.statusCode != 200) {
+          final snippet = response.body.length > 200 ? response.body.substring(0, 200) : response.body;
+          log('configs API non-200 body: $snippet');
+        }
         final data = jsonDecode(utf8.decode(response.bodyBytes));
         if (data['success'] == true && data['data'] != null && data['data']['servers'] != null) {
           final List list = data['data']['servers'];
           final parsed = list.map((e) => ServerModel.fromJson(e)).toList();
           final bool hasMock = parsed.any((s) => s.configUri.contains('mock_pbk') || s.id == 'mci_reality_de');
+          log('configs API: ${parsed.length} servers, hasMock=$hasMock');
           
           // Accept only if real inbounds (more than 5 servers without mock items)
           if (!hasMock && parsed.length > 5) {
             servers = parsed;
+          } else {
+            log('configs list rejected (hasMock=$hasMock count=${parsed.length}) — falling back to sublink');
           }
+        } else {
+          log('configs API: success=${data['success']} error=${data['error']}');
         }
       } catch (e) {
+        log('API configs fetch error: $e');
         debugPrint("API configs fetch error: $e");
       }
 
       // 2. Direct Node / Panel Sublink Auto-Resolver (Delivers all 14 live PasarGuard inbounds)
       if (servers.isEmpty && subUrl.isNotEmpty) {
         try {
+          log('sublink fallback: $subUrl');
           final subResp = await http.get(
             Uri.parse(subUrl),
             headers: {'User-Agent': 'v2rayNG/1.8.5'},
-          ).timeout(const Duration(seconds: 9));
+          ).timeout(const Duration(seconds: 15));
+          log('sublink HTTP ${subResp.statusCode} (${subResp.body.length} bytes)');
 
           if (subResp.statusCode == 200 && subResp.body.isNotEmpty) {
             String decoded = subResp.body.trim();
@@ -193,14 +205,19 @@ class ApiService {
                 servers.add(ServerModel.fromUri(line, idx++));
               }
             }
+            log('sublink parsed ${servers.length} servers');
           }
         } catch (e) {
+          log('Sublink direct resolver error: $e');
           debugPrint("Sublink direct resolver error: $e");
         }
+      } else if (servers.isEmpty) {
+        log('NO SERVERS: API failed/empty and sub_url is not saved');
       }
 
       return servers;
     } catch (e) {
+      log('getServers Top-level error: $e');
       debugPrint("getServers Top-level error: $e");
       return [];
     }
