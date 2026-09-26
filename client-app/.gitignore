@@ -41,3 +41,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Generated at build time (do NOT commit — duplicates the gradle-generated registrant)
+android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
+pubspec.lock
