@@ -102,6 +102,10 @@ class MetadataController {
                 Setting::set('app_update_published_at', date('Y-m-d H:i:s'));
             }
 
+            // ---- Windows App Update Release Settings ----
+            Setting::set('app_latest_version_windows', trim($_POST['app_latest_version_windows'] ?? ''));
+            Setting::set('app_download_url_windows', trim($_POST['app_download_url_windows'] ?? ''));
+
             // ---- App Management (global support & announcement shown inside the app) ----
             Setting::set('app_support_id', trim($_POST['app_support_id'] ?? ''));
             Setting::set('app_support_link', trim($_POST['app_support_link'] ?? ''));

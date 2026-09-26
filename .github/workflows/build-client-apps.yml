@@ -448,3 +448,117 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+
+  # ---------------------------------------------------------------------
+  # Windows client (Phase 1): Flutter Windows runner + bundled open-source
+  # Xray core + Windows system-proxy routing. See lib/services/xray_service.dart
+  # ---------------------------------------------------------------------
+  build-windows:
+    name: Build Windows App (Xray core)
+    runs-on: windows-latest
+    needs: build-android
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.x'
+          channel: 'stable'
+          cache: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Get dependencies
+        working-directory: client-app
+        run: flutter pub get
+
+      - name: Download pinned Xray core (Windows x64)
+        shell: pwsh
+        run: |
+          $zip = "xray-windows-64.zip"
+          Invoke-WebRequest -Uri "https://github.com/XTLS/Xray-core/releases/download/v25.3.6/$zip" -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath "xray" -Force
+          Get-ChildItem "xray" | Select-Object Name
+
+      - name: Build Windows release
+        working-directory: client-app
+        run: flutter build windows --release
+
+      - name: Bundle Xray core into app data
+        shell: pwsh
+        run: |
+          $dest = "client-app\build\windows\x64\runner\Release\data\xray"
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Copy-Item "xray\Xray.exe" "$dest\Xray.exe" -Force
+          if (-not (Test-Path "xray\geoip.dat")) { Write-Host "geoip.dat not present (ok for client)" }
+          else { Copy-Item "xray\geoip.dat" "$dest\geoip.dat" -Force }
+          if (-not (Test-Path "xray\geosite.dat")) { Write-Host "geosite.dat not present (ok for client)" }
+          else { Copy-Item "xray\geosite.dat" "$dest\geosite.dat" -Force }
+          Get-ChildItem "$dest" | Select-Object Name,Length
+
+      - name: Package portable ZIP
+        shell: pwsh
+        run: |
+          $rel = "client-app\build\windows\x64\runner\Release"
+          Compress-Archive -Path "$rel\*" -DestinationPath "Connectix-Windows-x64.zip" -Force
+          Get-Item "Connectix-Windows-x64.zip" | Select-Object Name,Length
+
+      - name: Generate app_release.json (with Windows section)
+        shell: pwsh
+        run: |
+          python - <<'PY'
+          import json, re, datetime, pathlib
+          base_dir = pathlib.Path.cwd()
+          dart = open('client-app/lib/screens/dashboard_screen.dart', encoding='utf-8').read()
+          ver = re.search(r"currentAppVersion\s*=\s*'([\d.]+)'", dart).group(1)
+          pub = open('client-app/pubspec.yaml', encoding='utf-8').read()
+          code = re.search(r"^version:\s*[\d.]+\+(\d+)", pub, re.M).group(1)
+          changelog = ''
+          try:
+              cl = open('client-app/CHANGELOG.md', encoding='utf-8').read()
+              m = re.search(r'## [\d.]+[^\n]*\n(.*?)(?=\n## |\Z)', cl, re.S)
+              changelog = ' '.join(m.group(1).split()) if m else ''
+          except FileNotFoundError:
+              pass
+          base = 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.0.0'
+          data = {
+              'version': ver,
+              'code': int(code),
+              'changelog': changelog,
+              'date': datetime.date.today().isoformat(),
+              'apk': {
+                  'arm64': base + '/Connectix-ARM64-v8a.apk',
+                  'universal': base + '/Connectix-Universal.apk',
+                  'arm32': base + '/Connectix-ARM32-v7a.apk',
+              },
+              'windows': {
+                  'version': ver,
+                  'file': 'Connectix-Windows-x64.zip',
+                  'url': base + '/Connectix-Windows-x64.zip',
+                  'min_os': 'Windows 10 64-bit',
+              },
+          }
+          with open('app_release.json', 'w', encoding='utf-8') as f:
+              json.dump(data, f, ensure_ascii=False, indent=2)
+          print('app_release.json (windows) =>', data['version'])
+          PY
+
+      - name: Upload Windows Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Connectix-Windows-App
+          path: Connectix-Windows-x64.zip
+
+      - name: Publish Windows + final manifest to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v3.0.0
+          files: |
+            Connectix-Windows-x64.zip
+            app_release.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

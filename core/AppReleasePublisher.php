@@ -121,6 +121,18 @@ class AppReleasePublisher
                 : 'up_to_date');
         }
 
+        // Windows package (same auto-publish rules as Android):
+        // publish app_latest_version_windows when the manifest carries a
+        // newer windows.version.
+        $winVer     = trim((string)($manifest['windows']['version'] ?? ''));
+        $winCurrent = trim((string)Setting::get('app_latest_version_windows', ''));
+        if ($winVer !== '' && $enabled && $source !== 'admin'
+            && ($winCurrent === '' || version_compare($winVer, $winCurrent, '>'))) {
+            Setting::set('app_latest_version_windows', $winVer);
+            $status['windows_published_version'] = $winVer;
+            $status['windows_published_at'] = date('Y-m-d H:i:s');
+        }
+
         // Mirror APK assets onto the panel host: the in-app updater downloads
         // "$baseUrl/Connectix-*.apk" from THIS server (fast + works inside Iran,
         // where the GitHub fallback fails with a connection error).

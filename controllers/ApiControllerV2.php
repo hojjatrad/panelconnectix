@@ -771,6 +771,45 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
     public function checkAppUpdate(): void {
         require_once __DIR__ . '/../core/Setting.php';
 
+        // Platform-aware: ?platform=windows returns the Windows package
+        // version/URL (app_latest_version_windows / app_download_url_windows).
+        $platform = strtolower(trim((string)($_GET['platform'] ?? $_POST['platform'] ?? 'android')));
+
+        if ($platform === 'windows') {
+            $latestWin = trim(Setting::get('app_latest_version_windows', ''));
+            $winUrl    = trim(Setting::get('app_download_url_windows', ''));
+            $winChlg   = trim(Setting::get('app_update_changelog', '')) ?: "• نگارش جدید سامانه منتشر شد.";
+            if ($winUrl === '') {
+                require_once __DIR__ . '/../core/Updater.php';
+                $winUrl = 'https://github.com/' . Updater::getRepo()
+                    . '/releases/download/v3.0.0/Connectix-Windows-x64.zip';
+            }
+            if ($latestWin === '') {
+                self::jsonSuccess([
+                    'platform' => 'windows',
+                    'current_version' => '0.0.0',
+                    'latest_version' => '0.0.0',
+                    'has_update' => false,
+                    'title' => 'Connectix Windows',
+                    'changelog' => '',
+                    'download_url' => '',
+                    'release_date' => date('Y-m-d')
+                ], 'نسخه شما به‌روز است.');
+                return;
+            }
+            self::jsonSuccess([
+                'platform' => 'windows',
+                'current_version' => '0.0.0',
+                'latest_version' => $latestWin,
+                'has_update' => true,
+                'title' => "Connectix Windows v{$latestWin}",
+                'changelog' => $winChlg,
+                'download_url' => $winUrl,
+                'release_date' => date('Y-m-d')
+            ], 'نگارش جدید نسخه ویندوز آماده دریافت است.');
+            return;
+        }
+
         $latest      = trim(Setting::get('app_latest_version', ''));
         // Empty URL = let the app use its fast panel-hosted direct APK.
         $downloadUrl = trim(Setting::get('app_download_url', ''));

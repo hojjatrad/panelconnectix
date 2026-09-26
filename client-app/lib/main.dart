@@ -10,6 +10,7 @@ import 'models/server_model.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/login_screen.dart';
 import 'services/api_service.dart';
+import 'services/v2ray_compat.dart';
 
 // ---------------- Global crash capture ----------------
 // 3.3.3: crashes used to be swallowed by debugPrint (invisible in release)
@@ -142,6 +143,8 @@ class _SessionMarkerState extends State<_SessionMarker>
           await p.setString(
               'session_clean_exit_at', DateTime.now().toIso8601String());
         }).catchError((_) {}));
+        // Windows: restore the system proxy + stop the Xray core on exit.
+        unawaited(V2RayCompat().shutdown().catchError((_) {}));
       } catch (_) {}
     }
   }

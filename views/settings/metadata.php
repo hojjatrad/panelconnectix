@@ -177,6 +177,18 @@ $appAutoMode = (($appPub['source'] ?? 'auto') !== 'admin');
                                    class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-[11px]">
                         </div>
                     </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-1">نسخه ویندوز <span class="text-slate-600">(حالت خودکار: فقط‌نمایش)</span></label>
+                            <input type="text" name="app_latest_version_windows" value="<?= htmlspecialchars(Setting::get('app_latest_version_windows', '')) ?>" dir="ltr" placeholder="3.3.3"
+                                   class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-xs opacity-60" readonly>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-1">لینک دانلود ویندوز (ZIP — اختیاری)</label>
+                            <input type="text" name="app_download_url_windows" value="<?= htmlspecialchars(Setting::get('app_download_url_windows', '')) ?>" dir="ltr" placeholder="خالی = ریلیز گیت‌هاب (Connectix-Windows-x64.zip)"
+                                   class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-[11px]">
+                        </div>
+                    </div>
                     <div>
                         <label class="block text-[11px] text-slate-400 mb-1">تغییرات این نسخه (Changelog) <span class="text-slate-600">(حالت خودکار: فقط‌نمایش)</span></label>
                         <textarea id="appChangelogInput" name="app_update_changelog" rows="3" dir="rtl" placeholder="• قابلیت جدید اول&#10;• رفع باگ دوم" <?= $appAutoMode ? 'readonly' : '' ?>

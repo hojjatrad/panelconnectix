@@ -15,6 +15,8 @@ class OpsController {
         'github_webhook_secret',
         'app_download_url',
         'app_universal_url',
+        'app_download_url_windows',
+        'app_latest_version_windows',
         'disk_alert_pct',
         'backup_retention_days',
         'node_sync_reseller_id',

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_v2ray/flutter_v2ray.dart';
 import 'package:percent_indicator/circular_percent_indicator.dart';
@@ -7,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/client_model.dart';
 import '../models/server_model.dart';
 import '../services/api_service.dart';
+import '../services/v2ray_compat.dart';
 import 'login_screen.dart';
 import 'server_list_modal.dart';
 
@@ -35,7 +37,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   List<ServerModel> _servers = [];
   ServerModel? _selectedServer;
 
-  late final FlutterV2ray _flutterV2ray;
+  late final V2RayCompat _flutterV2ray;
   final ValueNotifier<V2RayStatus> _v2rayStatus = ValueNotifier<V2RayStatus>(V2RayStatus());
 
   bool _isConnected = false;
@@ -200,7 +202,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   void _initV2Ray() async {
-    _flutterV2ray = FlutterV2ray(
+    _flutterV2ray = V2RayCompat(
       onStatusChanged: (status) {
         _v2rayStatus.value = status;
         if (mounted) {
@@ -562,6 +564,21 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         return;
       }
       downloadUrl = fallbackUrl;
+    }
+
+    // Windows (phase 1): the update is a ZIP package — open it in the
+    // default browser (no in-process installer yet).
+    if (Platform.isWindows) {
+      final uri = Uri.parse(downloadUrl);
+      canLaunchUrl(uri).then((ok) {
+        if (ok) {
+          launchUrl(uri, mode: LaunchMode.externalApplication);
+        }
+      });
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('درخواست دانلود شد. بعد از دانلود، فایل فشرده را باز کرده و طبق راهنما نصب کنید.'),
+      ));
+      return;
     }
 
     double downloadProgress = 0.0;
