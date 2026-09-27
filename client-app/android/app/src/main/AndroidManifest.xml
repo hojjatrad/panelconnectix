@@ -33,14 +33,6 @@
             </intent-filter>
         </activity>
 
-        <receiver
-            android:name=".V2rayNotificationReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="V2RAY_CONNECTION_INFO" />
-            </intent-filter>
-        </receiver>
-
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

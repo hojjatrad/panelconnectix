@@ -134,7 +134,7 @@ class ApiService {
           final List sList = data['data']['servers'];
           final parsed = sList.map((e) => ServerModel.fromJson(e)).toList();
           final bool hasMock = parsed.any((s) => s.configUri.contains('mock_pbk') || s.id == 'mci_reality_de');
-          if (!hasMock && parsed.length > 5) {
+          if (!hasMock && parsed.isNotEmpty) {
             initialServers = parsed;
           }
         }
@@ -201,8 +201,8 @@ class ApiService {
           final bool hasMock = parsed.any((s) => s.configUri.contains('mock_pbk') || s.id == 'mci_reality_de');
           log('configs API: ${parsed.length} servers, hasMock=$hasMock');
           
-          // Accept only if real inbounds (more than 5 servers without mock items)
-          if (!hasMock && parsed.length > 5) {
+          // Accept real inbounds without mock items
+          if (!hasMock && parsed.isNotEmpty) {
             servers = parsed;
           } else {
             log('configs list rejected (hasMock=$hasMock count=${parsed.length}) — falling back to sublink');
@@ -601,6 +601,21 @@ class ApiService {
   static Future<void> openHotspotSettings() async {
     try {
       await _updaterChannel.invokeMethod('openHotspotSettings');
+    } catch (_) {}
+  }
+
+  static void updateNotificationStatus({
+    required String title,
+    required String content,
+    required bool isConnected,
+  }) {
+    if (!Platform.isAndroid) return;
+    try {
+      _updaterChannel.invokeMethod('updateNotification', {
+        'title': title,
+        'content': content,
+        'isConnected': isConnected,
+      });
     } catch (_) {}
   }
 

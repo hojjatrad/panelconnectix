@@ -64,7 +64,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Map<String, dynamic>? _updateInfo;
   bool _isCheckingUpdate = false;
 
-  static const String currentAppVersion = '3.4.2';
+  static const String currentAppVersion = '3.4.3';
 
   // "Download over Wi-Fi only" for update packages
   bool _updateWifiOnly = false;
@@ -261,6 +261,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   void _initV2Ray() async {
+    const MethodChannel('com.connectix.vpn/updater').setMethodCallHandler((call) async {
+      if (call.method == 'onNotificationDisconnect') {
+        if (_isConnected && mounted) {
+          _toggleConnection();
+        }
+      }
+    });
+
     _flutterV2ray = V2RayCompat(
       onStatusChanged: (status) {
         _v2rayStatus.value = status;
@@ -276,10 +284,23 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               if (!wasConnected) {
                 _autoCheckUpdateInBackground();
               }
+              final down = _formatSpeed(status.downloadSpeed);
+              final up = _formatSpeed(status.uploadSpeed);
+              ApiService.updateNotificationStatus(
+                title: 'Connectix VPN • متصل (${status.duration})',
+                content: '↓ $down   •   ↑ $up',
+                isConnected: true,
+              );
             } else if (status.state == 'DISCONNECTED') {
               _isConnected = false;
               _isConnecting = false;
               _timer?.cancel();
+
+              ApiService.updateNotificationStatus(
+                title: '',
+                content: '',
+                isConnected: false,
+              );
 
               // Failover / Auto-reconnect handling
               if (!_userIntentionallyDisconnected && _autoReconnectEnabled) {
@@ -888,20 +909,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
       final configUri = _selectedServer!.configUri;
       final parser = FlutterV2ray.parseFromURL(configUri);
-      var configJson = parser.getFullConfiguration();
-      try {
-        final cfg = jsonDecode(configJson) as Map<String, dynamic>;
-        // Ensure robust DNS resolvers in Iran
-        cfg['dns'] = {
-          'servers': ['1.1.1.1', '8.8.8.8', '1.0.0.1']
-        };
-        configJson = jsonEncode(cfg);
-      } catch (_) {}
 
       // Pass Split Tunneling blocked apps to exclude domestic/banking apps natively
       await _flutterV2ray.startV2Ray(
         remark: _selectedServer!.name,
-        config: configJson,
+        config: parser.getFullConfiguration(),
         blockedApps: _splitTunnelingEnabled ? defaultDomesticBypassApps : null,
         proxyOnly: false, // Full device-wide VPN tunnel
         tunMode: tunMode,
@@ -2069,9 +2081,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               InkWell(
                 onTap: () async {
                   if (_servers.isEmpty && !_isRefreshing) {
-                    await _loadServers();
+                    _loadServers();
                   }
-                  if (!mounted) return;
                   final selected = await showModalBottomSheet<ServerModel>(
                     context: context,
                     backgroundColor: Colors.transparent,
