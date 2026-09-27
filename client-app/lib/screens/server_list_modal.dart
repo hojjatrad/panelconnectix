@@ -215,7 +215,7 @@ class _ServerListModalState extends State<ServerListModal> {
       padding: const EdgeInsets.all(20),
       child: SafeArea(
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize: MainAxisSize.max,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Center(

@@ -65,7 +65,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Map<String, dynamic>? _updateInfo;
   bool _isCheckingUpdate = false;
 
-  static const String currentAppVersion = '3.4.3';
+  static const String currentAppVersion = '3.4.4';
 
   // "Download over Wi-Fi only" for update packages
   bool _updateWifiOnly = false;
@@ -915,7 +915,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       await _flutterV2ray.startV2Ray(
         remark: _selectedServer!.name,
         config: parser.getFullConfiguration(),
-        blockedApps: _splitTunnelingEnabled ? defaultDomesticBypassApps : null,
+        blockedApps: null,
         proxyOnly: false, // Full device-wide VPN tunnel
         tunMode: tunMode,
       );

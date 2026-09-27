@@ -527,14 +527,41 @@ jobs:
             Connectix-ARM32-v7a.apk
             app_release.json
 
-      - name: Publish All APKs to GitHub Release
+      - name: Prepare Clean Release Asset Copies
+        run: |
+          cp Connectix-ARM64-v8a.apk Connectix-Android-ARM64.apk
+          cp Connectix-Universal.apk Connectix-Android-Universal.apk
+          cp Connectix-ARM32-v7a.apk Connectix-Android-ARM32.apk
+
+      - name: Publish All APKs to GitHub Release v3.0.0 (Panel Sync)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v3.0.0
+          name: Connectix Client Release (Current Builds)
           files: |
             Connectix-Universal.apk
             Connectix-ARM64-v8a.apk
             Connectix-ARM32-v7a.apk
+            Connectix-Android-ARM64.apk
+            Connectix-Android-Universal.apk
+            Connectix-Android-ARM32.apk
+            app_release.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish Versioned Release on GitHub (v3.4.4)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v3.4.4
+          name: Connectix Client Release v3.4.4
+          draft: false
+          prerelease: false
+          files: |
+            Connectix-Android-ARM64.apk
+            Connectix-Android-Universal.apk
+            Connectix-Android-ARM32.apk
+            Connectix-ARM64-v8a.apk
+            Connectix-Universal.apk
             app_release.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -665,6 +692,16 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v3.0.0
+          files: |
+            Connectix-Windows-x64.zip
+            app_release.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish Windows to Versioned Release v3.4.4
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v3.4.4
           files: |
             Connectix-Windows-x64.zip
             app_release.json
