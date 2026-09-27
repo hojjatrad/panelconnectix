@@ -71,6 +71,30 @@ class ServerModel {
     return '$pingMs ms';
   }
 
+  /// True if this node is an upstream quota/status pseudo-config rather than a functional proxy server
+  bool get isInfoBanner {
+    final lower = name.toLowerCase();
+    final lowerUri = configUri.toLowerCase();
+    if (name.contains('📊') || name.contains('⏳') || name.contains('📉') || name.contains('⌛')) {
+      return true;
+    }
+    if (lower.contains('روز اعتبار') ||
+        lower.contains('اعتبار باقی') ||
+        lower.contains('حجم باقی') ||
+        lower.contains('انقضا') ||
+        lower.contains('traffic remaining')) {
+      return true;
+    }
+    if (RegExp(r'\d+(\.\d+)?\s*(gb|mb)', caseSensitive: false).hasMatch(name) &&
+        (lower.contains('روز') || lower.contains('day') || lower.contains('expire') || lower.contains('اعتبار'))) {
+      return true;
+    }
+    if (lowerUri.contains('%f0%9f%93%8a') || lowerUri.contains('%e2%8f%b3')) {
+      return true;
+    }
+    return false;
+  }
+
   factory ServerModel.fromUri(String rawUri, int index) {
     String uri = rawUri.trim();
     String proto = 'vless';

@@ -662,6 +662,12 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
             $proto = strtolower($parsed['scheme'] ?? 'vless');
             $rawRemark = !empty($parsed['fragment']) ? urldecode($parsed['fragment']) : '';
 
+            // HARD GUARD: Skip dummy info / quota banners (e.g. 📊75.27 GB ⏳261 روز اعتبار)
+            if (preg_match('/(📊|⏳|📉|⌛|اعتبار|روز|expire|traffic|حجم\s*باقی)/ui', $rawRemark) ||
+                preg_match('/(📊|⏳|📉|⌛)/u', $link)) {
+                continue;
+            }
+
             if (!empty($rawRemark)) {
                 $name = $rawRemark;
             } else {

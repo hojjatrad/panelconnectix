@@ -65,7 +65,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Map<String, dynamic>? _updateInfo;
   bool _isCheckingUpdate = false;
 
-  static const String currentAppVersion = '3.4.5';
+  static const String currentAppVersion = '3.4.6';
 
   // "Download over Wi-Fi only" for update packages
   bool _updateWifiOnly = false;
@@ -101,8 +101,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     super.initState();
     _client = widget.client;
     if (widget.initialServers != null && widget.initialServers!.isNotEmpty) {
-      _servers = widget.initialServers!;
-      _selectedServer = _servers.first;
+      _servers = widget.initialServers!.where((s) => !s.isInfoBanner && s.configUri.isNotEmpty).toList();
+      if (_servers.isNotEmpty) {
+        _syncActiveServer(_servers);
+      }
     }
     _loadSettings();
     _initV2Ray();
@@ -362,31 +364,61 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
   }
 
+  Future<void> _syncActiveServer(List<ServerModel> list) async {
+    final clean = list.where((s) => !s.isInfoBanner && s.configUri.isNotEmpty).toList();
+    if (clean.isEmpty) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final lastId = prefs.getString('last_working_server_id');
+
+    ServerModel? target;
+    if (lastId != null) {
+      final matches = clean.where((s) => s.id == lastId);
+      if (matches.isNotEmpty) {
+        target = matches.first;
+      }
+    }
+
+    if (target == null && _selectedServer != null) {
+      final matches = clean.where((s) => s.id == _selectedServer!.id && !s.isInfoBanner);
+      if (matches.isNotEmpty) {
+        target = matches.first;
+      }
+    }
+
+    if (target == null) {
+      target = clean.firstWhere((s) => s.isRecommended, orElse: () => clean.first);
+    }
+
+    if (mounted) {
+      setState(() {
+        _selectedServer = target;
+      });
+      _measureSelectedServerPing();
+    }
+  }
+
   Future<void> _loadServers() async {
     // 1. Immediately populate from local cache if list is currently empty
     if (_servers.isEmpty) {
       final cached = await ApiService.getCachedServers();
-      if (cached.isNotEmpty && mounted && _servers.isEmpty) {
+      final cleanCached = cached.where((s) => !s.isInfoBanner && s.configUri.isNotEmpty).toList();
+      if (cleanCached.isNotEmpty && mounted && _servers.isEmpty) {
         setState(() {
-          _servers = cached;
-          if (_selectedServer == null || !_servers.any((s) => s.id == _selectedServer!.id)) {
-            _selectedServer = _servers.first;
-          }
+          _servers = cleanCached;
         });
-        _measureSelectedServerPing();
+        await _syncActiveServer(cleanCached);
       }
     }
 
     // 2. Fetch fresh server list in background
     final list = await ApiService.getServers();
-    if (mounted && list.isNotEmpty) {
+    final cleanList = list.where((s) => !s.isInfoBanner && s.configUri.isNotEmpty).toList();
+    if (mounted && cleanList.isNotEmpty) {
       setState(() {
-        _servers = list;
-        if (_selectedServer == null || !_servers.any((s) => s.id == _selectedServer!.id)) {
-          _selectedServer = _servers.first;
-        }
+        _servers = cleanList;
       });
-      _measureSelectedServerPing();
+      await _syncActiveServer(cleanList);
     }
   }
 
@@ -404,25 +436,25 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     final updatedServers = results[1] as List<ServerModel>;
 
     if (mounted) {
+      final cleanUpdated = updatedServers.where((s) => !s.isInfoBanner && s.configUri.isNotEmpty).toList();
       setState(() {
         _isRefreshing = false;
         if (updatedProfile != null) {
           _client = updatedProfile;
         }
-        if (updatedServers.isNotEmpty) {
-          _servers = updatedServers;
-          if (_selectedServer == null || !_servers.any((s) => s.id == _selectedServer!.id)) {
-            _selectedServer = _servers.first;
-          }
+        if (cleanUpdated.isNotEmpty) {
+          _servers = cleanUpdated;
         }
       });
-      _measureSelectedServerPing();
+      if (cleanUpdated.isNotEmpty) {
+        await _syncActiveServer(cleanUpdated);
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            updatedServers.isNotEmpty
-                ? 'اطلاعات حساب و ${updatedServers.length} کانکشن سرور با موفقیت بروزرسانی شد.'
+            cleanUpdated.isNotEmpty
+                ? 'اطلاعات حساب و ${cleanUpdated.length} کانکشن سرور با موفقیت بروزرسانی شد.'
                 : 'اطلاعات حساب با موفقیت بروزرسانی شد.',
           ),
           backgroundColor: const Color(0xFF10B981),
@@ -437,7 +469,16 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   void _measureSelectedServerPing() async {
     if (_selectedServer == null || _selectedServer!.configUri.isEmpty) return;
     try {
-      final delay = await ApiService.pingServerUri(_selectedServer!.configUri);
+      int? delay;
+      try {
+        final parser = FlutterV2ray.parseFromURL(_selectedServer!.configUri);
+        delay = await _flutterV2ray.getServerDelay(config: parser.getFullConfiguration());
+      } catch (_) {}
+
+      if (delay == null || delay <= 0) {
+        delay = await ApiService.pingServerUri(_selectedServer!.configUri);
+      }
+
       if (mounted && delay != null && delay > 0) {
         setState(() {
           _currentServerPing = delay;
@@ -450,7 +491,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   // 1-Tap Smart Connect to Best Ping Server
   void _smartConnect() async {
     if (_isSmartConnecting || _isConnecting) return;
-    if (_servers.isEmpty) {
+    final clean = _servers.where((s) => !s.isInfoBanner && s.configUri.isNotEmpty).toList();
+    if (clean.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('هیچ سروری برای سنجش پینگ یافت نشد.')),
       );
@@ -469,11 +511,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       ),
     );
 
-    ServerModel bestServer = _servers.first;
+    ServerModel bestServer = clean.first;
     int lowestPing = 99999;
 
-    for (int i = 0; i < _servers.length && i < 6; i++) {
-      final s = _servers[i];
+    for (int i = 0; i < clean.length && i < 6; i++) {
+      final s = clean[i];
       if (s.configUri.isEmpty) continue;
       try {
         final parser = FlutterV2ray.parseFromURL(s.configUri);
@@ -484,6 +526,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         }
       } catch (_) {}
     }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('last_working_server_id', bestServer.id);
+    } catch (_) {}
 
     if (mounted) {
       setState(() {
@@ -862,12 +909,22 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   void _startTunnel({bool isReconnect = false}) async {
-    if (_selectedServer == null || _selectedServer!.configUri.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('لطفاً یک سرور دارای کانکشن معتبر انتخاب فرمایید.')),
-      );
-      return;
+    if (_selectedServer == null || _selectedServer!.configUri.isEmpty || _selectedServer!.isInfoBanner) {
+      final clean = _servers.where((s) => !s.isInfoBanner && s.configUri.isNotEmpty).toList();
+      if (clean.isNotEmpty) {
+        _selectedServer = clean.first;
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('لطفاً یک سرور دارای کانکشن معتبر انتخاب فرمایید.')),
+        );
+        return;
+      }
     }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('last_working_server_id', _selectedServer!.id);
+    } catch (_) {}
 
     setState(() {
       _isConnecting = true;
@@ -2104,92 +2161,108 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               const SizedBox(height: 22),
 
               // Server Selector Card
-              InkWell(
-                onTap: () async {
-                  if (_servers.isEmpty && !_isRefreshing) {
-                    _loadServers();
-                  }
-                  final selected = await showModalBottomSheet<ServerModel>(
-                    context: context,
-                    backgroundColor: Colors.transparent,
-                    isScrollControlled: true,
-                    builder: (_) => FractionallySizedBox(
-                      heightFactor: 0.85,
-                      child: ServerListModal(
-                        servers: _servers,
-                        selectedServer: _selectedServer,
-                        onRefresh: _manualRefresh,
-                      ),
-                    ),
-                  );
-                  if (selected != null && mounted) {
-                    setState(() {
-                      _selectedServer = selected;
-                      _currentServerPing = selected.pingMs;
-                    });
-                    if (_currentServerPing == null) {
-                      _measureSelectedServerPing();
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () async {
+                    if (_servers.isEmpty) {
+                      await _loadServers();
                     }
-                    if (_isConnected) {
-                      // Seamlessly reconnect with newly selected server
+                    if (!mounted) return;
+                    final selected = await showModalBottomSheet<ServerModel>(
+                      context: context,
+                      backgroundColor: Colors.transparent,
+                      isScrollControlled: true,
+                      builder: (modalCtx) => SizedBox(
+                        height: MediaQuery.of(modalCtx).size.height * 0.85,
+                        child: ServerListModal(
+                          servers: _servers,
+                          selectedServer: _selectedServer,
+                          onRefresh: _manualRefresh,
+                          pingFunction: (uri) async {
+                            try {
+                              final parser = FlutterV2ray.parseFromURL(uri);
+                              final delay = await _flutterV2ray.getServerDelay(config: parser.getFullConfiguration());
+                              if (delay != null && delay > 0) return delay;
+                            } catch (_) {}
+                            return await ApiService.pingServerUri(uri);
+                          },
+                        ),
+                      ),
+                    );
+                    if (selected != null && mounted) {
                       try {
-                        await _flutterV2ray.stopV2Ray();
+                        final prefs = await SharedPreferences.getInstance();
+                        await prefs.setString('last_working_server_id', selected.id);
                       } catch (_) {}
-                      await Future.delayed(const Duration(milliseconds: 300));
-                      _startTunnel();
+                      setState(() {
+                        _selectedServer = selected;
+                        _currentServerPing = selected.pingMs;
+                      });
+                      if (_currentServerPing == null) {
+                        _measureSelectedServerPing();
+                      }
+                      if (_isConnected) {
+                        // Seamlessly reconnect with newly selected server
+                        try {
+                          await _flutterV2ray.stopV2Ray();
+                        } catch (_) {}
+                        await Future.delayed(const Duration(milliseconds: 300));
+                        _startTunnel();
+                      }
                     }
-                  }
-                },
-                borderRadius: BorderRadius.circular(20),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0F172A),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: const Color(0xFF1E293B)),
-                  ),
-                  child: Row(
-                    children: [
-                      Text(
-                        _selectedServer?.flag ?? '🌐',
-                        style: const TextStyle(fontSize: 26),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _selectedServer?.name ?? 'در حال دریافت سرورها...',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
+                  },
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F172A),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFF1E293B)),
+                    ),
+                    child: Row(
+                      children: [
+                        Text(
+                          _selectedServer?.flag ?? '🌐',
+                          style: const TextStyle(fontSize: 26),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _selectedServer?.name ?? 'در حال دریافت سرورها...',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              '${_selectedServer?.protocol.toUpperCase() ?? 'VLESS'} • ${_selectedServer?.operatorName ?? 'پیش‌فرض'}',
-                              style: const TextStyle(color: Color(0xFF64748B), fontSize: 11),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (_currentServerPing != null)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          margin: const EdgeInsets.only(left: 8),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF10B981).withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            '$_currentServerPing ms',
-                            style: const TextStyle(color: Color(0xFF34D399), fontSize: 10, fontWeight: FontWeight.bold),
+                              const SizedBox(height: 3),
+                              Text(
+                                '${_selectedServer?.protocol.toUpperCase() ?? 'VLESS'} • ${_selectedServer?.operatorName ?? 'پیش‌فرض'}',
+                                style: const TextStyle(color: Color(0xFF64748B), fontSize: 11),
+                              ),
+                            ],
                           ),
                         ),
-                      const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF64748B)),
-                    ],
+                        if (_currentServerPing != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            margin: const EdgeInsets.only(left: 8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981).withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              '$_currentServerPing ms',
+                              style: const TextStyle(color: Color(0xFF34D399), fontSize: 10, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF64748B)),
+                      ],
+                    ),
                   ),
                 ),
               ),

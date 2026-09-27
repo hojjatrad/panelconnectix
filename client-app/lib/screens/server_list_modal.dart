@@ -7,12 +7,14 @@ class ServerListModal extends StatefulWidget {
   final List<ServerModel> servers;
   final ServerModel? selectedServer;
   final VoidCallback? onRefresh;
+  final Future<int?> Function(String uri)? pingFunction;
 
   const ServerListModal({
     Key? key,
     required this.servers,
     required this.selectedServer,
     this.onRefresh,
+    this.pingFunction,
   }) : super(key: key);
 
   @override
@@ -29,7 +31,7 @@ class _ServerListModalState extends State<ServerListModal> {
   @override
   void initState() {
     super.initState();
-    _list = List<ServerModel>.from(widget.servers);
+    _list = widget.servers.where((s) => !s.isInfoBanner && s.configUri.isNotEmpty).toList();
     _calculateBestServer();
     if (_list.isEmpty) {
       _loadFromCacheIfEmpty();
@@ -37,7 +39,11 @@ class _ServerListModalState extends State<ServerListModal> {
   }
 
   void _loadFromCacheIfEmpty() async {
-    final cached = await ApiService.getCachedServers();
+    var cached = await ApiService.getCachedServers();
+    if (cached.isEmpty) {
+      cached = await ApiService.getServers();
+    }
+    cached = cached.where((s) => !s.isInfoBanner && s.configUri.isNotEmpty).toList();
     if (mounted && cached.isNotEmpty && _list.isEmpty) {
       setState(() {
         _list = List<ServerModel>.from(cached);
@@ -49,9 +55,10 @@ class _ServerListModalState extends State<ServerListModal> {
   @override
   void didUpdateWidget(ServerListModal oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.servers != oldWidget.servers || widget.servers.length != _list.length) {
+    final clean = widget.servers.where((s) => !s.isInfoBanner && s.configUri.isNotEmpty).toList();
+    if (clean.length != _list.length) {
       setState(() {
-        _list = List<ServerModel>.from(widget.servers);
+        _list = List<ServerModel>.from(clean);
         if (_sortByPing) {
           _applySort();
         } else {
@@ -79,7 +86,7 @@ class _ServerListModalState extends State<ServerListModal> {
         return aVal.compareTo(bVal);
       });
     } else {
-      _list = List<ServerModel>.from(widget.servers);
+      _list = widget.servers.where((s) => !s.isInfoBanner && s.configUri.isNotEmpty).toList();
     }
     _calculateBestServer();
   }
@@ -93,6 +100,7 @@ class _ServerListModalState extends State<ServerListModal> {
 
     await ApiService.pingAllServers(
       _list,
+      pingFn: widget.pingFunction,
       onProgress: (current, total) {
         if (mounted) {
           setState(() {

@@ -132,9 +132,11 @@ class ApiService {
         List<ServerModel> initialServers = [];
         if (data['data']['servers'] != null && data['data']['servers'] is List) {
           final List sList = data['data']['servers'];
-          final parsed = sList.map((e) => ServerModel.fromJson(e)).toList();
-          final bool hasMock = parsed.any((s) => s.configUri.contains('mock_pbk') || s.id == 'mci_reality_de');
-          if (!hasMock && parsed.isNotEmpty) {
+          final parsed = sList
+              .map((e) => ServerModel.fromJson(e))
+              .where((s) => !s.isInfoBanner && !s.configUri.contains('mock_pbk') && s.id != 'mci_reality_de')
+              .toList();
+          if (parsed.isNotEmpty) {
             initialServers = parsed;
           }
         }
@@ -197,15 +199,16 @@ class ApiService {
         final data = jsonDecode(utf8.decode(response.bodyBytes));
         if (data['success'] == true && data['data'] != null && data['data']['servers'] != null) {
           final List list = data['data']['servers'];
-          final parsed = list.map((e) => ServerModel.fromJson(e)).toList();
-          final bool hasMock = parsed.any((s) => s.configUri.contains('mock_pbk') || s.id == 'mci_reality_de');
-          log('configs API: ${parsed.length} servers, hasMock=$hasMock');
+          final parsed = list
+              .map((e) => ServerModel.fromJson(e))
+              .where((s) => !s.isInfoBanner && !s.configUri.contains('mock_pbk') && s.id != 'mci_reality_de')
+              .toList();
+          log('configs API: ${parsed.length} clean servers');
           
-          // Accept real inbounds without mock items
-          if (!hasMock && parsed.isNotEmpty) {
+          if (parsed.isNotEmpty) {
             servers = parsed;
           } else {
-            log('configs list rejected (hasMock=$hasMock count=${parsed.length}) — falling back to sublink');
+            log('configs list empty after filtering — falling back to sublink');
           }
         } else {
           log('configs API: success=${data['success']} error=${data['error']}');
@@ -215,7 +218,7 @@ class ApiService {
         debugPrint("API configs fetch error: $e");
       }
 
-      // 2. Direct Node / Panel Sublink Auto-Resolver (Delivers all 14 live PasarGuard inbounds)
+      // 2. Direct Node / Panel Sublink Auto-Resolver (Delivers all live PasarGuard inbounds)
       if (servers.isEmpty && subUrl.isNotEmpty) {
         try {
           log('sublink fallback: $subUrl');
@@ -239,7 +242,10 @@ class ApiService {
             int idx = 1;
             for (final line in lines) {
               if (line.contains('://')) {
-                servers.add(ServerModel.fromUri(line, idx++));
+                final model = ServerModel.fromUri(line, idx++);
+                if (!model.isInfoBanner) {
+                  servers.add(model);
+                }
               }
             }
             log('sublink parsed ${servers.length} servers');
@@ -303,19 +309,29 @@ class ApiService {
   }
 
   /**
-   * Ping multiple servers in parallel batches with progress callback
+   * Ping multiple servers in parallel batches with progress callback.
+   * Supports custom pingFn (e.g. FlutterV2ray core delay) falling back to TCP socket ping.
    */
   static Future<void> pingAllServers(
     List<ServerModel> servers, {
+    Future<int?> Function(String uri)? pingFn,
     void Function(int current, int total)? onProgress,
   }) async {
     int finished = 0;
-    const batchSize = 4;
+    const batchSize = 3;
     for (int i = 0; i < servers.length; i += batchSize) {
       final batch = servers.sublist(i, math.min(i + batchSize, servers.length));
       await Future.wait(batch.map((s) async {
         if (s.configUri.isNotEmpty) {
-          final ms = await pingServerUri(s.configUri);
+          int? ms;
+          if (pingFn != null) {
+            try {
+              ms = await pingFn(s.configUri);
+            } catch (_) {}
+          }
+          if (ms == null || ms <= 0) {
+            ms = await pingServerUri(s.configUri);
+          }
           s.pingMs = ms;
         } else {
           s.pingMs = -1;
