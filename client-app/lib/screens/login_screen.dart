@@ -478,9 +478,9 @@ class _PreLoginUpdateDialogState extends State<_PreLoginUpdateDialog> {
                 padding: const EdgeInsets.symmetric(vertical: 13),
               ),
               icon: const Icon(Icons.download_rounded, size: 18),
-              label: const Text(
+              label: Text(
                 _failed ? 'تلاش مجدد برای دانلود و نصب' : 'دانلود و نصب',
-                style: TextStyle(fontWeight: FontWeight.bold),
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
           ),
