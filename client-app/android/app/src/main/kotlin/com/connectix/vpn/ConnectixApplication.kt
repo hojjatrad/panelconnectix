@@ -26,17 +26,6 @@ class ConnectixApplication : Application() {
                 kotlin.system.exitProcess(10)
             }
         }
-
-        // Dynamically register receiver for live VPN speed & disconnect notification updates
-        try {
-            val filter = IntentFilter("V2RAY_CONNECTION_INFO")
-            val receiver = V2rayNotificationReceiver()
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
-            } else {
-                registerReceiver(receiver, filter)
-            }
-        } catch (_: Exception) {}
     }
 
     private fun writeCrashReport(thread: Thread, throwable: Throwable) {

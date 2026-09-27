@@ -31,6 +31,34 @@ class _ServerListModalState extends State<ServerListModal> {
     super.initState();
     _list = List<ServerModel>.from(widget.servers);
     _calculateBestServer();
+    if (_list.isEmpty) {
+      _loadFromCacheIfEmpty();
+    }
+  }
+
+  void _loadFromCacheIfEmpty() async {
+    final cached = await ApiService.getCachedServers();
+    if (mounted && cached.isNotEmpty && _list.isEmpty) {
+      setState(() {
+        _list = List<ServerModel>.from(cached);
+        _calculateBestServer();
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(ServerListModal oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.servers != oldWidget.servers || widget.servers.length != _list.length) {
+      setState(() {
+        _list = List<ServerModel>.from(widget.servers);
+        if (_sortByPing) {
+          _applySort();
+        } else {
+          _calculateBestServer();
+        }
+      });
+    }
   }
 
   void _calculateBestServer() {

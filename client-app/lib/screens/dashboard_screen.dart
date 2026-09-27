@@ -62,8 +62,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   List<Map<String, dynamic>> _announcements = [];
   bool _hasAppUpdate = false;
   Map<String, dynamic>? _updateInfo;
+  bool _isCheckingUpdate = false;
 
-  static const String currentAppVersion = '3.4.1';
+  static const String currentAppVersion = '3.4.2';
 
   // "Download over Wi-Fi only" for update packages
   bool _updateWifiOnly = false;
@@ -218,32 +219,35 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   void _autoCheckUpdateInBackground() async {
+    if (_isCheckingUpdate) return;
+    _isCheckingUpdate = true;
     try {
       final prefs = await SharedPreferences.getInstance();
       final updateData = await ApiService.checkAppUpdate();
       if (mounted && updateData != null) {
-        final bool hasUpdateFlag = updateData['has_update'] == true;
         final latest = (updateData['latest_version'] ?? '').toString();
         final lastPrompted = prefs.getString('last_prompted_version') ?? '';
 
-        if (hasUpdateFlag && isNewerVersion(latest, currentAppVersion)) {
-          setState(() {
-            _hasAppUpdate = true;
-            _updateInfo = updateData;
-          });
+        final bool isNew = isNewerVersion(latest, currentAppVersion);
+        setState(() {
+          _hasAppUpdate = isNew;
+          _updateInfo = isNew ? updateData : null;
+        });
 
-          // Automatically alert user with one-click install dialog if not yet prompted for this version
-          if (lastPrompted != latest) {
-            await prefs.setString('last_prompted_version', latest);
-            Future.delayed(const Duration(milliseconds: 1400), () {
-              if (mounted) {
-                _showUpdateDialog(updateData, isAutoPrompt: true);
-              }
-            });
-          }
+        // Automatically alert user with one-click install dialog if not yet prompted for this version
+        if (isNew && lastPrompted != latest) {
+          await prefs.setString('last_prompted_version', latest);
+          Future.delayed(const Duration(milliseconds: 1400), () {
+            if (mounted) {
+              _showUpdateDialog(updateData, isAutoPrompt: true);
+            }
+          });
         }
       }
-    } catch (_) {}
+    } catch (_) {
+    } finally {
+      _isCheckingUpdate = false;
+    }
   }
 
   void _dismissUpdateBanner() async {
@@ -263,12 +267,15 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         if (mounted) {
           setState(() {
             if (status.state == 'CONNECTED') {
+              final wasConnected = _isConnected;
               _isConnected = true;
               _isConnecting = false;
               _userIntentionallyDisconnected = false;
               _reconnectAttempts = 0;
-              // Check for update once connected so panel is guaranteed reachable
-              _autoCheckUpdateInBackground();
+              // Check for update once connected so panel is guaranteed reachable (single trigger)
+              if (!wasConnected) {
+                _autoCheckUpdateInBackground();
+              }
             } else if (status.state == 'DISCONNECTED') {
               _isConnected = false;
               _isConnecting = false;
@@ -497,7 +504,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     if (!mounted) return;
     Navigator.pop(context);
 
-    if (updateData != null && (updateData['has_update'] == true || isNewerVersion((updateData['latest_version'] ?? '').toString(), currentAppVersion))) {
+    if (updateData != null && isNewerVersion((updateData['latest_version'] ?? '').toString(), currentAppVersion)) {
       _showUpdateDialog(updateData, isAutoPrompt: false);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2062,8 +2069,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               InkWell(
                 onTap: () async {
                   if (_servers.isEmpty && !_isRefreshing) {
-                    _loadServers();
+                    await _loadServers();
                   }
+                  if (!mounted) return;
                   final selected = await showModalBottomSheet<ServerModel>(
                     context: context,
                     backgroundColor: Colors.transparent,
@@ -2086,7 +2094,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       _measureSelectedServerPing();
                     }
                     if (_isConnected) {
-                      _toggleConnection(); // reconnect with new server
+                      // Seamlessly reconnect with newly selected server
+                      try {
+                        await _flutterV2ray.stopV2Ray();
+                      } catch (_) {}
+                      await Future.delayed(const Duration(milliseconds: 300));
+                      _startTunnel();
                     }
                   }
                 },
