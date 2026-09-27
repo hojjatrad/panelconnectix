@@ -432,28 +432,36 @@ class ApiService {
       }
     } catch (_) {}
 
-    // 2. Fallback: Default Release v3.1.0 metadata
-    return {
-      'has_update': true,
-      'latest_version': '3.1.0',
-      'title': 'Connectix v3.1.0 (نگارش پایدار)',
-      'changelog': "• ماندگاری دائمی ورود به حساب و عدم بازگشت به صفحه لاگین\n• رفع کامل کانکشن‌های پیش‌فرض و نمایش هر ۱۴ سرور فعال پاسارگاد\n• دانلود مستقیم و فوق‌سریع درون‌برنامه‌ای بدون نیاز به مرورگر\n• اعطای خودکار دسترسی‌های نصاب اندروید بدون خطا",
-      'download_url': directApkUrl,
-      'fallback_url': ghApkUrl
-    };
+    // 2. Direct Fallback: Query GitHub raw release manifest (available globally even when panel is blocked)
+    try {
+      final ghResp = await http.get(
+        Uri.parse("https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/app_release.json"),
+        headers: {'Accept': 'application/json'},
+      ).timeout(const Duration(seconds: 5));
+      if (ghResp.statusCode == 200) {
+        final ghData = jsonDecode(utf8.decode(ghResp.bodyBytes));
+        final ver = (ghData['version'] ?? '').toString();
+        if (ver.isNotEmpty) {
+          final apkArm64 = ghData['apk']?['arm64']?.toString() ?? ghApkUrl;
+          return {
+            'has_update': true,
+            'latest_version': ver,
+            'title': 'Connectix v$ver',
+            'changelog': (ghData['changelog'] ?? '• نگارش جدید سامانه منتشر شد.').toString(),
+            'download_url': apkArm64,
+            'fallback_url': directApkUrl,
+          };
+        }
+      }
+    } catch (_) {}
+
+    return null;
   }
 
   /**
    * High-Speed In-App Download and Native Package Installation
    * Downloads APK directly into cache with progress callback, then triggers Android PackageInstaller
    */
-  /// Robust APK downloader:
-  /// - Streams the file in 1 MB Range chunks (each request is short, so
-  ///   network/edge timeouts cannot kill a long transfer)
-  /// - On any interruption, retries the SAME chunk (server-side resume via
-  ///   HTTP Range — no data lost, no restart from zero)
-  /// - Falls back to a plain single-stream GET when the server does not
-  ///   support Range (206) responses.
   static Future<void> downloadAndInstallApk({
     required String downloadUrl,
     required Function(double progress, int receivedBytes, int totalBytes) onProgress,
@@ -483,95 +491,41 @@ class ApiService {
         } catch (_) {}
       }
 
+      // Check permission for installing unknown packages beforehand
+      try {
+        final canInstall = await _updaterChannel.invokeMethod<bool>('canInstallPackages') ?? true;
+        if (!canInstall) {
+          await _updaterChannel.invokeMethod('openInstallPermissionSettings');
+          onError('دسترسی «نصب برنامه‌های ناشناخته» را در صفحه تنظیمات فعال کرده و دوباره دکمه را لمس فرمایید.');
+          return;
+        }
+      } catch (_) {}
+
       var client = http.Client();
       const String ua = 'Mozilla/5.0 (Linux; Android 10; Mobile)';
 
-      // 2. Discover total size (HEAD, then Range: bytes=0-0 fallback)
-      int totalBytes = 0;
-      bool rangeSupported = false;
-      try {
-        final headReq = http.Request('HEAD', Uri.parse(downloadUrl));
-        headReq.headers['User-Agent'] = ua;
-        final headResp = await client.send(headReq).timeout(const Duration(seconds: 15));
-        totalBytes = int.tryParse(headResp.headers['content-length'] ?? '') ?? 0;
-        rangeSupported = (headResp.headers['accept-ranges'] ?? '').toLowerCase().contains('bytes');
-        await headResp.stream.drain<void>();
-      } catch (_) {}
-      if (totalBytes <= 0 || !rangeSupported) {
-        try {
-          final req0 = http.Request('GET', Uri.parse(downloadUrl))..headers['User-Agent'] = ua;
-          if (rangeSupported) req0.headers['Range'] = 'bytes=0-0';
-          final r0 = await client.send(req0).timeout(const Duration(seconds: 15));
-          if (r0.statusCode == 206) {
-            rangeSupported = true;
-            final m = RegExp(r'/(\d+)\s*$').firstMatch(r0.headers['content-range'] ?? '');
-            if (m != null) totalBytes = int.tryParse(m.group(1)!) ?? 0;
-          } else if (r0.statusCode == 200) {
-            totalBytes = int.tryParse(r0.headers['content-length'] ?? '') ?? 0;
-            rangeSupported = false;
-          }
-          await r0.stream.drain<void>();
-        } catch (_) {}
+      // 2. Direct high-speed streaming download
+      final req = http.Request('GET', Uri.parse(downloadUrl))..headers['User-Agent'] = ua;
+      final resp = await client.send(req).timeout(const Duration(minutes: 5));
+
+      if (resp.statusCode >= 400) {
+        onError('خطا در دریافت بسته (کد خطا: ${resp.statusCode})');
+        return;
       }
 
-      const int chunkSize = 1024 * 1024; // 1 MB per HTTP request
-      int offset = 0;
+      final totalBytes = resp.contentLength ?? 0;
       final sink = file.openWrite();
+      int offset = 0;
 
-      if (rangeSupported && totalBytes > 0) {
-        // 3a. Chunked Range download with resume + retry
-        while (offset < totalBytes) {
-          final end = math.min(offset + chunkSize - 1, totalBytes - 1);
-          bool got = false;
-          for (int attempt = 0; attempt < 6 && !got; attempt++) {
-            try {
-              final req = http.Request('GET', Uri.parse(downloadUrl))
-                ..headers['User-Agent'] = ua
-                ..headers['Range'] = 'bytes=$offset-$end';
-              final resp = await client.send(req).timeout(const Duration(seconds: 45));
-              if (resp.statusCode != 206) {
-                await resp.stream.drain<void>();
-                ApiService.log('chunk ${offset}-$end HTTP ${resp.statusCode} (unexpected)');
-                throw Exception('HTTP ${resp.statusCode}');
-              }
-              await resp.stream.listen((c) {
-                sink.add(c);
-                offset += c.length;
-                onProgress(offset / totalBytes, offset, totalBytes);
-              }).asFuture<void>();
-              ApiService.log('chunk ..$end ok (now $offset/$totalBytes)');
-              got = true;
-            } catch (err) {
-              // Interrupted — recycle the client (a timed-out stream may leave
-              // the pooled socket broken), back off, resume from same offset
-              ApiService.log('chunk retry $attempt from offset $offset: $err');
-              try { client.close(); } catch (_) {}
-              client = http.Client();
-              await Future<void>.delayed(Duration(milliseconds: 1500 * (attempt + 1)));
-            }
-          }
-          if (!got) {
-            await sink.close();
-            onError('اتصال مکرراً قطع شد؛ لطفاً دوباره تلاش کنید.');
-            return;
-          }
+      await resp.stream.listen((chunk) {
+        sink.add(chunk);
+        offset += chunk.length;
+        if (totalBytes > 0) {
+          onProgress(offset / totalBytes, offset, totalBytes);
+        } else {
+          onProgress(0.5, offset, 0);
         }
-      } else {
-        // 3b. Plain single-stream fallback (server without Range support)
-        final req = http.Request('GET', Uri.parse(downloadUrl));
-        req.headers['User-Agent'] = ua;
-        final resp = await client.send(req).timeout(const Duration(minutes: 10));
-        if (resp.statusCode >= 400) {
-          await sink.close();
-          onError('خطا در دریافت بسته (کد خطا: ${resp.statusCode})');
-          return;
-        }
-        await resp.stream.listen((chunk) {
-          sink.add(chunk);
-          offset += chunk.length;
-          onProgress(totalBytes > 0 ? offset / totalBytes : 0, offset, totalBytes);
-        }, cancelOnError: true).asFuture<void>();
-      }
+      }, cancelOnError: true).asFuture<void>();
 
       await sink.flush();
       await sink.close();
@@ -597,16 +551,6 @@ class ApiService {
       } catch (nativeErr) {
         debugPrint("Native install failed: $nativeErr");
       }
-
-      // 4. If native installer permission was not granted, request permission
-      try {
-        final canInstall = await _updaterChannel.invokeMethod<bool>('canInstallPackages') ?? true;
-        if (!canInstall) {
-          await _updaterChannel.invokeMethod('openInstallPermissionSettings');
-          onError('دسترسی نصب در تنظیمات فعال نیست. لطفاً دسترسی را فعال فرمایید.');
-          return;
-        }
-      } catch (_) {}
 
       onSuccess();
     } catch (e) {

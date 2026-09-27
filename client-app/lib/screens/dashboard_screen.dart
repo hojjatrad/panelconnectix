@@ -65,7 +65,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Map<String, dynamic>? _updateInfo;
   bool _isCheckingUpdate = false;
 
-  static const String currentAppVersion = '3.4.6';
+  static const String currentAppVersion = '3.4.7';
 
   // "Download over Wi-Fi only" for update packages
   bool _updateWifiOnly = false;
@@ -561,6 +561,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   // In-App Auto-Update & In-Place Installer Flow
   void _checkAppUpdate() async {
+    if (_hasAppUpdate && _updateInfo != null) {
+      final latestVer = (_updateInfo!['latest_version'] ?? '3.4.7').toString();
+      final dlUrl = (_updateInfo!['download_url'] ?? '').toString();
+      final fbUrl = (_updateInfo!['fallback_url'] ?? '').toString();
+      _startInAppDownloadAndInstall(dlUrl, latestVer, fallbackUrl: fbUrl);
+      return;
+    }
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -574,7 +582,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     Navigator.pop(context);
 
     if (updateData != null && isNewerVersion((updateData['latest_version'] ?? '').toString(), currentAppVersion)) {
-      _showUpdateDialog(updateData, isAutoPrompt: false);
+      final latestVer = (updateData['latest_version'] ?? '3.4.7').toString();
+      final dlUrl = (updateData['download_url'] ?? '').toString();
+      final fbUrl = (updateData['fallback_url'] ?? '').toString();
+      _startInAppDownloadAndInstall(dlUrl, latestVer, fallbackUrl: fbUrl);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -695,14 +706,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   // Real-time In-App Downloader Modal Sheet
   void _startInAppDownloadAndInstall(String downloadUrl, String version, {String fallbackUrl = ''}) {
-    if (downloadUrl.isEmpty) {
-      if (fallbackUrl.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('لینک مستقیم بسته یافت نشد.')),
-        );
-        return;
-      }
-      downloadUrl = fallbackUrl;
+    const defaultPrimary = "https://github.com/hojjatrad/panelconnectix/releases/download/v3.0.0/Connectix-Android-ARM64.apk";
+    const defaultFallback = "https://vpbotn.ir/contax/Connectix-ARM64-v8a.apk";
+
+    if (downloadUrl.isEmpty || !downloadUrl.startsWith('http')) {
+      downloadUrl = defaultPrimary;
+    }
+    if (fallbackUrl.isEmpty || !fallbackUrl.startsWith('http')) {
+      fallbackUrl = defaultFallback;
     }
 
     // Windows (phase 1): the update is a ZIP package — open it in the
@@ -1757,7 +1768,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         ),
                       ),
                       ElevatedButton(
-                        onPressed: _checkAppUpdate,
+                        onPressed: () {
+                          final latestVer = (_updateInfo?['latest_version'] ?? '3.4.7').toString();
+                          final dlUrl = (_updateInfo?['download_url'] ?? '').toString();
+                          final fbUrl = (_updateInfo?['fallback_url'] ?? '').toString();
+                          _startInAppDownloadAndInstall(dlUrl, latestVer, fallbackUrl: fbUrl);
+                        },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.white,
                           foregroundColor: const Color(0xFF4338CA),
