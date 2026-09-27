@@ -340,7 +340,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
   }
 
-  void _loadServers() async {
+  Future<void> _loadServers() async {
     // 1. Immediately populate from local cache if list is currently empty
     if (_servers.isEmpty) {
       final cached = await ApiService.getCachedServers();
