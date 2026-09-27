@@ -52,10 +52,16 @@ jobs:
           cat << 'EOF' > android/app/src/main/kotlin/com/connectix/vpn/MainActivity.kt
           package com.connectix.vpn
 
+          import android.app.NotificationChannel
+          import android.app.NotificationManager
+          import android.app.PendingIntent
+          import android.content.Context
           import android.content.Intent
+          import android.content.pm.PackageManager
           import android.net.Uri
           import android.os.Build
           import android.provider.Settings
+          import androidx.core.app.NotificationCompat
           import androidx.core.content.FileProvider
           import io.flutter.embedding.android.FlutterActivity
           import io.flutter.embedding.engine.FlutterEngine
@@ -64,11 +70,108 @@ jobs:
 
           class MainActivity: FlutterActivity() {
               private val CHANNEL = "com.connectix.vpn/updater"
+              private val NOTIF_CHANNEL_ID = "connectix_vpn_status_ch"
+              private val NOTIF_ID = 9999
+              private var methodChannel: MethodChannel? = null
+
+              override fun onNewIntent(intent: Intent) {
+                  super.onNewIntent(intent)
+                  if (intent.action == "DISCONNECT_VPN_ACTION") {
+                      methodChannel?.invokeMethod("onNotificationDisconnect", null)
+                  }
+              }
 
               override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
                   super.configureFlutterEngine(flutterEngine)
-                  MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
+                  val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
+                  methodChannel = channel
+
+                  if (intent?.action == "DISCONNECT_VPN_ACTION") {
+                      channel.invokeMethod("onNotificationDisconnect", null)
+                  }
+
+                  // Request POST_NOTIFICATIONS runtime permission on Android 13+ (API 33+)
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                      try {
+                          if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                              requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 101)
+                          }
+                      } catch (_: Exception) {}
+                  }
+
+                  channel.setMethodCallHandler { call, result ->
                       when (call.method) {
+                          "updateNotification" -> {
+                              val title = call.argument<String>("title") ?: "Connectix VPN"
+                              val content = call.argument<String>("content") ?: ""
+                              val isConnected = call.argument<Boolean>("isConnected") ?: false
+                              try {
+                                  val notifMgr = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+                                  if (notifMgr != null) {
+                                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                          if (notifMgr.getNotificationChannel(NOTIF_CHANNEL_ID) == null) {
+                                              val ch = NotificationChannel(
+                                                  NOTIF_CHANNEL_ID,
+                                                  "Connectix VPN Status",
+                                                  NotificationManager.IMPORTANCE_LOW
+                                              ).apply {
+                                                  description = "نمایش زنده سرعت و وضعیت اتصال وی‌پی‌ان"
+                                                  setShowBadge(false)
+                                                  setSound(null, null)
+                                                  enableVibration(false)
+                                              }
+                                              notifMgr.createNotificationChannel(ch)
+                                          }
+                                      }
+
+                                      if (!isConnected) {
+                                          notifMgr.cancel(NOTIF_ID)
+                                          result.success(true)
+                                          return@setMethodCallHandler
+                                      }
+
+                                      val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                          PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+                                      } else {
+                                          PendingIntent.FLAG_UPDATE_CURRENT
+                                      }
+
+                                      val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
+                                      val contentPendingIntent = PendingIntent.getActivity(this, 100, launchIntent, flags)
+
+                                      val discIntent = Intent(this, MainActivity::class.java).apply {
+                                          action = "DISCONNECT_VPN_ACTION"
+                                          this.flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+                                      }
+                                      val discPendingIntent = PendingIntent.getActivity(this, 101, discIntent, flags)
+
+                                      val notif = NotificationCompat.Builder(this, NOTIF_CHANNEL_ID)
+                                          .setSmallIcon(R.mipmap.ic_launcher)
+                                          .setContentTitle(title)
+                                          .setContentText(content)
+                                          .setOngoing(true)
+                                          .setOnlyAlertOnce(true)
+                                          .setContentIntent(contentPendingIntent)
+                                          .addAction(android.R.drawable.ic_menu_close_clear_cancel, "قطع اتصال", discPendingIntent)
+                                          .setPriority(NotificationCompat.PRIORITY_LOW)
+                                          .build()
+
+                                      notifMgr.notify(NOTIF_ID, notif)
+                                  }
+                                  result.success(true)
+                              } catch (e: Exception) {
+                                  result.success(false)
+                              }
+                          }
+                          "cancelNotification" -> {
+                              try {
+                                  val notifMgr = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+                                  notifMgr?.cancel(NOTIF_ID)
+                                  result.success(true)
+                              } catch (e: Exception) {
+                                  result.success(false)
+                              }
+                          }
                           "getCacheDir" -> {
                               try {
                                   val cacheDir = context.externalCacheDir ?: context.cacheDir
@@ -379,14 +482,6 @@ jobs:
                       </intent-filter>
                   </activity>
 
-                  <receiver
-                      android:name=".V2rayNotificationReceiver"
-                      android:exported="true">
-                      <intent-filter>
-                          <action android:name="V2RAY_CONNECTION_INFO" />
-                      </intent-filter>
-                  </receiver>
-
                   <provider
                       android:name="androidx.core.content.FileProvider"
                       android:authorities="${applicationId}.fileprovider"
@@ -405,6 +500,13 @@ jobs:
           EOF
 
           flutter pub get
+
+      - name: Extract App Version
+        id: version
+        run: |
+          APP_VER=$(grep -oE "currentAppVersion[[:space:]]*=[[:space:]]*'[0-9]+\.[0-9]+\.[0-9]+'" client-app/lib/screens/dashboard_screen.dart | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          echo "app_ver=$APP_VER" >> $GITHUB_OUTPUT
+          echo "Detected App Version: $APP_VER"
 
       - name: Build Universal APK (All Androids)
         run: |
@@ -427,8 +529,6 @@ jobs:
           set -e
           cd client-app
           curl -fsSL "https://vpbotn.ir/contax/index.php?route=api/v1/reseller/brand/${{ inputs.reseller_id }}&key=${PANEL_BRAND_KEY}" -o /tmp/brand.json
-          # Rewrite the app label directly in the generated manifest (deterministic;
-          # avoids AGP manifestPlaceholders quirks with the Flutter gradle plugin).
           python3 - <<'PY'
           import json
           d = json.load(open('/tmp/brand.json'))
@@ -464,24 +564,51 @@ jobs:
                       print(f"FAIL: no classes*.dex found in {apk}")
                       sys.exit(1)
                   all_dex = b"".join(z.read(n) for n in dexes)
-                  # Crucial check: verify that MainActivity exists in DEX
+                  
+                  # Verify MainActivity exists in DEX
                   expected_class = b"Lcom/connectix/vpn/MainActivity;"
                   if expected_class not in all_dex:
                       print(f"CRITICAL TEST FAILED: {expected_class} NOT FOUND in dex of {apk}!")
                       sys.exit(1)
                   print(f"VERIFIED: {expected_class} found in {apk} dex!")
-                  # Native crash-capture Application class (manifest android:name target)
+                  
+                  # Verify ConnectixApplication exists in DEX
                   crash_app = b"Lcom/connectix/vpn/ConnectixApplication;"
                   if crash_app not in all_dex:
                       print(f"CRITICAL TEST FAILED: {crash_app} NOT FOUND in dex of {apk} (app would crash at startup)!")
                       sys.exit(1)
                   print(f"VERIFIED: {crash_app} found in {apk} dex!")
-                  
-                  # Verify AndroidManifest.xml exists
-                  if "AndroidManifest.xml" not in names:
-                      print(f"FAIL: AndroidManifest.xml missing in {apk}")
+
+                  # Verify updateNotification method channel exists in DEX
+                  if b"updateNotification" not in all_dex:
+                      print(f"CRITICAL TEST FAILED: updateNotification NOT FOUND in dex of {apk}!")
                       sys.exit(1)
-                  print(f"SUCCESS: {apk} passed all structural and startup tests.")
+                  print(f"VERIFIED: updateNotification method channel found in {apk} dex!")
+
+                  # CRITICAL INTEGRITY CHECK: NO phantom V2rayNotificationReceiver in manifest
+                  manifest_bytes = z.read("AndroidManifest.xml")
+                  utf16_strings = []
+                  pos = 0
+                  while pos < len(manifest_bytes) - 1:
+                      end = pos
+                      while end < len(manifest_bytes) - 1 and manifest_bytes[end+1] == 0 and 32 <= manifest_bytes[end] <= 126:
+                          end += 2
+                      if end - pos >= 8:
+                          try:
+                              s = manifest_bytes[pos:end].decode('utf-16le')
+                              utf16_strings.append(s)
+                          except:
+                              pass
+                          pos = end + 2
+                      else:
+                          pos += 1
+
+                  for s in utf16_strings:
+                      if "V2rayNotificationReceiver" in s:
+                          print(f"CRITICAL DEFECT DETECTED: V2rayNotificationReceiver found in {apk} manifest!")
+                          sys.exit(1)
+
+                  print(f"SUCCESS: {apk} passed all structural, class, and integrity tests.")
           print("ALL APKS PASSED RIGOROUS AUTOMATED VERIFICATION TESTS!")
           EOF
 
@@ -549,11 +676,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Publish Versioned Release on GitHub (v3.4.4)
+      - name: Publish Versioned Release on GitHub
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v3.4.4
-          name: Connectix Client Release v3.4.4
+          tag_name: v${{ steps.version.outputs.app_ver }}
+          name: Connectix Client Release v${{ steps.version.outputs.app_ver }}
           draft: false
           prerelease: false
           files: |
@@ -578,9 +705,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # NOTE: Windows job uses a recent stable (VS 2022 detection). Flutter
-      # 3.22's toolchain prefers the stale VS 2019 install on the runner and
-      # fails CMake configure.
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -593,6 +717,14 @@ jobs:
         with:
           python-version: '3.x'
 
+      - name: Extract App Version
+        id: win_version
+        shell: bash
+        run: |
+          APP_VER=$(grep -oE "currentAppVersion[[:space:]]*=[[:space:]]*'[0-9]+\.[0-9]+\.[0-9]+'" client-app/lib/screens/dashboard_screen.dart | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          echo "app_ver=$APP_VER" >> $GITHUB_OUTPUT
+          echo "Detected App Version for Windows: $APP_VER"
+
       - name: Get dependencies
         working-directory: client-app
         run: flutter pub get
@@ -603,12 +735,8 @@ jobs:
           $zip = "xray-windows-64.zip"
           Invoke-WebRequest -Uri "https://github.com/XTLS/Xray-core/releases/download/v25.3.6/$zip" -OutFile $zip
           Expand-Archive -Path $zip -DestinationPath "xray" -Force
-          # Wintun (required for TUN / full-VPN mode) - official builds;
-          # the Xray zip does NOT ship it.
           Invoke-WebRequest -Uri "https://www.wintun.net/builds/wintun-0.14.1.zip" -OutFile "wintun.zip"
           Expand-Archive -Path "wintun.zip" -DestinationPath "wintun" -Force
-          # Archive nests a top-level folder (wintun\wintun\bin\amd64\...) -
-          # locate the amd64 dll instead of hardcoding the depth.
           $wintunDll = Get-ChildItem -Path "wintun" -Recurse -Filter "wintun.dll" |
               Where-Object { $_.FullName -match 'amd64' } | Select-Object -First 1
           if (-not $wintunDll) { throw "wintun.dll (amd64) not found in archive" }
@@ -626,7 +754,6 @@ jobs:
           $dest = "client-app\build\windows\x64\runner\Release\data\xray"
           New-Item -ItemType Directory -Force -Path $dest | Out-Null
           Copy-Item "xray\Xray.exe" "$dest\Xray.exe" -Force
-          # wintun.dll = TUN (full-VPN) mode support, ships in the official zip
           if (Test-Path "xray\wintun.dll") { Copy-Item "xray\wintun.dll" "$dest\wintun.dll" -Force }
           else { Write-Host "WARNING: wintun.dll missing - TUN mode will not work" }
           if (-not (Test-Path "xray\geoip.dat")) { Write-Host "geoip.dat not present (ok for client)" }
@@ -698,10 +825,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Publish Windows to Versioned Release v3.4.4
+      - name: Publish Windows to Versioned Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v3.4.4
+          tag_name: v${{ steps.win_version.outputs.app_ver }}
           files: |
             Connectix-Windows-x64.zip
             app_release.json
