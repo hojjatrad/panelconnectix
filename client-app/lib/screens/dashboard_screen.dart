@@ -63,7 +63,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   bool _hasAppUpdate = false;
   Map<String, dynamic>? _updateInfo;
 
-  static const String currentAppVersion = '3.4.0';
+  static const String currentAppVersion = '3.4.1';
 
   // "Download over Wi-Fi only" for update packages
   bool _updateWifiOnly = false;
@@ -267,6 +267,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               _isConnecting = false;
               _userIntentionallyDisconnected = false;
               _reconnectAttempts = 0;
+              // Check for update once connected so panel is guaranteed reachable
+              _autoCheckUpdateInBackground();
             } else if (status.state == 'DISCONNECTED') {
               _isConnected = false;
               _isConnecting = false;
@@ -398,6 +400,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           duration: const Duration(seconds: 2),
         ),
       );
+
+      _autoCheckUpdateInBackground();
     }
   }
 
@@ -1082,6 +1086,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   // Announcements & Notifications Inbox Modal
   void _openAnnouncementsInbox() {
+    _autoCheckUpdateInBackground();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1089,87 +1094,229 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      builder: (ctx) => FractionallySizedBox(
-        heightFactor: 0.65,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 44,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF334155),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  const Icon(Icons.mark_email_unread_rounded, color: Color(0xFF38BDF8), size: 24),
-                  const SizedBox(width: 10),
-                  const Text(
-                    'صندوق پیام‌ها و اطلاعیه‌ها',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              if (_announcements.isEmpty)
-                const Expanded(
-                  child: Center(
-                    child: Text(
-                      'هیچ اطلاعیه جدیدی وجود ندارد.',
-                      style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+      builder: (ctx) {
+        final hasUpdate = _hasAppUpdate && _updateInfo != null;
+        final latestVer = (_updateInfo?['latest_version'] ?? '').toString();
+        final changelog = (_updateInfo?['changelog'] ?? 'بهبود پایداری، سنجش پینگ و قابلیت‌های جدید برنامه').toString();
+        final updateTitle = (_updateInfo?['title'] ?? 'بروزرسانی جدید Connectix').toString();
+
+        return FractionallySizedBox(
+          heightFactor: hasUpdate ? 0.82 : 0.65,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 44,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF334155),
+                      borderRadius: BorderRadius.circular(4),
                     ),
                   ),
-                )
-              else
-                Expanded(
-                  child: ListView.separated(
-                    itemCount: _announcements.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
-                    itemBuilder: (context, idx) {
-                      final item = _announcements[idx];
-                      return Container(
-                        padding: const EdgeInsets.all(16),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    const Icon(Icons.notifications_active_rounded, color: Color(0xFF38BDF8), size: 24),
+                    const SizedBox(width: 10),
+                    const Text(
+                      'صندوق پیام‌ها و بروزرسانی',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    const Spacer(),
+                    if (hasUpdate)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF1E293B),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: const Color(0xFF334155)),
+                          color: const Color(0xFF10B981).withOpacity(0.18),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFF10B981)),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        child: const Text(
+                          'بروزرسانی جدید',
+                          style: TextStyle(color: Color(0xFF34D399), fontSize: 10, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Dedicated In-App Update Card
+                if (hasUpdate) ...[
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF1E1B4B), Color(0xFF31104B)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFF9333EA), width: 1.5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF9333EA).withOpacity(0.25),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
                           children: [
-                            Text(
-                              item['title'] ?? 'اطلاعیه شبکه',
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              item['message'] ?? '',
-                              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12, height: 1.6),
-                            ),
-                            if (item['created_at'] != null) ...[
-                              const SizedBox(height: 8),
-                              Text(
-                                item['created_at'],
-                                style: const TextStyle(color: Color(0xFF64748B), fontSize: 10),
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF10B981).withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                            ],
+                              child: const Icon(Icons.system_update_rounded, color: Color(0xFF34D399), size: 22),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Text(
+                                        'نگارش جدید برنامه',
+                                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF10B981),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          'نسخه $latestVer',
+                                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    updateTitle,
+                                    style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 11),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
-                      );
-                    },
+                        const SizedBox(height: 10),
+                        Text(
+                          changelog,
+                          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11, height: 1.6),
+                        ),
+                        const SizedBox(height: 14),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              _startInAppDownloadAndInstall(
+                                (_updateInfo!['download_url'] ?? '').toString(),
+                                latestVer,
+                                fallbackUrl: (_updateInfo!['fallback_url'] ?? '').toString(),
+                              );
+                            },
+                            icon: const Icon(Icons.download_rounded, size: 18),
+                            label: Text(
+                              'دانلود و نصب خودکار نسخه $latestVer',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF10B981),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              elevation: 4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-            ],
+                ],
+
+                if (_announcements.isEmpty && !hasUpdate)
+                  const Expanded(
+                    child: Center(
+                      child: Text(
+                        'هیچ پیام یا اطلاعیه جدیدی وجود ندارد.',
+                        style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                      ),
+                    ),
+                  )
+                else if (_announcements.isNotEmpty)
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (hasUpdate)
+                          const Padding(
+                            padding: EdgeInsets.only(bottom: 8),
+                            child: Text(
+                              'سایر اطلاعیه‌ها',
+                              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        Expanded(
+                          child: ListView.separated(
+                            itemCount: _announcements.length,
+                            separatorBuilder: (_, __) => const SizedBox(height: 10),
+                            itemBuilder: (context, idx) {
+                              final item = _announcements[idx];
+                              return Container(
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF1E293B),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: const Color(0xFF334155)),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      item['title'] ?? 'اطلاعیه شبکه',
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      item['message'] ?? '',
+                                      style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11, height: 1.5),
+                                    ),
+                                    if (item['created_at'] != null) ...[
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        item['created_at'],
+                                        style: const TextStyle(color: Color(0xFF64748B), fontSize: 9),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -1376,25 +1523,29 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               onPressed: _checkAppUpdate,
               tooltip: 'نصب خودکار نگارش جدید',
             ),
-          // Announcements Inbox with Badge
+          // Announcements & Update Inbox with Badge
           Stack(
             alignment: Alignment.center,
             children: [
               IconButton(
-                icon: const Icon(Icons.notifications_none_rounded, color: Color(0xFF94A3B8)),
+                icon: Icon(
+                  _hasAppUpdate ? Icons.notifications_active_rounded : Icons.notifications_none_rounded,
+                  color: _hasAppUpdate ? const Color(0xFF34D399) : const Color(0xFF94A3B8),
+                ),
                 onPressed: _openAnnouncementsInbox,
-                tooltip: 'اطلاعیه‌ها',
+                tooltip: _hasAppUpdate ? 'بروزرسانی جدید در دسترس است' : 'اطلاعیه‌ها',
               ),
-              if (_announcements.isNotEmpty)
+              if (_hasAppUpdate || _announcements.isNotEmpty)
                 Positioned(
-                  top: 10,
-                  right: 10,
+                  top: 8,
+                  right: 8,
                   child: Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFEF4444),
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: _hasAppUpdate ? const Color(0xFF10B981) : const Color(0xFFEF4444),
                       shape: BoxShape.circle,
+                      border: Border.all(color: const Color(0xFF090D16), width: 1.8),
                     ),
                   ),
                 ),
