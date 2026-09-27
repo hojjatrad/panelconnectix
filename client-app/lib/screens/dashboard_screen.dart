@@ -62,7 +62,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   bool _hasAppUpdate = false;
   Map<String, dynamic>? _updateInfo;
 
-  static const String currentAppVersion = '3.3.9';
+  static const String currentAppVersion = '3.4.0';
 
   // "Download over Wi-Fi only" for update packages
   bool _updateWifiOnly = false;
@@ -289,43 +289,34 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   void _handleAutoReconnect() async {
-    if (_reconnectAttempts < 2) {
+    if (_userIntentionallyDisconnected) return;
+
+    if (_reconnectAttempts < 3) {
       _reconnectAttempts++;
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('قطع ناگهانی ارتباط! تلاش مجدد ($_reconnectAttempts از ۲)...'),
+            content: Text('افت موقت اتصال؛ تلاش برای اتصال پایدار به همین سرور ($_reconnectAttempts از ۳)...'),
             backgroundColor: const Color(0xFFF59E0B),
             duration: const Duration(seconds: 2),
           ),
         );
       }
-      await Future.delayed(const Duration(seconds: 2));
-      if (!_isConnected && mounted) {
+      await Future.delayed(Duration(seconds: _reconnectAttempts * 2));
+      if (!_isConnected && mounted && !_userIntentionallyDisconnected) {
         _startTunnel(isReconnect: true);
       }
-    } else if (_servers.length > 1) {
-      // Failover to next server
+    } else {
+      // Reconnect attempts exhausted — stay cleanly disconnected, NEVER hop to random servers!
       _reconnectAttempts = 0;
-      final currentIndex = _servers.indexWhere((s) => s.id == _selectedServer?.id);
-      final nextIndex = (currentIndex + 1) % _servers.length;
-      final nextServer = _servers[nextIndex];
-
       if (mounted) {
-        setState(() {
-          _selectedServer = nextServer;
-        });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('تغییر خودکار به سرور پایدارتر (${nextServer.name})...'),
-            backgroundColor: const Color(0xFF6366F1),
-            duration: const Duration(seconds: 3),
+          const SnackBar(
+            content: Text('اتصال متوقف شد. برای اتصال مجدد دکمه را لمس نمایید یا سرور را بررسی فرمایید.'),
+            backgroundColor: Color(0xFFEF4444),
+            duration: Duration(seconds: 4),
           ),
         );
-      }
-      await Future.delayed(const Duration(seconds: 1));
-      if (!_isConnected && mounted) {
-        _startTunnel(isReconnect: true);
       }
     }
   }
@@ -340,14 +331,27 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   void _loadServers() async {
-    final list = await ApiService.getServers();
-    if (mounted) {
-      setState(() {
-        _servers = list;
-        if (_servers.isNotEmpty) {
+    // 1. Immediately populate from local cache if list is currently empty
+    if (_servers.isEmpty) {
+      final cached = await ApiService.getCachedServers();
+      if (cached.isNotEmpty && mounted && _servers.isEmpty) {
+        setState(() {
+          _servers = cached;
           if (_selectedServer == null || !_servers.any((s) => s.id == _selectedServer!.id)) {
             _selectedServer = _servers.first;
           }
+        });
+        _measureSelectedServerPing();
+      }
+    }
+
+    // 2. Fetch fresh server list in background
+    final list = await ApiService.getServers();
+    if (mounted && list.isNotEmpty) {
+      setState(() {
+        _servers = list;
+        if (_selectedServer == null || !_servers.any((s) => s.id == _selectedServer!.id)) {
+          _selectedServer = _servers.first;
         }
       });
       _measureSelectedServerPing();
@@ -399,11 +403,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   void _measureSelectedServerPing() async {
     if (_selectedServer == null || _selectedServer!.configUri.isEmpty) return;
     try {
-      final parser = FlutterV2ray.parseFromURL(_selectedServer!.configUri);
-      final delay = await _flutterV2ray.getServerDelay(config: parser.getFullConfiguration());
+      final delay = await ApiService.pingServerUri(_selectedServer!.configUri);
       if (mounted && delay != null && delay > 0) {
         setState(() {
           _currentServerPing = delay;
+          _selectedServer!.pingMs = delay;
         });
       }
     } catch (_) {}
@@ -872,11 +876,20 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
       final configUri = _selectedServer!.configUri;
       final parser = FlutterV2ray.parseFromURL(configUri);
+      var configJson = parser.getFullConfiguration();
+      try {
+        final cfg = jsonDecode(configJson) as Map<String, dynamic>;
+        // Ensure robust DNS resolvers in Iran
+        cfg['dns'] = {
+          'servers': ['1.1.1.1', '8.8.8.8', '1.0.0.1']
+        };
+        configJson = jsonEncode(cfg);
+      } catch (_) {}
 
       // Pass Split Tunneling blocked apps to exclude domestic/banking apps natively
       await _flutterV2ray.startV2Ray(
         remark: _selectedServer!.name,
-        config: parser.getFullConfiguration(),
+        config: configJson,
         blockedApps: _splitTunnelingEnabled ? defaultDomesticBypassApps : null,
         proxyOnly: false, // Full device-wide VPN tunnel
         tunMode: tunMode,
@@ -1231,6 +1244,48 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     final s = (seconds % 60).toString().padLeft(2, '0');
     final h = (seconds ~/ 3600).toString().padLeft(2, '0');
     return h == '00' ? '$m:$s' : '$h:$m:$s';
+  }
+
+  String _formatSpeed(int bytes) {
+    if (bytes >= 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB/s';
+    } else if (bytes >= 1024) {
+      return '${(bytes / 1024).toStringAsFixed(0)} KB/s';
+    } else {
+      return '$bytes B/s';
+    }
+  }
+
+  Widget _buildSpeedChip({
+    required IconData icon,
+    required String label,
+    required int bytes,
+    required Color color,
+  }) {
+    final speedText = _formatSpeed(bytes);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 4),
+          Text(
+            '$label: $speedText',
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -1771,6 +1826,34 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
               ),
 
+              // Live Real-Time Speed Badges (Upload / Download)
+              if (_isConnected) ...[
+                const SizedBox(height: 10),
+                ValueListenableBuilder<V2RayStatus>(
+                  valueListenable: _v2rayStatus,
+                  builder: (context, status, _) {
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _buildSpeedChip(
+                          icon: Icons.arrow_downward_rounded,
+                          label: 'دانلود',
+                          bytes: status.downloadSpeed,
+                          color: const Color(0xFF10B981),
+                        ),
+                        const SizedBox(width: 10),
+                        _buildSpeedChip(
+                          icon: Icons.arrow_upward_rounded,
+                          label: 'آپلود',
+                          bytes: status.uploadSpeed,
+                          color: const Color(0xFF6366F1),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ],
+
               if (Platform.isWindows) ...[
                 const SizedBox(height: 18),
                 // Windows tunnel flavor selector (Phase 1: system proxy,
@@ -1834,7 +1917,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     backgroundColor: Colors.transparent,
                     isScrollControlled: true,
                     builder: (_) => FractionallySizedBox(
-                      heightFactor: 0.70,
+                      heightFactor: 0.85,
                       child: ServerListModal(
                         servers: _servers,
                         selectedServer: _selectedServer,
@@ -1845,9 +1928,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   if (selected != null && mounted) {
                     setState(() {
                       _selectedServer = selected;
-                      _currentServerPing = null;
+                      _currentServerPing = selected.pingMs;
                     });
-                    _measureSelectedServerPing();
+                    if (_currentServerPing == null) {
+                      _measureSelectedServerPing();
+                    }
                     if (_isConnected) {
                       _toggleConnection(); // reconnect with new server
                     }
@@ -1993,8 +2078,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             const Icon(Icons.arrow_downward_rounded, size: 16, color: Color(0xFF10B981)),
                             const SizedBox(width: 6),
                             Text(
-                              'دانلود: ${status.downloadSpeed}',
-                              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                              'دانلود: ${_formatSpeed(status.downloadSpeed)}',
+                              style: const TextStyle(color: Color(0xFFE2E8F0), fontSize: 12, fontWeight: FontWeight.bold),
                             ),
                           ],
                         ),
@@ -2004,8 +2089,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             const Icon(Icons.arrow_upward_rounded, size: 16, color: Color(0xFF38BDF8)),
                             const SizedBox(width: 6),
                             Text(
-                              'آپلود: ${status.uploadSpeed}',
-                              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                              'آپلود: ${_formatSpeed(status.uploadSpeed)}',
+                              style: const TextStyle(color: Color(0xFFE2E8F0), fontSize: 12, fontWeight: FontWeight.bold),
                             ),
                           ],
                         ),

@@ -1,7 +1,9 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../models/server_model.dart';
+import '../services/api_service.dart';
 
-class ServerListModal extends StatelessWidget {
+class ServerListModal extends StatefulWidget {
   final List<ServerModel> servers;
   final ServerModel? selectedServer;
   final VoidCallback? onRefresh;
@@ -12,6 +14,168 @@ class ServerListModal extends StatelessWidget {
     required this.selectedServer,
     this.onRefresh,
   }) : super(key: key);
+
+  @override
+  State<ServerListModal> createState() => _ServerListModalState();
+}
+
+class _ServerListModalState extends State<ServerListModal> {
+  late List<ServerModel> _list;
+  bool _isPingingAll = false;
+  int _pingProgress = 0;
+  bool _sortByPing = false;
+  ServerModel? _bestServer;
+
+  @override
+  void initState() {
+    super.initState();
+    _list = List<ServerModel>.from(widget.servers);
+    _calculateBestServer();
+  }
+
+  void _calculateBestServer() {
+    final valid = _list.where((s) => s.pingMs != null && s.pingMs! > 0).toList();
+    if (valid.isNotEmpty) {
+      valid.sort((a, b) => a.pingMs!.compareTo(b.pingMs!));
+      _bestServer = valid.first;
+    } else {
+      _bestServer = null;
+    }
+  }
+
+  void _applySort() {
+    if (_sortByPing) {
+      _list.sort((a, b) {
+        final aVal = (a.pingMs != null && a.pingMs! > 0) ? a.pingMs! : 999999;
+        final bVal = (b.pingMs != null && b.pingMs! > 0) ? b.pingMs! : 999999;
+        return aVal.compareTo(bVal);
+      });
+    } else {
+      _list = List<ServerModel>.from(widget.servers);
+    }
+    _calculateBestServer();
+  }
+
+  Future<void> _pingAll() async {
+    if (_isPingingAll || _list.isEmpty) return;
+    setState(() {
+      _isPingingAll = true;
+      _pingProgress = 0;
+    });
+
+    await ApiService.pingAllServers(
+      _list,
+      onProgress: (current, total) {
+        if (mounted) {
+          setState(() {
+            _pingProgress = current;
+          });
+        }
+      },
+    );
+
+    if (mounted) {
+      setState(() {
+        _isPingingAll = false;
+        _calculateBestServer();
+        if (_sortByPing) {
+          _applySort();
+        }
+      });
+
+      if (_bestServer != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'سنجش پینگ به پایان رسید. بهترین سرور: ${_bestServer!.name} (${_bestServer!.pingMs} میلی‌ثانیه)',
+            ),
+            backgroundColor: const Color(0xFF10B981),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildPingBadge(ServerModel s) {
+    if (s.pingMs == null) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E293B),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFF334155)),
+        ),
+        child: const Text(
+          'آماده اتصال',
+          style: TextStyle(color: Color(0xFF94A3B8), fontSize: 10, fontWeight: FontWeight.bold),
+        ),
+      );
+    }
+
+    if (s.pingMs! < 0) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEF4444).withOpacity(0.15),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.3)),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.close_rounded, size: 10, color: Color(0xFFF87171)),
+            SizedBox(width: 3),
+            Text(
+              'بدون پاسخ',
+              style: TextStyle(color: Color(0xFFF87171), fontSize: 10, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final ms = s.pingMs!;
+    final Color badgeColor = ms < 180
+        ? const Color(0xFF10B981)
+        : (ms < 350 ? const Color(0xFFF59E0B) : const Color(0xFFF97316));
+
+    final bool isBest = (_bestServer != null && _bestServer!.id == s.id);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: badgeColor.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: badgeColor.withOpacity(0.4)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.bolt_rounded, size: 12, color: badgeColor),
+          const SizedBox(width: 2),
+          Text(
+            '$ms ms',
+            style: TextStyle(color: badgeColor, fontSize: 10, fontWeight: FontWeight.bold),
+          ),
+          if (isBest) ...[
+            const SizedBox(width: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+              decoration: BoxDecoration(
+                color: const Color(0xFF10B981),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: const Text(
+                'بهترین',
+                style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -46,10 +210,10 @@ class ServerListModal extends StatelessWidget {
                 ),
                 Row(
                   children: [
-                    if (onRefresh != null)
+                    if (widget.onRefresh != null)
                       InkWell(
                         onTap: () {
-                          onRefresh!();
+                          widget.onRefresh!();
                           Navigator.pop(context);
                         },
                         borderRadius: BorderRadius.circular(10),
@@ -60,9 +224,9 @@ class ServerListModal extends StatelessWidget {
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(color: const Color(0xFF334155)),
                           ),
-                          child: Row(
+                          child: const Row(
                             mainAxisSize: MainAxisSize.min,
-                            children: const [
+                            children: [
                               Icon(Icons.refresh, size: 13, color: Color(0xFF38BDF8)),
                               SizedBox(width: 4),
                               Text('بروزرسانی', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 10, fontWeight: FontWeight.bold)),
@@ -79,7 +243,7 @@ class ServerListModal extends StatelessWidget {
                         border: Border.all(color: const Color(0xFF6366F1).withOpacity(0.3)),
                       ),
                       child: Text(
-                        '${servers.length} کانکشن',
+                        '${_list.length} سرور',
                         style: const TextStyle(color: Color(0xFFA5B4FC), fontSize: 11, fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -92,21 +256,83 @@ class ServerListModal extends StatelessWidget {
               'کلیه کانکشن‌های اختصاصی سرور در این بخش نمایش داده می‌شوند.',
               style: TextStyle(color: Color(0xFF64748B), fontSize: 11),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
 
-            // Smart Connect Card (اتصال هوشمند - کمترین پینگ)
-            if (servers.isNotEmpty) ...[
+            // Action Bar: Ping All Servers + Sort by Ping
+            if (_list.isNotEmpty) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _isPingingAll ? null : _pingAll,
+                      icon: _isPingingAll
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Icon(Icons.speed_rounded, size: 16),
+                      label: Text(
+                        _isPingingAll
+                            ? 'در حال سنجش پینگ ($_pingProgress/${_list.length})...'
+                            : 'تست پینگ همه سرورها',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF6366F1),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  InkWell(
+                    onTap: () {
+                      setState(() {
+                        _sortByPing = !_sortByPing;
+                        _applySort();
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+                      decoration: BoxDecoration(
+                        color: _sortByPing ? const Color(0xFF10B981).withOpacity(0.2) : const Color(0xFF1E293B),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _sortByPing ? const Color(0xFF10B981) : const Color(0xFF334155),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.sort_rounded,
+                            size: 15,
+                            color: _sortByPing ? const Color(0xFF34D399) : const Color(0xFF94A3B8),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'کمترین پینگ',
+                            style: TextStyle(
+                              color: _sortByPing ? const Color(0xFF34D399) : const Color(0xFF94A3B8),
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+
+              // Smart Connect Card (اتصال هوشمند - کمترین پینگ)
               InkWell(
                 onTap: () {
-                  // Find best server by lowest ping or recommended flag
-                  final best = servers.reduce((curr, next) {
-                    final currPing = curr.pingMs ?? 999;
-                    final nextPing = next.pingMs ?? 999;
-                    if (currPing < nextPing) return curr;
-                    if (nextPing < currPing) return next;
-                    return curr.isRecommended ? curr : next;
-                  });
-                  Navigator.pop(context, best);
+                  final target = _bestServer ?? _list.first;
+                  Navigator.pop(context, target);
                 },
                 borderRadius: BorderRadius.circular(16),
                 child: Container(
@@ -140,15 +366,19 @@ class ServerListModal extends StatelessWidget {
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: const [
+                          children: [
                             Text(
-                              '⚡️ اتصال هوشمند (کمترین پینگ)',
-                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13),
+                              _bestServer != null
+                                  ? '⚡️ اتصال به بهترین سرور (${_bestServer!.name} - ${_bestServer!.pingMs}ms)'
+                                  : '⚡️ اتصال هوشمند (کمترین پینگ)',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13),
                             ),
-                            SizedBox(height: 2),
+                            const SizedBox(height: 2),
                             Text(
-                              'انتخاب خودکار پایدارترین سرور سازگار با اینترنت شما',
-                              style: TextStyle(color: Color(0xFFE0E7FF), fontSize: 10),
+                              _bestServer != null
+                                  ? 'سریع‌ترین سرور بر اساس تست پینگ لحظه‌ای'
+                                  : 'انتخاب خودکار پایدارترین سرور سازگار با اینترنت شما',
+                              style: const TextStyle(color: Color(0xFFE0E7FF), fontSize: 10),
                             ),
                           ],
                         ),
@@ -162,17 +392,17 @@ class ServerListModal extends StatelessWidget {
             ],
 
             Expanded(
-              child: servers.isEmpty
+              child: _list.isEmpty
                   ? Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.cloud_off, color: Color(0xFF64748B), size: 48),
-                          const SizedBox(height: 12),
-                          const Text('هیچ کانکشنی یافت نشد.', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
-                          const SizedBox(height: 6),
-                          const Text(
-                            'اگر ادامه یافت: دکمهٔ تازه‌سازی را بزنید،\nیا یک‌بار از حساب خارج و دوباره وارد شوید.',
+                        children: const [
+                          Icon(Icons.cloud_off, color: Color(0xFF64748B), size: 48),
+                          SizedBox(height: 12),
+                          Text('هیچ کانکشنی یافت نشد.', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
+                          SizedBox(height: 6),
+                          Text(
+                            'اگر ادامه یافت: دکمهٔ بروزرسانی را بزنید،\nیا یک‌بار از حساب خارج و دوباره وارد شوید.',
                             style: TextStyle(color: Color(0xFF64748B), fontSize: 11),
                             textAlign: TextAlign.center,
                           ),
@@ -180,11 +410,11 @@ class ServerListModal extends StatelessWidget {
                       ),
                     )
                   : ListView.separated(
-                      itemCount: servers.length,
+                      itemCount: _list.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 8),
                       itemBuilder: (context, index) {
-                        final s = servers[index];
-                        final isSelected = (s.id == selectedServer?.id);
+                        final s = _list[index];
+                        final isSelected = (s.id == widget.selectedServer?.id);
                         final hasConfig = s.configUri.isNotEmpty;
 
                         return Container(
@@ -242,17 +472,7 @@ class ServerListModal extends StatelessWidget {
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF10B981).withOpacity(0.12),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: const Text(
-                                    'آماده اتصال',
-                                    style: TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold),
-                                  ),
-                                ),
+                                _buildPingBadge(s),
                                 const SizedBox(width: 8),
                                 if (isSelected)
                                   const Icon(Icons.check_circle, color: Color(0xFF6366F1), size: 20),

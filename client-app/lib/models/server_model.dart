@@ -43,8 +43,32 @@ class ServerModel {
       configUri: json['config_uri'] ?? '',
       isRecommended: json['is_recommended'] ?? false,
       isOnline: json['is_online'] ?? true,
-      pingMs: null,
+      pingMs: json['ping_ms'] is int ? json['ping_ms'] : null,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'country_name': countryName,
+      'country_code': countryCode,
+      'flag': flag,
+      'protocol': protocol,
+      'operator_tag': operatorTag,
+      'operator_name': operatorName,
+      'ping_url': pingUrl,
+      'config_uri': configUri,
+      'is_recommended': isRecommended,
+      'is_online': isOnline,
+      'ping_ms': pingMs,
+    };
+  }
+
+  String get pingDisplay {
+    if (pingMs == null) return '--';
+    if (pingMs! < 0) return 'خطا';
+    return '$pingMs ms';
   }
 
   factory ServerModel.fromUri(String rawUri, int index) {

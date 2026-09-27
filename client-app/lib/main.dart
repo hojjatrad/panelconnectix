@@ -509,6 +509,9 @@ class _SplashScreenState extends State<SplashScreen> {
           builder: (_) => DashboardScreen(
             client: session['client'],
             branding: session['branding'],
+            initialServers: session['servers'] is List<ServerModel> && (session['servers'] as List<ServerModel>).isNotEmpty
+                ? (session['servers'] as List<ServerModel>)
+                : null,
           ),
         ),
       );

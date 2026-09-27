@@ -62,10 +62,12 @@ class ApiService {
       if (isLoggedIn && token.isNotEmpty && cachedClientStr != null) {
         final clientMap = jsonDecode(cachedClientStr);
         final brandingMap = cachedBrandingStr != null ? jsonDecode(cachedBrandingStr) : {};
+        final cachedServers = await getCachedServers();
 
         return {
           'client': ClientModel.fromJson(clientMap),
           'branding': BrandingModel.fromJson(brandingMap),
+          'servers': cachedServers,
         };
       }
       return null;
@@ -73,6 +75,31 @@ class ApiService {
       debugPrint("checkSavedSession Error: $e");
       return null;
     }
+  }
+
+  static Future<void> saveCachedServers(List<ServerModel> servers) async {
+    try {
+      if (servers.isEmpty) return;
+      final prefs = await SharedPreferences.getInstance();
+      final list = servers.map((s) => s.toJson()).toList();
+      await prefs.setString('cached_servers', jsonEncode(list));
+    } catch (e) {
+      debugPrint("saveCachedServers Error: $e");
+    }
+  }
+
+  static Future<List<ServerModel>> getCachedServers() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final str = prefs.getString('cached_servers');
+      if (str != null && str.isNotEmpty) {
+        final List list = jsonDecode(str);
+        return list.map((e) => ServerModel.fromJson(e)).toList();
+      }
+    } catch (e) {
+      debugPrint("getCachedServers Error: $e");
+    }
+    return [];
   }
 
   static Future<Map<String, dynamic>> login(String username, String password) async {
@@ -110,6 +137,10 @@ class ApiService {
           if (!hasMock && parsed.length > 5) {
             initialServers = parsed;
           }
+        }
+
+        if (initialServers.isNotEmpty) {
+          await saveCachedServers(initialServers);
         }
 
         return {
@@ -221,11 +252,77 @@ class ApiService {
         log('NO SERVERS: API failed/empty and sub_url is not saved');
       }
 
+      if (servers.isNotEmpty) {
+        await saveCachedServers(servers);
+      } else {
+        // Fallback to locally cached servers so the user NEVER sees an empty server list
+        servers = await getCachedServers();
+      }
+
       return servers;
     } catch (e) {
       log('getServers Top-level error: $e');
       debugPrint("getServers Top-level error: $e");
-      return [];
+      return await getCachedServers();
+    }
+  }
+
+  /**
+   * Fast TCP Ping to server host:port directly (works offline/online, no VPN needed)
+   */
+  static Future<int?> pingServerUri(String uriStr) async {
+    try {
+      String host = '';
+      int port = 443;
+      if (uriStr.startsWith('vless://') || uriStr.startsWith('trojan://') || uriStr.startsWith('ss://')) {
+        final u = Uri.tryParse(uriStr);
+        if (u != null && u.host.isNotEmpty) {
+          host = u.host;
+          port = u.hasPort ? u.port : 443;
+        }
+      } else if (uriStr.startsWith('vmess://')) {
+        try {
+          final b64 = uriStr.substring(8);
+          final raw = utf8.decode(base64Decode(b64));
+          final j = jsonDecode(raw);
+          host = j['add'] ?? '';
+          port = int.tryParse(j['port']?.toString() ?? '') ?? 443;
+        } catch (_) {}
+      }
+
+      if (host.isEmpty) return null;
+
+      final sw = Stopwatch()..start();
+      final socket = await Socket.connect(host, port, timeout: const Duration(seconds: 4));
+      sw.stop();
+      socket.destroy();
+      return sw.elapsedMilliseconds;
+    } catch (_) {
+      return -1; // timed out or unreachable
+    }
+  }
+
+  /**
+   * Ping multiple servers in parallel batches with progress callback
+   */
+  static Future<void> pingAllServers(
+    List<ServerModel> servers, {
+    void Function(int current, int total)? onProgress,
+  }) async {
+    int finished = 0;
+    const batchSize = 4;
+    for (int i = 0; i < servers.length; i += batchSize) {
+      final batch = servers.sublist(i, math.min(i + batchSize, servers.length));
+      await Future.wait(batch.map((s) async {
+        if (s.configUri.isNotEmpty) {
+          final ms = await pingServerUri(s.configUri);
+          s.pingMs = ms;
+        } else {
+          s.pingMs = -1;
+        }
+        finished++;
+        onProgress?.call(finished, servers.length);
+      }));
     }
   }
 
