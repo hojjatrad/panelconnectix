@@ -35,14 +35,16 @@ class ApiService {
   // ----------------------------------------------------------
 
   static Future<void> initBaseUrl() async {
-    final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getString('api_base_url');
-    if (saved != null && saved.isNotEmpty) {
-      baseUrl = saved.replaceAll(RegExp(r'/+$'), '');
-    } else {
-      baseUrl = "https://vpbotn.ir/contax";
-      await prefs.setString('api_base_url', baseUrl);
-    }
+    // 3.3.9: the panel address is FIXED at build time. Any per-device saved
+    // value is ignored on purpose — the app must always talk to the official
+    // panel (the "set panel address" UI was removed in 3.3.9, so customers
+    // can never misconfigure the server). To change the panel address,
+    // release a new build with the new constant (see docs/RULES.md).
+    baseUrl = "https://vpbotn.ir/contax";
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('api_base_url', baseUrl); // keep legacy key in sync
+    } catch (_) {}
   }
 
   /**
