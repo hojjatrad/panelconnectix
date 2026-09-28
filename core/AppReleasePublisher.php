@@ -96,6 +96,12 @@ class AppReleasePublisher
 
         if ($isNewer && $enabled && $source !== 'admin') {
             Setting::set('app_latest_version', $remoteVer);
+            if (!empty($manifest['apk']['arm64'])) {
+                Setting::set('app_download_url', $manifest['apk']['arm64']);
+            }
+            if (!empty($manifest['apk']['universal'])) {
+                Setting::set('app_universal_url', $manifest['apk']['universal']);
+            }
             Setting::set('app_update_changelog', $changelog !== '' ? $changelog : 'نسخه جدید اپلیکیشن آماده شد.');
             Setting::set('app_update_title', trim((string)($manifest['title'] ?? '')) !== '' ? trim((string)$manifest['title']) : 'Connectix');
             Setting::set('app_update_source', 'auto');

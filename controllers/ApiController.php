@@ -762,9 +762,16 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
         require_once __DIR__ . '/../core/Setting.php';
 
         $latest      = trim(Setting::get('app_latest_version', ''));
-        // Empty URL = let the app use its fast panel-hosted direct APK.
+        require_once __DIR__ . '/../core/Updater.php';
+        $repo = Updater::getRepo();
         $downloadUrl = trim(Setting::get('app_download_url', ''));
         $universalUrl= trim(Setting::get('app_universal_url', ''));
+        if ($downloadUrl === '' || !str_contains($downloadUrl, "v{$latest}")) {
+            $downloadUrl = "https://github.com/{$repo}/releases/download/v{$latest}/Connectix-Android-ARM64.apk";
+        }
+        if ($universalUrl === '' || !str_contains($universalUrl, "v{$latest}")) {
+            $universalUrl = "https://github.com/{$repo}/releases/download/v{$latest}/Connectix-Android-Universal.apk";
+        }
         $title       = trim(Setting::get('app_update_title', '')) ?: "Connectix v{$latest}";
         $changelog   = trim(Setting::get('app_update_changelog', '')) ?: "• نگارش جدید سامانه منتشر شد.";
         $enabled     = trim(Setting::get('app_update_enabled', '1'));
