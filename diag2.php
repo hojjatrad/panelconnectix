@@ -181,6 +181,8 @@ try {
         'clients_count' => $clCount,
         'servers_count' => count($servers),
         'nodes' => $nodeDiagnostics,
+        'backups' => glob(__DIR__ . '/data/*.sqlite*') ?: [],
+        'data_files' => array_map('basename', glob(__DIR__ . '/data/*') ?: []),
     ];
 
     $cl = $pdo->query("SELECT * FROM clients ORDER BY id DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
