@@ -814,10 +814,10 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
             $latestWin = trim(Setting::get('app_latest_version_windows', ''));
             $winUrl    = trim(Setting::get('app_download_url_windows', ''));
             $winChlg   = trim(Setting::get('app_update_changelog', '')) ?: "• نگارش جدید سامانه منتشر شد.";
+            require_once __DIR__ . '/../core/Updater.php';
+            $repo = Updater::getRepo();
             if ($winUrl === '') {
-                require_once __DIR__ . '/../core/Updater.php';
-                $winUrl = 'https://github.com/' . Updater::getRepo()
-                    . '/releases/download/v3.0.0/Connectix-Windows-x64.zip';
+                $winUrl = "https://github.com/{$repo}/releases/download/v{$latestWin}/Connectix-Windows-x64.zip";
             }
             if ($latestWin === '') {
                 self::jsonSuccess([
@@ -846,9 +846,16 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
         }
 
         $latest      = trim(Setting::get('app_latest_version', ''));
-        // Empty URL = let the app use its fast panel-hosted direct APK.
+        require_once __DIR__ . '/../core/Updater.php';
+        $repo = Updater::getRepo();
         $downloadUrl = trim(Setting::get('app_download_url', ''));
         $universalUrl= trim(Setting::get('app_universal_url', ''));
+        if ($downloadUrl === '') {
+            $downloadUrl = "https://github.com/{$repo}/releases/download/v{$latest}/Connectix-Android-ARM64.apk";
+        }
+        if ($universalUrl === '') {
+            $universalUrl = "https://github.com/{$repo}/releases/download/v{$latest}/Connectix-Android-Universal.apk";
+        }
         $title       = trim(Setting::get('app_update_title', '')) ?: "Connectix v{$latest}";
         $changelog   = trim(Setting::get('app_update_changelog', '')) ?: "• نگارش جدید سامانه منتشر شد.";
         $enabled     = trim(Setting::get('app_update_enabled', '1'));

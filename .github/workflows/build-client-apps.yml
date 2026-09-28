@@ -193,7 +193,7 @@ jobs:
                           }
                           "getCacheDir" -> {
                               try {
-                                  val cacheDir = context.externalCacheDir ?: context.cacheDir
+                                  val cacheDir = context.cacheDir
                                   result.success(cacheDir.absolutePath)
                               } catch (e: Exception) {
                                   result.error("CACHE_DIR_ERROR", e.message, null)
@@ -252,7 +252,16 @@ jobs:
                                               Uri.fromFile(file)
                                           }
                                           intent.setDataAndType(uri, "application/vnd.android.package-archive")
-                                          intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
+                                          intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or 
+                                                         Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                                                         Intent.FLAG_ACTIVITY_CLEAR_TOP
+
+                                          val resInfoList = packageManager.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
+                                          for (resolveInfo in resInfoList) {
+                                              val pkgName = resolveInfo.activityInfo.packageName
+                                              context.grantUriPermission(pkgName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                          }
+
                                           context.startActivity(intent)
                                           result.success(true)
                                       } catch (e: Exception) {
@@ -453,8 +462,9 @@ jobs:
             echo "ERROR: could not derive version (PUB_CODE='$PUB_CODE' APP_VER='$APP_VER')"
             exit 1
           fi
-          echo "Injecting versionCode=$PUB_CODE versionName=$APP_VER"
-          sed -i "s/__VERSION_CODE__/${PUB_CODE}/; s/__VERSION_NAME__/${APP_VER}/" android/app/build.gradle
+          BASE_VERSION_CODE=$((100000 + PUB_CODE))
+          echo "Injecting versionCode=$BASE_VERSION_CODE (base from PUB_CODE=$PUB_CODE) versionName=$APP_VER"
+          sed -i "s/__VERSION_CODE__/${BASE_VERSION_CODE}/; s/__VERSION_NAME__/${APP_VER}/" android/app/build.gradle
           grep -n "versionCode\|versionName" android/app/build.gradle
 
           # Ensure AndroidManifest has extractNativeLibs, VPN permissions, package installer and launcher activity
@@ -646,16 +656,16 @@ jobs:
               changelog = ' '.join(m.group(1).split()) if m else ''
           except FileNotFoundError:
               pass
-          base = 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.0.0'
+          base = f'https://github.com/hojjatrad/panelconnectix/releases/download/v{ver}'
           data = {
               'version': ver,
               'code': int(code),
               'changelog': changelog,
               'date': datetime.date.today().isoformat(),
               'apk': {
-                  'arm64': base + '/Connectix-ARM64-v8a.apk',
-                  'universal': base + '/Connectix-Universal.apk',
-                  'arm32': base + '/Connectix-ARM32-v7a.apk',
+                  'arm64': base + '/Connectix-Android-ARM64.apk',
+                  'universal': base + '/Connectix-Android-Universal.apk',
+                  'arm32': base + '/Connectix-Android-ARM32.apk',
               },
           }
           with open('app_release.json', 'w', encoding='utf-8') as f:
@@ -805,16 +815,16 @@ jobs:
               changelog = ' '.join(m.group(1).split()) if m else ''
           except FileNotFoundError:
               pass
-          base = 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.0.0'
+          base = f'https://github.com/hojjatrad/panelconnectix/releases/download/v{ver}'
           data = {
               'version': ver,
               'code': int(code),
               'changelog': changelog,
               'date': datetime.date.today().isoformat(),
               'apk': {
-                  'arm64': base + '/Connectix-ARM64-v8a.apk',
-                  'universal': base + '/Connectix-Universal.apk',
-                  'arm32': base + '/Connectix-ARM32-v7a.apk',
+                  'arm64': base + '/Connectix-Android-ARM64.apk',
+                  'universal': base + '/Connectix-Android-Universal.apk',
+                  'arm32': base + '/Connectix-Android-ARM32.apk',
               },
               'windows': {
                   'version': ver,

@@ -141,7 +141,7 @@ class MainActivity: FlutterActivity() {
                 }
                 "getCacheDir" -> {
                     try {
-                        val cacheDir = context.externalCacheDir ?: context.cacheDir
+                        val cacheDir = context.cacheDir
                         result.success(cacheDir.absolutePath)
                     } catch (e: Exception) {
                         result.error("CACHE_DIR_ERROR", e.message, null)
@@ -200,7 +200,16 @@ class MainActivity: FlutterActivity() {
                                     Uri.fromFile(file)
                                 }
                                 intent.setDataAndType(uri, "application/vnd.android.package-archive")
-                                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
+                                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or 
+                                               Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                                               Intent.FLAG_ACTIVITY_CLEAR_TOP
+
+                                val resInfoList = packageManager.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
+                                for (resolveInfo in resInfoList) {
+                                    val pkgName = resolveInfo.activityInfo.packageName
+                                    context.grantUriPermission(pkgName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+
                                 context.startActivity(intent)
                                 result.success(true)
                             } catch (e: Exception) {

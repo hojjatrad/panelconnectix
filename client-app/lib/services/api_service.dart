@@ -399,9 +399,6 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>?> checkAppUpdate() async {
-    final directApkUrl = "$baseUrl/Connectix-ARM64-v8a.apk";
-    final ghApkUrl = "https://github.com/hojjatrad/panelconnectix/releases/download/v3.0.0/Connectix-ARM64-v8a.apk";
-
     // 1. Primary: Query Panel /api/v1/app/check-update
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -421,13 +418,17 @@ class ApiService {
       final data = jsonDecode(utf8.decode(response.bodyBytes));
       if (data['success'] == true && data['data'] != null) {
         final map = Map<String, dynamic>.from(data['data']);
-        // Respect the admin-configured APK URL from the panel settings;
-        // otherwise use the fast panel-hosted direct APK.
+        final latestVer = (map['latest_version'] ?? '').toString();
         final serverUrl = (map['download_url'] ?? '').toString();
+        final dynamicGhArm64 = "https://github.com/hojjatrad/panelconnectix/releases/download/v$latestVer/Connectix-Android-ARM64.apk";
+        final dynamicGhUniversal = "https://github.com/hojjatrad/panelconnectix/releases/download/v$latestVer/Connectix-Android-Universal.apk";
+
         map['download_url'] = (serverUrl.isNotEmpty && serverUrl.startsWith('http'))
             ? serverUrl
-            : directApkUrl;
-        map['fallback_url'] = ghApkUrl;
+            : dynamicGhArm64;
+        map['fallback_url'] = (map['universal_url'] != null && map['universal_url'].toString().startsWith('http'))
+            ? map['universal_url'].toString()
+            : dynamicGhUniversal;
         return map;
       }
     } catch (_) {}
@@ -442,14 +443,17 @@ class ApiService {
         final ghData = jsonDecode(utf8.decode(ghResp.bodyBytes));
         final ver = (ghData['version'] ?? '').toString();
         if (ver.isNotEmpty) {
-          final apkArm64 = ghData['apk']?['arm64']?.toString() ?? ghApkUrl;
+          final apkArm64 = ghData['apk']?['arm64']?.toString() ??
+              "https://github.com/hojjatrad/panelconnectix/releases/download/v$ver/Connectix-Android-ARM64.apk";
+          final apkUniversal = ghData['apk']?['universal']?.toString() ??
+              "https://github.com/hojjatrad/panelconnectix/releases/download/v$ver/Connectix-Android-Universal.apk";
           return {
             'has_update': true,
             'latest_version': ver,
             'title': 'Connectix v$ver',
             'changelog': (ghData['changelog'] ?? '• نگارش جدید سامانه منتشر شد.').toString(),
             'download_url': apkArm64,
-            'fallback_url': directApkUrl,
+            'fallback_url': apkUniversal,
           };
         }
       }

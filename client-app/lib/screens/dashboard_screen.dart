@@ -65,7 +65,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Map<String, dynamic>? _updateInfo;
   bool _isCheckingUpdate = false;
 
-  static const String currentAppVersion = '3.5.0';
+  static const String currentAppVersion = '3.5.1';
 
   // "Download over Wi-Fi only" for update packages
   bool _updateWifiOnly = false;
@@ -689,8 +689,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   // Real-time In-App Downloader Modal Sheet
   void _startInAppDownloadAndInstall(String downloadUrl, String version, {String fallbackUrl = ''}) {
-    const defaultPrimary = "https://github.com/hojjatrad/panelconnectix/releases/download/v3.0.0/Connectix-Android-ARM64.apk";
-    const defaultFallback = "https://vpbotn.ir/contax/Connectix-ARM64-v8a.apk";
+    final defaultPrimary = "https://github.com/hojjatrad/panelconnectix/releases/download/v$version/Connectix-Android-ARM64.apk";
+    final defaultFallback = "https://github.com/hojjatrad/panelconnectix/releases/download/v$version/Connectix-Android-Universal.apk";
 
     if (downloadUrl.isEmpty || !downloadUrl.startsWith('http')) {
       downloadUrl = defaultPrimary;

@@ -29,11 +29,11 @@ $tgSupport = $branding['telegram_support'] ?? '@Support';
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
-            <a href="https://github.com/hojjatrad/panelconnectix/releases/download/v3.0.0/Connectix-ARM64-v8a.apk" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs shadow-lg shadow-emerald-600/30 transition flex items-center gap-2">
+            <a href="https://github.com/hojjatrad/panelconnectix/releases/latest/download/Connectix-Android-ARM64.apk" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs shadow-lg shadow-emerald-600/30 transition flex items-center gap-2">
                 <i class="fa-brands fa-android text-sm"></i>
                 <span>دانلود APK نسخه ARM64 (پیشنهادی)</span>
             </a>
-            <a href="https://github.com/hojjatrad/panelconnectix/releases/download/v3.0.0/Connectix-Universal.apk" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs border border-slate-700 transition flex items-center gap-2">
+            <a href="https://github.com/hojjatrad/panelconnectix/releases/latest/download/Connectix-Android-Universal.apk" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs border border-slate-700 transition flex items-center gap-2">
                 <i class="fa-solid fa-box text-cyan-400"></i>
                 <span>دانلود نسخه همگانی (Universal)</span>
             </a>
@@ -52,13 +52,13 @@ $tgSupport = $branding['telegram_support'] ?? '@Support';
             </div>
         </div>
         <div class="flex flex-wrap items-center gap-2">
-            <a href="https://github.com/hojjatrad/panelconnectix/releases/download/v3.0.0/Connectix-ARM64-v8a.apk" class="px-3 py-1.5 bg-emerald-700/80 hover:bg-emerald-600 text-white rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition">
+            <a href="https://github.com/hojjatrad/panelconnectix/releases/latest/download/Connectix-Android-ARM64.apk" class="px-3 py-1.5 bg-emerald-700/80 hover:bg-emerald-600 text-white rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition">
                 <i class="fa-solid fa-download"></i> ARM64 (25 MB)
             </a>
-            <a href="https://github.com/hojjatrad/panelconnectix/releases/download/v3.0.0/Connectix-Universal.apk" class="px-3 py-1.5 bg-cyan-800/80 hover:bg-cyan-700 text-white rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition">
+            <a href="https://github.com/hojjatrad/panelconnectix/releases/latest/download/Connectix-Android-Universal.apk" class="px-3 py-1.5 bg-cyan-800/80 hover:bg-cyan-700 text-white rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition">
                 <i class="fa-solid fa-download"></i> Universal (71 MB)
             </a>
-            <a href="https://github.com/hojjatrad/panelconnectix/releases/download/v3.0.0/Connectix-ARM32-v7a.apk" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition">
+            <a href="https://github.com/hojjatrad/panelconnectix/releases/latest/download/Connectix-Android-ARM32.apk" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition">
                 <i class="fa-solid fa-download"></i> ARM32 (25 MB)
             </a>
         </div>
