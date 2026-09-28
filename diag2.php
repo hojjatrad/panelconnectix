@@ -146,7 +146,7 @@ try {
     $pdo = Database::getConnection();
 
     $clCount = (int)$pdo->query("SELECT COUNT(*) FROM clients")->fetchColumn();
-    $servers = $pdo->query("SELECT id, name, driver, api_url, is_active FROM server_nodes")->fetchAll(PDO::FETCH_ASSOC);
+    $servers = $pdo->query("SELECT id, name, driver, api_url, api_username, api_password, api_token, is_active FROM server_nodes")->fetchAll(PDO::FETCH_ASSOC);
 
     $nodeDiagnostics = [];
     require_once __DIR__ . '/drivers/DriverFactory.php';
@@ -157,6 +157,12 @@ try {
             'driver' => $s['driver'],
             'is_active' => $s['is_active'],
             'api_url' => $s['api_url'],
+            'has_user' => !empty($s['api_username']),
+            'has_pass' => !empty($s['api_password']),
+            'has_token' => !empty($s['api_token']),
+            'user_len' => strlen($s['api_username'] ?? ''),
+            'pass_len' => strlen($s['api_password'] ?? ''),
+            'token_len' => strlen($s['api_token'] ?? ''),
         ];
         if (!empty($s['driver']) && $s['driver'] !== 'mock' && $s['is_active']) {
             try {
