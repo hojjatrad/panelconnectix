@@ -187,11 +187,14 @@ try {
         }
     }
 
+    $recentLogs = $pdo->query("SELECT * FROM activity_logs ORDER BY id DESC LIMIT 15")->fetchAll(PDO::FETCH_ASSOC);
+
     $out['db_state'] = [
         'clients_count' => $clCount,
         'servers_count' => count($servers),
         'nodes' => $nodeDiagnostics,
         'table_counts' => $tableCounts,
+        'recent_logs' => $recentLogs,
         'backups' => glob(__DIR__ . '/data/*.sqlite*') ?: [],
         'data_files' => array_map('basename', glob(__DIR__ . '/data/*') ?: []),
     ];
