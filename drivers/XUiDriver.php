@@ -7,6 +7,7 @@ class XUiDriver implements PanelDriverInterface {
     private ?string $username;
     private ?string $password;
     private string $cookieFile;
+    private ?string $token;
     private ?string $lastError = null;
     private int $timeout = 10;
 
@@ -14,11 +15,17 @@ class XUiDriver implements PanelDriverInterface {
         return $this->lastError;
     }
 
-    public function __construct(string $baseUrl, ?string $username, ?string $password, ?string $subDomain = null) {
-        $this->baseUrl = rtrim($baseUrl, '/');
-        $this->username = $username;
-        $this->password = $password;
-        $this->cookieFile = sys_get_temp_dir() . '/xui_cookie_' . md5($this->baseUrl . $this->username) . '.txt';
+    public function __construct(string $baseUrl, ?string $username = null, ?string $password = null, ?string $token = null, ?string $subDomain = null) {
+        $clean = rtrim(trim($baseUrl), '/');
+        if (!empty($clean) && !preg_match('#^https?://#i', $clean)) {
+            $clean = 'https://' . $clean;
+        }
+        $this->baseUrl = $clean;
+        $this->username = $username ? trim($username) : null;
+        $this->password = $password ? trim($password) : null;
+        $this->token = $token ? trim($token) : ($this->username ? null : $this->password);
+        $this->subDomain = $subDomain ? trim($subDomain) : null;
+        $this->cookieFile = sys_get_temp_dir() . '/xui_cookie_' . md5($this->baseUrl . ($this->username ?: $this->token ?: 'default')) . '.txt';
     }
 
     private function request(string $endpoint, string $method = 'GET', ?array $data = null): array {
@@ -28,6 +35,11 @@ class XUiDriver implements PanelDriverInterface {
         $headers = [
             'Accept: application/json'
         ];
+        if (!empty($this->token)) {
+            $headers[] = 'Authorization: Bearer ' . $this->token;
+            $headers[] = 'X-API-KEY: ' . $this->token;
+            $headers[] = 'Cookie: session=' . $this->token;
+        }
 
         if ($method === 'POST') {
             curl_setopt($ch, CURLOPT_POST, true);
@@ -65,7 +77,19 @@ class XUiDriver implements PanelDriverInterface {
     }
 
     public function authenticate(): bool {
-        if (empty($this->username) || empty($this->password)) return false;
+        // If token is present, try probe with inbounds list
+        if (!empty($this->token)) {
+            $probe = $this->request('/panel/api/inbounds/list');
+            if ($probe['success']) {
+                $this->lastError = null;
+                return true;
+            }
+        }
+
+        if (empty($this->username) || empty($this->password)) {
+            $this->lastError = "نام کاربری یا رمز عبور یا کلید API وارد نشده است.";
+            return false;
+        }
 
         $ch = curl_init($this->baseUrl . '/login');
         curl_setopt($ch, CURLOPT_POST, true);

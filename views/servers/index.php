@@ -210,7 +210,7 @@ require __DIR__ . '/../layout/header.php';
             </div>
 
             <!-- Modal Scrollable Body -->
-            <form action="<?= Helpers::url('servers/store') ?>" method="POST" id="newServerForm" class="flex flex-col flex-1 overflow-hidden">
+            <form action="<?= Helpers::url('servers/store') ?>" method="POST" id="newServerForm" onsubmit="normalizeApiUrl(this.querySelector('[name=api_url]'))" class="flex flex-col flex-1 overflow-hidden">
                 <?= Helpers::csrfField() ?>
 
                 <div class="overflow-y-auto p-4 sm:p-5 space-y-4 text-xs flex-1 overscroll-contain modal-scroll-body" style="scrollbar-width: thin; scrollbar-color: #8b5cf6 #1e293b;">
@@ -245,19 +245,35 @@ require __DIR__ . '/../layout/header.php';
                     </div>
 
                     <div>
-                        <label class="block text-slate-300 mb-1 font-semibold">آدرس API سرور (با پورت و پروتکل) *</label>
-                        <input type="url" name="api_url" required dir="ltr" oninput="autoFillCdn(this, 'new')" placeholder="https://vpn.example.com:8000" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
+                        <label class="block text-slate-300 mb-1 font-semibold flex items-center justify-between">
+                            <span>آدرس API سرور (با پورت و پروتکل) *</span>
+                            <span class="text-[10px] text-cyan-400 font-normal">دامنه یا IP (مانند 192.168.1.1:2053)</span>
+                        </label>
+                        <input type="text" name="api_url" required dir="ltr" oninput="autoFillCdn(this, 'new')" onblur="normalizeApiUrl(this)" placeholder="https://vpn.example.com:2053 یا 192.168.1.1:2053" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
+                        <span class="text-[10px] text-slate-400 mt-0.5 block">در صورت وارد نکردن https:// سیستم به صورت خودکار پروتکل مناسب را اضافه می‌کند.</span>
                     </div>
 
                     <div class="grid grid-cols-2 gap-3">
                         <div>
                             <label class="block text-slate-300 mb-1 font-semibold">نام کاربری / ادمین</label>
-                            <input type="text" name="api_username" dir="ltr" placeholder="admin" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
+                            <input type="text" name="api_username" dir="ltr" placeholder="admin (اختیاری در صورت داشتن کلید)" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
                         </div>
                         <div>
                             <label class="block text-slate-300 mb-1 font-semibold">رمز عبور / Secret</label>
                             <input type="password" name="api_password" dir="ltr" placeholder="••••••••" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
                         </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-slate-300 mb-1 font-semibold flex items-center justify-between">
+                            <span class="flex items-center gap-1.5">
+                                <i class="fa-solid fa-key text-amber-400"></i>
+                                <span>کلید API یا توکن دسترسی (API Key / Bearer Token)</span>
+                            </span>
+                            <span class="text-[10px] text-amber-400 font-normal">اتصال اختصاصی با کلید</span>
+                        </label>
+                        <input type="text" name="api_token" dir="ltr" placeholder="اختیاری - در صورت اتصال فقط با کلید API، کلید را اینجا وارد فرمایید" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-xs">
+                        <span class="text-[10px] text-slate-400 mt-0.5 block">اگر سرور شما تنها با کلید اختصاصی متصل می‌شود، کلید را در این فیلد قرار دهید. در این حالت نیازی به پر کردن نام کاربری نیست.</span>
                     </div>
 
                     <!-- MirzaPro-Style Smart Inbound & CDN Discovery Card -->
@@ -348,7 +364,7 @@ require __DIR__ . '/../layout/header.php';
             </div>
 
             <!-- Modal Scrollable Body -->
-            <form action="<?= Helpers::url('servers/update') ?>" method="POST" id="editServerForm" class="flex flex-col flex-1 overflow-hidden">
+            <form action="<?= Helpers::url('servers/update') ?>" method="POST" id="editServerForm" onsubmit="normalizeApiUrl(this.querySelector('[name=api_url]'))" class="flex flex-col flex-1 overflow-hidden">
                 <?= Helpers::csrfField() ?>
                 <input type="hidden" name="id" id="edit_server_id">
 
@@ -384,8 +400,12 @@ require __DIR__ . '/../layout/header.php';
                     </div>
 
                     <div>
-                        <label class="block text-slate-300 mb-1 font-semibold">آدرس API سرور *</label>
-                        <input type="url" name="api_url" id="edit_server_api_url" required dir="ltr" oninput="autoFillCdn(this, 'edit')" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
+                        <label class="block text-slate-300 mb-1 font-semibold flex items-center justify-between">
+                            <span>آدرس API سرور *</span>
+                            <span class="text-[10px] text-cyan-400 font-normal">دامنه یا IP</span>
+                        </label>
+                        <input type="text" name="api_url" id="edit_server_api_url" required dir="ltr" oninput="autoFillCdn(this, 'edit')" onblur="normalizeApiUrl(this)" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
+                        <span class="text-[10px] text-slate-400 mt-0.5 block">در صورت وارد نکردن https:// سیستم به صورت خودکار پروتکل مناسب را اضافه می‌کند.</span>
                     </div>
 
                     <div class="grid grid-cols-2 gap-3">
@@ -397,6 +417,18 @@ require __DIR__ . '/../layout/header.php';
                             <label class="block text-slate-300 mb-1 font-semibold">رمز عبور (خالی بگذارید تا تغییر نکند)</label>
                             <input type="password" name="api_password" dir="ltr" placeholder="••••••••" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
                         </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-slate-300 mb-1 font-semibold flex items-center justify-between">
+                            <span class="flex items-center gap-1.5">
+                                <i class="fa-solid fa-key text-amber-400"></i>
+                                <span>کلید API یا توکن دسترسی (API Key / Bearer Token)</span>
+                            </span>
+                            <span class="text-[10px] text-amber-400 font-normal">اتصال اختصاصی با کلید</span>
+                        </label>
+                        <input type="text" name="api_token" id="edit_server_api_token" dir="ltr" placeholder="اختیاری - کلید اختصاصی API / Bearer Token" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-xs">
+                        <span class="text-[10px] text-slate-400 mt-0.5 block">اگر سرور با کلید اختصاصی متصل است، کلید را اینجا ویرایش نمایید.</span>
                     </div>
 
                     <!-- MirzaPro-Style Smart Inbound & CDN Discovery Card -->
@@ -510,6 +542,9 @@ require __DIR__ . '/../layout/header.php';
         }
         document.getElementById('edit_server_api_url').value = s.api_url;
         document.getElementById('edit_server_api_username').value = s.api_username || '';
+        if (document.getElementById('edit_server_api_token')) {
+            document.getElementById('edit_server_api_token').value = s.api_token || '';
+        }
         document.getElementById('edit_server_sub_domain').value = s.sub_domain || '';
         document.getElementById('edit_server_max_clients').value = (s.max_clients !== null && s.max_clients !== undefined) ? s.max_clients : 0;
         if (document.getElementById('edit_server_config_template')) {
@@ -698,6 +733,16 @@ require __DIR__ . '/../layout/header.php';
             resultBox.className = 'mb-3 p-3.5 rounded-xl text-xs bg-rose-950/70 border border-rose-700/60 text-rose-300';
             resultBox.innerHTML = '<div class="flex items-center gap-2"><i class="fa-solid fa-triangle-exclamation text-rose-400 text-base shrink-0"></i><span>خطا در پاسخ کنترلر: ' + err.message + '</span></div>';
         });
+    }
+
+    function normalizeApiUrl(input) {
+        if (!input) return;
+        let val = input.value.trim();
+        if (!val) return;
+        if (!/^https?:\/\//i.test(val)) {
+            val = 'https://' + val;
+            input.value = val;
+        }
     }
 
     function autoFillCdn(el, mode) {

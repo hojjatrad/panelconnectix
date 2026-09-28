@@ -42,9 +42,20 @@ class ServerController {
         $name = trim($_POST['name'] ?? '');
         $driver = trim($_POST['driver'] ?? 'auto');
         $apiUrl = trim($_POST['api_url'] ?? '');
+        if (!empty($apiUrl) && !preg_match('#^https?://#i', $apiUrl)) {
+            $apiUrl = 'https://' . $apiUrl;
+        }
         $username = trim($_POST['api_username'] ?? '');
         $password = trim($_POST['api_password'] ?? '');
         $token = trim($_POST['api_token'] ?? '');
+
+        // Dual-fallback: If token is provided without password, or token empty but user put token into password without username
+        if (empty($token) && empty($username) && !empty($password)) {
+            $token = $password;
+        }
+        if (!empty($token) && empty($password)) {
+            $password = $token;
+        }
         $serverGroup = trim($_POST['server_group'] ?? 'default');
         $categoryId = !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null;
         $subDomain = trim($_POST['sub_domain'] ?? '');
@@ -102,9 +113,19 @@ class ServerController {
         $name = trim($_POST['name'] ?? '');
         $driver = trim($_POST['driver'] ?? 'auto');
         $apiUrl = trim($_POST['api_url'] ?? '');
+        if (!empty($apiUrl) && !preg_match('#^https?://#i', $apiUrl)) {
+            $apiUrl = 'https://' . $apiUrl;
+        }
         $username = trim($_POST['api_username'] ?? '');
         $password = trim($_POST['api_password'] ?? '');
         $token = trim($_POST['api_token'] ?? '');
+
+        if (empty($token) && empty($username) && !empty($password)) {
+            $token = $password;
+        }
+        if (!empty($token) && empty($password)) {
+            $password = $token;
+        }
         $serverGroup = trim($_POST['server_group'] ?? 'default');
         $categoryId = !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null;
         $subDomain = trim($_POST['sub_domain'] ?? '');
@@ -383,9 +404,19 @@ class ServerController {
         Auth::requireAdmin();
         $driverType = trim($_POST['driver'] ?? $_GET['driver'] ?? 'marzban');
         $apiUrl = trim($_POST['api_url'] ?? $_GET['api_url'] ?? '');
+        if (!empty($apiUrl) && !preg_match('#^https?://#i', $apiUrl)) {
+            $apiUrl = 'https://' . $apiUrl;
+        }
         $username = trim($_POST['api_username'] ?? $_GET['api_username'] ?? '');
         $password = trim($_POST['api_password'] ?? $_GET['api_password'] ?? '');
         $token = trim($_POST['api_token'] ?? $_GET['api_token'] ?? '');
+
+        if (empty($token) && empty($username) && !empty($password)) {
+            $token = $password;
+        }
+        if (!empty($token) && empty($password)) {
+            $password = $token;
+        }
 
         if (empty($apiUrl)) {
             Helpers::jsonResponse(['success' => false, 'message' => 'لطفاً ابتدا آدرس سرور (URL) را وارد نمایید.']);

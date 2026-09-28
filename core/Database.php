@@ -372,6 +372,7 @@ class Database {
             }
 
             $serverCols = [
+                'api_token' => 'TEXT NULL',
                 'health_status' => "VARCHAR(32) DEFAULT 'online'",
                 'latency_ms' => 'INT DEFAULT 0',
                 'last_checked_at' => 'DATETIME NULL',

@@ -39,7 +39,7 @@ class DriverFactory {
                 return new MarzbanDriver($url, $user, $pass, $token, $subDomain);
             case '3xui':
             case 'xui':
-                return new XUiDriver($url, $user, $pass, $subDomain);
+                return new XUiDriver($url, $user, $pass, $token, $subDomain);
             case 'mock':
             default:
                 return new MockDriver($url, $user, $pass, $token);

@@ -19,7 +19,7 @@ class MarzbanDriver implements PanelDriverInterface {
 
         $this->username = $username ? trim($username) : null;
         $this->password = $password ? trim($password) : null;
-        $this->token = $token ? trim($token) : null;
+        $this->token = $token ? trim($token) : ($this->username ? null : $this->password);
         $this->subDomain = $subDomain ? trim($subDomain) : null;
     }
 
