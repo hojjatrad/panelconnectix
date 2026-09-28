@@ -26,8 +26,8 @@ class SublinkControllerV2 {
                                LEFT JOIN server_nodes s ON c.server_id = s.id 
                                LEFT JOIN branding_metadata b ON b.user_id = c.reseller_id 
                                LEFT JOIN reserved_plans rp ON rp.client_id = c.id AND rp.status = 'queued'
-                               WHERE c.sub_token = ? OR c.uuid = ? OR c.username = ? OR c.node_sublink LIKE ? LIMIT 1");
-        $stmt->execute([$token, $token, $token, "%{$token}%"]);
+                               WHERE c.sub_token = ? OR c.uuid = ? OR c.username = ? OR c.node_sublink = ? LIMIT 1");
+        $stmt->execute([$token, $token, $token, $token]);
         $client = $stmt->fetch();
 
         if (!$client) {
