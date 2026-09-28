@@ -175,6 +175,44 @@ $renewalLink = !empty($client['renewal_url']) ? $client['renewal_url'] : (!empty
             <?php endif; ?>
         </div>
 
+        <!-- Dedicated App Download Card (Android & Windows) -->
+        <div class="bg-gradient-to-br from-purple-950/60 via-slate-900 to-indigo-950/50 border border-purple-500/40 rounded-2xl p-4 md:p-5 space-y-3.5 shadow-xl">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <span class="w-9 h-9 rounded-xl bg-purple-600 flex items-center justify-center text-white text-base shadow-md">
+                        <i class="fa-solid fa-rocket"></i>
+                    </span>
+                    <div>
+                        <h3 class="font-extrabold text-white text-xs md:text-sm">دانلود اپلیکیشن اختصاصی <?= $brandName ?></h3>
+                        <p class="text-[10px] text-purple-300">ورود آسان فقط با نام کاربری و پسورد بالا (بدون نیاز به لینک)</p>
+                    </div>
+                </div>
+                <span class="text-[9px] px-2 py-0.5 rounded-full font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">پیشنهادی</span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 pt-1 text-xs">
+                <a href="https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.1/Connectix-Android-Universal.apk" class="py-2.5 px-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition shadow-md">
+                    <i class="fa-brands fa-android text-base"></i>
+                    <span>دانلود اندروید</span>
+                </a>
+                <a href="https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.1/Connectix-Windows-x64.zip" class="py-2.5 px-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition shadow-md">
+                    <i class="fa-brands fa-windows text-base"></i>
+                    <span>دانلود ویندوز</span>
+                </a>
+            </div>
+
+            <div class="flex items-center justify-between pt-1 border-t border-slate-800/80 text-[11px] text-slate-400">
+                <span class="flex items-center gap-1">
+                    <i class="fa-solid fa-circle-info text-purple-400 text-[10px]"></i>
+                    <span>تست پینگ خودکار و ضد فیلتر</span>
+                </span>
+                <a href="<?= Helpers::url('apps') ?>" target="_blank" class="text-purple-400 hover:text-purple-300 font-bold flex items-center gap-1 transition">
+                    <span>راهنمای تصویری و سایر سیستم‌عامل‌ها</span>
+                    <i class="fa-solid fa-arrow-left text-[9px]"></i>
+                </a>
+            </div>
+        </div>
+
         <!-- QR Code for fast import (Rendered with local fallback) -->
         <div class="text-center space-y-3">
             <span class="text-xs text-slate-300 block font-semibold"><i class="fa-solid fa-qrcode text-purple-400 ml-1"></i> اسکن مستقیم بارکد اشتراک:</span>

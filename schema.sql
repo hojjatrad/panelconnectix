@@ -421,12 +421,14 @@ ON DUPLICATE KEY UPDATE `name`=VALUES(`name`);
 
 -- Seed Default App Guides
 INSERT INTO `app_guides` (`platform`, `app_name`, `download_url`, `guide_url`, `description`, `sort_order`, `is_active`) VALUES
+('android', '🚀 Connectix Android (اپلیکیشن اختصاصی - پیشنهادی)', 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.1/Connectix-Android-Universal.apk', '', 'نرم‌افزار رسمی و اختصاصی با ورود آسان تنها با نام کاربری و پسورد، بدون نیاز به کانفیگ دستی و تست خودکار پینگ', 0, 1),
 ('android', 'v2rayNG (پیشنهادی اندروید)', 'https://github.com/2dust/v2rayNG/releases', 'https://t.me/connectix/79', 'پایدارترین کلاینت اندروید با قابلیت اتصال خودکار و پشتیبانی از همه پروتکل‌ها', 1, 1),
 ('android', 'NapsternetV (کلاینت دوم اندروید)', 'https://play.google.com/store/apps/details?id=com.napsternetlabs.napsternetv', '', 'نرم‌افزار کمکی برای اینترنت‌های با اختلال بالا', 2, 1),
-('ios', 'Streisand (پیشنهادی آیفون و آیپد)', 'https://apps.apple.com/app/streisand/id6450534064', '', 'رایگان، بسیار سریع و سازگار با اینترنت‌های همراه اول و ایرانسل', 1, 1),
-('ios', 'V2Box (کلاینت جایگزین iOS)', 'https://apps.apple.com/app/v2box-v2ray-client/id6446814042', '', 'پشتیبانی کامل از ساب‌لینک هوشمند و پینگ تست آنی', 2, 1),
+('windows', '🚀 Connectix Windows (نرم‌افزار اختصاصی ویندوز - پیشنهادی)', 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.1/Connectix-Windows-x64.zip', '', 'کلاینت اختصاصی ویندوز با تونل کل ترافیک سیستم (VPN Mode) و اتصال ۱ کلیک فوق‌العاده سریع', 0, 1),
 ('windows', 'NekoRay (پیشنهادی ویندوز)', 'https://github.com/MatsuriDayo/nekoray/releases', '', 'دارای حالت System Proxy و VPN Mode برای کل ترافیک ویندوز', 1, 1),
 ('windows', 'v2rayN (کلاینت کلاسیک ویندوز)', 'https://github.com/2dust/v2rayN/releases', '', 'پشتیبانی از Reality و Xray Core', 2, 1),
+('ios', 'Streisand (پیشنهادی آیفون و آیپد)', 'https://apps.apple.com/app/streisand/id6450534064', '', 'رایگان، بسیار سریع و سازگار با اینترنت‌های همراه اول و ایرانسل', 1, 1),
+('ios', 'V2Box (کلاینت جایگزین iOS)', 'https://apps.apple.com/app/v2box-v2ray-client/id6446814042', '', 'پشتیبانی کامل از ساب‌لینک هوشمند و پینگ تست آنی', 2, 1),
 ('macos', 'FoXray (مک‌بوک)', 'https://apps.apple.com/app/foxray/id6448898396', '', 'کلاینت رسمی و بسیار سبک سیستم‌عامل macOS', 1, 1)
 ON DUPLICATE KEY UPDATE `id`=`id`;
 

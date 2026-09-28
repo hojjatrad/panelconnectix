@@ -140,6 +140,33 @@ input { direction: ltr; text-align: left; }
 
             <div class="h-px bg-slate-800"></div>
 
+            <!-- Dedicated App Download Card -->
+            <div class="bg-gradient-to-br from-purple-950/40 via-slate-900 to-indigo-950/40 border border-purple-500/30 rounded-2xl p-4 space-y-3">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h4 class="text-xs font-bold text-white flex items-center gap-1.5">
+                            <span class="text-purple-400">🚀</span>
+                            <span>دانلود نرم‌افزار اختصاصی <?= htmlspecialchars($brandName) ?></span>
+                        </h4>
+                        <p class="text-[10px] text-slate-400 mt-0.5">اتصال آسان فقط با نام کاربری و رمز عبور</p>
+                    </div>
+                    <span class="text-[9px] px-2 py-0.5 rounded font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">پیشنهادی</span>
+                </div>
+                <div class="grid grid-cols-2 gap-2 text-xs">
+                    <a href="https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.1/Connectix-Android-Universal.apk" class="py-2.5 px-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold flex items-center justify-center gap-1.5 transition text-center shadow">
+                        <i class="fa-brands fa-android"></i>
+                        <span>دانلود اندروید</span>
+                    </a>
+                    <a href="https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.1/Connectix-Windows-x64.zip" class="py-2.5 px-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl font-bold flex items-center justify-center gap-1.5 transition text-center shadow">
+                        <i class="fa-brands fa-windows"></i>
+                        <span>دانلود ویندوز</span>
+                    </a>
+                </div>
+                <a href="<?= Helpers::url('apps') ?>" target="_blank" class="block text-center text-[10px] text-purple-400 hover:underline">مشاهده راهنمای کامل تصویری و سایر سیستم‌عامل‌ها ←</a>
+            </div>
+
+            <div class="h-px bg-slate-800"></div>
+
             <!-- Actions -->
             <div class="grid grid-cols-2 gap-2">
                 <?php if ($renewalUrl !== ''): ?>

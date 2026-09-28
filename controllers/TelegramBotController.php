@@ -2022,14 +2022,15 @@ class TelegramBotController {
         $kb = [
             'inline_keyboard' => [
                 [
-                    ['text' => '⚡ اتصال با V2rayNG', 'url' => $primarySub],
-                    ['text' => '🚀 اتصال با Hiddify / Streisand', 'url' => $primarySub]
+                    ['text' => '🚀 دانلود اپلیکیشن اختصاصی ما', 'callback_data' => 'apps_plat_our_app'],
+                    ['text' => '⚡ اتصال با V2rayNG', 'url' => $primarySub]
                 ],
                 [
-                    ['text' => '🔄 تمدید این اشتراک', 'callback_data' => 'renew_acc_' . $c['id']],
-                    ['text' => '📥 دریافت کانفیگ‌ها', 'callback_data' => 'configs_acc_' . $c['id']]
+                    ['text' => '🚀 اتصال با Hiddify / Streisand', 'url' => $primarySub],
+                    ['text' => '🔄 تمدید این اشتراک', 'callback_data' => 'renew_acc_' . $c['id']]
                 ],
                 [
+                    ['text' => '📥 دریافت کانفیگ‌ها', 'callback_data' => 'configs_acc_' . $c['id']],
                     ['text' => '🚪 قطع اتصال از تلگرام', 'callback_data' => 'unbind_acc_' . $c['id']]
                 ],
                 [
@@ -2334,6 +2335,19 @@ class TelegramBotController {
     private static function showAppsDownload(PDO $pdo, string $chatId, ?int $messageId = null, ?string $selectedPlatform = null): void {
         $ctx = self::getContext($pdo);
         $botToken = $ctx['bot_token'];
+        $brandName = $ctx['brand_name'] ?? 'Connectix VPN';
+        $appsWebUrl = Helpers::fullUrl('apps');
+
+        // Dynamic Manifest URLs
+        $manifestPath = dirname(__DIR__) . '/app_release.json';
+        $manifest = [];
+        if (is_file($manifestPath)) {
+            $manifest = @json_decode(file_get_contents($manifestPath), true) ?: [];
+        }
+        $appVersion = $manifest['version'] ?? '3.5.1';
+        $apkUniversalUrl = $manifest['apk']['universal'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.1/Connectix-Android-Universal.apk';
+        $apkArm64Url = $manifest['apk']['arm64'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.1/Connectix-Android-ARM64.apk';
+        $windowsUrl = $manifest['windows']['url'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.1/Connectix-Windows-x64.zip';
 
         $platforms = [
             'android' => ['title' => '🤖 اندروید (Android)', 'header' => '🤖 نرم‌افزارهای اندروید'],
@@ -2342,19 +2356,27 @@ class TelegramBotController {
             'macos' => ['title' => '🍎 مک‌بوک (macOS)', 'header' => '🍎 نرم‌افزارهای مک‌بوک']
         ];
 
+        // 1. Main Platform Chooser
         if ($selectedPlatform === null) {
-            $msg = "📱 <b>مرکز دانلود نرم‌افزارها و راهنمای اتصال ({$ctx['brand_name']})</b>\n\n"
-                 . "جهت مشاهده اپلیکیشن‌های سازگار و آموزش ویدیویی، سیستم‌عامل خود را انتخاب فرمایید:";
+            $msg = "📱 <b>مرکز دانلود نرم‌افزارها و راهنمای اتصال ({$brandName})</b>\n\n"
+                 . "🚀 <b>پیشنهاد ویژه:</b> جهت اتصال فوق‌العاده پرسرعت، پایدار و بدون قطعی، از <b>اپلیکیشن اختصاصی ما</b> استفاده فرمایید؛ ورود آسان تنها با وارد کردن «نام کاربری» و «رمز عبور» بدون نیاز به لینک یا کانفیگ دستی!\n\n"
+                 . "جهت مشاهده نرم‌افزارها یا دریافت اپلیکیشن اختصاصی، سیستم‌عامل خود را انتخاب فرمایید:";
 
             $kb = [
                 'inline_keyboard' => [
                     [
-                        ['text' => '🤖 اندروید (Android)', 'callback_data' => 'apps_plat_android'],
-                        ['text' => '🍏 آیفون / آیپد (iOS)', 'callback_data' => 'apps_plat_ios']
+                        ['text' => '⭐ اپلیکیشن اختصاصی ما (اندروید و ویندوز)', 'callback_data' => 'apps_plat_our_app']
                     ],
                     [
-                        ['text' => '💻 ویندوز (Windows)', 'callback_data' => 'apps_plat_windows'],
+                        ['text' => '🤖 نرم‌افزارهای اندروید', 'callback_data' => 'apps_plat_android'],
+                        ['text' => '💻 نرم‌افزارهای ویندوز', 'callback_data' => 'apps_plat_windows']
+                    ],
+                    [
+                        ['text' => '🍏 آیفون / آیپد (iOS)', 'callback_data' => 'apps_plat_ios'],
                         ['text' => '🍎 مک‌بوک (macOS)', 'callback_data' => 'apps_plat_macos']
+                    ],
+                    [
+                        ['text' => '🌐 راهنمای جامع تصویری و دانلود در وب', 'url' => $appsWebUrl]
                     ],
                     [
                         ['text' => '🔙 بازگشت به منوی اصلی', 'callback_data' => 'menu_main']
@@ -2370,34 +2392,95 @@ class TelegramBotController {
             return;
         }
 
-        // Fetch apps from app_guides table
+        // 2. Dedicated Connectix Software Screen
+        if ($selectedPlatform === 'our_app' || $selectedPlatform === 'connectix') {
+            $msg = "🚀 <b>اپلیکیشن اختصاصی هوشمند {$brandName} (نسخه {$appVersion})</b>\n\n"
+                 . "پایدارترین، سریع‌ترین و ساده‌ترین راه اتصال به اینترنت آزاد و بدون محدودیت:\n\n"
+                 . "✨ <b>مزایای اپلیکیشن اختصاصی:</b>\n"
+                 . "• <b>ورود آسان:</b> بدون نیاز به کپی ساب‌لینک یا اسکن کد، فقط نام کاربری و رمز عبور اشتراک خود را وارد کنید.\n"
+                 . "• <b>اتصال هوشمند:</b> انتخاب خودکار سریع‌ترین و خلوت‌ترین سرور با تست پینگ آنی.\n"
+                 . "• <b>پروتکل‌های نسل جدید:</b> سازگار با تمامی اپراتورها (همراه اول، ایرانسل، مخابرات، رایتل) با هسته Reality.\n"
+                 . "• <b>نسخه ویندوز:</b> دارای حالت VPN Mode جهت تونل کل سیستم کامپیوتر بدون نیاز به پیش‌نیاز.\n\n"
+                 . "📖 <b>راهنمای ۳ مرحله‌ای اتصال:</b>\n"
+                 . "۱️⃣ نرم‌افزار مربوط به دستگاه خود را از دکمه‌های زیر دریافت و نصب کنید.\n"
+                 . "۲️⃣ برنامه را باز کرده و «نام کاربری» و «کلمه عبور» اشتراک خود را وارد نمایید.\n"
+                 . "۳️⃣ دکمه بزرگ اتصال را لمس کنید تا متصل شوید!\n\n"
+                 . "👇 <b>جهت دانلود مستقیم، روی دکمه مورد نظر کلیک فرمایید:</b>";
+
+            $kb = [
+                'inline_keyboard' => [
+                    [
+                        ['text' => '🤖 دانلود مستقیم اندروید (Universal - تمام گوشی‌ها)', 'url' => $apkUniversalUrl]
+                    ],
+                    [
+                        ['text' => '⚡ دانلود مستقیم اندروید (ARM64 - مدرن)', 'url' => $apkArm64Url]
+                    ],
+                    [
+                        ['text' => '💻 دانلود مستقیم نرم‌افزار ویندوز (x64 ZIP)', 'url' => $windowsUrl]
+                    ],
+                    [
+                        ['text' => '🌐 مشاهده راهنمای کامل و تصویری در وب', 'url' => $appsWebUrl]
+                    ],
+                    [
+                        ['text' => '🔙 بازگشت به سیستم‌عامل‌ها', 'callback_data' => 'menu_apps']
+                    ]
+                ]
+            ];
+
+            if ($messageId) {
+                TelegramBot::editMessageText($msg, $chatId, $messageId, $kb, $botToken);
+            } else {
+                TelegramBot::sendMessage($msg, $chatId, $kb, $botToken);
+            }
+            return;
+        }
+
+        // 3. Platform specific (Android, Windows, iOS, macOS)
         $stmt = $pdo->prepare("SELECT * FROM app_guides WHERE platform = ? AND is_active = 1 ORDER BY sort_order ASC, id ASC");
         $stmt->execute([$selectedPlatform]);
         $apps = $stmt->fetchAll();
 
         $platTitle = $platforms[$selectedPlatform]['header'] ?? 'نرم‌افزارها';
-        $msg = "📱 <b>{$platTitle}</b>\n\n"
-             . "یکی از نرم‌افزارهای زیر را نصب نموده و لینک ساب‌لینک خود را در آن وارد کنید:\n\n";
+        $msg = "📱 <b>{$platTitle}</b>\n\n";
 
         $buttons = [];
-        if (empty($apps)) {
-            $msg .= "<i>در حال حاضر نرم‌افزاری برای این بخش ثبت نشده است.</i>\n";
-        } else {
-            foreach ($apps as $idx => $app) {
-                $msg .= ($idx + 1) . ". <b>" . htmlspecialchars($app['app_name']) . "</b>\n";
-                if (!empty($app['description'])) {
-                    $msg .= "<i>" . htmlspecialchars($app['description']) . "</i>\n";
-                }
-                $msg .= "\n";
 
-                $row = [['text' => "📥 دانلود {$app['app_name']}", 'url' => $app['download_url']]];
-                if (!empty($app['guide_url'])) {
-                    $row[] = ['text' => "🎥 آموزش", 'url' => $app['guide_url']];
-                }
-                $buttons[] = $row;
-            }
+        if ($selectedPlatform === 'android') {
+            $msg .= "⭐ <b>پیشنهاد ویژه:</b> اپلیکیشن اختصاصی ما با ورود سریع تنها با نام کاربری و رمز عبور و بدون نیاز به کانفیگ دستی!\n\n"
+                 . "جهت دانلود اپلیکیشن اختصاصی ما یا سایر نرم‌افزارهای استاندارد (نظیر v2rayNG)، گزینه مورد نظر را انتخاب فرمایید:\n\n";
+
+            $buttons[] = [['text' => "🚀 دانلود اپلیکیشن اختصاصی اندروید (Universal)", 'url' => $apkUniversalUrl]];
+            $buttons[] = [['text' => "⚡ دانلود نسخه ARM64 اپلیکیشن اختصاصی", 'url' => $apkArm64Url]];
+        } elseif ($selectedPlatform === 'windows') {
+            $msg .= "⭐ <b>پیشنهاد ویژه:</b> نرم‌افزار اختصاصی ویندوز ما با حالت تونل کامل سیستم (VPN Mode) بدون نیاز به تنظیمات شبکه!\n\n"
+                 . "جهت دانلود نرم‌افزار اختصاصی یا سایر کلاینت‌ها، گزینه مورد نظر را انتخاب فرمایید:\n\n";
+
+            $buttons[] = [['text' => "🚀 دانلود کلاینت اختصاصی ویندوز (64-bit ZIP)", 'url' => $windowsUrl]];
+        } else {
+            $msg .= "یکی از نرم‌افزارهای زیر را نصب نموده و لینک ساب‌لینک خود را در آن وارد کنید:\n\n";
         }
 
+        // Add other apps from DB (avoid duplicate Connectix buttons if already seeded)
+        $displayIndex = 1;
+        foreach ($apps as $app) {
+            if (($selectedPlatform === 'android' || $selectedPlatform === 'windows') && str_contains($app['app_name'], 'Connectix')) {
+                continue;
+            }
+            $msg .= $displayIndex . ". <b>" . htmlspecialchars($app['app_name']) . "</b>\n";
+            if (!empty($app['description'])) {
+                $msg .= "<i>" . htmlspecialchars($app['description']) . "</i>\n";
+            }
+            $msg .= "\n";
+            $displayIndex++;
+
+            $row = [['text' => "📥 دانلود {$app['app_name']}", 'url' => $app['download_url']]];
+            if (!empty($app['guide_url'])) {
+                $row[] = ['text' => "🎥 آموزش", 'url' => $app['guide_url']];
+            }
+            $buttons[] = $row;
+        }
+
+        $buttons[] = [['text' => '🌐 راهنمای جامع تصویری در وب', 'url' => $appsWebUrl]];
         $buttons[] = [['text' => '🔙 بازگشت به سیستم‌عامل‌ها', 'callback_data' => 'menu_apps']];
 
         $kb = ['inline_keyboard' => $buttons];
@@ -2679,6 +2762,7 @@ class TelegramBotController {
 
             TelegramBot::sendPhoto($qrUrl, $customerMsg, $order['user_tg_id'], [
                 'inline_keyboard' => [
+                    [['text' => '🚀 دانلود اپلیکیشن اختصاصی ما', 'callback_data' => 'apps_plat_our_app']],
                     [['text' => '⚡ اتصال مستقیم با V2rayNG', 'url' => $primarySub]],
                     [['text' => '🚀 اتصال با Streisand / Hiddify', 'url' => $primarySub]],
                     [['text' => '📊 مشاهده وضعیت اشتراک', 'callback_data' => 'view_acc_' . $client['id']]],
@@ -2747,6 +2831,7 @@ class TelegramBotController {
 
         $customerKeyboard = [
             'inline_keyboard' => [
+                [['text' => '🚀 دانلود اپلیکیشن اختصاصی ما', 'callback_data' => 'apps_plat_our_app']],
                 [['text' => '⚡ اتصال مستقیم با V2rayNG', 'url' => $primarySub]],
                 [['text' => '🚀 اتصال با Streisand / Hiddify', 'url' => $primarySub]],
                 [['text' => '📊 صفحه وب وضعیت اشتراک', 'url' => $prov['sub_url']]],

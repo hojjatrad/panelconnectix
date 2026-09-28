@@ -436,11 +436,14 @@ $router->get('webapp', [WebappController::class, 'index']);
 $router->post('webapp/spin', [WebappController::class, 'spin']);
 
 // App Guides & Download Tutorials
+$router->get('apps', [AppGuideController::class, 'publicIndex']);
+$router->get('download', [AppGuideController::class, 'publicIndex']);
 $router->get('settings/app-guides', [AppGuideController::class, 'index']);
 $router->post('settings/app-guides/store', [AppGuideController::class, 'store']);
 $router->post('settings/app-guides/update', [AppGuideController::class, 'update']);
 $router->post('settings/app-guides/toggle', [AppGuideController::class, 'toggle']);
 $router->post('settings/app-guides/delete', [AppGuideController::class, 'delete']);
+$router->post('settings/app-guides/reset-defaults', [AppGuideController::class, 'resetDefaults']);
 
 // Discount Coupons
 $router->get('settings/coupons', [CouponController::class, 'index']);

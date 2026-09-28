@@ -21,10 +21,25 @@ $platforms = [
             <p class="text-xs text-slate-400 mt-1">تنظیم لینک‌های دانلود مستقیم و آموزش‌های ویدیویی برای نمایش مرتب در منوی ربات تلگرام</p>
         </div>
 
-        <button onclick="openNewGuideModal()" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-bold rounded-xl transition-all shadow-md flex items-center gap-2">
-            <i class="fa-solid fa-plus"></i>
-            <span>افزودن نرم‌افزار جدید</span>
-        </button>
+        <div class="flex items-center gap-2 flex-wrap">
+            <a href="<?= Helpers::url('apps') ?>" target="_blank" class="px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl transition-all shadow-md flex items-center gap-1.5">
+                <i class="fa-solid fa-arrow-up-right-from-square text-[11px]"></i>
+                <span>صفحه عمومی دانلود و راهنما</span>
+            </a>
+
+            <form action="<?= Helpers::url('settings/app-guides/reset-defaults') ?>" method="POST" class="m-0">
+                <?= Helpers::csrfField() ?>
+                <button type="submit" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold rounded-xl border border-slate-700 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-sync text-[11px]"></i>
+                    <span>افزودن نرم‌افزارهای اختصاصی به لیست</span>
+                </button>
+            </form>
+
+            <button onclick="openNewGuideModal()" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-bold rounded-xl transition-all shadow-md flex items-center gap-2">
+                <i class="fa-solid fa-plus"></i>
+                <span>افزودن نرم‌افزار جدید</span>
+            </button>
+        </div>
     </div>
 
     <!-- Grouped by platform -->
