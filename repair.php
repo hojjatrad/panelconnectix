@@ -17,9 +17,14 @@ if (isset($_GET['dump_clients'])) {
     require_once __DIR__ . '/core/Database.php';
     $pdo = Database::getConnection();
     $rows = $pdo->query("SELECT id, name, driver, config_template, sub_domain FROM server_nodes")->fetchAll(PDO::FETCH_ASSOC);
-    $clients = $pdo->query("SELECT id, username, password, server_id, sub_token, node_sublink, traffic_limit_bytes, traffic_used_bytes, expire_at, status FROM clients WHERE traffic_used_bytes > 0 ORDER BY traffic_used_bytes DESC")->fetchAll(PDO::FETCH_ASSOC);
+    $allClients = $pdo->query("SELECT id, username, traffic_limit_bytes, traffic_used_bytes, expire_at, status FROM clients ORDER BY id ASC LIMIT 10")->fetchAll(PDO::FETCH_ASSOC);
+    $clientsWithTraffic = $pdo->query("SELECT id, username, traffic_limit_bytes, traffic_used_bytes, expire_at, status FROM clients WHERE traffic_used_bytes > 0 ORDER BY traffic_used_bytes DESC")->fetchAll(PDO::FETCH_ASSOC);
     $totalClients = (int)$pdo->query("SELECT COUNT(*) FROM clients")->fetchColumn();
-    echo json_encode(['servers' => $rows, 'total_clients' => $totalClients, 'clients_with_traffic' => $clients], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    echo json_encode([
+        'total_clients' => $totalClients,
+        'all_sample' => $allClients,
+        'clients_with_traffic' => $clientsWithTraffic
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
     exit;
 }
 
