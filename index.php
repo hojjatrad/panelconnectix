@@ -451,6 +451,8 @@ $router->post('tickets/store', [TicketController::class, 'store']);
 $router->get('tickets/show', [TicketController::class, 'show']);
 $router->post('tickets/reply', [TicketController::class, 'reply']);
 $router->post('tickets/close', [TicketController::class, 'close']);
+$router->post('tickets/bulk-close', [TicketController::class, 'bulkClose']);
+$router->post('tickets/bulk-action', [TicketController::class, 'bulkAction']);
 $router->post('tickets/ai-draft/send', [TicketController::class, 'aiDraftSend']);
 $router->post('tickets/ai-draft/discard', [TicketController::class, 'aiDraftDiscard']);
 

@@ -11,15 +11,15 @@ class TicketController {
         $pdo = Database::getConnection();
         $user = Auth::user();
 
-        if (Auth::isAdmin()) {
-            $statusFilter = trim($_GET['status'] ?? '');
-            $where = "1=1";
-            $params = [];
-            if (!empty($statusFilter)) {
-                $where .= " AND t.status = ?";
-                $params[] = $statusFilter;
-            }
+        $statusFilter = trim($_GET['status'] ?? '');
+        $where = "1=1";
+        $params = [];
+        if (!empty($statusFilter)) {
+            $where .= " AND t.status = ?";
+            $params[] = $statusFilter;
+        }
 
+        if (Auth::isAdmin()) {
             $stmt = $pdo->prepare("SELECT t.*, u.username, u.full_name, u.brand_name,
                                           (SELECT COUNT(*) FROM ticket_messages WHERE ticket_id = t.id) as msg_count
                                    FROM tickets t
@@ -34,15 +34,50 @@ class TicketController {
                                      END, t.updated_at DESC");
             $stmt->execute($params);
             $tickets = $stmt->fetchAll();
+
+            $countsRow = $pdo->query("SELECT 
+                COUNT(*) as total,
+                SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END) as count_open,
+                SUM(CASE WHEN status = 'answered' THEN 1 ELSE 0 END) as count_answered,
+                SUM(CASE WHEN status = 'waiting_reseller' THEN 1 ELSE 0 END) as count_waiting,
+                SUM(CASE WHEN status = 'closed' THEN 1 ELSE 0 END) as count_closed
+                FROM tickets")->fetch(PDO::FETCH_ASSOC);
         } else {
+            $whereUser = $where . " AND t.user_id = ?";
+            $paramsUser = array_merge($params, [$user['id']]);
+
             $stmt = $pdo->prepare("SELECT t.*, 
                                           (SELECT COUNT(*) FROM ticket_messages WHERE ticket_id = t.id) as msg_count
                                    FROM tickets t
-                                   WHERE t.user_id = ?
-                                   ORDER BY t.updated_at DESC");
-            $stmt->execute([$user['id']]);
+                                   WHERE $whereUser
+                                   ORDER BY 
+                                     CASE t.status 
+                                       WHEN 'open' THEN 1 
+                                       WHEN 'waiting_reseller' THEN 2 
+                                       WHEN 'answered' THEN 3 
+                                       ELSE 4 
+                                     END, t.updated_at DESC");
+            $stmt->execute($paramsUser);
             $tickets = $stmt->fetchAll();
+
+            $stC = $pdo->prepare("SELECT 
+                COUNT(*) as total,
+                SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END) as count_open,
+                SUM(CASE WHEN status = 'answered' THEN 1 ELSE 0 END) as count_answered,
+                SUM(CASE WHEN status = 'waiting_reseller' THEN 1 ELSE 0 END) as count_waiting,
+                SUM(CASE WHEN status = 'closed' THEN 1 ELSE 0 END) as count_closed
+                FROM tickets WHERE user_id = ?");
+            $stC->execute([$user['id']]);
+            $countsRow = $stC->fetch(PDO::FETCH_ASSOC);
         }
+
+        $counts = [
+            'all' => (int)($countsRow['total'] ?? 0),
+            'open' => (int)($countsRow['count_open'] ?? 0),
+            'answered' => (int)($countsRow['count_answered'] ?? 0),
+            'waiting_reseller' => (int)($countsRow['count_waiting'] ?? 0),
+            'closed' => (int)($countsRow['count_closed'] ?? 0),
+        ];
 
         require __DIR__ . '/../views/tickets/index.php';
     }
@@ -280,5 +315,124 @@ class TicketController {
         $pdo->prepare("UPDATE tickets SET status = 'closed', updated_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$id]);
         Helpers::flash('info', "تیکت شماره #{$id} بسته شد.");
         Helpers::redirect('tickets/show?id=' . $id);
+    }
+
+    public function bulkClose(): void {
+        Auth::requireLogin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
+            Helpers::redirect('tickets');
+        }
+
+        $ids = $_POST['selected_ids'] ?? [];
+        if (empty($ids) || !is_array($ids)) {
+            Helpers::flash('error', 'هیچ تیکتی جهت بستن انتخاب نشده است.');
+            Helpers::redirect('tickets');
+        }
+
+        $ticketIds = array_map('intval', array_filter($ids, 'is_numeric'));
+        if (empty($ticketIds)) {
+            Helpers::flash('error', 'شناسه تیکت‌های انتخابی نامعتبر است.');
+            Helpers::redirect('tickets');
+        }
+
+        $pdo = Database::getConnection();
+        $placeholders = implode(',', array_fill(0, count($ticketIds), '?'));
+
+        if (Auth::isAdmin()) {
+            $stmt = $pdo->prepare("UPDATE tickets SET status = 'closed', updated_at = CURRENT_TIMESTAMP WHERE id IN ($placeholders) AND status != 'closed'");
+            $stmt->execute($ticketIds);
+            $count = $stmt->rowCount();
+        } else {
+            $userId = Auth::id();
+            $stmt = $pdo->prepare("UPDATE tickets SET status = 'closed', updated_at = CURRENT_TIMESTAMP WHERE id IN ($placeholders) AND user_id = ? AND status != 'closed'");
+            $stmt->execute(array_merge($ticketIds, [$userId]));
+            $count = $stmt->rowCount();
+        }
+
+        Helpers::logActivity('ticket_bulk_close', "بستن گروهی {$count} تیکت پشتیبانی", 'ticket');
+        Helpers::flash('success', "تعداد {$count} تیکت با موفقیت بسته شد.");
+        Helpers::redirect('tickets');
+    }
+
+    public function bulkAction(): void {
+        Auth::requireLogin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
+            Helpers::redirect('tickets');
+        }
+
+        $action = trim($_POST['bulk_action'] ?? '');
+        $ids = $_POST['selected_ids'] ?? [];
+
+        if (empty($action) || empty($ids) || !is_array($ids)) {
+            Helpers::flash('error', 'هیچ تیکت یا عملیاتی انتخاب نشده است.');
+            Helpers::redirect('tickets');
+        }
+
+        $ticketIds = array_map('intval', array_filter($ids, 'is_numeric'));
+        if (empty($ticketIds)) {
+            Helpers::flash('error', 'شناسه‌های انتخابی معتبر نیستند.');
+            Helpers::redirect('tickets');
+        }
+
+        $pdo = Database::getConnection();
+        $placeholders = implode(',', array_fill(0, count($ticketIds), '?'));
+        $isAdmin = Auth::isAdmin();
+        $userId = Auth::id();
+
+        switch ($action) {
+            case 'close':
+                if ($isAdmin) {
+                    $stmt = $pdo->prepare("UPDATE tickets SET status = 'closed', updated_at = CURRENT_TIMESTAMP WHERE id IN ($placeholders) AND status != 'closed'");
+                    $stmt->execute($ticketIds);
+                } else {
+                    $stmt = $pdo->prepare("UPDATE tickets SET status = 'closed', updated_at = CURRENT_TIMESTAMP WHERE id IN ($placeholders) AND user_id = ? AND status != 'closed'");
+                    $stmt->execute(array_merge($ticketIds, [$userId]));
+                }
+                $count = $stmt->rowCount();
+                Helpers::logActivity('ticket_bulk_close', "بستن گروهی {$count} تیکت پشتیبانی", 'ticket');
+                Helpers::flash('success', "تعداد {$count} تیکت با موفقیت بسته شد.");
+                break;
+
+            case 'reopen':
+                if ($isAdmin) {
+                    $stmt = $pdo->prepare("UPDATE tickets SET status = 'open', updated_at = CURRENT_TIMESTAMP WHERE id IN ($placeholders) AND status = 'closed'");
+                    $stmt->execute($ticketIds);
+                } else {
+                    $stmt = $pdo->prepare("UPDATE tickets SET status = 'open', updated_at = CURRENT_TIMESTAMP WHERE id IN ($placeholders) AND user_id = ? AND status = 'closed'");
+                    $stmt->execute(array_merge($ticketIds, [$userId]));
+                }
+                $count = $stmt->rowCount();
+                Helpers::logActivity('ticket_bulk_reopen', "بازگشایی مجدد {$count} تیکت پشتیبانی", 'ticket');
+                Helpers::flash('success', "تعداد {$count} تیکت مجدداً بازگشایی شد.");
+                break;
+
+            case 'delete':
+                if (!$isAdmin) {
+                    Helpers::flash('error', 'حذف تیکت‌ها تنها در اختیار مدیریت کل است.');
+                    Helpers::redirect('tickets');
+                }
+                $pdo->beginTransaction();
+                try {
+                    $pdo->prepare("DELETE FROM ticket_messages WHERE ticket_id IN ($placeholders)")->execute($ticketIds);
+                    $stmt = $pdo->prepare("DELETE FROM tickets WHERE id IN ($placeholders)");
+                    $stmt->execute($ticketIds);
+                    $count = $stmt->rowCount();
+                    $pdo->commit();
+                    Helpers::logActivity('ticket_bulk_delete', "حذف گروهی {$count} تیکت پشتیبانی", 'ticket');
+                    Helpers::flash('success', "تعداد {$count} تیکت و پیام‌های مربوطه به طور کامل حذف شدند.");
+                } catch (Throwable $e) {
+                    $pdo->rollBack();
+                    Helpers::flash('error', 'خطا در حذف گروهی: ' . $e->getMessage());
+                }
+                break;
+
+            default:
+                Helpers::flash('error', 'عملیات انتخابی معتبر نیست.');
+                break;
+        }
+
+        Helpers::redirect('tickets');
     }
 }
