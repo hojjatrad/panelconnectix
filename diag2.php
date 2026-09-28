@@ -144,6 +144,45 @@ try {
     require_once __DIR__ . '/config.php';
     require_once __DIR__ . '/core/Database.php';
     $pdo = Database::getConnection();
+
+    $clCount = (int)$pdo->query("SELECT COUNT(*) FROM clients")->fetchColumn();
+    $servers = $pdo->query("SELECT id, name, driver, api_url, is_active FROM server_nodes")->fetchAll(PDO::FETCH_ASSOC);
+
+    $nodeDiagnostics = [];
+    require_once __DIR__ . '/drivers/DriverFactory.php';
+    foreach ($servers as $s) {
+        $diagItem = [
+            'id' => $s['id'],
+            'name' => $s['name'],
+            'driver' => $s['driver'],
+            'is_active' => $s['is_active'],
+            'api_url' => $s['api_url'],
+        ];
+        if (!empty($s['driver']) && $s['driver'] !== 'mock' && $s['is_active']) {
+            try {
+                $driver = DriverFactory::create($s);
+                $auth = $driver->authenticate();
+                $diagItem['auth'] = $auth;
+                if ($auth) {
+                    $users = $driver->listUsers();
+                    $diagItem['users_count'] = count($users);
+                    $diagItem['sample_users'] = array_slice(array_column($users, 'username'), 0, 5);
+                } else {
+                    $diagItem['auth_error'] = $driver->getLastError();
+                }
+            } catch (Throwable $e) {
+                $diagItem['error'] = $e->getMessage();
+            }
+        }
+        $nodeDiagnostics[] = $diagItem;
+    }
+
+    $out['db_state'] = [
+        'clients_count' => $clCount,
+        'servers_count' => count($servers),
+        'nodes' => $nodeDiagnostics,
+    ];
+
     $cl = $pdo->query("SELECT * FROM clients ORDER BY id DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
     if ($cl) {
         require_once __DIR__ . '/controllers/ApiControllerV2.php';
