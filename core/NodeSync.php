@@ -83,6 +83,9 @@ class NodeSync {
                 SET traffic_limit_bytes = ?, traffic_used_bytes = ?, expire_at = ?, status = ?, node_sublink = ?
               WHERE id = ?"
         );
+        $stTrafficOnly = $pdo->prepare(
+            "UPDATE clients SET traffic_used_bytes = ? WHERE id = ?"
+        );
 
         foreach ($users as $u) {
             $username = trim((string)($u['username'] ?? ''));
@@ -100,8 +103,9 @@ class NodeSync {
             try {
                 if ($row) {
                     if (empty($row['node_sync'])) {
-                        // Panel-managed client — panel is source of truth, do not touch
-                        $stats['skipped']++;
+                        // Panel-managed client — update live traffic without changing plan attribution
+                        $stTrafficOnly->execute([$used, (int)$row['id']]);
+                        $stats['updated']++;
                         continue;
                     }
                     $stUpd->execute([$limit, $used, $expireAt, $status, $nodeSub, (int)$row['id']]);

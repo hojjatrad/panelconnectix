@@ -654,54 +654,46 @@ class ServerController {
         Auth::requireAdmin();
         $pdo = Database::getConnection();
 
-        // 1. First run NodeSync to import and re-read all users from the remote servers
+        // 1. First run NodeSync to import and re-read all users and traffic from the remote servers in bulk
         require_once __DIR__ . '/../core/NodeSync.php';
         $nodeStats = NodeSync::syncAll($pdo);
 
-        $stmt = $pdo->query("SELECT c.*, s.name as server_name, s.driver as server_driver, s.api_url, s.api_username, s.api_password, s.api_token,
-                                    rp.id as reserved_id, rp.traffic_gb as reserved_gb, rp.duration_days as reserved_days
-                             FROM clients c 
-                             JOIN server_nodes s ON c.server_id = s.id 
-                             LEFT JOIN reserved_plans rp ON rp.client_id = c.id AND rp.status = 'queued'
-                             WHERE c.status != 'disabled'");
-        $clients = $stmt->fetchAll();
-
-        $synced = 0;
+        // 2. Check and activate queued reserved plans for clients whose traffic is exhausted
+        $stmtReserved = $pdo->query("SELECT c.*, s.name as server_name, s.driver as server_driver, s.api_url, s.api_username, s.api_password, s.api_token,
+                                            rp.id as reserved_id, rp.traffic_gb as reserved_gb, rp.duration_days as reserved_days
+                                     FROM clients c 
+                                     JOIN server_nodes s ON c.server_id = s.id 
+                                     JOIN reserved_plans rp ON rp.client_id = c.id AND rp.status = 'queued'
+                                     WHERE c.status != 'disabled' 
+                                       AND (c.traffic_used_bytes >= c.traffic_limit_bytes OR (c.expire_at IS NOT NULL AND c.expire_at <= CURRENT_TIMESTAMP))");
+        $reservedClients = $stmtReserved ? $stmtReserved->fetchAll() : [];
         $reservedActivated = 0;
 
-        foreach ($clients as $c) {
+        foreach ($reservedClients as $c) {
             try {
                 $driver = DriverFactory::create($c);
-                $remoteData = $driver->getUser($c['username']);
-                if ($remoteData && isset($remoteData['traffic_used_bytes'])) {
-                    $pdo->prepare("UPDATE clients SET traffic_used_bytes = ? WHERE id = ?")->execute([$remoteData['traffic_used_bytes'], $c['id']]);
-                    $c['traffic_used_bytes'] = $remoteData['traffic_used_bytes'];
-                }
-
-                $isTrafficDone = ($c['traffic_used_bytes'] >= $c['traffic_limit_bytes']);
-                $isTimeDone = (!empty($c['expire_at']) && strtotime($c['expire_at']) <= time());
-
-                if (($isTrafficDone || $isTimeDone) && !empty($c['reserved_id'])) {
-                    $addBytes = (int)$c['reserved_gb'] * 1024 * 1024 * 1024;
-                    $newExpire = date('Y-m-d H:i:s', time() + ($c['reserved_days'] * 86400));
-                    $pdo->prepare("UPDATE clients SET traffic_limit_bytes = traffic_limit_bytes + ?, expire_at = ?, status = 'active' WHERE id = ?")
-                        ->execute([$addBytes, $newExpire, $c['id']]);
-                    $pdo->prepare("UPDATE reserved_plans SET status = 'applied', applied_at = CURRENT_TIMESTAMP WHERE id = ?")
-                        ->execute([$c['reserved_id']]);
-                    $driver->extendUser($c['username'], $addBytes, $c['reserved_days'] * 86400);
-                    $reservedActivated++;
-                }
-                $synced++;
+                $addBytes = (int)$c['reserved_gb'] * 1024 * 1024 * 1024;
+                $newExpire = date('Y-m-d H:i:s', time() + ($c['reserved_days'] * 86400));
+                $pdo->prepare("UPDATE clients SET traffic_limit_bytes = traffic_limit_bytes + ?, expire_at = ?, status = 'active' WHERE id = ?")
+                    ->execute([$addBytes, $newExpire, $c['id']]);
+                $pdo->prepare("UPDATE reserved_plans SET status = 'applied', applied_at = CURRENT_TIMESTAMP WHERE id = ?")
+                    ->execute([$c['reserved_id']]);
+                $driver->extendUser($c['username'], $addBytes, $c['reserved_days'] * 86400);
+                $reservedActivated++;
             } catch (Throwable $e) {}
         }
 
+        $errText = !empty($nodeStats['errors']) ? ' (خطا: ' . implode(' | ', array_slice($nodeStats['errors'], 0, 2)) . ')' : '';
         $msg = sprintf(
-            "همگام‌سازی و بازخوانی از سرورها با موفقیت انجام شد: %d کلاینت از سرورها اضافه یا همگام شد، %d کلاینت بررسی و %d پلن رزرو فعال گردید.",
-            ($nodeStats['added'] + $nodeStats['updated']),
-            $synced,
-            $reservedActivated
+            "همگام‌سازی و بازخوانی از سرورها با موفقیت انجام شد: %d کاربر اضافه، %d کاربر همگام‌سازی شد و %d پلن رزرو فعال گردید.%s",
+            $nodeStats['added'],
+            $nodeStats['updated'],
+            $reservedActivated,
+            $errText
         );
+        Helpers::logActivity('servers_sync', "بازخوانی از سرورها: {$nodeStats['added']} اضافه، {$nodeStats['updated']} همگام‌سازی", 'server');
         Helpers::flash('success', $msg);
+
         $referer = $_SERVER['HTTP_REFERER'] ?? '';
         if (!empty($referer) && (str_contains($referer, 'clients') || str_contains($referer, 'dashboard'))) {
             header("Location: " . $referer);

@@ -89,6 +89,50 @@ try {
     echo "[Auto Backup Error] " . $e->getMessage() . $eol;
 }
 
+// 2.6 Node Client Sync (bulk mirror live node users & traffic into clients table)
+try {
+    require_once __DIR__ . '/../core/NodeSync.php';
+    $lastNodeSync = (int)Setting::get('last_cron_node_sync', '0');
+    $clientCount = (int)($pdo->query("SELECT COUNT(*) FROM clients")->fetchColumn() ?: 0);
+    $forceNodeSync = isset($_GET['force_node_sync']) || ($clientCount === 0);
+    if ($forceNodeSync || time() - $lastNodeSync >= 120) {
+        Setting::set('last_cron_node_sync', (string)time());
+        $nodeSyncRes = NodeSync::syncAll($pdo);
+        echo "[Node Sync] servers=" . $nodeSyncRes['servers']
+            . " added=" . $nodeSyncRes['added']
+            . " updated=" . $nodeSyncRes['updated']
+            . " skipped=" . $nodeSyncRes['skipped'] . $eol;
+
+        $problem = '';
+        if (!empty($nodeSyncRes['errors'])) {
+            $problem = 'errors: ' . implode(' | ', array_slice($nodeSyncRes['errors'], 0, 5));
+        } elseif ((int)$nodeSyncRes['servers'] === 0) {
+            $problem = 'no active non-mock servers to sync';
+        }
+        if ($problem !== '') {
+            $sig = substr(hash('sha1', $problem), 0, 16);
+            $lastSig = trim((string)Setting::get('last_node_sync_alert_sig', ''));
+            $lastAt  = (int)Setting::get('last_node_sync_alert_at', '0');
+            if ($sig !== $lastSig || (time() - $lastAt) >= 21600) {
+                $errList = !empty($nodeSyncRes['errors'])
+                    ? '- ' . implode("\n- ", array_slice($nodeSyncRes['errors'], 0, 5))
+                    : '- هیچ سرور فعال غیر-موشن (mock)ی برای همگام‌سازی وجود ندارد.';
+                TelegramBot::sendCategorizedReport('servers',
+                    "🔄 <b>هشدار همگام‌سازی کلاینت‌های سرور</b>\n\n" . $errList);
+                Setting::set('last_node_sync_alert_sig', $sig);
+                Setting::set('last_node_sync_alert_at', (string)time());
+            }
+        } elseif (trim((string)Setting::get('last_node_sync_alert_sig', '')) !== '') {
+            Setting::set('last_node_sync_alert_sig', '');
+            Setting::set('last_node_sync_alert_at', '0');
+        }
+    } else {
+        echo "[Node Sync] skipped (throttled, last run " . (time() - $lastNodeSync) . "s ago)." . $eol;
+    }
+} catch (Throwable $e) {
+    echo "[Node Sync Error] " . $e->getMessage() . $eol;
+}
+
 // Fetch active clients and their servers
 $stmt = $pdo->query("SELECT c.*, s.name as server_name, s.driver as server_driver, s.api_url, s.api_username, s.api_password, s.api_token,
                             rp.id as reserved_id, rp.traffic_gb as reserved_gb, rp.duration_days as reserved_days
@@ -104,17 +148,8 @@ $expiredCount = 0;
 
 foreach ($clients as $c) {
     try {
-        $driver = DriverFactory::create($c);
-        $remoteData = $driver->getUser($c['username']);
-
-        if ($remoteData && isset($remoteData['traffic_used_bytes'])) {
-            $usedBytes = $remoteData['traffic_used_bytes'];
-            $pdo->prepare("UPDATE clients SET traffic_used_bytes = ? WHERE id = ?")->execute([$usedBytes, $c['id']]);
-            $c['traffic_used_bytes'] = $usedBytes;
-        }
-
         // 0. First-Connect Activation Check (فعال‌سازی هوشمند با شروع اولین اتصال واقعی)
-        if (!empty($c['start_on_first_use']) && empty($c['first_connected_at']) && ($c['traffic_used_bytes'] > 0 || ($remoteData && !empty($remoteData['online'])))) {
+        if (!empty($c['start_on_first_use']) && empty($c['first_connected_at']) && $c['traffic_used_bytes'] > 0) {
             $days = (int)($c['duration_days'] ?? 30);
             if ($days <= 0) $days = 30;
             $newExpire = date('Y-m-d H:i:s', time() + ($days * 86400));
@@ -122,6 +157,7 @@ foreach ($clients as $c) {
             $c['first_connected_at'] = date('Y-m-d H:i:s');
             $c['expire_at'] = $newExpire;
             $c['status'] = 'active';
+            $driver = DriverFactory::create($c);
             $driver->extendUser($c['username'], 0, $days * 86400);
             echo "[First Use Activated] Client {$c['username']} started {$days}-day validity." . $eol;
         }
@@ -415,57 +451,6 @@ if ($forceCheck || (time() - $lastUpdateCheck >= 180)) {
     } catch (Throwable $e) {
         echo "[Auto-Update Error] " . $e->getMessage() . $eol;
     }
-}
-
-// 4.5 Node Client Sync (mirror live node users into the clients table every 5 minutes, or immediately if empty/forced)
-try {
-    require_once __DIR__ . '/../core/NodeSync.php';
-    $lastNodeSync = (int)Setting::get('last_cron_node_sync', '0');
-    $clientCount = (int)($pdo->query("SELECT COUNT(*) FROM clients")->fetchColumn() ?: 0);
-    $forceNodeSync = isset($_GET['force_node_sync']) || ($clientCount === 0);
-    if ($forceNodeSync || time() - $lastNodeSync >= 300) {
-        Setting::set('last_cron_node_sync', (string)time());
-        $nodeSyncRes = NodeSync::syncAll($pdo);
-        echo "[Node Sync] servers=" . $nodeSyncRes['servers']
-            . " added=" . $nodeSyncRes['added']
-            . " updated=" . $nodeSyncRes['updated']
-            . " skipped=" . $nodeSyncRes['skipped'] . $eol;
-
-        // Visible alert when node sync is broken or has nothing to sync.
-        // (Previously failures were only echoed to the cron log, so a deleted
-        // server row or a changed API key made node clients "vanish" silently.)
-        // De-duplicated by problem signature, at most once per 6 hours.
-        $problem = '';
-        if (!empty($nodeSyncRes['errors'])) {
-            $problem = 'errors: ' . implode(' | ', array_slice($nodeSyncRes['errors'], 0, 5));
-        } elseif ((int)$nodeSyncRes['servers'] === 0) {
-            $problem = 'no active non-mock servers to sync';
-        }
-        if ($problem !== '') {
-            $sig = substr(hash('sha1', $problem), 0, 16);
-            $lastSig = trim((string)Setting::get('last_node_sync_alert_sig', ''));
-            $lastAt  = (int)Setting::get('last_node_sync_alert_at', '0');
-            if ($sig !== $lastSig || (time() - $lastAt) >= 21600) {
-                $errList = !empty($nodeSyncRes['errors'])
-                    ? '- ' . implode("\n- ", array_slice($nodeSyncRes['errors'], 0, 5))
-                    : '- هیچ سرور فعال غیر-موشن (mock)ی برای همگام‌سازی وجود ندارد.\n- اگر انتظار همگام‌سازی کلاینت‌های سروری مثل پاسارگاد را دارید، مطمئن شوید آن سرور هنوز در «مدیریت سرورها» تعریف و فعال است (driver صحیح + آدرس/کلید API معتبر).';
-                TelegramBot::sendCategorizedReport('servers',
-                    "🔄 <b>هشدار همگام‌سازی کلاینت‌های سرور</b>\n\n" . $errList .
-                    "\n\nتا رفع مشکل، کلاینت‌های مستقیم سرور به‌صورت خودکار در پنل به‌روز نمی‌شوند.");
-                Setting::set('last_node_sync_alert_sig', $sig);
-                Setting::set('last_node_sync_alert_at', (string)time());
-            }
-        } elseif (trim((string)Setting::get('last_node_sync_alert_sig', '')) !== '') {
-            // Healthy sync again — clear the de-dupe state so the next
-            // problem alerts immediately.
-            Setting::set('last_node_sync_alert_sig', '');
-            Setting::set('last_node_sync_alert_at', '0');
-        }
-    } else {
-        echo "[Node Sync] skipped (throttled, last run " . (time() - $lastNodeSync) . "s ago)." . $eol;
-    }
-} catch (Throwable $e) {
-    echo "[Node Sync Error] " . $e->getMessage() . $eol;
 }
 
 // 5. App Release Auto-Publisher (publishes new Android app builds from CI automatically)
