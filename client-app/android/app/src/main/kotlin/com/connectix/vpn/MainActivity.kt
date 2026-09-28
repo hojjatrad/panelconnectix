@@ -25,6 +25,10 @@ class MainActivity: FlutterActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         if (intent.action == "DISCONNECT_VPN_ACTION") {
+            try {
+                val notifMgr = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+                notifMgr?.cancel(NOTIF_ID)
+            } catch (_: Exception) {}
             methodChannel?.invokeMethod("onNotificationDisconnect", null)
         }
     }
@@ -35,6 +39,10 @@ class MainActivity: FlutterActivity() {
         methodChannel = channel
 
         if (intent?.action == "DISCONNECT_VPN_ACTION") {
+            try {
+                val notifMgr = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+                notifMgr?.cancel(NOTIF_ID)
+            } catch (_: Exception) {}
             channel.invokeMethod("onNotificationDisconnect", null)
         }
 

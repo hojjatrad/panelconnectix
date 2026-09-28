@@ -65,7 +65,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Map<String, dynamic>? _updateInfo;
   bool _isCheckingUpdate = false;
 
-  static const String currentAppVersion = '3.4.8';
+  static const String currentAppVersion = '3.4.9';
 
   // "Download over Wi-Fi only" for update packages
   bool _updateWifiOnly = false;
@@ -266,9 +266,23 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   void _initV2Ray() async {
     MethodChannel('com.connectix.vpn/updater').setMethodCallHandler((call) async {
       if (call.method == 'onNotificationDisconnect') {
-        if (_isConnected && mounted) {
-          _toggleConnection();
+        _userIntentionallyDisconnected = true;
+        _reconnectAttempts = 0;
+        try {
+          await _flutterV2ray.stopV2Ray();
+        } catch (_) {}
+        _timer?.cancel();
+        if (mounted) {
+          setState(() {
+            _isConnected = false;
+            _isConnecting = false;
+          });
         }
+        ApiService.updateNotificationStatus(
+          title: '',
+          content: '',
+          isConnected: false,
+        );
       }
     });
 
@@ -297,6 +311,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             } else if (status.state == 'DISCONNECTED') {
               _isConnected = false;
               _isConnecting = false;
+              _userIntentionallyDisconnected = true;
+              _reconnectAttempts = 0;
               _timer?.cancel();
 
               ApiService.updateNotificationStatus(
@@ -304,11 +320,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 content: '',
                 isConnected: false,
               );
-
-              // Failover / Auto-reconnect handling
-              if (!_userIntentionallyDisconnected && _autoReconnectEnabled) {
-                _handleAutoReconnect();
-              }
             }
           });
         }
@@ -322,37 +333,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
   }
 
-  void _handleAutoReconnect() async {
-    if (_userIntentionallyDisconnected) return;
-
-    if (_reconnectAttempts < 3) {
-      _reconnectAttempts++;
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('افت موقت اتصال؛ تلاش برای اتصال پایدار به همین سرور ($_reconnectAttempts از ۳)...'),
-            backgroundColor: const Color(0xFFF59E0B),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
-      await Future.delayed(Duration(seconds: _reconnectAttempts * 2));
-      if (!_isConnected && mounted && !_userIntentionallyDisconnected) {
-        _startTunnel(isReconnect: true);
-      }
-    } else {
-      // Reconnect attempts exhausted — stay cleanly disconnected, NEVER hop to random servers!
-      _reconnectAttempts = 0;
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('اتصال متوقف شد. برای اتصال مجدد دکمه را لمس نمایید یا سرور را بررسی فرمایید.'),
-            backgroundColor: Color(0xFFEF4444),
-            duration: Duration(seconds: 4),
-          ),
-        );
-      }
-    }
+  void _handleAutoReconnect() {
+    _reconnectAttempts = 0;
   }
 
   void _refreshProfile() async {
