@@ -13,6 +13,11 @@ require __DIR__ . '/../layout/header.php';
     </div>
 
     <div class="flex items-center gap-2">
+        <a href="<?= Helpers::url('servers/sync') ?>" class="px-3.5 py-2.5 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 text-xs font-bold rounded-xl transition-all shadow-sm flex items-center gap-1.5" title="بازخوانی و همگام‌سازی لحظه‌ای تمامی کلاینت‌ها از روی سرورها">
+            <i class="fa-solid fa-cloud-arrow-down text-purple-400"></i>
+            <span>بازخوانی از سرورها</span>
+        </a>
+
         <button type="button" onclick="openOptimizerModal()" class="px-3.5 py-2.5 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-xs font-bold rounded-xl transition-all shadow-sm flex items-center gap-1.5" title="پاکسازی و بهینه‌سازی سرویس‌های منقضی و بدون استفاده">
             <i class="fa-solid fa-broom text-rose-400"></i>
             <span>بهینه‌سازی و پاکسازی</span>

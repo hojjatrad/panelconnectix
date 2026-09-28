@@ -654,6 +654,10 @@ class ServerController {
         Auth::requireAdmin();
         $pdo = Database::getConnection();
 
+        // 1. First run NodeSync to import and re-read all users from the remote servers
+        require_once __DIR__ . '/../core/NodeSync.php';
+        $nodeStats = NodeSync::syncAll($pdo);
+
         $stmt = $pdo->query("SELECT c.*, s.name as server_name, s.driver as server_driver, s.api_url, s.api_username, s.api_password, s.api_token,
                                     rp.id as reserved_id, rp.traffic_gb as reserved_gb, rp.duration_days as reserved_days
                              FROM clients c 
@@ -691,8 +695,19 @@ class ServerController {
             } catch (Throwable $e) {}
         }
 
-        Helpers::flash('success', "همگام‌سازی لحظه‌ای با موفقیت انجام شد: {$synced} کلاینت بررسی و {$reservedActivated} پلن رزرو فعال شدند.");
-        Helpers::redirect('servers');
+        $msg = sprintf(
+            "همگام‌سازی و بازخوانی از سرورها با موفقیت انجام شد: %d کلاینت از سرورها اضافه یا همگام شد، %d کلاینت بررسی و %d پلن رزرو فعال گردید.",
+            ($nodeStats['added'] + $nodeStats['updated']),
+            $synced,
+            $reservedActivated
+        );
+        Helpers::flash('success', $msg);
+        $referer = $_SERVER['HTTP_REFERER'] ?? '';
+        if (!empty($referer) && (str_contains($referer, 'clients') || str_contains($referer, 'dashboard'))) {
+            header("Location: " . $referer);
+            exit;
+        }
+        Helpers::redirect('clients');
     }
 
     /**

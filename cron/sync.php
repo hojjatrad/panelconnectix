@@ -417,11 +417,13 @@ if ($forceCheck || (time() - $lastUpdateCheck >= 180)) {
     }
 }
 
-// 4.5 Node Client Sync (mirror live node users into the clients table every 5 minutes)
+// 4.5 Node Client Sync (mirror live node users into the clients table every 5 minutes, or immediately if empty/forced)
 try {
     require_once __DIR__ . '/../core/NodeSync.php';
     $lastNodeSync = (int)Setting::get('last_cron_node_sync', '0');
-    if (time() - $lastNodeSync >= 300) {
+    $clientCount = (int)($pdo->query("SELECT COUNT(*) FROM clients")->fetchColumn() ?: 0);
+    $forceNodeSync = isset($_GET['force_node_sync']) || ($clientCount === 0);
+    if ($forceNodeSync || time() - $lastNodeSync >= 300) {
         Setting::set('last_cron_node_sync', (string)time());
         $nodeSyncRes = NodeSync::syncAll($pdo);
         echo "[Node Sync] servers=" . $nodeSyncRes['servers']
