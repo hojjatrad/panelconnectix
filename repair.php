@@ -775,19 +775,22 @@ if (isset($_GET['restore_traffic']) || isset($_POST['restore_traffic'])) {
 
             preg_match_all("/INSERT INTO `clients`.*?VALUES\s*\((.*?)\);/s", $sql, $matches);
             $pdo = Database::getConnection();
-            $stUpdate = $pdo->prepare("UPDATE clients SET traffic_used_bytes = ?, status = ?, expire_at = ? WHERE id = ?");
+            $stUpdate = $pdo->prepare("UPDATE clients SET traffic_used_bytes = ?, status = ?, expire_at = ? WHERE username = ? OR id = ?");
 
             $pdo->beginTransaction();
             $restoredCount = 0;
             foreach ($matches[1] as $valStr) {
                 $vals = str_getcsv($valStr, ',', "'");
                 $cId = (int)($vals[$idIdx] ?? 0);
+                $uName = trim((string)($vals[$userIdx] ?? ''));
                 $used = (int)($vals[$usedIdx] ?? 0);
                 $status = $vals[$statusIdx] ?? 'active';
                 $expire = !empty($vals[$expireIdx]) && $vals[$expireIdx] !== 'NULL' ? $vals[$expireIdx] : null;
 
-                $stUpdate->execute([$used, $status, $expire, $cId]);
-                $restoredCount++;
+                if (!empty($uName) || $cId > 0) {
+                    $stUpdate->execute([$used, $status, $expire, $uName, $cId]);
+                    $restoredCount++;
+                }
             }
             $pdo->commit();
             $trafficRestoreMsg = "<div class='p-3 bg-emerald-950/80 border border-emerald-800 text-emerald-200 rounded-xl text-xs'>✅ میزان مصرف ترافیک و وضعیت {$restoredCount} کلاینت با موفقیت از بکاپ پایدار بازیابی شد!</div>";
