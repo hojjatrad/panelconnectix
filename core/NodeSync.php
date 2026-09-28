@@ -102,13 +102,18 @@ class NodeSync {
 
             try {
                 if ($row) {
+                    $curUsed = (int)($row['traffic_used_bytes'] ?? 0);
+                    $effectiveUsed = max($curUsed, $used);
+
                     if (empty($row['node_sync'])) {
-                        // Panel-managed client — update live traffic without changing plan attribution
-                        $stTrafficOnly->execute([$used, (int)$row['id']]);
+                        // Panel-managed client — update live traffic only if increased
+                        if ($effectiveUsed > $curUsed) {
+                            $stTrafficOnly->execute([$effectiveUsed, (int)$row['id']]);
+                        }
                         $stats['updated']++;
                         continue;
                     }
-                    $stUpd->execute([$limit, $used, $expireAt, $status, $nodeSub, (int)$row['id']]);
+                    $stUpd->execute([$limit, $effectiveUsed, $expireAt, $status, $nodeSub, (int)$row['id']]);
                     $stats['updated']++;
                 } else {
                     $insParams = [
