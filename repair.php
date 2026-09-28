@@ -11,6 +11,85 @@ define('CONNECTIX_REPAIR', true);
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
+if (isset($_GET['restore_traffic'])) {
+    header('Content-Type: application/json; charset=utf-8');
+    require_once __DIR__ . '/config.php';
+    require_once __DIR__ . '/core/Database.php';
+    $pdo = Database::getConnection();
+
+    $targetZip = '/tmp/connectix_backups/connectix_backup_2026-09-28_12-00-42.zip';
+    if (!file_exists($targetZip)) {
+        $zips = glob('/tmp/connectix_backups/*.zip') ?: [];
+        rsort($zips);
+        foreach ($zips as $z) {
+            if (str_contains($z, '2026-09-28_12-00') || str_contains($z, '2026-09-28_11-5')) {
+                $targetZip = $z;
+                break;
+            }
+        }
+    }
+
+    $updated = [];
+    $errors = [];
+    $cols = [];
+    $usedIdx = null;
+    $userIdx = null;
+
+    if (file_exists($targetZip)) {
+        $zip = new ZipArchive();
+        if ($zip->open($targetZip) === true) {
+            $sql = $zip->getFromIndex(0);
+            $zip->close();
+
+            preg_match('/INSERT INTO `clients` \((.*?)\) VALUES/s', $sql, $colsM);
+            $cols = array_map(function($c) { return trim($c, " `\t\n\r"); }, explode(',', $colsM[1] ?? ''));
+            $usedIdx = array_search('traffic_used_bytes', $cols);
+            $userIdx = array_search('username', $cols);
+            $statusIdx = array_search('status', $cols);
+            $expireIdx = array_search('expire_at', $cols);
+
+            preg_match_all("/INSERT INTO `clients`.*?VALUES\s*\((.*?)\);/s", $sql, $matches);
+            $stUpd = $pdo->prepare("UPDATE clients SET traffic_used_bytes = ?, status = ?, expire_at = ? WHERE username = ?");
+
+            $pdo->beginTransaction();
+            foreach ($matches[1] as $valStr) {
+                $vals = str_getcsv($valStr, ',', "'");
+                $uName = trim((string)($vals[$userIdx] ?? ''));
+                $used = (int)($vals[$usedIdx] ?? 0);
+                $status = $vals[$statusIdx] ?? 'active';
+                $expire = !empty($vals[$expireIdx]) && $vals[$expireIdx] !== 'NULL' ? $vals[$expireIdx] : null;
+
+                if (!empty($uName)) {
+                    try {
+                        $stUpd->execute([$used, $status, $expire, $uName]);
+                        if ($stUpd->rowCount() > 0) {
+                            $updated[$uName] = [
+                                'used_bytes' => $used,
+                                'used_gb' => round($used / (1024*1024*1024), 2),
+                                'status' => $status
+                            ];
+                        }
+                    } catch (Throwable $e) {
+                        $errors[] = $uName . ': ' . $e->getMessage();
+                    }
+                }
+            }
+            $pdo->commit();
+        }
+    }
+
+    echo json_encode([
+        'zip' => basename($targetZip),
+        'cols' => $cols,
+        'usedIdx' => $usedIdx,
+        'userIdx' => $userIdx,
+        'updated_count' => count($updated),
+        'errors' => $errors,
+        'sample_updated' => array_slice($updated, 0, 10),
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 if (isset($_GET['dump_clients'])) {
     header('Content-Type: application/json; charset=utf-8');
     require_once __DIR__ . '/config.php';

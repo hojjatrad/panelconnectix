@@ -418,7 +418,9 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
                     $driver = DriverFactory::create($node);
                     $liveData = $driver->getUser($client['username']);
                     if ($liveData) {
-                        $liveUsed = (int)($liveData['traffic_used_bytes'] ?? $client['traffic_used_bytes']);
+                        $curUsed = (int)($client['traffic_used_bytes'] ?? 0);
+                        $nodeUsed = (int)($liveData['traffic_used_bytes'] ?? 0);
+                        $liveUsed = max($curUsed, $nodeUsed);
                         $liveLimit = (int)($liveData['traffic_limit_bytes'] ?? $client['traffic_limit_bytes']);
                         $liveExpire = !empty($liveData['expire_at']) ? $liveData['expire_at'] : $client['expire_at'];
                         
