@@ -214,7 +214,7 @@ class ClientController {
         $trafficBytes = $plan['traffic_gb'] * 1024 * 1024 * 1024;
         $expireAt = date('Y-m-d H:i:s', strtotime("+{$plan['duration_days']} days"));
         $expireTimestamp = strtotime($expireAt);
-        $ipLimit = isset($_POST['ip_limit']) ? max(0, (int)$_POST['ip_limit']) : (int)($plan['ip_limit'] ?? 2);
+        $ipLimit = isset($_POST['ip_limit']) && $_POST['ip_limit'] !== '' ? max(0, (int)$_POST['ip_limit']) : (int)($plan['ip_limit'] ?? 0);
 
         // 1. Provision on Remote Server Node via Driver
         $driver = DriverFactory::create($server);
@@ -224,7 +224,8 @@ class ClientController {
             'uuid' => $uuid,
             'sub_token' => $subToken,
             'traffic_limit_bytes' => $trafficBytes,
-            'expire_timestamp' => $expireTimestamp
+            'expire_timestamp' => $expireTimestamp,
+            'ip_limit' => $ipLimit
         ];
 
         $driverResult = $driver->createUser($driverPayload);
@@ -236,7 +237,7 @@ class ClientController {
         // First-Connect Calculation & Status
         $startOnFirstUse = !empty($plan['start_on_first_use']) || !empty($_POST['start_on_first_use']);
         $durationDays = (int)($plan['duration_days'] ?? 30);
-        $maxDevices = max(1, (int)($plan['max_devices'] ?? $ipLimit ?? 2));
+        $maxDevices = max(0, (int)($plan['max_devices'] ?? $ipLimit ?? 0));
 
         if ($startOnFirstUse) {
             $expireAt = null;
@@ -355,7 +356,7 @@ class ClientController {
         $expireAt = !empty($_POST['expire_at']) ? trim($_POST['expire_at']) : null;
         $telegramChatId = !empty($_POST['telegram_chat_id']) ? trim($_POST['telegram_chat_id']) : null;
         $customNote = trim($_POST['custom_note'] ?? ($client['custom_note'] ?? ''));
-        $ipLimit = max(0, (int)($_POST['ip_limit'] ?? ($client['ip_limit'] ?? 2)));
+        $ipLimit = isset($_POST['ip_limit']) && $_POST['ip_limit'] !== '' ? max(0, (int)$_POST['ip_limit']) : (int)($client['ip_limit'] ?? 0);
         $nodeSublink = !empty($_POST['node_sublink']) ? trim($_POST['node_sublink']) : ($client['node_sublink'] ?? null);
         if ($nodeSublink && str_contains($nodeSublink, 'montago-shop.ir')) {
             $nodeSublink = preg_replace('#https?://[^/]+#i', 'https://sub.speedur.org:2096', $nodeSublink);
@@ -938,8 +939,9 @@ class ClientController {
 
             // Database insert
             $stmtInsert = $pdo->prepare("INSERT INTO clients (reseller_id, server_id, plan_id, username, password, uuid, sub_token, traffic_limit_bytes, traffic_used_bytes, expire_at, ip_limit, max_devices, start_on_first_use, duration_days, status, custom_note) 
-                                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 2, 2, 1, ?, 'active', ?)");
-            $stmtInsert->execute([$targetResellerId, $serverId, $planId, $username, $password, $uuid, $subToken, $trafficBytes, $expireAt, $durationDays, "ساخت گروهی دسته {$count} تایی"]);
+                                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, 1, ?, 'active', ?)");
+            $planIpLimit = max(0, (int)($plan['ip_limit'] ?? 0));
+            $stmtInsert->execute([$targetResellerId, $serverId, $planId, $username, $password, $uuid, $subToken, $trafficBytes, $expireAt, $planIpLimit, $planIpLimit, $durationDays, "ساخت گروهی دسته {$count} تایی"]);
 
             $subUrl = Helpers::subUrl($subToken);
             $createdAccounts[] = [

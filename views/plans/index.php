@@ -169,7 +169,7 @@ foreach ($customPlanCats as $idx => $custCat) {
                         <?php endif; ?>
                         <div class="flex justify-between text-slate-400">
                             <span>سقف اتصال همزمان:</span>
-                            <span class="font-bold text-purple-300 font-mono"><?= ($p['ip_limit'] ?? 2) > 0 ? ($p['ip_limit'] ?? 2) . ' دستگاه' : 'نامحدود' ?></span>
+                            <span class="font-bold text-purple-300 font-mono"><?= !empty($p['ip_limit']) && (int)$p['ip_limit'] > 0 ? ((int)$p['ip_limit'] . ' دستگاه') : 'نامحدود' ?></span>
                         </div>
                         <div class="flex justify-between text-slate-400">
                             <span>خوشه / سرور:</span>
@@ -371,7 +371,8 @@ foreach ($customPlanCats as $idx => $custCat) {
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="block text-slate-300 mb-1 font-semibold">سقف اتصال همزمان (کاربر/IP)</label>
-                    <input type="number" name="ip_limit" required min="0" value="2" placeholder="0 = نامحدود" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
+                    <input type="number" name="ip_limit" required min="0" value="0" placeholder="0 = نامحدود" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
+                    <span class="text-[10px] text-slate-500 mt-1 block">مقدار 0 یعنی نامحدود (بدون سقف کاربر)</span>
                 </div>
                 <div>
                     <label class="block text-slate-300 mb-1 font-semibold">قیمت پایه فروش عادی (تومان)</label>
@@ -536,7 +537,8 @@ foreach ($customPlanCats as $idx => $custCat) {
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="block text-slate-300 mb-1 font-semibold">سقف اتصال همزمان (کاربر/IP)</label>
-                    <input type="number" name="ip_limit" id="edit_ip_limit" required min="0" value="2" placeholder="0 = نامحدود" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
+                    <input type="number" name="ip_limit" id="edit_ip_limit" required min="0" value="0" placeholder="0 = نامحدود" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
+                    <span class="text-[10px] text-slate-500 mt-1 block">مقدار 0 یعنی نامحدود</span>
                 </div>
                 <div>
                     <label class="block text-slate-300 mb-1 font-semibold">قیمت پایه فروش عادی (تومان)</label>
@@ -655,7 +657,7 @@ foreach ($customPlanCats as $idx => $custCat) {
         updateEditHelper();
 
         document.getElementById('edit_duration_days').value = p.duration_days;
-        document.getElementById('edit_ip_limit').value = p.ip_limit ?? 2;
+        document.getElementById('edit_ip_limit').value = p.ip_limit ?? 0;
         document.getElementById('edit_base_price').value = p.base_price;
         document.getElementById('edit_reseller_price').value = p.reseller_price;
         document.getElementById('edit_show_in_bot').checked = (parseInt(p.show_in_bot ?? 1) === 1);

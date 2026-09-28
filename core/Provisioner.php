@@ -71,6 +71,8 @@ class Provisioner {
         $trafficBytes = (int)$plan['traffic_gb'] * 1024 * 1024 * 1024;
         $expireAt = date('Y-m-d H:i:s', strtotime("+{$plan['duration_days']} days"));
         $expireTimestamp = strtotime($expireAt);
+        $ipLimit = max(0, (int)($plan['ip_limit'] ?? 0));
+        $maxDevices = max(0, (int)($plan['max_devices'] ?? $ipLimit));
 
         // 1. Provision on remote node
         $nodeSublink = null;
@@ -83,6 +85,7 @@ class Provisioner {
                 'sub_token' => $subToken,
                 'traffic_limit_bytes' => $trafficBytes,
                 'expire_timestamp' => $expireTimestamp,
+                'ip_limit' => $ipLimit,
                 'selected_inbounds' => $server['selected_inbounds'] ?? null
             ];
             $driverResult = $driver->createUser($driverPayload);
@@ -103,8 +106,8 @@ class Provisioner {
         // 2. Insert into database
         try {
             $stmt = $pdo->prepare("INSERT INTO clients 
-                (reseller_id, server_id, plan_id, username, password, uuid, sub_token, node_sublink, traffic_limit_bytes, traffic_used_bytes, expire_at, status, custom_note, telegram_chat_id) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'active', ?, ?)");
+                (reseller_id, server_id, plan_id, username, password, uuid, sub_token, node_sublink, traffic_limit_bytes, traffic_used_bytes, expire_at, ip_limit, max_devices, status, custom_note, telegram_chat_id) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, 'active', ?, ?)");
             $stmt->execute([
                 $resellerId,
                 $server['id'],
@@ -116,6 +119,8 @@ class Provisioner {
                 $nodeSublink,
                 $trafficBytes,
                 $expireAt,
+                $ipLimit,
+                $maxDevices,
                 $customNote,
                 $telegramChatId
             ]);
@@ -136,6 +141,8 @@ class Provisioner {
                 'links' => $driverResult['links'] ?? [],
                 'expire_at' => $expireAt,
                 'traffic_gb' => $plan['traffic_gb'],
+                'ip_limit' => $ipLimit,
+                'max_devices' => $maxDevices,
                 'server_id' => (int)$server['id'],
                 'server_name' => $server['name']
             ];

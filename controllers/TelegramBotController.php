@@ -963,7 +963,7 @@ class TelegramBotController {
      * Render Order Invoice with Clean 2-Column Action Buttons
      */
     private static function renderOrderInvoice(PDO $pdo, int $orderId, string $chatId, ?int $messageId = null, ?string $botToken = null): void {
-        $stmt = $pdo->prepare("SELECT o.*, p.title, p.traffic_gb, p.duration_days, 
+        $stmt = $pdo->prepare("SELECT o.*, p.title, p.traffic_gb, p.duration_days, p.ip_limit, 
                                       COALESCE(rp.custom_title, p.title) as display_title
                                FROM bot_orders o
                                LEFT JOIN plans p ON o.plan_id = p.id
@@ -988,9 +988,13 @@ class TelegramBotController {
             $trafficText = 'نامحدود';
         }
 
+        $orderIpLimit = (int)($order['ip_limit'] ?? 0);
+        $userLimitText = $orderIpLimit > 0 ? "{$orderIpLimit} کاربر" : "نامحدود";
+
         $msg = "🛒 <b>{$titlePrefix}</b>\n\n"
              . "📦 <b>پلن انتخابی:</b> {$order['display_title']}\n"
              . "💾 <b>حجم ترافیک:</b> {$trafficText}\n"
+             . "👥 <b>سقف اتصال همزمان:</b> {$userLimitText}\n"
              . "⏳ <b>مدت اعتبار:</b> {$order['duration_days']} روز\n";
 
         if (!empty($order['coupon_code'])) {
@@ -1765,9 +1769,13 @@ class TelegramBotController {
                 $days = Helpers::daysRemaining($client['expire_at']);
                 $subUrl = self::getClientPrimarySublink($client, $pdo);
 
+                $clientIpLimit = (int)($client['ip_limit'] ?? 0);
+                $userLimitText = $clientIpLimit > 0 ? "{$clientIpLimit} کاربر" : "نامحدود";
+
                 $msg = "🎉 <b>حساب با موفقیت به تلگرام متصل شد! (روش ۱)</b>\n\n"
                      . "👤 <b>نام کاربری:</b> <code>{$client['username']}</code>\n"
                      . "🔑 <b>کلمه عبور:</b> <code>{$client['password']}</code>\n"
+                     . "👥 <b>سقف اتصال همزمان:</b> {$userLimitText}\n"
                      . "📊 <b>میزان مصرف:</b> {$used} از {$total}\n"
                      . "⏳ <b>اعتبار زمانی:</b> {$days}\n\n"
                      . "🔗 <b>لینک مستقیم ساب‌لینک سرور:</b>\n<code>{$subUrl}</code>\n\n"
@@ -1842,10 +1850,14 @@ class TelegramBotController {
                     default => $client['status']
                 };
 
+                $clientIpLimit = (int)($client['ip_limit'] ?? 0);
+                $userLimitText = $clientIpLimit > 0 ? "{$clientIpLimit} کاربر" : "نامحدود";
+
                 $msg = "🔍 <b>گزارش استعلام حساب (حالت مهمان):</b>\n\n"
                      . "👤 <b>نام کاربری:</b> <code>{$client['username']}</code>\n"
                      . "🔑 <b>کلمه عبور:</b> <code>{$client['password']}</code>\n"
                      . "⚡️ <b>وضعیت:</b> {$statusFa}\n"
+                     . "👥 <b>سقف اتصال همزمان:</b> {$userLimitText}\n"
                      . "📊 <b>مصرف ترافیک:</b> {$used} از {$total}\n"
                      . "💾 <b>حجم باقیمانده:</b> <b>{$remStr}</b>\n"
                      . "⏳ <b>اعتبار زمانی:</b> <b>{$days}</b>\n"
@@ -1993,9 +2005,13 @@ class TelegramBotController {
             default => $c['status']
         };
 
+        $clientIpLimit = (int)($c['ip_limit'] ?? 0);
+        $userLimitText = $clientIpLimit > 0 ? "{$clientIpLimit} کاربر" : "نامحدود";
+
         $msg = "👤 <b>مدیریت حساب:</b> <code>{$c['username']}</code>\n\n"
              . "🔑 <b>کلمه عبور:</b> <code>" . ($c['password'] ?: '123456') . "</code>\n"
              . "⚡️ <b>وضعیت:</b> {$statusFa}\n"
+             . "👥 <b>سقف اتصال همزمان:</b> {$userLimitText}\n"
              . "📊 <b>مصرف کل:</b> {$used} از {$total}\n"
              . "💾 <b>حجم باقیمانده:</b> <b>{$remStr}</b>\n"
              . "⏳ <b>اعتبار زمانی:</b> <b>{$days}</b>\n"
@@ -2150,7 +2166,8 @@ class TelegramBotController {
                 $trafficText = 'نامحدود';
             }
             $daysText = $p['duration_days'] . 'D';
-            $ipText = !empty($p['ip_limit']) ? " | {$p['ip_limit']}U" : "";
+            $pIp = (int)($p['ip_limit'] ?? 0);
+            $ipText = $pIp > 0 ? " | {$pIp}U" : "";
             $btnText = "🔄 {$trafficText} | {$daysText}{$ipText} | {$priceFa}";
             $buttons[] = [['text' => $btnText, 'callback_data' => 'select_renew_plan_' . $client['id'] . '_' . $p['id']]];
         }
@@ -2284,7 +2301,8 @@ class TelegramBotController {
                 $trafficText = 'نامحدود';
             }
             $daysText = $p['duration_days'] . 'D';
-            $ipText = !empty($p['ip_limit']) ? " | {$p['ip_limit']}U" : "";
+            $pIp = (int)($p['ip_limit'] ?? 0);
+            $ipText = $pIp > 0 ? " | {$pIp}U" : "";
             $btnText = "📦 {$trafficText} | {$daysText}{$ipText} | {$priceFa}";
             $row[] = ['text' => $btnText, 'callback_data' => 'select_plan_' . $p['id']];
             if (count($row) === 2) {
@@ -2702,9 +2720,13 @@ class TelegramBotController {
         $primarySub = !empty($prov['node_sublink']) ? $prov['node_sublink'] : $prov['sub_url'];
         $qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=' . urlencode($primarySub);
 
+        $clientIpLimit = (int)($prov['ip_limit'] ?? 0);
+        $userLimitText = $clientIpLimit > 0 ? "{$clientIpLimit} کاربر" : "نامحدود";
+
         $customerMsg = "🎉 <b>سفارش شما تایید و اشتراک فعال گردید!</b>\n\n"
                      . "👤 <b>نام کاربری:</b> <code>{$prov['username']}</code>\n"
                      . "🔑 <b>کلمه عبور:</b> <code>{$prov['password']}</code>\n"
+                     . "👥 <b>سقف اتصال همزمان:</b> {$userLimitText}\n"
                      . "📦 <b>حجم اشتراک:</b> {$prov['traffic_gb']} گیگابایت\n"
                      . "⏳ <b>مهلت استفاده:</b> {$prov['expire_at']}\n"
                      . "🌐 <b>سرور متصل:</b> {$prov['server_name']}\n\n"

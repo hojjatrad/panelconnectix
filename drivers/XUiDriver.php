@@ -95,7 +95,7 @@ class XUiDriver implements PanelDriverInterface {
         $clientData = [
             'id' => $payload['uuid'],
             'email' => $payload['username'],
-            'limitIp' => 2,
+            'limitIp' => (int)($payload['ip_limit'] ?? 0),
             'totalGB' => $payload['traffic_limit_bytes'] ?? 0,
             'expiryTime' => ($payload['expire_timestamp'] ?? 0) * 1000,
             'enable' => true,

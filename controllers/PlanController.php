@@ -61,7 +61,7 @@ class PlanController {
         $serverId = !empty($_POST['server_id']) ? (int)$_POST['server_id'] : null;
         $categoryId = !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null;
         $category = trim($_POST['category'] ?? '');
-        $ipLimit = max(0, (int)($_POST['ip_limit'] ?? 2));
+        $ipLimit = max(0, (int)($_POST['ip_limit'] ?? 0));
         $showInBot = isset($_POST['show_in_bot']) ? 1 : 0;
         $isFree = isset($_POST['is_free']) ? 1 : 0;
 
@@ -91,7 +91,7 @@ class PlanController {
         }
 
         $startOnFirstUse = isset($_POST['start_on_first_use']) ? 1 : 0;
-        $maxDevices = max(1, (int)($_POST['max_devices'] ?? $ipLimit));
+        $maxDevices = max(0, (int)($_POST['max_devices'] ?? $ipLimit));
 
         // Intelligently detect available columns in plans table
         $availableCols = [];
@@ -162,7 +162,7 @@ class PlanController {
         $serverId = !empty($_POST['server_id']) ? (int)$_POST['server_id'] : null;
         $categoryId = !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null;
         $category = trim($_POST['category'] ?? '');
-        $ipLimit = max(0, (int)($_POST['ip_limit'] ?? 2));
+        $ipLimit = max(0, (int)($_POST['ip_limit'] ?? 0));
         $showInBot = isset($_POST['show_in_bot']) ? 1 : 0;
         $isFree = isset($_POST['is_free']) ? 1 : 0;
 
@@ -192,7 +192,7 @@ class PlanController {
         }
 
         $startOnFirstUse = isset($_POST['start_on_first_use']) ? 1 : 0;
-        $maxDevices = max(1, (int)($_POST['max_devices'] ?? $ipLimit));
+        $maxDevices = max(0, (int)($_POST['max_devices'] ?? $ipLimit));
 
         // Intelligently detect available columns in plans table
         $availableCols = [];

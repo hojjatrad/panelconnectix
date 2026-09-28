@@ -409,7 +409,7 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
                 'usage_percent' => $usagePercent,
                 'expire_at' => $client['expire_at'],
                 'days_remaining' => $daysRemaining,
-                'ip_limit' => (int)($client['ip_limit'] ?? 2),
+                'ip_limit' => (int)($client['ip_limit'] ?? 0),
                 'sub_url' => Helpers::subUrl($client['sub_token'])
             ],
             'servers' => self::extractServerList($client, $pdo),

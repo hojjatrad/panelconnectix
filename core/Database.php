@@ -358,8 +358,8 @@ class Database {
                 'alert_exp_sent' => 'TINYINT(1) DEFAULT 0',
                 'alert_final_sent' => 'TINYINT(1) DEFAULT 0',
                 'telegram_chat_id' => 'VARCHAR(64) NULL',
-                'ip_limit' => 'INT DEFAULT 2',
-                'max_devices' => 'INT DEFAULT 2',
+                'ip_limit' => 'INT DEFAULT 0',
+                'max_devices' => 'INT DEFAULT 0',
                 'start_on_first_use' => 'TINYINT(1) DEFAULT 0',
                 'first_connected_at' => 'DATETIME NULL',
                 'duration_days' => 'INT DEFAULT 30',
@@ -387,8 +387,8 @@ class Database {
             $planCols = [
                 'show_in_bot' => 'TINYINT(1) DEFAULT 1',
                 'category' => "VARCHAR(64) DEFAULT '۱ ماهه'",
-                'ip_limit' => 'INT DEFAULT 2',
-                'max_devices' => 'INT DEFAULT 2',
+                'ip_limit' => 'INT DEFAULT 0',
+                'max_devices' => 'INT DEFAULT 0',
                 'start_on_first_use' => 'TINYINT(1) DEFAULT 0',
                 'server_id' => 'INT NULL DEFAULT NULL',
                 'category_id' => 'INT NULL DEFAULT NULL'
@@ -404,6 +404,19 @@ class Database {
                     $pdo->exec("ALTER TABLE `reserved_plans` MODIFY COLUMN `traffic_gb` DECIMAL(10,3) NOT NULL DEFAULT 1.000");
                 } catch (Throwable $e) {}
             }
+
+            // Sync clients ip_limit to match plan if plan is unlimited (ip_limit=0)
+            try {
+                if ($isMysql) {
+                    $pdo->exec("ALTER TABLE `plans` ALTER COLUMN `ip_limit` SET DEFAULT 0");
+                    $pdo->exec("ALTER TABLE `plans` ALTER COLUMN `max_devices` SET DEFAULT 0");
+                    $pdo->exec("ALTER TABLE `clients` ALTER COLUMN `ip_limit` SET DEFAULT 0");
+                    $pdo->exec("ALTER TABLE `clients` ALTER COLUMN `max_devices` SET DEFAULT 0");
+                    $pdo->exec("UPDATE clients c INNER JOIN plans p ON c.plan_id = p.id SET c.ip_limit = p.ip_limit, c.max_devices = p.max_devices WHERE p.ip_limit = 0 AND c.ip_limit = 2");
+                } else {
+                    $pdo->exec("UPDATE clients SET ip_limit = 0, max_devices = 0 WHERE ip_limit = 2 AND plan_id IN (SELECT id FROM plans WHERE ip_limit = 0)");
+                }
+            } catch (Throwable $e) {}
 
             // Auto-disable mock servers and detach them from plans if at least one real server is active
             try {
@@ -646,8 +659,8 @@ CREATE TABLE IF NOT EXISTS plans (
     category_id INTEGER NULL DEFAULT NULL,
     category TEXT DEFAULT '۱ ماهه',
     show_in_bot INTEGER DEFAULT 1,
-    ip_limit INTEGER DEFAULT 2,
-    max_devices INTEGER DEFAULT 2,
+    ip_limit INTEGER DEFAULT 0,
+    max_devices INTEGER DEFAULT 0,
     start_on_first_use INTEGER DEFAULT 0,
     is_free INTEGER DEFAULT 0,
     is_active INTEGER DEFAULT 1,

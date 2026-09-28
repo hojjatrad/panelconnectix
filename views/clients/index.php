@@ -191,7 +191,7 @@ require __DIR__ . '/../layout/header.php';
                                     <div class="text-[11px] text-slate-400 mt-0.5"><?= htmlspecialchars($c['server_name'] ?? 'سرور ابری') ?></div>
                                     <span class="inline-flex items-center gap-1 mt-1 text-[10px] text-purple-300 font-mono bg-purple-950/40 px-1.5 py-0.5 rounded border border-purple-800/30">
                                         <i class="fa-solid fa-users text-[9px]"></i>
-                                        <span><?= ($c['ip_limit'] ?? 2) > 0 ? ($c['ip_limit'] ?? 2) . ' دستگاه' : 'نامحدود' ?></span>
+                                        <span><?= !empty($c['ip_limit']) && (int)$c['ip_limit'] > 0 ? ((int)$c['ip_limit'] . ' دستگاه') : 'نامحدود' ?></span>
                                     </span>
                                 </td>
 
@@ -665,7 +665,7 @@ ${c.sub_url}`;
         
         document.getElementById('editExpireAt').value = c.expire_at || '';
         document.getElementById('editTelegramChatId').value = c.telegram_chat_id || '';
-        document.getElementById('editIpLimit').value = c.ip_limit ?? 2;
+        document.getElementById('editIpLimit').value = c.ip_limit ?? 0;
         document.getElementById('editCustomNote').value = c.custom_note || '';
 
         const modal = document.getElementById('editClientModal');

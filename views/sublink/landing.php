@@ -155,7 +155,7 @@ $renewalLink = !empty($client['renewal_url']) ? $client['renewal_url'] : (!empty
                 </div>
                 <div class="flex items-center justify-between">
                     <span class="text-slate-400">سقف اتصال همزمان:</span>
-                    <span class="font-bold text-purple-300 font-mono"><?= ($client['ip_limit'] ?? 2) > 0 ? ($client['ip_limit'] ?? 2) . ' دستگاه' : 'نامحدود' ?></span>
+                    <span class="font-bold text-purple-300 font-mono"><?= !empty($client['ip_limit']) && (int)$client['ip_limit'] > 0 ? ((int)$client['ip_limit'] . ' دستگاه') : 'نامحدود' ?></span>
                 </div>
             </div>
 
