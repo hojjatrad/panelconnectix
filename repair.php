@@ -744,6 +744,57 @@ if (!empty($_FILES['emergency_sql_file']['tmp_name']) && $_FILES['emergency_sql_
     }
 }
 
+// 7.5 Restore clients traffic from snapshot if requested
+$trafficRestoreMsg = '';
+if (isset($_GET['restore_traffic']) || isset($_POST['restore_traffic'])) {
+    $targetZip = '/tmp/connectix_backups/connectix_backup_2026-09-28_12-00-42.zip';
+    if (!file_exists($targetZip)) {
+        $zips = glob('/tmp/connectix_backups/*.zip') ?: [];
+        rsort($zips);
+        foreach ($zips as $z) {
+            if (str_contains($z, '2026-09-28_12-00') || str_contains($z, '2026-09-28_11-5')) {
+                $targetZip = $z;
+                break;
+            }
+        }
+    }
+
+    if (file_exists($targetZip)) {
+        $zip = new ZipArchive();
+        if ($zip->open($targetZip) === true) {
+            $sql = $zip->getFromIndex(0);
+            $zip->close();
+
+            preg_match('/INSERT INTO `clients` \((.*?)\) VALUES/s', $sql, $colsM);
+            $cols = array_map(function($c) { return trim($c, " `\t\n\r"); }, explode(',', $colsM[1] ?? ''));
+            $usedIdx = array_search('traffic_used_bytes', $cols);
+            $userIdx = array_search('username', $cols);
+            $statusIdx = array_search('status', $cols);
+            $expireIdx = array_search('expire_at', $cols);
+            $idIdx = array_search('id', $cols);
+
+            preg_match_all("/INSERT INTO `clients`.*?VALUES\s*\((.*?)\);/s", $sql, $matches);
+            $pdo = Database::getConnection();
+            $stUpdate = $pdo->prepare("UPDATE clients SET traffic_used_bytes = ?, status = ?, expire_at = ? WHERE id = ?");
+
+            $pdo->beginTransaction();
+            $restoredCount = 0;
+            foreach ($matches[1] as $valStr) {
+                $vals = str_getcsv($valStr, ',', "'");
+                $cId = (int)($vals[$idIdx] ?? 0);
+                $used = (int)($vals[$usedIdx] ?? 0);
+                $status = $vals[$statusIdx] ?? 'active';
+                $expire = !empty($vals[$expireIdx]) && $vals[$expireIdx] !== 'NULL' ? $vals[$expireIdx] : null;
+
+                $stUpdate->execute([$used, $status, $expire, $cId]);
+                $restoredCount++;
+            }
+            $pdo->commit();
+            $trafficRestoreMsg = "<div class='p-3 bg-emerald-950/80 border border-emerald-800 text-emerald-200 rounded-xl text-xs'>✅ میزان مصرف ترافیک و وضعیت {$restoredCount} کلاینت با موفقیت از بکاپ پایدار بازیابی شد!</div>";
+        }
+    }
+}
+
 // 8. Telegram Bot Diagnostics & Instant Re-Activation Handler
 $botMsg = '';
 $currToken = '';
@@ -1023,6 +1074,22 @@ foreach ($stepResults as $r) {
                     <i class="fa-solid fa-check text-emerald-400"></i>
                 </div>
             <?php endif; ?>
+        </div>
+
+        <!-- Restore Client Traffic from Automatic Snapshot -->
+        <div class="p-4 bg-slate-950/80 border border-slate-800 rounded-2xl space-y-2.5 text-xs">
+            <div class="flex items-center justify-between text-white font-bold">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-chart-pie text-cyan-400"></i>
+                    <span>بازیابی ترافیک مصرفی کلاینت‌ها از بکاپ پایدار</span>
+                </div>
+                <a href="repair.php?restore_traffic=1" class="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1">
+                    <i class="fa-solid fa-rotate"></i>
+                    <span>بازیابی ترافیک مصرفی</span>
+                </a>
+            </div>
+            <p class="text-[11px] text-slate-400">در صورتی که ترافیک مصرفی کلاینت‌ها صفر نشان داده می‌شود، با یک کلیک ترافیک واقعی آنها از اسنپ‌شات بازیابی می‌شود.</p>
+            <?= $trafficRestoreMsg ?>
         </div>
 
         <!-- Emergency SQL Backup Restore Card -->
