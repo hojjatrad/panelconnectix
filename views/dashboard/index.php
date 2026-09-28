@@ -300,12 +300,12 @@ if (!empty($metrics72h) && count($metrics72h) >= 2) {
                     <td class="py-2.5">
                         <div class="flex items-center gap-2">
                             <span class="w-5 h-5 rounded-md bg-purple-500/15 text-purple-300 text-[10px] font-black flex items-center justify-center"><?= $rank + 1 ?></span>
-                            <span class="font-bold text-white"><?= htmlspecialchars((string)($tr['full_name'] ?: $tr['username'])) ?></span>
+                            <span class="font-bold text-white"><?= htmlspecialchars((string)(!empty($tr['full_name']) ? $tr['full_name'] : ($tr['username'] ?? 'نماینده'))) ?></span>
                         </div>
                     </td>
-                    <td class="py-2.5 font-bold text-emerald-400"><?= number_format((int)$tr['active_clients']) ?></td>
-                    <td class="py-2.5 font-semibold text-purple-300"><?= Helpers::formatMoney((int)$tr['week_sales']) ?></td>
-                    <td class="py-2.5 text-slate-300"><?= Helpers::formatMoney((int)$tr['wallet_balance']) ?></td>
+                    <td class="py-2.5 font-bold text-emerald-400"><?= number_format((int)($tr['active_clients'] ?? $tr['client_count'] ?? 0)) ?></td>
+                    <td class="py-2.5 font-semibold text-purple-300"><?= Helpers::formatMoney((int)($tr['week_sales'] ?? 0)) ?></td>
+                    <td class="py-2.5 text-slate-300"><?= Helpers::formatMoney((int)($tr['wallet_balance'] ?? 0)) ?></td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
