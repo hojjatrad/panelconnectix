@@ -209,15 +209,34 @@ try {
     $recentLogs = $pdo->query("SELECT * FROM activity_logs ORDER BY id DESC LIMIT 15")->fetchAll(PDO::FETCH_ASSOC);
     $botOrders = $pdo->query("SELECT * FROM bot_orders ORDER BY id DESC LIMIT 20")->fetchAll(PDO::FETCH_ASSOC);
 
+    // Inspect one of the pre-purge backups
+    $testBackupZip = '/tmp/connectix_backups/connectix_backup_2026-09-28_12-05-15.zip';
+    $backupClientsInfo = null;
+    if (file_exists($testBackupZip)) {
+        $zip = new ZipArchive();
+        if ($zip->open($testBackupZip) === true) {
+            $sqlName = $zip->getNameIndex(0);
+            $sqlContent = $zip->getFromIndex(0);
+            $zip->close();
+            preg_match_all("/INSERT INTO `clients`.*?;/s", $sqlContent, $matches);
+            $backupClientsInfo = [
+                'file' => $testBackupZip,
+                'sql_name' => $sqlName,
+                'client_insert_count' => count($matches[0] ?? []),
+                'sample_inserts' => array_slice($matches[0] ?? [], 0, 3),
+            ];
+        }
+    }
+
     $out['db_state'] = [
         'clients_count' => $clCount,
         'servers_count' => count($servers),
         'nodes' => $nodeDiagnostics,
         'table_counts' => $tableCounts,
+        'backup_clients_info' => $backupClientsInfo,
         'bot_orders' => $botOrders,
         'recent_logs' => $recentLogs,
         'backups' => glob(__DIR__ . '/data/*.sqlite*') ?: [],
-        'temp_backups' => glob(sys_get_temp_dir() . '/connectix_backups/*') ?: [],
         'data_files' => array_map('basename', glob(__DIR__ . '/data/*') ?: []),
     ];
 
