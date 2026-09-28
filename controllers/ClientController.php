@@ -66,6 +66,27 @@ class ClientController {
             $where[] = "(c.traffic_limit_bytes > 0 AND (c.traffic_used_bytes * 1.0 / c.traffic_limit_bytes) < 0.2)";
         }
 
+        // Optimization Quick Filters
+        $quickFilter = trim($_GET['filter'] ?? $_GET['quick_filter'] ?? '');
+        $now = date('Y-m-d H:i:s');
+        $sevenDaysAgo = date('Y-m-d H:i:s', strtotime('-7 days'));
+        $fourteenDaysAgo = date('Y-m-d H:i:s', strtotime('-14 days'));
+        $thirtyDaysAgo = date('Y-m-d H:i:s', strtotime('-30 days'));
+
+        if ($quickFilter === 'unused') {
+            $where[] = "(c.traffic_used_bytes = 0 OR c.traffic_used_bytes IS NULL)";
+        } elseif ($quickFilter === 'expired_7d') {
+            $where[] = "(c.expire_at IS NOT NULL AND c.expire_at <= '{$sevenDaysAgo}')";
+        } elseif ($quickFilter === 'expired_14d') {
+            $where[] = "(c.expire_at IS NOT NULL AND c.expire_at <= '{$fourteenDaysAgo}')";
+        } elseif ($quickFilter === 'expired_30d') {
+            $where[] = "(c.expire_at IS NOT NULL AND c.expire_at <= '{$thirtyDaysAgo}')";
+        } elseif ($quickFilter === 'expired_all') {
+            $where[] = "(c.status = 'expired' OR (c.expire_at IS NOT NULL AND c.expire_at <= '{$now}'))";
+        } elseif ($quickFilter === 'trials') {
+            $where[] = "(c.custom_note LIKE '%تست%' OR c.custom_note LIKE '%trial%' OR p.is_free = 1)";
+        }
+
         $whereSql = implode(' AND ', $where);
 
         $stmt = $pdo->prepare("SELECT c.*, p.title as plan_title, p.traffic_gb, p.duration_days, 
@@ -81,6 +102,27 @@ class ClientController {
                                ORDER BY c.id DESC");
         $stmt->execute($params);
         $clients = $stmt->fetchAll();
+
+        // Optimizer Live Stats
+        $baseOwnerWhere = $isAdmin ? "1=1" : "reseller_id = " . intval($userId);
+        $stmtOpt = $pdo->query("SELECT 
+            COUNT(*) as total,
+            SUM(CASE WHEN traffic_used_bytes = 0 OR traffic_used_bytes IS NULL THEN 1 ELSE 0 END) as count_unused,
+            SUM(CASE WHEN expire_at IS NOT NULL AND expire_at <= '{$sevenDaysAgo}' THEN 1 ELSE 0 END) as count_expired_7d,
+            SUM(CASE WHEN expire_at IS NOT NULL AND expire_at <= '{$fourteenDaysAgo}' THEN 1 ELSE 0 END) as count_expired_14d,
+            SUM(CASE WHEN expire_at IS NOT NULL AND expire_at <= '{$thirtyDaysAgo}' THEN 1 ELSE 0 END) as count_expired_30d,
+            SUM(CASE WHEN status = 'expired' OR (expire_at IS NOT NULL AND expire_at <= '{$now}') THEN 1 ELSE 0 END) as count_expired_all,
+            SUM(CASE WHEN (custom_note LIKE '%تست%' OR custom_note LIKE '%trial%') AND (expire_at IS NOT NULL AND expire_at <= '{$now}') THEN 1 ELSE 0 END) as count_expired_trials
+            FROM clients WHERE {$baseOwnerWhere}")->fetch(PDO::FETCH_ASSOC);
+
+        $optimizerStats = [
+            'unused' => (int)($stmtOpt['count_unused'] ?? 0),
+            'expired_7d' => (int)($stmtOpt['count_expired_7d'] ?? 0),
+            'expired_14d' => (int)($stmtOpt['count_expired_14d'] ?? 0),
+            'expired_30d' => (int)($stmtOpt['count_expired_30d'] ?? 0),
+            'expired_all' => (int)($stmtOpt['count_expired_all'] ?? 0),
+            'expired_trials' => (int)($stmtOpt['count_expired_trials'] ?? 0),
+        ];
 
         // Get plans & servers for filters and modals
         $plans = $pdo->query("SELECT * FROM plans WHERE is_active = 1 ORDER BY base_price ASC")->fetchAll();
@@ -737,6 +779,24 @@ class ClientController {
                     $driver->deleteUser($c['username']);
                     $pdo->prepare("DELETE FROM clients WHERE id = ?")->execute([$c['id']]);
                     $count++;
+                } elseif ($action === 'delete_unused') {
+                    if ((int)($c['traffic_used_bytes'] ?? 0) === 0) {
+                        $driver->deleteUser($c['username']);
+                        $pdo->prepare("DELETE FROM clients WHERE id = ?")->execute([$c['id']]);
+                        $count++;
+                    }
+                } elseif ($action === 'delete_expired') {
+                    if ($c['status'] === 'expired' || (!empty($c['expire_at']) && strtotime($c['expire_at']) <= time())) {
+                        $driver->deleteUser($c['username']);
+                        $pdo->prepare("DELETE FROM clients WHERE id = ?")->execute([$c['id']]);
+                        $count++;
+                    }
+                } elseif ($action === 'delete_expired_7d') {
+                    if (!empty($c['expire_at']) && strtotime($c['expire_at']) <= strtotime('-7 days')) {
+                        $driver->deleteUser($c['username']);
+                        $pdo->prepare("DELETE FROM clients WHERE id = ?")->execute([$c['id']]);
+                        $count++;
+                    }
                 }
             } catch (Throwable $e) {}
         }
@@ -746,7 +806,10 @@ class ClientController {
             'add_10_gb' => 'افزایش ۱۰ گیگابایت حجم',
             'disable' => 'غیرفعال‌سازی',
             'enable' => 'فعال‌سازی مجدد',
-            'delete' => 'حذف قطعی'
+            'delete' => 'حذف قطعی',
+            'delete_unused' => 'حذف سرویس‌های بدون مصرف',
+            'delete_expired' => 'حذف سرویس‌های منقضی‌شده',
+            'delete_expired_7d' => 'حذف سرویس‌های منقضی بیش از ۷ روز'
         ];
         $label = $actionNames[$action] ?? 'عملیات';
 
@@ -967,5 +1030,89 @@ class ClientController {
             Helpers::redirect('clients');
         }
         require __DIR__ . '/../views/clients/bulk_result.php';
+    }
+
+    /**
+     * Dedicated Smart Optimizer: Purge unused / expired services from nodes and database
+     */
+    public function optimizePurge(): void {
+        Auth::requireLogin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
+            Helpers::redirect('clients');
+        }
+
+        $type = trim($_POST['purge_type'] ?? '');
+        $pdo = Database::getConnection();
+        $isAdmin = Auth::isAdmin();
+        $userId = Auth::id();
+
+        $ownerWhere = $isAdmin ? "1=1" : "c.reseller_id = " . intval($userId);
+
+        $now = date('Y-m-d H:i:s');
+        $sevenDaysAgo = date('Y-m-d H:i:s', strtotime('-7 days'));
+        $fourteenDaysAgo = date('Y-m-d H:i:s', strtotime('-14 days'));
+        $thirtyDaysAgo = date('Y-m-d H:i:s', strtotime('-30 days'));
+
+        $condition = match($type) {
+            'unused' => "(c.traffic_used_bytes = 0 OR c.traffic_used_bytes IS NULL)",
+            'expired_7d' => "(c.expire_at IS NOT NULL AND c.expire_at <= '{$sevenDaysAgo}')",
+            'expired_14d' => "(c.expire_at IS NOT NULL AND c.expire_at <= '{$fourteenDaysAgo}')",
+            'expired_30d' => "(c.expire_at IS NOT NULL AND c.expire_at <= '{$thirtyDaysAgo}')",
+            'expired_all' => "(c.status = 'expired' OR (c.expire_at IS NOT NULL AND c.expire_at <= '{$now}'))",
+            'trials_expired' => "((c.custom_note LIKE '%تست%' OR c.custom_note LIKE '%trial%') AND (c.expire_at IS NOT NULL AND c.expire_at <= '{$now}'))",
+            default => null
+        };
+
+        if (!$condition) {
+            Helpers::flash('error', 'نوع عملیات بهینه‌سازی مشخص نیست.');
+            Helpers::redirect('clients');
+        }
+
+        // Fetch targets and server node credentials to remove them from remote servers
+        $sql = "SELECT c.id, c.username, c.server_id, s.driver, s.api_url, s.api_username, s.api_password, s.api_token 
+                FROM clients c 
+                LEFT JOIN server_nodes s ON c.server_id = s.id 
+                WHERE {$ownerWhere} AND {$condition}";
+
+        $targets = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+
+        if (empty($targets)) {
+            Helpers::flash('info', 'هیچ سرویسی منطبق با شرایط انتخابی جهت حذف یافت نشد.');
+            Helpers::redirect('clients');
+        }
+
+        $count = 0;
+        $serverNodes = [];
+        foreach ($targets as $t) {
+            try {
+                // Delete user from remote server node
+                if (!empty($t['server_id']) && !empty($t['driver'])) {
+                    if (!isset($serverNodes[$t['server_id']])) {
+                        $serverNodes[$t['server_id']] = DriverFactory::create($t);
+                    }
+                    $serverNodes[$t['server_id']]->deleteUser($t['username']);
+                }
+            } catch (Throwable $e) {}
+
+            try {
+                $pdo->prepare("DELETE FROM clients WHERE id = ?")->execute([$t['id']]);
+                $count++;
+            } catch (Throwable $e) {}
+        }
+
+        $typeLabels = [
+            'unused' => 'سرویس‌های بدون مصرف (حجم صفر)',
+            'expired_7d' => 'سرویس‌های منقضی بیش از ۷ روز (۱ هفته)',
+            'expired_14d' => 'سرویس‌های منقضی بیش از ۱۴ روز (۲ هفته)',
+            'expired_30d' => 'سرویس‌های منقضی بیش از ۳۰ روز (۱ ماه)',
+            'expired_all' => 'تمامی سرویس‌های منقضی‌شده',
+            'trials_expired' => 'اکانت‌های تست رایگان منقضی'
+        ];
+        $label = $typeLabels[$type] ?? 'سرویس‌ها';
+
+        Helpers::logActivity('client_optimize_purge', "بهینه‌سازی و پاکسازی: حذف {$count} مورد از {$label}", 'system');
+        Helpers::flash('success', "بهینه‌سازی با موفقیت انجام شد: تعداد {$count} مورد از «{$label}» از روی پنل و سرورها پاکسازی گردید.");
+        Helpers::redirect('clients');
     }
 }

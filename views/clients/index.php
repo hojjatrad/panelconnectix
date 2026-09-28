@@ -13,6 +13,17 @@ require __DIR__ . '/../layout/header.php';
     </div>
 
     <div class="flex items-center gap-2">
+        <button type="button" onclick="openOptimizerModal()" class="px-3.5 py-2.5 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-xs font-bold rounded-xl transition-all shadow-sm flex items-center gap-1.5" title="پاکسازی و بهینه‌سازی سرویس‌های منقضی و بدون استفاده">
+            <i class="fa-solid fa-broom text-rose-400"></i>
+            <span>بهینه‌سازی و پاکسازی</span>
+            <?php 
+                $pendingClean = ($optimizerStats['unused'] ?? 0) + ($optimizerStats['expired_7d'] ?? 0);
+                if ($pendingClean > 0): 
+            ?>
+                <span class="inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] bg-rose-600 text-white font-mono rounded-full font-bold shadow-sm"><?= $pendingClean ?></span>
+            <?php endif; ?>
+        </button>
+
         <button type="button" onclick="openTestModal()" class="px-3.5 py-2.5 bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/30 text-xs font-bold rounded-xl transition-all shadow-sm flex items-center gap-1.5" title="صدور آنی اکانت تست با حجم دلخواه (مثلاً ۲۰۰ یا ۵۰۰ مگابایت)">
             <i class="fa-solid fa-wand-magic-sparkles"></i>
             <span>صدور اکانت تست سریع</span>
@@ -35,8 +46,51 @@ require __DIR__ . '/../layout/header.php';
     </div>
 </div>
 
+<!-- Optimization Quick Filter Pills -->
+<?php $currentFilter = $_GET['filter'] ?? $_GET['quick_filter'] ?? ''; ?>
+<div class="flex items-center gap-2 overflow-x-auto pb-1 text-xs no-scrollbar">
+    <span class="text-slate-400 font-semibold whitespace-nowrap text-[11px] flex items-center gap-1">
+        <i class="fa-solid fa-bolt text-amber-400"></i> فیلترهای سریع:
+    </span>
+    <a href="<?= Helpers::url('clients') ?>" class="px-3 py-1.5 rounded-lg border transition whitespace-nowrap flex items-center gap-1.5 <?= empty($currentFilter) ? 'bg-purple-600 text-white border-purple-500 font-bold' : 'bg-slate-900/60 text-slate-300 border-slate-800 hover:bg-slate-800' ?>">
+        <span>همه سرویس‌ها</span>
+    </a>
+    <a href="<?= Helpers::url('clients') ?>?filter=unused" class="px-3 py-1.5 rounded-lg border transition whitespace-nowrap flex items-center gap-1.5 <?= $currentFilter === 'unused' ? 'bg-amber-600 text-white border-amber-500 font-bold' : 'bg-slate-900/60 text-amber-300/80 border-slate-800 hover:bg-amber-950/40' ?>" title="سرویس‌هایی که حجم مصرفی آن‌ها صفر است">
+        <i class="fa-solid fa-circle-pause text-[10px] text-amber-400"></i>
+        <span>بدون مصرف (حجم صفر)</span>
+        <span class="px-1.5 py-0.2 text-[10px] bg-amber-500/20 text-amber-300 rounded font-mono font-bold"><?= $optimizerStats['unused'] ?? 0 ?></span>
+    </a>
+    <a href="<?= Helpers::url('clients') ?>?filter=expired_7d" class="px-3 py-1.5 rounded-lg border transition whitespace-nowrap flex items-center gap-1.5 <?= $currentFilter === 'expired_7d' ? 'bg-rose-600 text-white border-rose-500 font-bold' : 'bg-slate-900/60 text-rose-300/80 border-slate-800 hover:bg-rose-950/40' ?>" title="سرویس‌هایی که بیش از ۷ روز از تاریخ انقضای آن‌ها گذشته است">
+        <i class="fa-solid fa-clock-rotate-left text-[10px] text-rose-400"></i>
+        <span>منقضی > ۷ روز</span>
+        <span class="px-1.5 py-0.2 text-[10px] bg-rose-500/20 text-rose-300 rounded font-mono font-bold"><?= $optimizerStats['expired_7d'] ?? 0 ?></span>
+    </a>
+    <a href="<?= Helpers::url('clients') ?>?filter=expired_14d" class="px-3 py-1.5 rounded-lg border transition whitespace-nowrap flex items-center gap-1.5 <?= $currentFilter === 'expired_14d' ? 'bg-rose-700 text-white border-rose-600 font-bold' : 'bg-slate-900/60 text-rose-400/80 border-slate-800 hover:bg-rose-950/40' ?>" title="سرویس‌هایی که بیش از ۱۴ روز از تاریخ انقضای آن‌ها گذشته است">
+        <i class="fa-solid fa-calendar-xmark text-[10px]"></i>
+        <span>منقضی > ۱۴ روز</span>
+        <span class="px-1.5 py-0.2 text-[10px] bg-rose-500/20 text-rose-300 rounded font-mono font-bold"><?= $optimizerStats['expired_14d'] ?? 0 ?></span>
+    </a>
+    <a href="<?= Helpers::url('clients') ?>?filter=expired_30d" class="px-3 py-1.5 rounded-lg border transition whitespace-nowrap flex items-center gap-1.5 <?= $currentFilter === 'expired_30d' ? 'bg-rose-800 text-white border-rose-700 font-bold' : 'bg-slate-900/60 text-rose-400 border-slate-800 hover:bg-rose-950/40' ?>" title="سرویس‌هایی که بیش از ۱ ماه از تاریخ انقضای آن‌ها گذشته است">
+        <i class="fa-solid fa-skull-crossbones text-[10px]"></i>
+        <span>منقضی > ۳۰ روز</span>
+        <span class="px-1.5 py-0.2 text-[10px] bg-rose-500/20 text-rose-300 rounded font-mono font-bold"><?= $optimizerStats['expired_30d'] ?? 0 ?></span>
+    </a>
+    <a href="<?= Helpers::url('clients') ?>?filter=expired_all" class="px-3 py-1.5 rounded-lg border transition whitespace-nowrap flex items-center gap-1.5 <?= $currentFilter === 'expired_all' ? 'bg-red-700 text-white border-red-600 font-bold' : 'bg-slate-900/60 text-red-300/80 border-slate-800 hover:bg-red-950/40' ?>" title="تمامی سرویس‌های منقضی‌شده">
+        <span>کل منقضی‌ها</span>
+        <span class="px-1.5 py-0.2 text-[10px] bg-red-500/20 text-red-300 rounded font-mono font-bold"><?= $optimizerStats['expired_all'] ?? 0 ?></span>
+    </a>
+    <a href="<?= Helpers::url('clients') ?>?filter=trials" class="px-3 py-1.5 rounded-lg border transition whitespace-nowrap flex items-center gap-1.5 <?= $currentFilter === 'trials' ? 'bg-cyan-700 text-white border-cyan-600 font-bold' : 'bg-slate-900/60 text-cyan-300 border-slate-800 hover:bg-cyan-950/40' ?>" title="اکانت‌های تست">
+        <i class="fa-solid fa-vial text-[10px]"></i>
+        <span>اکانت‌های تست</span>
+        <span class="px-1.5 py-0.2 text-[10px] bg-cyan-500/20 text-cyan-300 rounded font-mono font-bold"><?= $optimizerStats['expired_trials'] ?? 0 ?></span>
+    </a>
+</div>
+
 <!-- Search & Filter Form -->
 <form method="GET" action="<?= Helpers::url('clients') ?>" class="bg-slate-900/50 p-4 rounded-xl border border-slate-800/80 text-xs space-y-3">
+    <?php if (!empty($currentFilter)): ?>
+        <input type="hidden" name="filter" value="<?= htmlspecialchars($currentFilter) ?>">
+    <?php endif; ?>
     <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <div>
             <label class="block text-slate-400 mb-1">جستجو:</label>
@@ -130,6 +184,9 @@ require __DIR__ . '/../layout/header.php';
                 <option value="disable">⏸ غیرفعال‌سازی موقت</option>
                 <option value="enable">▶️ فعال‌سازی مجدد</option>
                 <option value="delete">🗑 حذف قطعی کاربران انتخاب‌شده</option>
+                <option value="delete_unused">🧹 حذف کاربران بدون مصرف از میان انتخاب‌شده‌ها</option>
+                <option value="delete_expired">⌛️ حذف کاربران منقضی‌شده از میان انتخاب‌شده‌ها</option>
+                <option value="delete_expired_7d">🗓 حذف کاربران منقضی بیش از ۷ روز از میان انتخاب‌شده‌ها</option>
             </select>
             <button type="submit" onclick="return confirm('آیا از اعمال این عملیات روی کاربران انتخاب‌شده مطمئن هستید؟');" class="px-4 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg transition shadow">
                 اعمال عملیات
@@ -857,6 +914,196 @@ ${c.sub_url}`;
     </div>
 </div>
 
+<!-- Modal: Smart Service Optimizer & Cleaner -->
+<div id="optimizerModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 space-y-5 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+        <button onclick="closeOptimizerModal()" class="absolute top-4 left-4 text-slate-400 hover:text-white transition">
+            <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+
+        <div>
+            <div class="flex items-center gap-2">
+                <div class="w-9 h-9 rounded-xl bg-rose-500/20 border border-rose-500/30 flex items-center justify-center text-rose-400">
+                    <i class="fa-solid fa-broom text-base"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-white">مرکز بهینه‌سازی و پاکسازی هوشمند سرویس‌ها</h3>
+                    <p class="text-xs text-slate-400 mt-0.5">پاکسازی خودکار از دیتابیس پنل و حذف از نودهای متصل (مرزبان، پاسارگاد، سنایی، X-UI)</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live Statistics Cards -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+            <div class="bg-slate-800/60 p-3 rounded-xl border border-slate-700/60">
+                <div class="text-slate-400 text-[11px] flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-amber-400 inline-block"></span>
+                    بدون مصرف (حجم صفر)
+                </div>
+                <div class="text-xl font-bold font-mono text-amber-300 mt-1"><?= number_format($optimizerStats['unused'] ?? 0) ?> <span class="text-xs text-slate-400 font-normal">سرویس</span></div>
+            </div>
+
+            <div class="bg-slate-800/60 p-3 rounded-xl border border-slate-700/60">
+                <div class="text-slate-400 text-[11px] flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-rose-400 inline-block"></span>
+                    منقضی بیش از ۷ روز
+                </div>
+                <div class="text-xl font-bold font-mono text-rose-300 mt-1"><?= number_format($optimizerStats['expired_7d'] ?? 0) ?> <span class="text-xs text-slate-400 font-normal">سرویس</span></div>
+            </div>
+
+            <div class="bg-slate-800/60 p-3 rounded-xl border border-slate-700/60">
+                <div class="text-slate-400 text-[11px] flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-rose-500 inline-block"></span>
+                    منقضی بیش از ۱۴ روز
+                </div>
+                <div class="text-xl font-bold font-mono text-rose-400 mt-1"><?= number_format($optimizerStats['expired_14d'] ?? 0) ?> <span class="text-xs text-slate-400 font-normal">سرویس</span></div>
+            </div>
+
+            <div class="bg-slate-800/60 p-3 rounded-xl border border-slate-700/60">
+                <div class="text-slate-400 text-[11px] flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-rose-600 inline-block"></span>
+                    منقضی بیش از ۳۰ روز
+                </div>
+                <div class="text-xl font-bold font-mono text-rose-500 mt-1"><?= number_format($optimizerStats['expired_30d'] ?? 0) ?> <span class="text-xs text-slate-400 font-normal">سرویس</span></div>
+            </div>
+
+            <div class="bg-slate-800/60 p-3 rounded-xl border border-slate-700/60">
+                <div class="text-slate-400 text-[11px] flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-red-500 inline-block"></span>
+                    کل منقضی‌ها
+                </div>
+                <div class="text-xl font-bold font-mono text-red-400 mt-1"><?= number_format($optimizerStats['expired_all'] ?? 0) ?> <span class="text-xs text-slate-400 font-normal">سرویس</span></div>
+            </div>
+
+            <div class="bg-slate-800/60 p-3 rounded-xl border border-slate-700/60">
+                <div class="text-slate-400 text-[11px] flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-cyan-400 inline-block"></span>
+                    تست‌های منقضی
+                </div>
+                <div class="text-xl font-bold font-mono text-cyan-300 mt-1"><?= number_format($optimizerStats['expired_trials'] ?? 0) ?> <span class="text-xs text-slate-400 font-normal">سرویس</span></div>
+            </div>
+        </div>
+
+        <div class="p-3 bg-amber-950/30 border border-amber-800/40 rounded-xl text-xs text-amber-200/90 leading-relaxed flex items-start gap-2">
+            <i class="fa-solid fa-triangle-exclamation text-amber-400 mt-0.5"></i>
+            <div>
+                <b>هشدار پاکسازی:</b> عملیات بهینه‌سازی غیرقابل بازگشت است. کاربران شناسایی‌شده همزمان از دیتابیس پنل و همچنین از روی سرورهای نود (مرزبان، پاسارگاد و ۳X-UI) به طور کامل حذف خواهند شد تا منابع و حافظه آزاد شوند.
+            </div>
+        </div>
+
+        <!-- 1-Click Optimization Actions -->
+        <div class="space-y-2.5">
+            <!-- Purge Unused -->
+            <form action="<?= Helpers::url('clients/optimize-purge') ?>" method="POST" onsubmit="return confirmPurge('سرویس‌های بدون مصرف (حجم صفر)');" class="flex items-center justify-between p-3 bg-slate-800/50 hover:bg-slate-800 rounded-xl border border-slate-700/60 transition">
+                <?= Helpers::csrfField() ?>
+                <input type="hidden" name="purge_type" value="unused">
+                <div class="text-xs">
+                    <div class="font-bold text-white flex items-center gap-1.5">
+                        <i class="fa-solid fa-circle-pause text-amber-400"></i>
+                        <span>پاکسازی سرویس‌های بدون مصرف (حجم صفر)</span>
+                    </div>
+                    <div class="text-[11px] text-slate-400 mt-0.5">اکانت‌هایی که ساخته شده اما کلاینت هیچ ترافیکی مصرف نکرده است</div>
+                </div>
+                <button type="submit" <?= ($optimizerStats['unused'] ?? 0) === 0 ? 'disabled' : '' ?> class="px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:opacity-40 disabled:pointer-events-none text-white font-bold rounded-lg text-xs transition shadow flex items-center gap-1.5">
+                    <i class="fa-solid fa-trash-can"></i>
+                    <span>حذف (<?= $optimizerStats['unused'] ?? 0 ?>)</span>
+                </button>
+            </form>
+
+            <!-- Purge Expired > 7 Days -->
+            <form action="<?= Helpers::url('clients/optimize-purge') ?>" method="POST" onsubmit="return confirmPurge('سرویس‌های منقضی بیش از ۷ روز');" class="flex items-center justify-between p-3 bg-slate-800/50 hover:bg-slate-800 rounded-xl border border-slate-700/60 transition">
+                <?= Helpers::csrfField() ?>
+                <input type="hidden" name="purge_type" value="expired_7d">
+                <div class="text-xs">
+                    <div class="font-bold text-white flex items-center gap-1.5">
+                        <i class="fa-solid fa-clock-rotate-left text-rose-400"></i>
+                        <span>پاکسازی اکانت‌های منقضی بیش از ۷ روز (۱ هفته)</span>
+                    </div>
+                    <div class="text-[11px] text-slate-400 mt-0.5">بهترین گزینه برای آزاد کردن دوره‌ای منابع و ترافیک سرورها</div>
+                </div>
+                <button type="submit" <?= ($optimizerStats['expired_7d'] ?? 0) === 0 ? 'disabled' : '' ?> class="px-4 py-2 bg-rose-600 hover:bg-rose-500 disabled:opacity-40 disabled:pointer-events-none text-white font-bold rounded-lg text-xs transition shadow flex items-center gap-1.5">
+                    <i class="fa-solid fa-trash-can"></i>
+                    <span>حذف (<?= $optimizerStats['expired_7d'] ?? 0 ?>)</span>
+                </button>
+            </form>
+
+            <!-- Purge Expired > 14 Days -->
+            <form action="<?= Helpers::url('clients/optimize-purge') ?>" method="POST" onsubmit="return confirmPurge('سرویس‌های منقضی بیش از ۱۴ روز');" class="flex items-center justify-between p-3 bg-slate-800/50 hover:bg-slate-800 rounded-xl border border-slate-700/60 transition">
+                <?= Helpers::csrfField() ?>
+                <input type="hidden" name="purge_type" value="expired_14d">
+                <div class="text-xs">
+                    <div class="font-bold text-white flex items-center gap-1.5">
+                        <i class="fa-solid fa-calendar-xmark text-rose-500"></i>
+                        <span>پاکسازی اکانت‌های منقضی بیش از ۱۴ روز (۲ هفته)</span>
+                    </div>
+                    <div class="text-[11px] text-slate-400 mt-0.5">اکانت‌های متروکه‌ای که پس از دو هفته تمدید نشده‌اند</div>
+                </div>
+                <button type="submit" <?= ($optimizerStats['expired_14d'] ?? 0) === 0 ? 'disabled' : '' ?> class="px-4 py-2 bg-rose-700 hover:bg-rose-600 disabled:opacity-40 disabled:pointer-events-none text-white font-bold rounded-lg text-xs transition shadow flex items-center gap-1.5">
+                    <i class="fa-solid fa-trash-can"></i>
+                    <span>حذف (<?= $optimizerStats['expired_14d'] ?? 0 ?>)</span>
+                </button>
+            </form>
+
+            <!-- Purge Expired > 30 Days -->
+            <form action="<?= Helpers::url('clients/optimize-purge') ?>" method="POST" onsubmit="return confirmPurge('سرویس‌های منقضی بیش از ۳۰ روز');" class="flex items-center justify-between p-3 bg-slate-800/50 hover:bg-slate-800 rounded-xl border border-slate-700/60 transition">
+                <?= Helpers::csrfField() ?>
+                <input type="hidden" name="purge_type" value="expired_30d">
+                <div class="text-xs">
+                    <div class="font-bold text-white flex items-center gap-1.5">
+                        <i class="fa-solid fa-skull-crossbones text-rose-600"></i>
+                        <span>پاکسازی اکانت‌های منقضی بیش از ۳۰ روز (۱ ماه)</span>
+                    </div>
+                    <div class="text-[11px] text-slate-400 mt-0.5">آزادسازی قطعی اکانت‌های تاریخ‌گذشته قدیمی</div>
+                </div>
+                <button type="submit" <?= ($optimizerStats['expired_30d'] ?? 0) === 0 ? 'disabled' : '' ?> class="px-4 py-2 bg-rose-800 hover:bg-rose-700 disabled:opacity-40 disabled:pointer-events-none text-white font-bold rounded-lg text-xs transition shadow flex items-center gap-1.5">
+                    <i class="fa-solid fa-trash-can"></i>
+                    <span>حذف (<?= $optimizerStats['expired_30d'] ?? 0 ?>)</span>
+                </button>
+            </form>
+
+            <!-- Purge Expired Trials -->
+            <form action="<?= Helpers::url('clients/optimize-purge') ?>" method="POST" onsubmit="return confirmPurge('اکانت‌های تست رایگان منقضی');" class="flex items-center justify-between p-3 bg-slate-800/50 hover:bg-slate-800 rounded-xl border border-slate-700/60 transition">
+                <?= Helpers::csrfField() ?>
+                <input type="hidden" name="purge_type" value="trials_expired">
+                <div class="text-xs">
+                    <div class="font-bold text-white flex items-center gap-1.5">
+                        <i class="fa-solid fa-vial text-cyan-400"></i>
+                        <span>پاکسازی اکانت‌های تست منقضی</span>
+                    </div>
+                    <div class="text-[11px] text-slate-400 mt-0.5">حذف تست‌های ۲۴ ساعته یا موقتی که به اتمام رسیده‌اند</div>
+                </div>
+                <button type="submit" <?= ($optimizerStats['expired_trials'] ?? 0) === 0 ? 'disabled' : '' ?> class="px-4 py-2 bg-cyan-700 hover:bg-cyan-600 disabled:opacity-40 disabled:pointer-events-none text-white font-bold rounded-lg text-xs transition shadow flex items-center gap-1.5">
+                    <i class="fa-solid fa-trash-can"></i>
+                    <span>حذف (<?= $optimizerStats['expired_trials'] ?? 0 ?>)</span>
+                </button>
+            </form>
+
+            <!-- Purge All Expired -->
+            <form action="<?= Helpers::url('clients/optimize-purge') ?>" method="POST" onsubmit="return confirmPurge('کلیه سرویس‌های منقضی‌شده');" class="flex items-center justify-between p-3 bg-slate-800/50 hover:bg-slate-800 rounded-xl border border-slate-700/60 transition">
+                <?= Helpers::csrfField() ?>
+                <input type="hidden" name="purge_type" value="expired_all">
+                <div class="text-xs">
+                    <div class="font-bold text-white flex items-center gap-1.5">
+                        <i class="fa-solid fa-fire text-red-500"></i>
+                        <span>پاکسازی کلیه سرویس‌های منقضی‌شده (همه تاریخ‌ها)</span>
+                    </div>
+                    <div class="text-[11px] text-slate-400 mt-0.5">حذف فوری تمامی سرویس‌هایی که وضعیت آنها منقضی یا تاریخشان به اتمام رسیده است</div>
+                </div>
+                <button type="submit" <?= ($optimizerStats['expired_all'] ?? 0) === 0 ? 'disabled' : '' ?> class="px-4 py-2 bg-red-700 hover:bg-red-600 disabled:opacity-40 disabled:pointer-events-none text-white font-bold rounded-lg text-xs transition shadow flex items-center gap-1.5">
+                    <i class="fa-solid fa-trash-can"></i>
+                    <span>حذف (<?= $optimizerStats['expired_all'] ?? 0 ?>)</span>
+                </button>
+            </form>
+        </div>
+
+        <div class="pt-2 flex justify-end">
+            <button type="button" onclick="closeOptimizerModal()" class="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition">
+                بستن پنجره
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
 function openTestModal() {
     var m = document.getElementById('testAccountModal');
@@ -875,6 +1122,24 @@ function closeTestModal() {
 function setTestMb(mb) {
     var inp = document.getElementById('test_traffic_mb');
     if (inp) inp.value = mb;
+}
+
+function openOptimizerModal() {
+    var m = document.getElementById('optimizerModal');
+    if (m) {
+        m.classList.remove('hidden');
+        m.classList.add('flex');
+    }
+}
+function closeOptimizerModal() {
+    var m = document.getElementById('optimizerModal');
+    if (m) {
+        m.classList.remove('flex');
+        m.classList.add('hidden');
+    }
+}
+function confirmPurge(label) {
+    return confirm('هشدار نهایی: آیا از حذف دائمی «' + label + '» از روی دیتابیس پنل و کلیه سرورها اطمینان کامل دارید؟\n\nاین عملیات قابل بازگشت نیست.');
 }
 </script>
 
