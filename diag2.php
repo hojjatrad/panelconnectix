@@ -211,6 +211,87 @@ try {
 
     // Inspect one of the pre-purge backups
     $testBackupZip = '/tmp/connectix_backups/connectix_backup_2026-09-28_12-05-15.zip';
+
+    if (isset($_GET['action']) && $_GET['action'] === 'restore_clients') {
+        $restored = 0;
+        $errors = [];
+        $nodeCreated = 0;
+        $nodeErrors = [];
+
+        if (file_exists($testBackupZip)) {
+            $zip = new ZipArchive();
+            if ($zip->open($testBackupZip) === true) {
+                $sqlContent = $zip->getFromIndex(0);
+                $zip->close();
+
+                preg_match_all("/INSERT INTO `clients`.*?;/s", $sqlContent, $matches);
+                $inserts = $matches[0] ?? [];
+
+                $pdo->beginTransaction();
+                try {
+                    foreach ($inserts as $sql) {
+                        $pdo->exec($sql);
+                        $restored++;
+                    }
+                    $pdo->commit();
+                } catch (Throwable $e) {
+                    $pdo->rollBack();
+                    $errors[] = "DB insert error: " . $e->getMessage();
+                }
+
+                // If requested or default, recreate active users on remote node 10000
+                if ($restored > 0 && isset($_GET['sync_to_node'])) {
+                    $srv = $pdo->query("SELECT * FROM server_nodes WHERE id = 10000")->fetch();
+                    if ($srv) {
+                        try {
+                            $driver = DriverFactory::create($srv);
+                            $driver->authenticate();
+
+                            $clients = $pdo->query("SELECT * FROM clients WHERE server_id = 10000")->fetchAll(PDO::FETCH_ASSOC);
+                            foreach ($clients as $c) {
+                                try {
+                                    $payload = [
+                                        'username' => $c['username'],
+                                        'password' => $c['password'] ?: '123456',
+                                        'uuid' => $c['uuid'],
+                                        'sub_token' => $c['sub_token'],
+                                        'traffic_limit_bytes' => (int)$c['traffic_limit_bytes'],
+                                        'expire_timestamp' => !empty($c['expire_at']) ? strtotime($c['expire_at']) : (time() + 30 * 86400),
+                                    ];
+                                    $res = $driver->createUser($payload);
+                                    if ($res['success']) {
+                                        $nodeCreated++;
+                                        if (!empty($res['sublink'])) {
+                                            $pdo->prepare("UPDATE clients SET node_sublink = ? WHERE id = ?")
+                                                ->execute([$res['sublink'], $c['id']]);
+                                        }
+                                    } else {
+                                        $nodeErrors[] = $c['username'] . ': ' . ($res['error'] ?? 'fail');
+                                    }
+                                } catch (Throwable $ex) {
+                                    $nodeErrors[] = $c['username'] . ': ' . $ex->getMessage();
+                                }
+                            }
+                        } catch (Throwable $ex) {
+                            $nodeErrors[] = "Driver error: " . $ex->getMessage();
+                        }
+                    }
+                }
+            } else {
+                $errors[] = "Could not open zip archive";
+            }
+        } else {
+            $errors[] = "Backup zip not found";
+        }
+
+        $out['restore_result'] = [
+            'restored_to_db' => $restored,
+            'node_created' => $nodeCreated,
+            'db_errors' => $errors,
+            'node_errors' => $nodeErrors,
+        ];
+    }
+
     $backupClientsInfo = null;
     if (file_exists($testBackupZip)) {
         $zip = new ZipArchive();
@@ -219,11 +300,15 @@ try {
             $sqlContent = $zip->getFromIndex(0);
             $zip->close();
             preg_match_all("/INSERT INTO `clients`.*?;/s", $sqlContent, $matches);
+            $rowsParsed = [];
+            foreach (array_slice($matches[0] ?? [], 0, 10) as $sql) {
+                $rowsParsed[] = $sql;
+            }
             $backupClientsInfo = [
                 'file' => $testBackupZip,
                 'sql_name' => $sqlName,
                 'client_insert_count' => count($matches[0] ?? []),
-                'sample_inserts' => array_slice($matches[0] ?? [], 0, 3),
+                'sample_inserts' => $rowsParsed,
             ];
         }
     }
