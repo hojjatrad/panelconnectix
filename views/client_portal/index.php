@@ -5,9 +5,9 @@
  */
 /** @var array|null $client */
 $client = $client ?? null;
-$brandName = htmlspecialchars($client['brand_name'] ?? 'Connectix VPN');
+$brandName = htmlspecialchars((string)($client['brand_name'] ?? 'Connectix VPN'));
 $logoUrl = (string)($client['logo_url'] ?? '');
-$theme = $client['theme_color'] ?? 'violet';
+$theme = (string)($client['theme_color'] ?? 'violet');
 $themeMap = [
     'violet' => '#8b5cf6',
     'blue' => '#3b82f6',
@@ -17,7 +17,7 @@ $themeMap = [
     'cyan' => '#06b6d4'
 ];
 $accent = $themeMap[$theme] ?? '#8b5cf6';
-$err = $error ?? '';
+$err = (string)($error ?? '');
 
 // Load App Release Manifest
 $manifestPath = dirname(__DIR__, 2) . '/app_release.json';
@@ -25,16 +25,24 @@ $manifest = [];
 if (is_file($manifestPath)) {
     $manifest = @json_decode(file_get_contents($manifestPath), true) ?: [];
 }
-$appVersion = $manifest['version'] ?? '3.5.1';
-$apkUniversalUrl = $manifest['apk']['universal'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.1/Connectix-Android-Universal.apk';
-$apkArm64Url = $manifest['apk']['arm64'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.1/Connectix-Android-ARM64.apk';
-$windowsUrl = $manifest['windows']['url'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.1/Connectix-Windows-x64.zip';
+$appVersion = (string)($manifest['version'] ?? '3.5.1');
+$apkUniversalUrl = (string)($manifest['apk']['universal'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.1/Connectix-Android-Universal.apk');
+$apkArm64Url = (string)($manifest['apk']['arm64'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.1/Connectix-Android-ARM64.apk');
+$windowsUrl = (string)($manifest['windows']['url'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.1/Connectix-Windows-x64.zip');
+
+// Sanitized Client Data
+$clientUsername = htmlspecialchars((string)($client['username'] ?? 'user'));
+$clientPassword = htmlspecialchars((string)(!empty($client['password']) ? $client['password'] : '123456'));
+$serverName = htmlspecialchars((string)(!empty($client['server_name']) ? $client['server_name'] : 'سرور ابری'));
+$subToken = (string)($client['sub_token'] ?? '');
+$subUrl = $subToken !== '' ? Helpers::subUrl($subToken) : '';
+$subUrlEncoded = urlencode($subUrl);
 
 $usedBytes = (int)($client['traffic_used_bytes'] ?? 0);
 $limitBytes = (int)($client['traffic_limit_bytes'] ?? 0);
 $remBytes = max(0, $limitBytes - $usedBytes);
 $usagePct = $limitBytes > 0 ? min(100, round(($usedBytes / $limitBytes) * 100, 1)) : 0;
-$daysLeft = $client ? Helpers::daysRemaining($client['expire_at']) : '';
+$daysLeft = $client ? Helpers::daysRemaining($client['expire_at'] ?? null) : '';
 $expired = $client && !empty($client['expire_at']) && strtotime((string)$client['expire_at']) <= time();
 
 $statusFa = match ($client['status'] ?? '') {
@@ -44,13 +52,22 @@ $statusFa = match ($client['status'] ?? '') {
     default => ['⚪ ' . ($client['status'] ?? 'نامشخص'), 'text-slate-400 bg-slate-800 border-slate-700'],
 };
 
-$subUrl = $client ? Helpers::subUrl((string)$client['sub_token']) : '';
+// Support & Renewal URLs
+$rawTelegram = trim((string)($client['telegram_support'] ?? ''));
+$telegramUsername = ltrim($rawTelegram, '@');
+$telegramUrl = $telegramUsername !== '' ? 'https://t.me/' . $telegramUsername : '';
+
+$rawWhatsapp = trim((string)($client['whatsapp_support'] ?? ''));
+$whatsappPhone = preg_replace('/[^0-9]/', '', $rawWhatsapp);
+$whatsappUrl = $whatsappPhone !== '' ? 'https://wa.me/' . $whatsappPhone : '';
+
 $renewalUrl = trim((string)($client['renewal_url'] ?? ''));
-$botUsername = trim((string)($client['reseller_bot_username'] ?? ''));
-$telegramSupport = trim((string)($client['telegram_support'] ?? ''));
-$whatsappSupport = trim((string)($client['whatsapp_support'] ?? ''));
+$rawBot = trim((string)($client['reseller_bot_username'] ?? ''));
+$botUsername = ltrim($rawBot, '@');
+$botUrl = $botUsername !== '' ? 'https://t.me/' . $botUsername : '';
+
 $clientIpLimit = (int)($client['ip_limit'] ?? 0);
-$userLimitText = $clientIpLimit > 0 ? "{$clientIpLimit} کاربر" : "نامحدود";
+$userLimitText = $clientIpLimit > 0 ? "{$clientIpLimit} دستگاه" : "نامحدود";
 ?>
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
@@ -72,7 +89,7 @@ $userLimitText = $clientIpLimit > 0 ? "{$clientIpLimit} کاربر" : "نامح�
     <div class="fixed -top-40 -right-40 w-96 h-96 bg-purple-600/15 rounded-full blur-3xl pointer-events-none"></div>
     <div class="fixed -bottom-40 -left-40 w-96 h-96 bg-cyan-600/15 rounded-full blur-3xl pointer-events-none"></div>
 
-    <div class="w-full max-w-lg space-y-5 relative z-10 py-4">
+    <div class="w-full max-w-lg space-y-4 relative z-10 py-4">
 
         <!-- Header & Branding -->
         <div class="flex items-center justify-between bg-slate-900/80 border border-slate-800 rounded-3xl p-4 shadow-xl backdrop-blur-md">
@@ -129,7 +146,7 @@ $userLimitText = $clientIpLimit > 0 ? "{$clientIpLimit} کاربر" : "نامح�
                             <i class="fa-solid fa-user text-purple-400 text-xs"></i>
                             <span>نام کاربری</span>
                         </label>
-                        <input name="username" required autofocus placeholder="مثلاً: user123" class="w-full bg-slate-950 border border-slate-700/80 rounded-2xl px-4 py-3 text-sm text-white font-mono focus:outline-none focus:border-purple-500 transition" dir="ltr">
+                        <input name="username" required autofocus placeholder="username" class="w-full bg-slate-950 border border-slate-700/80 rounded-2xl px-4 py-3 text-sm text-white font-mono focus:outline-none focus:border-purple-500 transition" dir="ltr">
                     </div>
 
                     <div>
@@ -174,7 +191,7 @@ $userLimitText = $clientIpLimit > 0 ? "{$clientIpLimit} کاربر" : "نامح�
                         <span class="text-[10px] text-slate-400 block mb-0.5">مشخصات اشتراک</span>
                         <h2 class="text-base font-bold text-white flex items-center gap-2">
                             <i class="fa-solid fa-circle-user text-purple-400"></i>
-                            <span class="font-mono" dir="ltr"><?= htmlspecialchars($client['username']) ?></span>
+                            <span class="font-mono" dir="ltr"><?= $clientUsername ?></span>
                         </h2>
                     </div>
                     <span class="text-xs font-bold px-3 py-1 rounded-full border <?= $statusFa[1] ?>">
@@ -187,9 +204,9 @@ $userLimitText = $clientIpLimit > 0 ? "{$clientIpLimit} کاربر" : "نامح�
                     <div class="bg-slate-950/70 border border-slate-800 rounded-2xl p-3 flex items-center justify-between">
                         <div class="space-y-0.5">
                             <span class="text-[10px] text-slate-400 block">نام کاربری:</span>
-                            <span class="font-mono font-bold text-xs text-white" dir="ltr"><?= htmlspecialchars($client['username']) ?></span>
+                            <span class="font-mono font-bold text-xs text-white" dir="ltr"><?= $clientUsername ?></span>
                         </div>
-                        <button onclick="copyToClipboard('<?= htmlspecialchars($client['username']) ?>', this)" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-[11px] font-semibold border border-slate-700 transition flex items-center gap-1">
+                        <button type="button" data-copy="<?= $clientUsername ?>" onclick="copyFromData(this)" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-[11px] font-semibold border border-slate-700 transition flex items-center gap-1">
                             <i class="fa-regular fa-copy"></i>
                             <span>کپی</span>
                         </button>
@@ -198,9 +215,9 @@ $userLimitText = $clientIpLimit > 0 ? "{$clientIpLimit} کاربر" : "نامح�
                     <div class="bg-slate-950/70 border border-purple-900/30 rounded-2xl p-3 flex items-center justify-between">
                         <div class="space-y-0.5">
                             <span class="text-[10px] text-slate-400 block">کلمه عبور اشتراک:</span>
-                            <span class="font-mono font-bold text-xs text-purple-300" dir="ltr"><?= htmlspecialchars($client['password'] ?: '123456') ?></span>
+                            <span class="font-mono font-bold text-xs text-purple-300" dir="ltr"><?= $clientPassword ?></span>
                         </div>
-                        <button onclick="copyToClipboard('<?= htmlspecialchars($client['password'] ?: '123456') ?>', this)" class="px-2.5 py-1 bg-slate-800 hover:bg-purple-600 text-slate-300 hover:text-white rounded-xl text-[11px] font-semibold border border-slate-700 transition flex items-center gap-1">
+                        <button type="button" data-copy="<?= $clientPassword ?>" onclick="copyFromData(this)" class="px-2.5 py-1 bg-slate-800 hover:bg-purple-600 text-slate-300 hover:text-white rounded-xl text-[11px] font-semibold border border-slate-700 transition flex items-center gap-1">
                             <i class="fa-regular fa-copy"></i>
                             <span>کپی</span>
                         </button>
@@ -211,7 +228,7 @@ $userLimitText = $clientIpLimit > 0 ? "{$clientIpLimit} کاربر" : "نامح�
                 <div class="grid grid-cols-2 gap-2 text-xs pt-1">
                     <div class="bg-slate-950/50 rounded-2xl p-3 border border-slate-800/80">
                         <span class="text-[10px] text-slate-400 block mb-0.5">سرور متصل:</span>
-                        <span class="font-bold text-slate-200"><?= htmlspecialchars((string)($client['server_name'] ?: 'سرور ابری')) ?></span>
+                        <span class="font-bold text-slate-200"><?= $serverName ?></span>
                     </div>
 
                     <div class="bg-slate-950/50 rounded-2xl p-3 border border-slate-800/80">
@@ -299,7 +316,7 @@ $userLimitText = $clientIpLimit > 0 ? "{$clientIpLimit} کاربر" : "نامح�
                         <i class="fa-solid fa-link text-purple-400"></i>
                         <span>لینک اشتراک هوشمند (Sublink)</span>
                     </h3>
-                    <button onclick="copyToClipboard('<?= htmlspecialchars($subUrl) ?>', this)" class="px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow">
+                    <button type="button" data-copy="<?= htmlspecialchars($subUrl) ?>" onclick="copyFromData(this)" class="px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow">
                         <i class="fa-regular fa-copy"></i>
                         <span>کپی لینک</span>
                     </button>
@@ -322,22 +339,22 @@ $userLimitText = $clientIpLimit > 0 ? "{$clientIpLimit} کاربر" : "نامح�
                 <div class="pt-3 border-t border-slate-800 space-y-2">
                     <span class="text-[11px] text-slate-400 block font-semibold text-center">اتصال با یک کلیک در برنامه‌های استاندارد:</span>
                     <div class="grid grid-cols-2 gap-2 text-xs">
-                        <a href="hiddify://install-sub?url=<?= urlencode($subUrl) ?>" class="py-2.5 px-3 bg-slate-950 hover:bg-purple-900/40 rounded-xl border border-slate-800 text-purple-300 flex items-center justify-center gap-2 transition font-semibold">
+                        <a href="hiddify://install-sub?url=<?= $subUrlEncoded ?>" class="py-2.5 px-3 bg-slate-950 hover:bg-purple-900/40 rounded-xl border border-slate-800 text-purple-300 flex items-center justify-center gap-2 transition font-semibold">
                             <i class="fa-solid fa-bolt"></i>
                             <span>ورود به Hiddify</span>
                         </a>
 
-                        <a href="v2rayng://install-config?url=<?= urlencode($subUrl) ?>" class="py-2.5 px-3 bg-slate-950 hover:bg-slate-800 rounded-xl border border-slate-800 text-emerald-400 flex items-center justify-center gap-2 transition font-semibold">
+                        <a href="v2rayng://install-config?url=<?= $subUrlEncoded ?>" class="py-2.5 px-3 bg-slate-950 hover:bg-slate-800 rounded-xl border border-slate-800 text-emerald-400 flex items-center justify-center gap-2 transition font-semibold">
                             <i class="fa-brands fa-android"></i>
                             <span>ورود به V2rayNG</span>
                         </a>
 
-                        <a href="streisand://import/<?= urlencode($subUrl) ?>" class="py-2.5 px-3 bg-slate-950 hover:bg-slate-800 rounded-xl border border-slate-800 text-slate-200 flex items-center justify-center gap-2 transition font-semibold">
+                        <a href="streisand://import/<?= $subUrlEncoded ?>" class="py-2.5 px-3 bg-slate-950 hover:bg-slate-800 rounded-xl border border-slate-800 text-slate-200 flex items-center justify-center gap-2 transition font-semibold">
                             <i class="fa-brands fa-apple"></i>
                             <span>ورود به Streisand</span>
                         </a>
 
-                        <a href="sing-box://import-remote-profile?url=<?= urlencode($subUrl) ?>" class="py-2.5 px-3 bg-slate-950 hover:bg-slate-800 rounded-xl border border-slate-800 text-cyan-300 flex items-center justify-center gap-2 transition font-semibold">
+                        <a href="sing-box://import-remote-profile?url=<?= $subUrlEncoded ?>" class="py-2.5 px-3 bg-slate-950 hover:bg-slate-800 rounded-xl border border-slate-800 text-cyan-300 flex items-center justify-center gap-2 transition font-semibold">
                             <i class="fa-solid fa-box"></i>
                             <span>ورود به Sing-box</span>
                         </a>
@@ -346,6 +363,12 @@ $userLimitText = $clientIpLimit > 0 ? "{$clientIpLimit} کاربر" : "نامح�
             </div>
 
             <!-- Card 5: Renewal & Customer Support -->
+            <?php 
+            $hasRenewal = ($renewalUrl !== '' || $botUrl !== '');
+            $hasTelegram = ($telegramUrl !== '');
+            $hasWhatsapp = ($whatsappUrl !== '');
+            if ($hasRenewal || $hasTelegram || $hasWhatsapp): 
+            ?>
             <div class="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 shadow-xl space-y-3 backdrop-blur-md">
                 <span class="text-xs text-slate-400 block text-center font-semibold">نیاز به تمدید یا ارتباط با پشتیبانی دارید؟</span>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 text-xs font-semibold">
@@ -354,28 +377,29 @@ $userLimitText = $clientIpLimit > 0 ? "{$clientIpLimit} کاربر" : "نامح�
                             <i class="fa-solid fa-arrows-rotate"></i>
                             <span>تمدید آنلاین اشتراک</span>
                         </a>
-                    <?php elseif ($botUsername !== ''): ?>
-                        <a href="https://t.me/<?= htmlspecialchars(ltrim($botUsername, '@')) ?>" target="_blank" class="py-3 px-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-center shadow transition flex items-center justify-center gap-2">
+                    <?php elseif ($botUrl !== ''): ?>
+                        <a href="<?= htmlspecialchars($botUrl) ?>" target="_blank" class="py-3 px-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-center shadow transition flex items-center justify-center gap-2">
                             <i class="fa-brands fa-telegram"></i>
                             <span>تمدید از طریق ربات</span>
                         </a>
                     <?php endif; ?>
 
-                    <?php if ($telegramSupport !== ''): ?>
-                        <a href="https://t.me/<?= htmlspecialchars(ltrim($telegramSupport, '@')) ?>" target="_blank" class="py-3 px-3 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 rounded-xl text-center transition flex items-center justify-center gap-2">
+                    <?php if ($hasTelegram): ?>
+                        <a href="<?= htmlspecialchars($telegramUrl) ?>" target="_blank" class="py-3 px-3 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 rounded-xl text-center transition flex items-center justify-center gap-2">
                             <i class="fa-brands fa-telegram text-sm"></i>
                             <span>پشتیبانی تلگرام</span>
                         </a>
                     <?php endif; ?>
 
-                    <?php if ($whatsappSupport !== ''): ?>
-                        <a href="https://wa.me/<?= preg_replace('/[^0-9]/', '', $whatsappSupport) ?>" target="_blank" class="py-3 px-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl text-center transition flex items-center justify-center gap-2">
+                    <?php if ($hasWhatsapp): ?>
+                        <a href="<?= htmlspecialchars($whatsappUrl) ?>" target="_blank" class="py-3 px-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl text-center transition flex items-center justify-center gap-2">
                             <i class="fa-brands fa-whatsapp text-sm"></i>
                             <span>پشتیبانی واتس‌اپ</span>
                         </a>
                     <?php endif; ?>
                 </div>
             </div>
+            <?php endif; ?>
 
             <!-- Clean Logout Link -->
             <div class="text-center pt-1 pb-4">
@@ -391,7 +415,7 @@ $userLimitText = $clientIpLimit > 0 ? "{$clientIpLimit} کاربر" : "نامح�
 
     <script>
         // Render QR Code
-        <?php if ($client): ?>
+        <?php if ($client && $subUrl !== ''): ?>
         try {
             if (typeof QRCode !== 'undefined') {
                 new QRCode(document.getElementById("qrcode"), {
@@ -403,15 +427,29 @@ $userLimitText = $clientIpLimit > 0 ? "{$clientIpLimit} کاربر" : "نامح�
                     correctLevel : QRCode.CorrectLevel.M
                 });
             } else {
-                document.getElementById("qrcode").innerHTML = '<img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=<?= urlencode($subUrl) ?>" alt="QR" class="w-40 h-40">';
+                document.getElementById("qrcode").innerHTML = '<img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=<?= $subUrlEncoded ?>" alt="QR" class="w-40 h-40">';
             }
         } catch(e) {
-            document.getElementById("qrcode").innerHTML = '<img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=<?= urlencode($subUrl) ?>" alt="QR" class="w-40 h-40">';
+            document.getElementById("qrcode").innerHTML = '<img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=<?= $subUrlEncoded ?>" alt="QR" class="w-40 h-40">';
         }
         <?php endif; ?>
 
-        // Robust Copy to Clipboard
+        // Copy from data attribute
+        function copyFromData(btn) {
+            const val = btn.getAttribute('data-copy') || '';
+            copyToClipboard(val, btn);
+        }
+
+        // Robust Copy to Clipboard with zero error
         function copyToClipboard(text, btnElement) {
+            const origHtml = btnElement.innerHTML;
+            const showSuccess = function() {
+                btnElement.innerHTML = '<i class="fa-solid fa-check text-emerald-400"></i> کپی شد!';
+                setTimeout(function() {
+                    btnElement.innerHTML = origHtml;
+                }, 2000);
+            };
+
             if (!navigator.clipboard) {
                 const ta = document.createElement("textarea");
                 ta.value = text;
@@ -419,22 +457,19 @@ $userLimitText = $clientIpLimit > 0 ? "{$clientIpLimit} کاربر" : "نامح�
                 ta.select();
                 document.execCommand("copy");
                 document.body.removeChild(ta);
-                showCopiedFeedback(btnElement);
+                showSuccess();
                 return;
             }
-            navigator.clipboard.writeText(text).then(function() {
-                showCopiedFeedback(btnElement);
-            }).catch(function() {
-                alert('خطا در کپی متن');
-            });
-        }
 
-        function showCopiedFeedback(btnElement) {
-            const origHtml = btnElement.innerHTML;
-            btnElement.innerHTML = '<i class="fa-solid fa-check text-emerald-400"></i> کپی شد!';
-            setTimeout(function() {
-                btnElement.innerHTML = origHtml;
-            }, 2000);
+            navigator.clipboard.writeText(text).then(showSuccess).catch(function() {
+                const ta = document.createElement("textarea");
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand("copy");
+                document.body.removeChild(ta);
+                showSuccess();
+            });
         }
     </script>
 </body>
