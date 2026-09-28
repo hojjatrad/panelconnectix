@@ -177,10 +177,21 @@ try {
         $nodeDiagnostics[] = $diagItem;
     }
 
+    $tables = $pdo->query("SELECT name FROM sqlite_master WHERE type='table'")->fetchAll(PDO::FETCH_COLUMN);
+    $tableCounts = [];
+    foreach ($tables as $tbl) {
+        try {
+            $tableCounts[$tbl] = (int)$pdo->query("SELECT COUNT(*) FROM \"{$tbl}\"")->fetchColumn();
+        } catch (Throwable $e) {
+            $tableCounts[$tbl] = 'err: ' . $e->getMessage();
+        }
+    }
+
     $out['db_state'] = [
         'clients_count' => $clCount,
         'servers_count' => count($servers),
         'nodes' => $nodeDiagnostics,
+        'table_counts' => $tableCounts,
         'backups' => glob(__DIR__ . '/data/*.sqlite*') ?: [],
         'data_files' => array_map('basename', glob(__DIR__ . '/data/*') ?: []),
     ];
