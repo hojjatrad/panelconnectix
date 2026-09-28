@@ -658,6 +658,50 @@ class ServerController {
         require_once __DIR__ . '/../core/NodeSync.php';
         $nodeStats = NodeSync::syncAll($pdo);
 
+        // 1.5 Auto-recover non-zero traffic from pre-purge backup for any clients showing 0 bytes
+        $zeroCount = (int)($pdo->query("SELECT COUNT(*) FROM clients WHERE traffic_used_bytes = 0 OR traffic_used_bytes IS NULL")->fetchColumn() ?: 0);
+        if ($zeroCount > 10) {
+            $candidateZips = glob('/tmp/connectix_backups/*.zip') ?: [];
+            rsort($candidateZips);
+            $targetZip = null;
+            foreach ($candidateZips as $cz) {
+                if (str_contains($cz, '2026-09-28_12-00') || str_contains($cz, '2026-09-28_11-5')) {
+                    $targetZip = $cz;
+                    break;
+                }
+            }
+            if ($targetZip && file_exists($targetZip)) {
+                $zip = new ZipArchive();
+                if ($zip->open($targetZip) === true) {
+                    $sql = $zip->getFromIndex(0);
+                    $zip->close();
+                    preg_match('/INSERT INTO `clients` \((.*?)\) VALUES/s', $sql, $colsM);
+                    $cols = array_map(function($c) { return trim($c, " `\t\n\r"); }, explode(',', $colsM[1] ?? ''));
+                    $usedIdx = array_search('traffic_used_bytes', $cols);
+                    $userIdx = array_search('username', $cols);
+                    $statusIdx = array_search('status', $cols);
+                    $expireIdx = array_search('expire_at', $cols);
+
+                    preg_match_all("/INSERT INTO `clients`.*?VALUES\s*\((.*?)\);/s", $sql, $matches);
+                    $stUpd = $pdo->prepare("UPDATE clients SET traffic_used_bytes = ?, status = ?, expire_at = ? WHERE username = ? AND (traffic_used_bytes = 0 OR traffic_used_bytes IS NULL)");
+
+                    $pdo->beginTransaction();
+                    foreach ($matches[1] as $valStr) {
+                        $vals = str_getcsv($valStr, ',', "'");
+                        $uName = trim((string)($vals[$userIdx] ?? ''));
+                        $used = (int)($vals[$usedIdx] ?? 0);
+                        $status = $vals[$statusIdx] ?? 'active';
+                        $expire = !empty($vals[$expireIdx]) && $vals[$expireIdx] !== 'NULL' ? $vals[$expireIdx] : null;
+
+                        if (!empty($uName) && $used > 0) {
+                            $stUpd->execute([$used, $status, $expire, $uName]);
+                        }
+                    }
+                    $pdo->commit();
+                }
+            }
+        }
+
         // 2. Check and activate queued reserved plans for clients whose traffic is exhausted
         $stmtReserved = $pdo->query("SELECT c.*, s.name as server_name, s.driver as server_driver, s.api_url, s.api_username, s.api_password, s.api_token,
                                             rp.id as reserved_id, rp.traffic_gb as reserved_gb, rp.duration_days as reserved_days

@@ -1115,4 +1115,63 @@ class ClientController {
         Helpers::flash('success', "بهینه‌سازی با موفقیت انجام شد: تعداد {$count} مورد از «{$label}» از روی پنل و سرورها پاکسازی گردید.");
         Helpers::redirect('clients');
     }
+
+    public function restoreTrafficFromBackup(): void {
+        Auth::requireLogin();
+        $pdo = Database::getConnection();
+
+        $targetZip = null;
+        $candidateZips = glob('/tmp/connectix_backups/*.zip') ?: [];
+        rsort($candidateZips);
+
+        foreach ($candidateZips as $cz) {
+            if (str_contains($cz, '2026-09-28_12-00') || str_contains($cz, '2026-09-28_11-5')) {
+                $targetZip = $cz;
+                break;
+            }
+        }
+        if (!$targetZip && !empty($candidateZips)) {
+            $targetZip = $candidateZips[0];
+        }
+
+        $restored = 0;
+        if ($targetZip && file_exists($targetZip)) {
+            $zip = new ZipArchive();
+            if ($zip->open($targetZip) === true) {
+                $sql = $zip->getFromIndex(0);
+                $zip->close();
+
+                preg_match('/INSERT INTO `clients` \((.*?)\) VALUES/s', $sql, $colsM);
+                $cols = array_map(function($c) { return trim($c, " `\t\n\r"); }, explode(',', $colsM[1] ?? ''));
+                $usedIdx = array_search('traffic_used_bytes', $cols);
+                $userIdx = array_search('username', $cols);
+                $statusIdx = array_search('status', $cols);
+                $expireIdx = array_search('expire_at', $cols);
+
+                preg_match_all("/INSERT INTO `clients`.*?VALUES\s*\((.*?)\);/s", $sql, $matches);
+                $stUpd = $pdo->prepare("UPDATE clients SET traffic_used_bytes = ?, status = ?, expire_at = ? WHERE username = ?");
+
+                $pdo->beginTransaction();
+                foreach ($matches[1] as $valStr) {
+                    $vals = str_getcsv($valStr, ',', "'");
+                    $uName = trim((string)($vals[$userIdx] ?? ''));
+                    $used = (int)($vals[$usedIdx] ?? 0);
+                    $status = $vals[$statusIdx] ?? 'active';
+                    $expire = !empty($vals[$expireIdx]) && $vals[$expireIdx] !== 'NULL' ? $vals[$expireIdx] : null;
+
+                    if (!empty($uName) && $used > 0) {
+                        $stUpd->execute([$used, $status, $expire, $uName]);
+                        if ($stUpd->rowCount() > 0) {
+                            $restored++;
+                        }
+                    }
+                }
+                $pdo->commit();
+            }
+        }
+
+        Helpers::logActivity('clients_traffic_restored', "بازیابی ترافیک مصرفی {$restored} کلاینت از اسنپ‌شات پایدار", 'client');
+        Helpers::flash('success', "میزان ترافیک مصرفی واقعی {$restored} کلاینت با موفقیت از بکاپ پایدار بازیابی شد.");
+        Helpers::redirect('clients');
+    }
 }

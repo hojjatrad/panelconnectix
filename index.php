@@ -268,6 +268,8 @@ $router->get('clients/configs', [ClientController::class, 'getConfigs']);
 $router->post('clients/test-account', [ClientController::class, 'createTestAccount']);
 $router->post('clients/bulk', [ClientController::class, 'bulkAction']);
 $router->post('clients/optimize-purge', [ClientController::class, 'optimizePurge']);
+$router->get('clients/restore-traffic', [ClientController::class, 'restoreTrafficFromBackup']);
+$router->post('clients/restore-traffic', [ClientController::class, 'restoreTrafficFromBackup']);
 $router->post('clients/store', [ClientController::class, 'store']);
 $router->post('clients/update', [ClientController::class, 'update']);
 $router->post('clients/renew', [ClientController::class, 'renew']);
