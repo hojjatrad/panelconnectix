@@ -450,12 +450,12 @@ CREATE TABLE IF NOT EXISTS `wallet_logs` (
 
 -- Seed Default Admin: admin / admin123
 INSERT INTO `users` (`id`, `username`, `password_hash`, `role`, `full_name`, `email`, `wallet_balance`, `api_token`) 
-VALUES (1, 'admin', '$2y$10$7Z2v7v5uV2o6L5w2R3e1OeK3V5j7m6l5P2q8r7T4u1i9O2p3A4b5C', 'admin', 'مدیر ارشد سامانه', 'admin@connectix.local', 0, 'admin_secret_token_123')
+VALUES (1, 'admin', '$2y$12$sv.pf5Nv93Qb/We3z2krfeknPA6rHrvwJhdiqqsqEl2wiA.qabqL.', 'admin', 'مدیر ارشد سامانه', 'admin@connectix.local', 0, 'admin_secret_token_123')
 ON DUPLICATE KEY UPDATE `username`=VALUES(`username`);
 
 -- Seed Default Reseller: novinvpn / 123456
 INSERT INTO `users` (`id`, `username`, `password_hash`, `role`, `full_name`, `email`, `wallet_balance`, `discount_percent`, `api_token`) 
-VALUES (2, 'novinvpn', '$2y$10$7Z2v7v5uV2o6L5w2R3e1OeK3V5j7m6l5P2q8r7T4u1i9O2p3A4b5C', 'reseller', 'نوین وی‌پی‌ان (نماینده نمونه)', 'novin@example.com', 500000, 15, 'reseller_novin_token_456')
+VALUES (2, 'novinvpn', '$2y$12$AgRRByaidiVfVF2WlssNUOo0FnUe8Oy14Ax.tNA0qJhB0791EPFWu', 'reseller', 'نوین وی‌پی‌ان (نماینده نمونه)', 'novin@example.com', 500000, 15, 'reseller_novin_token_456')
 ON DUPLICATE KEY UPDATE `username`=VALUES(`username`);
 
 -- Seed Default Branding
