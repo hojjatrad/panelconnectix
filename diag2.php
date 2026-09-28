@@ -178,6 +178,7 @@ try {
                             'success' => $testRes['success'],
                             'error' => $testRes['error'] ?? null,
                             'keys' => is_array($testRes['data']) ? array_keys($testRes['data']) : null,
+                            'data' => ($ep === '/api/system' || $ep === '/api/users') ? $testRes['data'] : null,
                             'count' => isset($testRes['data']['users']) ? count($testRes['data']['users']) : (isset($testRes['data']['total']) ? $testRes['data']['total'] : (is_array($testRes['data']) ? count($testRes['data']) : 0)),
                         ];
                     }
