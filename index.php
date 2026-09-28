@@ -68,7 +68,8 @@ if (str_ends_with($requestPath, 'webhook.php') || str_ends_with($requestPath, '/
     exit;
 }
 
-if (str_contains($requestPath, 'cron/sync.php') || str_contains($requestPath, 'sync.php') || str_ends_with($requestPath, '/sync') || $routeParam === 'cron/sync.php' || $routeParam === 'cron/sync' || $routeParam === 'sync') {
+if (!str_contains($requestPath, 'servers/') && !str_contains($requestPath, 'node-users/') && 
+    (str_contains($requestPath, 'cron/sync.php') || str_contains($requestPath, 'sync.php') || str_ends_with($requestPath, '/cron/sync') || $requestPath === '/sync' || str_ends_with($requestPath, 'contax/sync') || $routeParam === 'cron/sync.php' || $routeParam === 'cron/sync' || $routeParam === 'sync')) {
     require_once __DIR__ . '/cron/sync.php';
     exit;
 }

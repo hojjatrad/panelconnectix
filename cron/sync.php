@@ -8,13 +8,16 @@ require_once __DIR__ . '/../core/Retention.php';
 require_once __DIR__ . '/../drivers/DriverFactory.php';
 require_once __DIR__ . '/../controllers/ServerController.php';
 
-// Allow running via CLI or Web with secret token
+// Allow running via CLI, authenticated Admin, or Web with secret token
 if (php_sapi_name() !== 'cli') {
-    $providedKey = $_GET['key'] ?? $_GET['secret'] ?? '';
-    $validKeys = [APP_SECRET, 'gh_hook_sec_vpbotn_2026'];
-    if (!in_array($providedKey, $validKeys, true)) {
-        http_response_code(403);
-        die("دسترسی غیرمجاز. کلید امنیتی اشتباه است.");
+    require_once __DIR__ . '/../core/Auth.php';
+    if (!Auth::isAdmin()) {
+        $providedKey = $_GET['key'] ?? $_GET['secret'] ?? '';
+        $validKeys = [APP_SECRET, 'gh_hook_sec_vpbotn_2026', 'cpanel_cron'];
+        if (!in_array($providedKey, $validKeys, true)) {
+            http_response_code(403);
+            die("دسترسی غیرمجاز. کلید امنیتی اشتباه است.");
+        }
     }
 }
 
