@@ -65,7 +65,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Map<String, dynamic>? _updateInfo;
   bool _isCheckingUpdate = false;
 
-  static const String currentAppVersion = '3.4.9';
+  static const String currentAppVersion = '3.5.0';
 
   // "Download over Wi-Fi only" for update packages
   bool _updateWifiOnly = false;
@@ -303,8 +303,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               }
               final down = _formatSpeed(status.downloadSpeed);
               final up = _formatSpeed(status.uploadSpeed);
+              final sName = _selectedServer?.name ?? 'متصل';
               ApiService.updateNotificationStatus(
-                title: 'Connectix VPN • متصل (${status.duration})',
+                title: 'Connectix • $sName (${status.duration})',
                 content: '↓ $down   •   ↑ $up',
                 isConnected: true,
               );
@@ -963,11 +964,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
       // Pass Split Tunneling blocked apps to exclude domestic/banking apps natively
       await _flutterV2ray.startV2Ray(
-        remark: _selectedServer!.name,
+        remark: 'Connectix • ${_selectedServer!.name}',
         config: parser.getFullConfiguration(),
         blockedApps: null,
         proxyOnly: false, // Full device-wide VPN tunnel
         tunMode: tunMode,
+        notificationDisconnectButtonName: 'قطع اتصال',
       );
 
       _connectedSeconds = 0;

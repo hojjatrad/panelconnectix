@@ -19,7 +19,8 @@ import java.io.File
 class MainActivity: FlutterActivity() {
     private val CHANNEL = "com.connectix.vpn/updater"
     private val NOTIF_CHANNEL_ID = "connectix_vpn_status_ch"
-    private val NOTIF_ID = 9999
+    private val V2RAY_CHANNEL_ID = "A_FLUTTER_V2RAY_SERVICE_CH_ID"
+    private val NOTIF_ID = 1
     private var methodChannel: MethodChannel? = null
 
     override fun onNewIntent(intent: Intent) {
@@ -28,6 +29,7 @@ class MainActivity: FlutterActivity() {
             try {
                 val notifMgr = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
                 notifMgr?.cancel(NOTIF_ID)
+                notifMgr?.cancel(9999)
             } catch (_: Exception) {}
             methodChannel?.invokeMethod("onNotificationDisconnect", null)
         }
@@ -42,6 +44,7 @@ class MainActivity: FlutterActivity() {
             try {
                 val notifMgr = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
                 notifMgr?.cancel(NOTIF_ID)
+                notifMgr?.cancel(9999)
             } catch (_: Exception) {}
             channel.invokeMethod("onNotificationDisconnect", null)
         }
@@ -64,26 +67,32 @@ class MainActivity: FlutterActivity() {
                     try {
                         val notifMgr = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
                         if (notifMgr != null) {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                if (notifMgr.getNotificationChannel(NOTIF_CHANNEL_ID) == null) {
-                                    val ch = NotificationChannel(
-                                        NOTIF_CHANNEL_ID,
-                                        "Connectix VPN Status",
-                                        NotificationManager.IMPORTANCE_LOW
-                                    ).apply {
-                                        description = "نمایش زنده سرعت و وضعیت اتصال وی‌پی‌ان"
-                                        setShowBadge(false)
-                                        setSound(null, null)
-                                        enableVibration(false)
-                                    }
-                                    notifMgr.createNotificationChannel(ch)
-                                }
-                            }
-
                             if (!isConnected) {
                                 notifMgr.cancel(NOTIF_ID)
+                                notifMgr.cancel(9999)
                                 result.success(true)
                                 return@setMethodCallHandler
+                            }
+
+                            var channelId = NOTIF_CHANNEL_ID
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                if (notifMgr.getNotificationChannel(V2RAY_CHANNEL_ID) != null) {
+                                    channelId = V2RAY_CHANNEL_ID
+                                } else {
+                                    if (notifMgr.getNotificationChannel(NOTIF_CHANNEL_ID) == null) {
+                                        val ch = NotificationChannel(
+                                            NOTIF_CHANNEL_ID,
+                                            "Connectix VPN Status",
+                                            NotificationManager.IMPORTANCE_LOW
+                                        ).apply {
+                                            description = "نمایش زنده سرعت و وضعیت اتصال وی‌پی‌ان"
+                                            setShowBadge(false)
+                                            setSound(null, null)
+                                            enableVibration(false)
+                                        }
+                                        notifMgr.createNotificationChannel(ch)
+                                    }
+                                }
                             }
 
                             val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -101,7 +110,7 @@ class MainActivity: FlutterActivity() {
                             }
                             val discPendingIntent = PendingIntent.getActivity(this, 101, discIntent, flags)
 
-                            val notif = NotificationCompat.Builder(this, NOTIF_CHANNEL_ID)
+                            val notif = NotificationCompat.Builder(this, channelId)
                                 .setSmallIcon(R.mipmap.ic_launcher)
                                 .setContentTitle(title)
                                 .setContentText(content)
@@ -113,6 +122,7 @@ class MainActivity: FlutterActivity() {
                                 .build()
 
                             notifMgr.notify(NOTIF_ID, notif)
+                            notifMgr.cancel(9999)
                         }
                         result.success(true)
                     } catch (e: Exception) {
@@ -123,6 +133,7 @@ class MainActivity: FlutterActivity() {
                     try {
                         val notifMgr = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
                         notifMgr?.cancel(NOTIF_ID)
+                        notifMgr?.cancel(9999)
                         result.success(true)
                     } catch (e: Exception) {
                         result.success(false)

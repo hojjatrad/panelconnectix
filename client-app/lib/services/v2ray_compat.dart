@@ -60,6 +60,7 @@ class V2RayCompat {
     List<String>? bypassSubnets,
     bool proxyOnly = false,
     bool tunMode = false,
+    String notificationDisconnectButtonName = "DISCONNECT",
   }) async {
     if (isWindows) {
       await _xray.start(config, tunMode: tunMode);
@@ -71,6 +72,7 @@ class V2RayCompat {
       blockedApps: blockedApps,
       bypassSubnets: bypassSubnets,
       proxyOnly: proxyOnly,
+      notificationDisconnectButtonName: notificationDisconnectButtonName,
     );
   }
 
