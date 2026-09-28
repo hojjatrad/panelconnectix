@@ -170,6 +170,18 @@ try {
                 $auth = $driver->authenticate();
                 $diagItem['auth'] = $auth;
                 if ($auth) {
+                    $endpointTests = [];
+                    foreach (['/api/users', '/api/v1/users', '/api/users?limit=1000', '/api/v1/client/list', '/api/client/list', '/api/system'] as $ep) {
+                        $testRes = $driver->request($ep);
+                        $endpointTests[$ep] = [
+                            'code' => $testRes['code'],
+                            'success' => $testRes['success'],
+                            'error' => $testRes['error'] ?? null,
+                            'keys' => is_array($testRes['data']) ? array_keys($testRes['data']) : null,
+                            'count' => isset($testRes['data']['users']) ? count($testRes['data']['users']) : (isset($testRes['data']['total']) ? $testRes['data']['total'] : (is_array($testRes['data']) ? count($testRes['data']) : 0)),
+                        ];
+                    }
+                    $diagItem['endpoint_tests'] = $endpointTests;
                     $users = $driver->listUsers();
                     $diagItem['users_count'] = count($users);
                     $diagItem['sample_users'] = array_slice(array_column($users, 'username'), 0, 5);
