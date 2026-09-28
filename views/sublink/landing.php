@@ -373,22 +373,58 @@ $renewalLink = !empty($client['renewal_url']) ? $client['renewal_url'] : (!empty
         }
 
         function copyToClipboard(text, btnElement) {
-            navigator.clipboard.writeText(text).then(function() {
+            const successFeedback = () => {
                 const originalHtml = btnElement.innerHTML;
                 btnElement.innerHTML = '<i class="fa-solid fa-check text-emerald-400"></i> لینک اشتراک کپی شد!';
-                setTimeout(() => {
-                    btnElement.innerHTML = originalHtml;
-                }, 2500);
-            }).catch(function(err) {
-                alert('خطا در کپی: ' + err);
+                setTimeout(() => { btnElement.innerHTML = originalHtml; }, 2500);
+            };
+
+            if (!navigator.clipboard) {
+                const ta = document.createElement("textarea");
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand("copy");
+                document.body.removeChild(ta);
+                successFeedback();
+                return;
+            }
+            navigator.clipboard.writeText(text).then(successFeedback).catch(() => {
+                const ta = document.createElement("textarea");
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand("copy");
+                document.body.removeChild(ta);
+                successFeedback();
             });
         }
 
         function copyRaw(text, btnElement) {
-            navigator.clipboard.writeText(text).then(function() {
+            const successFeedback = () => {
                 const orig = btnElement.innerHTML;
                 btnElement.innerHTML = '<i class="fa-solid fa-check text-emerald-400"></i>';
                 setTimeout(() => { btnElement.innerHTML = orig; }, 2000);
+            };
+
+            if (!navigator.clipboard) {
+                const ta = document.createElement("textarea");
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand("copy");
+                document.body.removeChild(ta);
+                successFeedback();
+                return;
+            }
+            navigator.clipboard.writeText(text).then(successFeedback).catch(() => {
+                const ta = document.createElement("textarea");
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand("copy");
+                document.body.removeChild(ta);
+                successFeedback();
             });
         }
     </script>

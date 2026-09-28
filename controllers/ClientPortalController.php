@@ -12,6 +12,13 @@ require_once __DIR__ . '/../core/Setting.php';
  */
 class ClientPortalController {
 
+    public function __construct()
+    {
+        if (session_status() === PHP_SESSION_NONE && !headers_sent()) {
+            @session_start();
+        }
+    }
+
     private function lockState(string $username): array
     {
         $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';

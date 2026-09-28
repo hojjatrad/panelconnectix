@@ -2,6 +2,11 @@
 error_reporting(E_ALL & ~E_NOTICE & ~E_DEPRECATED);
 ini_set('display_errors', 1);
 
+// Safely start session before any output
+if (session_status() === PHP_SESSION_NONE && !headers_sent()) {
+    @session_start();
+}
+
 // Auto-detect and relocate if files were extracted into nested connectix-panel folder
 $subfolder = __DIR__ . '/connectix-panel';
 if (is_dir($subfolder) && file_exists($subfolder . '/index.php')) {
