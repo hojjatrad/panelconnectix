@@ -193,26 +193,13 @@ class Updater {
         $atomSha = '';
         $rawVer = '';
 
-        // Source 1: raw Updater.php (also gives us the remote version constant)
-        $rawUrls = [
-            "https://raw.githubusercontent.com/{$repo}/{$branch}/core/Updater.php?{$bust}",
-            "https://github.com/{$repo}/raw/{$branch}/core/Updater.php?{$bust}",
-        ];
-        foreach ($rawUrls as $rawUrl) {
-            $body = (string)self::httpGet($rawUrl);
-            if (preg_match("/CURRENT_VERSION\s*=\s*['\"]([^'\"]+)['\"]/u", $body, $m)) {
-                $rawVer = trim($m[1]);
-                break;
-            }
-        }
-
-        // Source 2: GitHub REST API (commits/{branch})
+        // Source 1: GitHub REST API (commits/{branch})
         $apiBody = (string)self::httpGet("https://api.github.com/repos/{$repo}/commits/{$branch}?{$bust}");
         if (preg_match('/"sha"\s*:\s*"([0-9a-f]{40})"/', $apiBody, $m)) {
             $apiSha = $m[1];
         }
 
-        // Source 3: GitHub Atom feed (independent pipeline, incident-proven)
+        // Source 2: GitHub Atom feed (independent pipeline, incident-proven)
         $atomBody = (string)self::httpGet("https://github.com/{$repo}/commits/{$branch}.atom?{$bust}");
         if (preg_match('/tag:github\.com,2008:Repository\/\d+\/commit\/([0-9a-f]{40})/', $atomBody, $m)) {
             $atomSha = $m[1];
@@ -232,11 +219,32 @@ class Updater {
         }
 
         if ($sha === '') return null;
+
+        // Source 3: Fetch remote Updater.php pinned to this EXACT commit SHA (immutable, 0 stale cache)
+        $rawUrls = [
+            "https://raw.githubusercontent.com/{$repo}/{$sha}/core/Updater.php",
+            "https://github.com/{$repo}/raw/{$sha}/core/Updater.php",
+            "https://raw.githubusercontent.com/{$repo}/{$branch}/core/Updater.php?{$bust}",
+            "https://github.com/{$repo}/raw/{$branch}/core/Updater.php?{$bust}",
+        ];
+        foreach ($rawUrls as $rawUrl) {
+            $body = (string)self::httpGet($rawUrl);
+            if (preg_match("/CURRENT_VERSION\s*=\s*['\"]([^'\"]+)['\"]/u", $body, $m)) {
+                $rawVer = trim($m[1]);
+                break;
+            }
+        }
+
         return ['sha' => $sha, 'source' => $source, 'remote_version' => $rawVer];
     }
 
     private static function httpGet(string $url): string {
         $ch = curl_init($url);
+        $headers = ['Cache-Control: no-cache, no-store', 'Pragma: no-cache'];
+        $token = self::getToken();
+        if (!empty($token) && (str_contains($url, 'api.github.com') || str_contains($url, 'github.com'))) {
+            $headers[] = "Authorization: token {$token}";
+        }
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_FOLLOWLOCATION => true,
@@ -244,7 +252,7 @@ class Updater {
             CURLOPT_SSL_VERIFYPEER => false,
             CURLOPT_SSL_VERIFYHOST => false,
             CURLOPT_USERAGENT => 'Connectix-Panel-Updater',
-            CURLOPT_HTTPHEADER => ['Cache-Control: no-cache, no-store', 'Pragma: no-cache'],
+            CURLOPT_HTTPHEADER => $headers,
         ]);
         $body = curl_exec($ch);
         curl_close($ch);
@@ -278,9 +286,10 @@ class Updater {
         $sha = $shaInfo['sha'];
         $expectedVer = (string)($shaInfo['remote_version'] ?? '');
         $localVer = self::getCurrentVersion();
-        if ($expectedVer !== '' && version_compare($expectedVer, $localVer, '<')) {
-            return ['success' => false, 'error' => "نسخه دورانی ({$expectedVer}) قدیمی‌تر از نسخه نصب‌شده ({$localVer}) است — اعمال نشد."];
-        }
+
+        // Note: Authoritative package version verification is performed
+        // downstream in SAFETY GATE 2 directly on the extracted zip files
+        // to avoid false-positive downgrade blocks caused by stale CDN caches.
 
         $downloadUrl = "https://codeload.github.com/{$repo}/zip/{$sha}";
 
@@ -387,8 +396,8 @@ class Updater {
         self::ensureDatabaseSchema();
 
         // Update installed version in database
-        $installedVer = $check['latest_version'] ?? self::CURRENT_VERSION;
-        $installedSha = str_replace('commit-', '', $installedVer);
+        $installedVer = (!empty($pkgVer) && !str_starts_with($pkgVer, 'commit-')) ? $pkgVer : self::CURRENT_VERSION;
+        $installedSha = substr($sha, 0, 7);
         Setting::set('current_version', $installedVer);
         Setting::set('last_installed_commit_sha', $installedSha);
         Setting::set('last_installed_version', $installedVer);

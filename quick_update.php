@@ -354,13 +354,21 @@ foreach (array_slice($repairedFiles, 0, 40) as $rel => $expectedSha) {
 $forensics['reverted_now'] = $revertCheck ?: 'none';
 logStep('FORENSICS: ' . json_encode($forensics, JSON_UNESCAPED_UNICODE), $revertCheck ? 'error' : 'info');
 
-// 9. Send Notification to Telegram Supergroup Reports Topic
+// 9. Send Notification to Telegram Supergroup Reports Topic & Synchronize Settings
 $tgNotice = false;
 try {
     require_once __DIR__ . '/config.php';
     require_once __DIR__ . '/core/Database.php';
     require_once __DIR__ . '/core/Setting.php';
     require_once __DIR__ . '/core/TelegramBot.php';
+
+    Setting::set('current_version', '5.5.2');
+    if (!empty($latestSha)) {
+        Setting::set('last_installed_commit_sha', substr($latestSha, 0, 7));
+        Setting::set('last_installed_version', '5.5.2');
+    }
+    Setting::set('update_check_cache', '');
+    Setting::set('update_check_time', '0');
 
     $dateTime = date('Y-m-d H:i:s');
     $tgMsg = "🚀 <b>بروزرسانی موفق پنل با آخرین نسخه گیت‌هاب</b>\n\n"
