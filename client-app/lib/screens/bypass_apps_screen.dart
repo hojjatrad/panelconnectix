@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -20,10 +19,27 @@ class _BypassAppsScreenState extends State<BypassAppsScreen> {
 
   bool _isLoading = true;
   String _errorMessage = '';
-  List<Map<String, dynamic>> _allApps = [];
+  List<Map<String, String>> _allApps = [];
   Set<String> _selectedPackages = {};
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
+
+  // Consistent pleasant colors for app avatar badges
+  static const List<Color> _avatarColors = [
+    Color(0xFF6366F1), // Indigo
+    Color(0xFF10B981), // Emerald
+    Color(0xFFF59E0B), // Amber
+    Color(0xFF3B82F6), // Blue
+    Color(0xFF8B5CF6), // Purple
+    Color(0xFFEC4899), // Pink
+    Color(0xFF06B6D4), // Cyan
+    Color(0xFF14B8A6), // Teal
+  ];
+
+  Color _getColorForPackage(String pkg) {
+    final hash = pkg.codeUnits.fold<int>(0, (prev, elem) => prev + elem);
+    return _avatarColors[hash % _avatarColors.length];
+  }
 
   @override
   void initState() {
@@ -47,18 +63,21 @@ class _BypassAppsScreenState extends State<BypassAppsScreen> {
       final prefs = await SharedPreferences.getInstance();
       final List<String>? savedList = prefs.getStringList('custom_bypass_apps');
 
-      // Fetch all installed launcher apps from native Android
+      // Fetch all installed launcher apps from native Android (lightweight, zero-lag)
       final List<dynamic>? rawApps = await _channel.invokeMethod<List<dynamic>>('getAllInstalledApps');
       
-      final List<Map<String, dynamic>> parsedApps = [];
+      final List<Map<String, String>> parsedApps = [];
       if (rawApps != null) {
         for (final item in rawApps) {
           if (item is Map) {
-            parsedApps.add({
-              'packageName': item['packageName']?.toString() ?? '',
-              'appName': item['appName']?.toString() ?? '',
-              'icon': item['icon'] as Uint8List?,
-            });
+            final pkg = item['packageName']?.toString() ?? '';
+            final appName = item['appName']?.toString() ?? pkg;
+            if (pkg.isNotEmpty) {
+              parsedApps.add({
+                'packageName': pkg,
+                'appName': appName,
+              });
+            }
           }
         }
       }
@@ -69,7 +88,7 @@ class _BypassAppsScreenState extends State<BypassAppsScreen> {
       } else {
         // First run: pre-select all apps that match our default domestic & banking list
         for (final app in parsedApps) {
-          final pkg = app['packageName'] as String;
+          final pkg = app['packageName']!;
           if (widget.defaultBypassList.contains(pkg)) {
             initialSelected.add(pkg);
           }
@@ -96,7 +115,7 @@ class _BypassAppsScreenState extends State<BypassAppsScreen> {
   void _resetToRecommendedDefaults() {
     final Set<String> recommended = {};
     for (final app in _allApps) {
-      final pkg = app['packageName'] as String;
+      final pkg = app['packageName']!;
       if (widget.defaultBypassList.contains(pkg)) {
         recommended.add(pkg);
       }
@@ -106,7 +125,7 @@ class _BypassAppsScreenState extends State<BypassAppsScreen> {
     });
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('لیست برنامه‌ها به حالت پیش‌فرض هوشمند (بانک‌ها و سامانه‌های ایرانی) بازنشانی شد (${recommended.length} برنامه).'),
+        content: Text('برنامه‌های بانکی و سامانه‌های ایرانی شناسایی‌شده (${recommended.length} برنامه) انتخاب شدند.'),
         backgroundColor: const Color(0xFF10B981),
         behavior: SnackBarBehavior.floating,
       ),
@@ -116,7 +135,7 @@ class _BypassAppsScreenState extends State<BypassAppsScreen> {
   void _selectAll(bool select) {
     setState(() {
       if (select) {
-        _selectedPackages = _allApps.map((e) => e['packageName'] as String).toSet();
+        _selectedPackages = _allApps.map((e) => e['packageName']!).toSet();
       } else {
         _selectedPackages.clear();
       }
@@ -131,7 +150,7 @@ class _BypassAppsScreenState extends State<BypassAppsScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('تنظیمات با موفقیت ذخیره شد. برای اعمال، یک‌بار فیلترشکن را قطع و وصل کنید.'),
+          content: Text('تنظیمات ذخیره شد. برای اعمال، یک‌بار فیلترشکن را قطع و مجدداً وصل فرمایید.'),
           backgroundColor: Color(0xFF10B981),
           behavior: SnackBarBehavior.floating,
         ),
@@ -143,8 +162,8 @@ class _BypassAppsScreenState extends State<BypassAppsScreen> {
   @override
   Widget build(BuildContext context) {
     final filteredApps = _allApps.where((app) {
-      final name = (app['appName'] as String).toLowerCase();
-      final pkg = (app['packageName'] as String).toLowerCase();
+      final name = app['appName']!.toLowerCase();
+      final pkg = app['packageName']!.toLowerCase();
       final q = _searchQuery.toLowerCase().trim();
       if (q.isEmpty) return true;
       return name.contains(q) || pkg.contains(q);
@@ -164,7 +183,7 @@ class _BypassAppsScreenState extends State<BypassAppsScreen> {
           actions: [
             TextButton.icon(
               onPressed: _saveAndExit,
-              icon: const Icon(Icons.check_rounded, color: Color(0xFF10B981), size: 20),
+              icon: const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 20),
               label: const Text(
                 'ذخیره',
                 style: TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold),
@@ -180,7 +199,7 @@ class _BypassAppsScreenState extends State<BypassAppsScreen> {
                     CircularProgressIndicator(color: Color(0xFF10B981)),
                     SizedBox(height: 16),
                     Text(
-                      'در حال اسکن برنامه‌های نصب‌شده روی دستگاه...',
+                      'در حال بارگذاری لیست برنامه‌ها...',
                       style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
                     ),
                   ],
@@ -331,11 +350,12 @@ class _BypassAppsScreenState extends State<BypassAppsScreen> {
                                 separatorBuilder: (ctx, i) => const Divider(color: Color(0xFF1E293B), height: 1),
                                 itemBuilder: (ctx, i) {
                                   final app = filteredApps[i];
-                                  final pkg = app['packageName'] as String;
-                                  final name = app['appName'] as String;
-                                  final Uint8List? iconBytes = app['icon'] as Uint8List?;
+                                  final pkg = app['packageName']!;
+                                  final name = app['appName']!;
                                   final isSelected = _selectedPackages.contains(pkg);
                                   final isRecommended = widget.defaultBypassList.contains(pkg);
+                                  final avatarColor = _getColorForPackage(pkg);
+                                  final firstLetter = name.isNotEmpty ? name.characters.first : '?';
 
                                   return Material(
                                     color: Colors.transparent,
@@ -354,32 +374,34 @@ class _BypassAppsScreenState extends State<BypassAppsScreen> {
                                         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
                                         child: Row(
                                           children: [
-                                            // App Icon
+                                            // App Avatar
                                             Container(
                                               width: 44,
                                               height: 44,
                                               decoration: BoxDecoration(
-                                                color: const Color(0xFF1E293B),
-                                                borderRadius: BorderRadius.circular(10),
+                                                gradient: LinearGradient(
+                                                  colors: [avatarColor.withOpacity(0.8), avatarColor],
+                                                  begin: Alignment.topLeft,
+                                                  end: Alignment.bottomRight,
+                                                ),
+                                                borderRadius: BorderRadius.circular(12),
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: avatarColor.withOpacity(0.25),
+                                                    blurRadius: 6,
+                                                    offset: const Offset(0, 2),
+                                                  ),
+                                                ],
                                               ),
-                                              clipBehavior: Clip.antiAlias,
-                                              child: iconBytes != null && iconBytes.isNotEmpty
-                                                  ? Image.memory(
-                                                      iconBytes,
-                                                      width: 44,
-                                                      height: 44,
-                                                      fit: BoxFit.cover,
-                                                      errorBuilder: (_, __, ___) => const Icon(
-                                                        Icons.android_rounded,
-                                                        color: Color(0xFF94A3B8),
-                                                        size: 26,
-                                                      ),
-                                                    )
-                                                  : const Icon(
-                                                      Icons.android_rounded,
-                                                      color: Color(0xFF94A3B8),
-                                                      size: 26,
-                                                    ),
+                                              alignment: Alignment.center,
+                                              child: Text(
+                                                firstLetter,
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 18,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
                                             ),
                                             const SizedBox(width: 12),
 
@@ -412,7 +434,7 @@ class _BypassAppsScreenState extends State<BypassAppsScreen> {
                                                             border: Border.all(color: const Color(0xFF10B981).withOpacity(0.4)),
                                                           ),
                                                           child: const Text(
-                                                            'بانکی / داخلی',
+                                                            'پیشنهادی',
                                                             style: TextStyle(color: Color(0xFF10B981), fontSize: 9, fontWeight: FontWeight.bold),
                                                           ),
                                                         ),

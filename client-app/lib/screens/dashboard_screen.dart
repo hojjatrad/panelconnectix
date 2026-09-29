@@ -66,7 +66,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Map<String, dynamic>? _updateInfo;
   bool _isCheckingUpdate = false;
 
-  static const String currentAppVersion = '3.5.3';
+  static const String currentAppVersion = '3.5.4';
 
   // "Download over Wi-Fi only" for update packages
   bool _updateWifiOnly = false;
@@ -1143,6 +1143,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
       final configUri = _selectedServer!.configUri;
       final parser = FlutterV2ray.parseFromURL(configUri);
+      String finalConfig = parser.getFullConfiguration();
 
       // Pass Split Tunneling blocked apps to exclude domestic/banking apps natively (without crashes)
       List<String>? blockedAppsToPass;
@@ -1150,26 +1151,61 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         try {
           final prefs = await SharedPreferences.getInstance();
           final List<String>? customBypass = prefs.getStringList('custom_bypass_apps');
-          final List<String> targetList = (customBypass != null && customBypass.isNotEmpty)
+          blockedAppsToPass = (customBypass != null && customBypass.isNotEmpty)
               ? customBypass
               : defaultDomesticBypassApps;
-
-          const channel = MethodChannel('com.connectix.vpn/updater');
-          final List<dynamic>? installed = await channel.invokeMethod<List<dynamic>>(
-            'getInstalledBypassApps',
-            {'packages': targetList},
-          );
-          if (installed != null && installed.isNotEmpty) {
-            blockedAppsToPass = installed.map((e) => e.toString()).toList();
-          }
         } catch (e) {
           debugPrint('Bypass apps check: $e');
+          blockedAppsToPass = defaultDomesticBypassApps;
+        }
+
+        // Layer 2: Inject direct routing rules into V2Ray config for Iranian domains & IPs
+        try {
+          final Map<String, dynamic> configMap = jsonDecode(finalConfig);
+          final routing = (configMap['routing'] as Map<String, dynamic>?) != null
+              ? Map<String, dynamic>.from(configMap['routing'] as Map)
+              : <String, dynamic>{};
+          final List<dynamic> rules = (routing['rules'] as List<dynamic>?) != null
+              ? List<dynamic>.from(routing['rules'] as List<dynamic>)
+              : <dynamic>[];
+
+          rules.insert(0, {
+            'type': 'field',
+            'outboundTag': 'direct',
+            'domain': [
+              'domain:ir',
+              'geosite:ir',
+              'regexp:.*\\.ir\$',
+              'eitaa.com',
+              'rubika.ir',
+              'bale.ai',
+              'divar.ir',
+              'snapp.ir',
+              'tapsi.ir',
+              'digikala.com',
+              'torob.com',
+              'shaparak.ir',
+            ],
+          });
+          rules.insert(1, {
+            'type': 'field',
+            'outboundTag': 'direct',
+            'ip': [
+              'geoip:ir',
+              'geoip:private',
+            ],
+          });
+          routing['rules'] = rules;
+          configMap['routing'] = routing;
+          finalConfig = jsonEncode(configMap);
+        } catch (e) {
+          debugPrint('Inject direct routing rules: $e');
         }
       }
 
       await _flutterV2ray.startV2Ray(
         remark: 'Connectix • ${_selectedServer!.name}',
-        config: parser.getFullConfiguration(),
+        config: finalConfig,
         blockedApps: blockedAppsToPass,
         proxyOnly: false, // Full device-wide VPN tunnel
         tunMode: tunMode,

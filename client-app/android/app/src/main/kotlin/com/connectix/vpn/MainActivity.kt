@@ -242,19 +242,7 @@ class MainActivity: FlutterActivity() {
                     try {
                         val rawList = call.argument<List<*>>("packages") ?: emptyList<Any>()
                         val candidateList = rawList.mapNotNull { it?.toString() }
-                        val installedList = mutableListOf<String>()
-                        val pm = context.packageManager
-                        for (pkg in candidateList) {
-                            try {
-                                pm.getPackageInfo(pkg, 0)
-                                installedList.add(pkg)
-                            } catch (_: PackageManager.NameNotFoundException) {
-                                // Package not installed on this device, skip safely
-                            } catch (_: Exception) {
-                                // Any other error, skip safely
-                            }
-                        }
-                        result.success(installedList)
+                        result.success(candidateList)
                     } catch (e: Exception) {
                         result.success(emptyList<String>())
                     }
@@ -267,7 +255,7 @@ class MainActivity: FlutterActivity() {
                                 addCategory(Intent.CATEGORY_LAUNCHER)
                             }
                             val resolveInfos = pm.queryIntentActivities(mainIntent, 0)
-                            val appsList = ArrayList<Map<String, Any>>()
+                            val appsList = ArrayList<Map<String, String>>()
                             val selfPkg = context.packageName
                             val seenPackages = HashSet<String>()
 
@@ -276,41 +264,26 @@ class MainActivity: FlutterActivity() {
                                 if (pkg == selfPkg || seenPackages.contains(pkg)) continue
                                 seenPackages.add(pkg)
 
-                                val label = ri.loadLabel(pm).toString()
-                                var iconBytes: ByteArray? = null
-                                try {
-                                    val iconDrawable = ri.loadIcon(pm)
-                                    val bmp = if (iconDrawable is BitmapDrawable && iconDrawable.bitmap != null) {
-                                        Bitmap.createScaledBitmap(iconDrawable.bitmap, 72, 72, true)
-                                    } else {
-                                        val b = Bitmap.createBitmap(72, 72, Bitmap.Config.ARGB_8888)
-                                        val canvas = Canvas(b)
-                                        iconDrawable.setBounds(0, 0, 72, 72)
-                                        iconDrawable.draw(canvas)
-                                        b
-                                    }
-                                    val stream = ByteArrayOutputStream()
-                                    bmp.compress(Bitmap.CompressFormat.PNG, 85, stream)
-                                    iconBytes = stream.toByteArray()
-                                } catch (_: Exception) {}
+                                val label = try {
+                                    ri.loadLabel(pm).toString()
+                                } catch (_: Exception) {
+                                    pkg
+                                }
 
-                                val map = HashMap<String, Any>()
+                                val map = HashMap<String, String>()
                                 map["packageName"] = pkg
                                 map["appName"] = label
-                                if (iconBytes != null) {
-                                    map["icon"] = iconBytes
-                                }
                                 appsList.add(map)
                             }
 
-                            appsList.sortBy { (it["appName"] as? String)?.lowercase() ?: "" }
+                            appsList.sortBy { it["appName"]?.lowercase() ?: "" }
 
                             runOnUiThread {
                                 result.success(appsList)
                             }
                         } catch (e: Exception) {
                             runOnUiThread {
-                                result.error("GET_APPS_ERROR", e.message, null)
+                                result.error("GET_APPS_ERROR", e.message ?: "Unknown error", null)
                             }
                         }
                     }.start()
