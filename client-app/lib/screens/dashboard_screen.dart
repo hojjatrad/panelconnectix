@@ -53,6 +53,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   // New Pro Features States
   bool _splitTunnelingEnabled = true;
+  bool _autoPauseForBankingEnabled = false;
+  bool _pausedByBankingApp = false;
+  String? _pausedForPackage;
+  Timer? _foregroundCheckTimer;
 
   // Windows-only tunnel flavor: 'proxy' (system proxy, Phase 1) or
   // 'tun' (full Wintun VPN, Phase 2). Ignored on Android.
@@ -67,7 +71,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Map<String, dynamic>? _updateInfo;
   bool _isCheckingUpdate = false;
 
-  static const String currentAppVersion = '3.5.5';
+  static const String currentAppVersion = '3.5.6';
 
   // "Download over Wi-Fi only" for update packages
   bool _updateWifiOnly = false;
@@ -299,12 +303,144 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   void _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _splitTunnelingEnabled = prefs.getBool('split_tunneling_enabled') ?? true;
-      _autoReconnectEnabled = prefs.getBool('auto_reconnect_enabled') ?? true;
-      _updateWifiOnly = prefs.getBool('update_wifi_only') ?? false;
-      _winTunnelMode = prefs.getString('windows_tunnel_mode') ?? 'proxy';
+    if (mounted) {
+      setState(() {
+        _splitTunnelingEnabled = prefs.getBool('split_tunneling_enabled') ?? true;
+        _autoReconnectEnabled = prefs.getBool('auto_reconnect_enabled') ?? true;
+        _autoPauseForBankingEnabled = prefs.getBool('auto_pause_for_banking_enabled') ?? false;
+        _updateWifiOnly = prefs.getBool('update_wifi_only') ?? false;
+        _winTunnelMode = prefs.getString('windows_tunnel_mode') ?? 'proxy';
+      });
+    }
+    if (_autoPauseForBankingEnabled && _isConnected) {
+      _startForegroundAppMonitoring();
+    }
+  }
+
+  Future<void> _setAutoPauseForBanking(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('auto_pause_for_banking_enabled', value);
+    if (mounted) setState(() => _autoPauseForBankingEnabled = value);
+    if (value && Platform.isAndroid) {
+      _checkAndRequestUsageStatsPermission();
+    }
+    if (value) {
+      _startForegroundAppMonitoring();
+    } else {
+      _stopForegroundAppMonitoring();
+    }
+  }
+
+  Future<void> _checkAndRequestUsageStatsPermission() async {
+    if (!Platform.isAndroid) return;
+    try {
+      const channel = MethodChannel('com.connectix.vpn/updater');
+      final bool hasPermission = await channel.invokeMethod<bool>('checkUsageStatsPermission') ?? false;
+      if (!hasPermission && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('برای توقف خودکار، دسترسی «دسترسی به آمار استفاده» را در تنظیمات فعال کنید.'),
+            duration: Duration(seconds: 5),
+          ),
+        );
+        await channel.invokeMethod('openUsageStatsSettings');
+      }
+    } catch (e) {
+      debugPrint('UsageStats permission check: $e');
+    }
+  }
+
+  void _startForegroundAppMonitoring() {
+    if (!Platform.isAndroid || !_autoPauseForBankingEnabled) return;
+    _foregroundCheckTimer?.cancel();
+    _foregroundCheckTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
+      if (!_isConnected || _isConnecting || _pausedByBankingApp) {
+        // If already paused by banking, check if we should resume
+        if (_pausedByBankingApp) {
+          await _checkShouldResumeVpn();
+        }
+        return;
+      }
+      await _checkForegroundAppAndMaybePause();
     });
+  }
+
+  void _stopForegroundAppMonitoring() {
+    _foregroundCheckTimer?.cancel();
+    _foregroundCheckTimer = null;
+  }
+
+  Future<void> _checkForegroundAppAndMaybePause() async {
+    if (!Platform.isAndroid || !_autoPauseForBankingEnabled || !_isConnected) return;
+    try {
+      const channel = MethodChannel('com.connectix.vpn/updater');
+      final String? foregroundPkg = await channel.invokeMethod<String>('getForegroundApp');
+      if (foregroundPkg == null || foregroundPkg.isEmpty) return;
+      if (foregroundPkg == 'com.connectix.vpn') return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final List<String>? customBypass = prefs.getStringList('custom_bypass_apps');
+      final List<String> bypassList = (customBypass != null && customBypass.isNotEmpty) ? customBypass : defaultDomesticBypassApps;
+
+      if (bypassList.contains(foregroundPkg)) {
+        // Banking/Iranian app in foreground -> pause VPN to hide tun0
+        debugPrint('Auto-pausing VPN for banking app: $foregroundPkg');
+        _pausedByBankingApp = true;
+        _pausedForPackage = foregroundPkg;
+        try {
+          await _flutterV2ray.stopV2Ray();
+        } catch (_) {}
+        _timer?.cancel();
+        if (mounted) {
+          setState(() {
+            _isConnected = false;
+            _isConnecting = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('VPN برای ${foregroundPkg} متوقف شد تا بدون شناسایی فیلترشکن باز شود.'),
+              backgroundColor: const Color(0xFF10B981),
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+        ApiService.updateNotificationStatus(title: '', content: '', isConnected: false);
+      }
+    } catch (e) {
+      debugPrint('Foreground check error: $e');
+    }
+  }
+
+  Future<void> _checkShouldResumeVpn() async {
+    if (!Platform.isAndroid || !_pausedByBankingApp) return;
+    try {
+      const channel = MethodChannel('com.connectix.vpn/updater');
+      final String? foregroundPkg = await channel.invokeMethod<String>('getForegroundApp');
+      if (foregroundPkg == null) return;
+      // If user left banking app and returned to Connectix or other non-bypass app, resume
+      final prefs = await SharedPreferences.getInstance();
+      final List<String>? customBypass = prefs.getStringList('custom_bypass_apps');
+      final List<String> bypassList = (customBypass != null && customBypass.isNotEmpty) ? customBypass : defaultDomesticBypassApps;
+
+      if (!bypassList.contains(foregroundPkg) || foregroundPkg == 'com.connectix.vpn') {
+        debugPrint('Auto-resuming VPN after leaving banking app: $_pausedForPackage -> $foregroundPkg');
+        _pausedByBankingApp = false;
+        _pausedForPackage = null;
+        if (mounted && !_isConnected && !_isConnecting && !_userIntentionallyDisconnected) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('بازگشت به Connectix - VPN دوباره وصل می‌شود...'),
+              backgroundColor: Color(0xFF6366F1),
+            ),
+          );
+          _startTunnel(isReconnect: true);
+        } else if (_userIntentionallyDisconnected) {
+          _pausedByBankingApp = false;
+        }
+      }
+    } catch (e) {
+      debugPrint('Resume check error: $e');
+    }
   }
 
   Future<void> _setWinTunnelMode(String value) async {
@@ -450,7 +586,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     MethodChannel('com.connectix.vpn/updater').setMethodCallHandler((call) async {
       if (call.method == 'onNotificationDisconnect') {
         _userIntentionallyDisconnected = true;
+        _pausedByBankingApp = false;
         _reconnectAttempts = 0;
+        _stopForegroundAppMonitoring();
         try {
           await _flutterV2ray.stopV2Ray();
         } catch (_) {}
@@ -479,10 +617,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               _isConnected = true;
               _isConnecting = false;
               _userIntentionallyDisconnected = false;
+              _pausedByBankingApp = false;
               _reconnectAttempts = 0;
-              // Check for update once connected so panel is guaranteed reachable (single trigger)
               if (!wasConnected) {
                 _autoCheckUpdateInBackground();
+                if (_autoPauseForBankingEnabled) {
+                  _startForegroundAppMonitoring();
+                }
               }
               final down = _formatSpeed(status.downloadSpeed);
               final up = _formatSpeed(status.uploadSpeed);
@@ -495,10 +636,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             } else if (status.state == 'DISCONNECTED') {
               _isConnected = false;
               _isConnecting = false;
-              _userIntentionallyDisconnected = true;
+              if (!_pausedByBankingApp) {
+                _userIntentionallyDisconnected = true;
+              }
               _reconnectAttempts = 0;
               _timer?.cancel();
-
+              if (!_pausedByBankingApp) {
+                _stopForegroundAppMonitoring();
+              }
               ApiService.updateNotificationStatus(
                 title: '',
                 content: '',
@@ -1162,7 +1307,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           blockedAppsToPass = defaultDomesticBypassApps;
         }
 
-        // Layer 2: Inject SAFE direct routing rules into V2Ray config (NO geosite/geoip/regexp - those need dat files and crash core)
+        // Layer 2: Inject SAFE direct routing rules (domain:ir + geosite:ir + geoip:ir - flutter_v2ray bundles dat files, so safe)
+        // Layer 2 is fallback for apps not in disallowed list, and for WebView traffic
         try {
           final Map<String, dynamic> configMap = jsonDecode(finalConfig);
           final routing = (configMap['routing'] as Map<String, dynamic>?) != null
@@ -1172,11 +1318,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               ? List<dynamic>.from(routing['rules'] as List<dynamic>)
               : <dynamic>[];
 
-          // Only use plain domain matching - 100% safe, no dat files required, never crashes Xray core
+          // Rule 0: Iranian domains -> direct (safe, uses dat files bundled by flutter_v2ray)
           rules.insert(0, {
             'type': 'field',
             'outboundTag': 'direct',
             'domain': [
+              'geosite:ir',
               'domain:ir',
               'eitaa.com',
               'rubika.ir',
@@ -1188,17 +1335,27 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               'torob.com',
               'shaparak.ir',
               'myket.ir',
-              'bazaar.ir',
+              'cafebazaar.ir',
               'bankmellat.ir',
               'bmi.ir',
               'bankmelli.ir',
+              'aparat.com',
+              'filimo.com',
+            ],
+          });
+          // Rule 1: Iranian & private IPs -> direct
+          rules.insert(1, {
+            'type': 'field',
+            'outboundTag': 'direct',
+            'ip': [
+              'geoip:ir',
+              'geoip:private',
             ],
           });
           routing['rules'] = rules;
           configMap['routing'] = routing;
           final encoded = jsonEncode(configMap);
-          // Validate that encoded is parseable
-          jsonDecode(encoded);
+          jsonDecode(encoded); // validate
           safeFinalConfig = encoded;
         } catch (e) {
           debugPrint('Inject direct routing rules failed, using original config: $e');
@@ -1241,10 +1398,15 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     if (_isConnecting) return;
 
     if (!_isConnected) {
+      _pausedByBankingApp = false;
+      _userIntentionallyDisconnected = false;
       _startTunnel();
     } else {
       // Intentional user disconnect
       _userIntentionallyDisconnected = true;
+      _pausedByBankingApp = false;
+      _pausedForPackage = null;
+      _stopForegroundAppMonitoring();
       try {
         await _flutterV2ray.stopV2Ray();
       } catch (_) {}
@@ -1661,8 +1823,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     );
   }
 
-  void _openAdvancedSettings() {
-    Navigator.push(
+  void _openAdvancedSettings() async {
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => AdvancedSettingsScreen(
@@ -1692,6 +1854,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         ),
       ),
     );
+    // Reload settings after returning from advanced screen (auto-pause may have changed)
+    _loadSettings();
+    if (_autoPauseForBankingEnabled && _isConnected) {
+      _startForegroundAppMonitoring();
+    }
   }
 
   // Quick Support & Account Drawer Modal
@@ -1813,6 +1980,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   @override
   void dispose() {
     _timer?.cancel();
+    _foregroundCheckTimer?.cancel();
     super.dispose();
   }
 

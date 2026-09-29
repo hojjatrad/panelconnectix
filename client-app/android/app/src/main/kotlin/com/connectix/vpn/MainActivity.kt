@@ -3,6 +3,7 @@ package com.connectix.vpn
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -291,6 +292,89 @@ class MainActivity: FlutterActivity() {
                             runOnUiThread {
                                 try {
                                     result.error("GET_APPS_ERROR", e.message ?: "Unknown error", null)
+                                } catch (_: Exception) {}
+                            }
+                        }
+                    }.start()
+                }
+                "checkUsageStatsPermission" -> {
+                    try {
+                        val appOps = getSystemService(Context.APP_OPS_SERVICE) as android.app.AppOpsManager
+                        val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                            appOps.unsafeCheckOpNoThrow("android:get_usage_stats", android.os.Process.myUid(), packageName)
+                        } else {
+                            @Suppress("DEPRECATION")
+                            appOps.checkOpNoThrow("android:get_usage_stats", android.os.Process.myUid(), packageName)
+                        }
+                        result.success(mode == android.app.AppOpsManager.MODE_ALLOWED)
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
+                }
+                "openUsageStatsSettings" -> {
+                    try {
+                        val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
+                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        startActivity(intent)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        try {
+                            val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
+                            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                            context.startActivity(intent)
+                            result.success(true)
+                        } catch (e2: Exception) {
+                            result.error("SETTINGS_ERROR", e2.message, null)
+                        }
+                    }
+                }
+                "getForegroundApp" -> {
+                    Thread {
+                        try {
+                            val usm = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+                            val end = System.currentTimeMillis()
+                            val begin = end - 1000 * 10 // last 10 seconds
+                            val stats = usm.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, begin, end)
+                            var foregroundPkg: String? = null
+                            var lastTime: Long = 0
+                            if (stats != null) {
+                                for (s in stats) {
+                                    try {
+                                        if (s.lastTimeUsed > lastTime) {
+                                            lastTime = s.lastTimeUsed
+                                            foregroundPkg = s.packageName
+                                        }
+                                    } catch (_: Exception) {}
+                                }
+                            }
+                            // Fallback: try queryEvents
+                            if (foregroundPkg == null) {
+                                try {
+                                    val events = usm.queryEvents(begin, end)
+                                    val event = android.app.usage.UsageEvents.Event()
+                                    var lastEventPkg: String? = null
+                                    while (events.hasNextEvent()) {
+                                        events.getNextEvent(event)
+                                        if (event.eventType == android.app.usage.UsageEvents.Event.MOVE_TO_FOREGROUND) {
+                                            lastEventPkg = event.packageName
+                                        }
+                                    }
+                                    if (lastEventPkg != null) {
+                                        foregroundPkg = lastEventPkg
+                                    }
+                                } catch (_: Exception) {}
+                            }
+
+                            val pkgToReturn = foregroundPkg ?: ""
+                            runOnUiThread {
+                                try {
+                                    result.success(pkgToReturn)
+                                } catch (_: Exception) {}
+                            }
+                        } catch (e: Exception) {
+                            runOnUiThread {
+                                try {
+                                    result.success("")
                                 } catch (_: Exception) {}
                             }
                         }

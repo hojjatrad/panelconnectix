@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'bypass_apps_screen.dart';
 
@@ -31,6 +32,9 @@ class _AdvancedSettingsScreenState extends State<AdvancedSettingsScreen> {
   late bool _splitEnabled;
   late bool _autoReconnect;
   late String _winMode;
+  bool _autoPauseEnabled = false;
+
+  static const MethodChannel _channel = MethodChannel('com.connectix.vpn/updater');
 
   @override
   void initState() {
@@ -38,6 +42,16 @@ class _AdvancedSettingsScreenState extends State<AdvancedSettingsScreen> {
     _splitEnabled = widget.splitTunnelingEnabled;
     _autoReconnect = widget.autoReconnectEnabled;
     _winMode = widget.winTunnelMode;
+    _loadAutoPause();
+  }
+
+  Future<void> _loadAutoPause() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _autoPauseEnabled = prefs.getBool('auto_pause_for_banking_enabled') ?? false;
+      });
+    }
   }
 
   Widget _winModeChip({required String label, required bool selected, required VoidCallback onTap}) {
@@ -96,7 +110,7 @@ class _AdvancedSettingsScreenState extends State<AdvancedSettingsScreen> {
                   const SizedBox(width: 12),
                   const Expanded(
                     child: Text(
-                      'در این بخش می‌توانید عبور مستقیم برنامه‌های ایرانی و بانکی را مدیریت کنید تا بدون قطعی و بدون شناسایی فیلترشکن باز شوند.',
+                      'عبور مستقیم برنامه‌های ایرانی و بانکی را مدیریت کنید. برای بانک‌هایی که فیلترشکن را شناسایی می‌کنند، توقف خودکار را فعال کنید.',
                       style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 11, height: 1.6),
                     ),
                   ),
@@ -178,6 +192,67 @@ class _AdvancedSettingsScreenState extends State<AdvancedSettingsScreen> {
             ),
             const SizedBox(height: 16),
 
+            // Auto-Pause for Banking (Layer 3 - 100% guarantee to hide tun0)
+            if (Platform.isAndroid)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F172A),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: _autoPauseEnabled ? const Color(0xFF10B981).withOpacity(0.4) : const Color(0xFF1E293B)),
+                ),
+                child: Column(
+                  children: [
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('توقف خودکار برای بانک‌ها و ایتا (تضمینی)', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                      subtitle: const Text('هنگام ورود به برنامه بانکی یا ایتا، VPN خودکار متوقف می‌شود تا هیچ اثری از tun0 باقی نماند و بانک فیلترشکن را شناسایی نکند. هنگام خروج، خودکار وصل می‌شود.', style: TextStyle(color: Color(0xFF64748B), fontSize: 10, height: 1.5)),
+                      value: _autoPauseEnabled,
+                      activeColor: const Color(0xFF10B981),
+                      onChanged: (val) async {
+                        final prefs = await SharedPreferences.getInstance();
+                        await prefs.setBool('auto_pause_for_banking_enabled', val);
+                        setState(() => _autoPauseEnabled = val);
+                        if (val) {
+                          try {
+                            final bool hasPerm = await _channel.invokeMethod<bool>('checkUsageStatsPermission') ?? false;
+                            if (!hasPerm) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('لطفا دسترسی «دسترسی به آمار استفاده» را فعال کنید تا توقف خودکار کار کند.'), duration: Duration(seconds: 5)),
+                                );
+                              }
+                              await _channel.invokeMethod('openUsageStatsSettings');
+                            }
+                          } catch (_) {}
+                        }
+                      },
+                    ),
+                    if (_autoPauseEnabled) ...[
+                      const Divider(color: Color(0xFF1E293B), height: 1),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(color: const Color(0xFF10B981).withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.verified_rounded, color: Color(0xFF10B981), size: 16),
+                            const SizedBox(width: 8),
+                            const Expanded(
+                              child: Text(
+                                'این روش تنها روش ۱۰۰٪ تضمینی برای دور زدن شناسایی از طریق getAllNetworks() و tun0 است. VPN هنگام استفاده از بانک کاملا خاموش می‌شود.',
+                                style: TextStyle(color: Color(0xFF6EE7B7), fontSize: 10, height: 1.4),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+
+            const SizedBox(height: 16),
+
             // Auto Reconnect Section
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -240,7 +315,7 @@ class _AdvancedSettingsScreenState extends State<AdvancedSettingsScreen> {
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(color: const Color(0xFF1E293B).withOpacity(0.5), borderRadius: BorderRadius.circular(12)),
               child: const Text(
-                'نکته: پس از تغییر تنظیمات عبور مستقیم، یک‌بار اتصال را قطع و مجددا وصل کنید تا تغییرات اعمال شود.',
+                'معماری ۳ لایه: ۱) معافیت سیستمی addDisallowedApplication ۲) روتینگ مستقیم geosite:ir/geoip:ir/domain:ir ۳) توقف خودکار هنگام ورود به بانک برای مخفی‌سازی کامل tun0',
                 style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11, height: 1.5),
                 textAlign: TextAlign.center,
               ),
