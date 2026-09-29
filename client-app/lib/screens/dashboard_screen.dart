@@ -13,6 +13,7 @@ import '../services/api_service.dart';
 import '../services/v2ray_compat.dart';
 import 'login_screen.dart';
 import 'server_list_modal.dart';
+import 'bypass_apps_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final ClientModel client;
@@ -65,134 +66,216 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Map<String, dynamic>? _updateInfo;
   bool _isCheckingUpdate = false;
 
-  static const String currentAppVersion = '3.5.2';
+  static const String currentAppVersion = '3.5.3';
 
   // "Download over Wi-Fi only" for update packages
   bool _updateWifiOnly = false;
 
-  // Iranian & Banking Apps Bypass List (Eitaa, Rubika, Bale, Snapp, Divar, Neshan, Torob, Digikala, Banking)
+  // Comprehensive Iranian & Banking Apps Bypass List (Verified package names from Cafe Bazaar & Myket)
   static const List<String> defaultDomesticBypassApps = [
-    // Messengers & Social (پیام‌رسان‌ها و ارتباطی)
-    'ir.eitaa.messenger',
-    'ir.resanememaran.rubika',
-    'ir.resanememaran.rubikax',
-    'ir.ble.messenger',
-    'mobi.mmdt.ott',
-    'i.gap.im',
-    'net.iGap',
-    'ir.soroush.app',
+    // ---------------------------------------------------------
+    // 1. پیام‌رسان‌ها و ارتباطی (Messengers & Social)
+    // ---------------------------------------------------------
+    'ir.eitaa.messenger',             // ایتا
+    'ir.resanememaran.rubika',        // روبیکا
+    'ir.resanememaran.rubikax',       // روبیکا ایکس
+    'ir.ble.messenger',               // بله
+    'mobi.mmdt.ott',                  // سروش پلاس
+    'net.iGap',                       // آیگپ
+    'i.gap.im',                       // آیگپ
+    'ir.soroush.app',                 // سروش
+    'ir.medu.shad',                   // شاد
+    'com.gap.android',                // گپ
 
-    // Bank Refah (بانک رفاه کارگران)
-    'ir.refah.mobilebank',
-    'com.refah.mobilebank',
-    'ir.refah.omidbank',
-    'com.refah.fara',
-
-    // Bank Melli (بانک ملی ایران - بام و ایوا)
-    'com.bmi.bam',
-    'ir.bmi.bam',
-    'ir.sadad.mobilebank',
-    'com.sadadpsp.eva',
-    'com.sadad.shast',
-    'ir.melli.app',
-
-    // Bank Mellat (بانک ملت)
+    // ---------------------------------------------------------
+    // 2. بانک ملت (Bank Mellat)
+    // ---------------------------------------------------------
+    'com.pmb.mobile',                 // همراه بانک ملت (اصلی - ۱۹ میلیون نصب)
     'com.mellat.mobilebank',
     'ir.bankmellat.mobilebank',
     'com.mellat.mobilebank.new',
-    'ir.bankmellat.sekeh',
+    'ir.bankmellat.sekeh',            // سکه ملت
 
-    // Bank Tejarat (بانک تجارت)
+    // ---------------------------------------------------------
+    // 3. بانک رفاه کارگران (Bank Refah)
+    // ---------------------------------------------------------
+    'com.refahbank.dpi.android',      // همراه بانک رفاه (اصلی - ۷ میلیون نصب)
+    'com.refah.superapp',             // فرا رفاه
+    'ir.refah.mobilebank',
+    'com.refah.mobilebank',
+    'ir.refah.omidbank',              // امید بانک رفاه
+    'com.refah.fara',
+
+    // ---------------------------------------------------------
+    // 4. بانک ملی ایران (Bank Melli)
+    // ---------------------------------------------------------
+    'ir.bmi.bam.nativeweb',           // همراه بام ملی (نسخه اصلی جدید)
+    'com.bmi.bam',                    // همراه بام ملی
+    'ir.bmi.bam',
+    'com.sadadpsp.eva',               // ایوا (پرداخت سداد ملی)
+    'com.sadad.shast',                // شصت (رمزساز بانک ملی)
+    'ir.melli.app',
+    'ir.sadad.mobilebank',
+
+    // ---------------------------------------------------------
+    // 5. بانک تجارت (Bank Tejarat)
+    // ---------------------------------------------------------
+    'ir.tejaratbank.tata.mobile.android.tejarat', // همراه بانک تجارت (اصلی - ۹.۷ میلیون نصب)
     'com.tejaratbank.mobilebank',
+    'ir.stts.bjt',                    // باجت (دیجیتال‌بانک تجارت)
+    'ir.stts.etc',                    // ست تجارت
     'ir.mbt.android',
     'com.tejarat.hamrah',
 
-    // Bank Saderat (بانک صادرات)
+    // ---------------------------------------------------------
+    // 6. بانک صادرات ایران (Bank Saderat)
+    // ---------------------------------------------------------
+    'com.isc.bsinew',                 // همراه بانک صادرات (اصلی - ۶ میلیون نصب)
     'ir.bsi.mobilebank',
     'com.saderat.mobilebank',
+    'com.isc.sap',                    // صاپ (پرداخت بانک صادرات)
     'com.saderat.sipa',
     'com.saderat.rimor',
 
-    // Bank Sepah (بانک سپه و ادغامی)
+    // ---------------------------------------------------------
+    // 7. بانک سپه و بانک‌های ادغامی (Bank Sepah)
+    // ---------------------------------------------------------
+    'mob.banking.android.sepah',       // همراه بانک سپه (سامانه توسن)
     'ir.sepah.mobilebank',
     'com.sepah.mobilebank',
-    'ir.sepah.omid',
-    'com.ansar.mobilebank',
-    'com.ghavamin.mobilebank',
+    'ir.sepah.omid',                  // امید سپه
+    'com.ansar.mobilebank',           // انصار سابق
+    'com.ghavamin.mobilebank',         // قوامین سابق
+    'com.kosar.mobilebank',           // کوثر سابق
 
-    // Neobanks & Crypto (بلو بانک، بانکینو، ویپاد و...)
-    'com.modern.blubank',
-    'com.bankino.mobile',
-    'ir.mizan.wepod',
-    'ir.ba.abank',
-    'ir.abantether.app',
-    'ir.nobitex.app',
-    'ir.wallex.app',
-    'ir.ramzinex.app',
-
-    // Bank Pasargad (بانک پاسارگاد)
+    // ---------------------------------------------------------
+    // 8. بانک پاسارگاد و ویپاد (Bank Pasargad & Wepod)
+    // ---------------------------------------------------------
+    'mob.banking.android.pasargad',    // همراه بانک پاسارگاد (اصلی - ۴.۴ میلیون نصب)
+    'com.dotin.wepod',                // ویپاد (نئوبانک پاسارگاد)
     'com.pasargad.mobilebank',
     'ir.pasargad.mobilebank',
 
-    // Bank Saman (بانک سامان)
+    // ---------------------------------------------------------
+    // 9. بانک سامان و بلو بانک (Bank Saman & BluBank)
+    // ---------------------------------------------------------
+    'com.samanpr.mobillet',           // موبایلت (همراه بانک سامان)
+    'com.samanpr.blubank',            // بلو بانک (BluBank سامان)
+    'com.modern.blubank',
     'com.samanpr.mb',
-    'ir.sep.seso',
     'com.saman.mobilebank',
 
-    // Bank Parsian (بانک پارسیان و تاپ)
-    'ir.parsian.mobile',
-    'com.pec.parsian',
-    'ir.parsian.parsianbank',
-
-    // Bank Shahr (بانک شهر)
-    'com.tosan.shahr',
-    'ir.tosan.shahr',
-    'ir.shahr.hamrah',
-
-    // Bank Maskan (بانک مسکن)
+    // ---------------------------------------------------------
+    // 10. بانک مسکن (Bank Maskan)
+    // ---------------------------------------------------------
+    'com.maskanmobilebank',           // همراه بانک مسکن (اصلی - ۲ میلیون نصب)
+    'mob.banking.android.maskan',
     'ir.maskan.mobilebank',
     'com.maskan.mobilebank',
 
-    // Bank Keshavarzi (بانک کشاورزی)
+    // ---------------------------------------------------------
+    // 11. بانک کشاورزی (Bank Keshavarzi)
+    // ---------------------------------------------------------
+    'com.bki.mobilebanking.android',  // همراه بانک کشاورزی (اصلی)
     'ir.keshavarzibank.mobilebank',
     'com.bki.mobilebank',
 
-    // Bank Sina (بانک سینا)
-    'ir.sinabank.mobilebank',
-    'com.tosan.sina',
+    // ---------------------------------------------------------
+    // 12. بانک شهر (Bank Shahr)
+    // ---------------------------------------------------------
+    'com.citydi.hplus',               // همراه شهر پلاس (اصلی - ۳.۷ میلیون نصب)
+    'mob.banking.android.shahr',
+    'ir.shahr.hamrah',
+    'com.tosan.shahr',
 
-    // Bank Day & Tourism (بانک دی و گردشگری)
-    'ir.daybank.mobilebank',
-    'com.tosan.day',
-    'ir.tourismbank.mobilebank',
-    'com.tosan.gardeshgari',
-
-    // Bank Resalat & Mehr (بانک رسالت و مهر ایران)
+    // ---------------------------------------------------------
+    // 13. بانک رسالت و مهر ایران (Gharzolhasaneh Banks)
+    // ---------------------------------------------------------
+    'mob.banking.android.resalat',     // همراه بانک رسالت (اصلی)
     'ir.rqbank.mobilebank',
     'com.melli.resalat',
+    'com.qmb.mobile',                 // بانک قرض‌الحسنه مهر ایران
     'ir.qmb.mobilebank',
     'com.qmb.mobilebank',
     'ir.ttbank.mobilebank',
 
-    // Payments & Fintech (پرداخت و کارت‌به‌کارت)
-    'com.asanpardakht.app',
-    'ir.mcoin.hamrahcard',
-    'com.tosan.saman.sekeh',
-    'com.snapp.pay',
+    // ---------------------------------------------------------
+    // 14. بانک آینده، آبانک و همراه کارت (Bank Ayandeh & Hamrah Card)
+    // ---------------------------------------------------------
+    'com.adpdigital.mbs.ayande',      // همراه کارت (۱۲ میلیون نصب)
+    'ir.ba.abank',                    // آبانک (نئوبانک آینده)
+    'com.tosan.keylid',               // کیلید بانک آینده
+    'com.ayandeh.mobilebank',
 
-    // Daily Iranian Services (تاکسی اینترنتی، خرید، نقشه)
-    'cab.snapp.passenger',
-    'cab.snapp.driver',
-    'com.tapsi.passenger',
-    'com.tapsi.driver',
-    'ir.divar',
-    'com.farsitel.bazaar',
-    'com.myket.android',
-    'ir.torob',
-    'com.digikala',
-    'ir.neshan.sp',
-    'ir.balad',
-    'com.takhfifan'
+    // ---------------------------------------------------------
+    // 15. سایر بانک‌ها (دی، گردشگری، سینا، تعاون، کارآفرین، خاورمیانه)
+    // ---------------------------------------------------------
+    'com.tosan.dara.day',             // دی جت (بانک دی)
+    'mob.banking.android.day',
+    'ir.daybank.mobilebank',
+    'mob.banking.android.gardesh',    // توبانک / گردشگری
+    'ir.tourismbank.mobilebank',
+    'com.tosan.gardeshgari',
+    'mob.banking.android.sina',       // بانک سینا
+    'ir.sinabank.mobilebank',
+    'mob.banking.android.taavon',     // توسعه تعاون
+    'com.tosan.dara.bim',             // صنعت و معدن
+    'com.tosan.dara.edbi',            // توسعه صادرات
+    'mob.banking.android.karafarin',  // کارآفرین
+    'com.middleeastbank.mobile',      // خاورمیانه
+    'mob.banking.android.iranzamin',  // ایران زمین
+    'com.iranzamin.faraz',            // فراز ایران زمین
+    'com.bankino.mobile',             // بانکینو (خاورمیانه)
+
+    // ---------------------------------------------------------
+    // 16. پرداخت، فین‌تک و خدمات مالی (Fintech & Payment)
+    // ---------------------------------------------------------
+    'com.asanpardakht.app',           // آپ (آسان پرداخت)
+    'ir.sep.seso',                    // ۷۲۴ (پرداخت الکترونیک سامان)
+    'ir.pec.top',                     // تاپ (تجارت الکترونیک پارسیان)
+    'com.pec.parsian',                // پارسیان من
+    'com.tosan.saman.sekeh',          // سکه
+    'com.snapp.pay',                  // اسنپ پی
+    'ir.mcoin.hamrahcard',
+
+    // ---------------------------------------------------------
+    // 17. صرافی‌های ایرانی ارز دیجیتال (Crypto Exchanges)
+    // ---------------------------------------------------------
+    'ir.nobitex.app',                 // نوبیتکس
+    'ir.wallex.app',                  // والکس
+    'ir.ramzinex.app',                // رمزینکس
+    'ir.abantether.app',              // آبان تتر
+    'com.bitpin.app',                 // بیت پین
+    'ir.exir.app',                    // اکسیر
+
+    // ---------------------------------------------------------
+    // 18. خدمات پرکاربرد روزمره، حمل‌ونقل و خرید (Daily Services)
+    // ---------------------------------------------------------
+    'cab.snapp.passenger',            // اسنپ مسافر
+    'cab.snapp.driver',               // اسنپ راننده
+    'com.tapsi.passenger',            // تپسی مسافر
+    'com.tapsi.driver',               // تپسی راننده
+    'ir.divar',                       // دیوار
+    'com.farsitel.bazaar',            // کافه بازار
+    'com.myket.android',              // مایکت
+    'ir.torob',                       // ترب
+    'com.digikala',                   // دیجی‌کالا
+    'ir.neshan.sp',                   // نشان
+    'ir.balad',                       // بلد
+    'com.takhfifan',                  // تخفیفان
+    'com.snapp.food',                 // اسنپ فود
+    'com.snappbox.passenger',         // اسنپ باکس
+
+    // ---------------------------------------------------------
+    // 19. خدمات دولتی، بیمه و عمومی (Government & Utilities)
+    // ---------------------------------------------------------
+    'ir.gov.my',                      // پنجره ملی خدمات دولت هوشمند
+    'ir.tamin.taminman',              // تأمین اجتماعی من
+    'ir.post.postman',                // پست من
+    'ir.tehran.mytehran',             // تهران من
+    'ir.mci.ecareapp',                // همراه من (همراه اول)
+    'ir.irancell.myirancell',         // ایرانسل من
+    'ir.rightel.myrightel',           // رایتل من
   ];
 
   @override
@@ -1065,10 +1148,16 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       List<String>? blockedAppsToPass;
       if (Platform.isAndroid && _splitTunnelingEnabled) {
         try {
+          final prefs = await SharedPreferences.getInstance();
+          final List<String>? customBypass = prefs.getStringList('custom_bypass_apps');
+          final List<String> targetList = (customBypass != null && customBypass.isNotEmpty)
+              ? customBypass
+              : defaultDomesticBypassApps;
+
           const channel = MethodChannel('com.connectix.vpn/updater');
           final List<dynamic>? installed = await channel.invokeMethod<List<dynamic>>(
             'getInstalledBypassApps',
-            {'packages': defaultDomesticBypassApps},
+            {'packages': targetList},
           );
           if (installed != null && installed.isNotEmpty) {
             blockedAppsToPass = installed.map((e) => e.toString()).toList();
@@ -2420,6 +2509,55 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         }
                       },
                     ),
+                    if (_splitTunnelingEnabled && Platform.isAndroid) ...[
+                      const Divider(color: Color(0xFF1E293B), height: 1),
+                      InkWell(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const BypassAppsScreen(
+                                defaultBypassList: defaultDomesticBypassApps,
+                              ),
+                            ),
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF10B981).withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(Icons.apps_rounded, color: Color(0xFF10B981), size: 18),
+                              ),
+                              const SizedBox(width: 12),
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'مدیریت برنامه‌های عبور مستقیم (Bypass Apps)',
+                                      style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                    ),
+                                    SizedBox(height: 2),
+                                    Text(
+                                      'مشاهده و انتخاب دستی برنامه‌هایی که از فیلترشکن عبور نکنند',
+                                      style: TextStyle(color: Color(0xFF64748B), fontSize: 10),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: Color(0xFF64748B)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                     const Divider(color: Color(0xFF1E293B), height: 1),
                     // Auto Reconnect Switch
                     SwitchListTile(

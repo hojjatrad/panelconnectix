@@ -6,6 +6,9 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -14,7 +17,11 @@ import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.util.ArrayList
+import java.util.HashMap
+import java.util.HashSet
 
 class MainActivity: FlutterActivity() {
     private val CHANNEL = "com.connectix.vpn/updater"
@@ -233,7 +240,8 @@ class MainActivity: FlutterActivity() {
                 }
                 "getInstalledBypassApps" -> {
                     try {
-                        val candidateList = call.argument<List<String>>("packages") ?: emptyList()
+                        val rawList = call.argument<List<*>>("packages") ?: emptyList<Any>()
+                        val candidateList = rawList.mapNotNull { it?.toString() }
                         val installedList = mutableListOf<String>()
                         val pm = context.packageManager
                         for (pkg in candidateList) {
@@ -250,6 +258,62 @@ class MainActivity: FlutterActivity() {
                     } catch (e: Exception) {
                         result.success(emptyList<String>())
                     }
+                }
+                "getAllInstalledApps" -> {
+                    Thread {
+                        try {
+                            val pm = context.packageManager
+                            val mainIntent = Intent(Intent.ACTION_MAIN, null).apply {
+                                addCategory(Intent.CATEGORY_LAUNCHER)
+                            }
+                            val resolveInfos = pm.queryIntentActivities(mainIntent, 0)
+                            val appsList = ArrayList<Map<String, Any>>()
+                            val selfPkg = context.packageName
+                            val seenPackages = HashSet<String>()
+
+                            for (ri in resolveInfos) {
+                                val pkg = ri.activityInfo.packageName
+                                if (pkg == selfPkg || seenPackages.contains(pkg)) continue
+                                seenPackages.add(pkg)
+
+                                val label = ri.loadLabel(pm).toString()
+                                var iconBytes: ByteArray? = null
+                                try {
+                                    val iconDrawable = ri.loadIcon(pm)
+                                    val bmp = if (iconDrawable is BitmapDrawable && iconDrawable.bitmap != null) {
+                                        Bitmap.createScaledBitmap(iconDrawable.bitmap, 72, 72, true)
+                                    } else {
+                                        val b = Bitmap.createBitmap(72, 72, Bitmap.Config.ARGB_8888)
+                                        val canvas = Canvas(b)
+                                        iconDrawable.setBounds(0, 0, 72, 72)
+                                        iconDrawable.draw(canvas)
+                                        b
+                                    }
+                                    val stream = ByteArrayOutputStream()
+                                    bmp.compress(Bitmap.CompressFormat.PNG, 85, stream)
+                                    iconBytes = stream.toByteArray()
+                                } catch (_: Exception) {}
+
+                                val map = HashMap<String, Any>()
+                                map["packageName"] = pkg
+                                map["appName"] = label
+                                if (iconBytes != null) {
+                                    map["icon"] = iconBytes
+                                }
+                                appsList.add(map)
+                            }
+
+                            appsList.sortBy { (it["appName"] as? String)?.lowercase() ?: "" }
+
+                            runOnUiThread {
+                                result.success(appsList)
+                            }
+                        } catch (e: Exception) {
+                            runOnUiThread {
+                                result.error("GET_APPS_ERROR", e.message, null)
+                            }
+                        }
+                    }.start()
                 }
                 else -> {
                     result.notImplemented()
