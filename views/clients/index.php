@@ -104,7 +104,7 @@ require __DIR__ . '/../layout/header.php';
     <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <div>
             <label class="block text-slate-400 mb-1">جستجو:</label>
-            <input type="text" name="search" value="<?= htmlspecialchars($_GET['search'] ?? '') ?>" placeholder="نام کاربری، یادداشت..." 
+            <input type="text" name="search" value="<?= htmlspecialchars($_GET['search'] ?? '') ?>" placeholder="نام خریدار، کاربری، یادداشت..." 
                    class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-purple-500">
         </div>
 
