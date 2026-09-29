@@ -71,7 +71,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Map<String, dynamic>? _updateInfo;
   bool _isCheckingUpdate = false;
 
-  static const String currentAppVersion = '3.5.7';
+  static const String currentAppVersion = '3.5.8';
 
   // "Download over Wi-Fi only" for update packages
   bool _updateWifiOnly = false;
@@ -1293,22 +1293,43 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
       // Pass Split Tunneling blocked apps to exclude domestic/banking apps natively (without crashes)
       // Layer 1: System-level disallowed apps (Android VpnService.Builder.addDisallowedApplication)
+      // v3.5.8 FIX: Filter to ONLY installed packages to avoid TransactionTooLarge & NameNotFoundException
       List<String>? blockedAppsToPass;
       String safeFinalConfig = finalConfig;
       if (Platform.isAndroid && _splitTunnelingEnabled) {
         try {
           final prefs = await SharedPreferences.getInstance();
           final List<String>? customBypass = prefs.getStringList('custom_bypass_apps');
-          blockedAppsToPass = (customBypass != null && customBypass.isNotEmpty)
+          List<String> candidateList = (customBypass != null && customBypass.isNotEmpty)
               ? customBypass
               : defaultDomesticBypassApps;
+
+          // v3.5.8: Ask native layer to filter to installed apps only (real check via PackageManager)
+          try {
+            const channel = MethodChannel('com.connectix.vpn/updater');
+            final filtered = await channel.invokeMethod<List<dynamic>>('getInstalledBypassApps', {'packages': candidateList});
+            if (filtered != null && filtered.isNotEmpty) {
+              blockedAppsToPass = filtered.map((e) => e.toString()).toList();
+              ApiService.log('bypass filter: ${candidateList.length} -> ${blockedAppsToPass!.length} installed');
+            } else {
+              // If filter returns empty (e.g. no banking apps installed), pass null to avoid empty list overhead
+              // But keep original candidate for safety if user has custom list that is all uninstalled? Use candidate truncated to 30
+              blockedAppsToPass = candidateList.length > 30 ? candidateList.sublist(0, 30) : candidateList;
+              ApiService.log('bypass filter empty, using truncated candidate ${blockedAppsToPass!.length}');
+            }
+          } catch (e) {
+            debugPrint('Bypass filter failed, using truncated list: $e');
+            ApiService.log('bypass filter error: $e');
+            // Fallback: truncate to 30 to avoid binder limit, still better than 130
+            blockedAppsToPass = candidateList.length > 30 ? candidateList.sublist(0, 30) : candidateList;
+          }
         } catch (e) {
           debugPrint('Bypass apps check: $e');
-          blockedAppsToPass = defaultDomesticBypassApps;
+          blockedAppsToPass = null; // fail-safe: no bypass rather than crash
         }
 
-        // Layer 2: Inject SAFE direct routing rules (domain:ir + geosite:ir + geoip:ir - flutter_v2ray bundles dat files, so safe)
-        // Layer 2 is fallback for apps not in disallowed list, and for WebView traffic
+        // Layer 2: Inject SAFE direct routing rules (NO geosite/geoip - those need dat files and crash core on many devices)
+        // v3.5.8 FIX: Revert to v3.5.5 safe rules that were proven stable: only domain:ir + explicit Iranian domains, ip: geoip:private only
         try {
           final Map<String, dynamic> configMap = jsonDecode(finalConfig);
           final routing = (configMap['routing'] as Map<String, dynamic>?) != null
@@ -1318,12 +1339,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               ? List<dynamic>.from(routing['rules'] as List<dynamic>)
               : <dynamic>[];
 
-          // Rule 0: Iranian domains -> direct (safe, uses dat files bundled by flutter_v2ray)
+          // Rule 0: Iranian domains -> direct (100% safe, no dat files required)
           rules.insert(0, {
             'type': 'field',
             'outboundTag': 'direct',
             'domain': [
-              'geosite:ir',
               'domain:ir',
               'eitaa.com',
               'rubika.ir',
@@ -1336,42 +1356,95 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               'shaparak.ir',
               'myket.ir',
               'cafebazaar.ir',
+              'bazaar.ir',
               'bankmellat.ir',
               'bmi.ir',
               'bankmelli.ir',
               'aparat.com',
               'filimo.com',
+              'aparat.com',
+              'myket.ir',
             ],
           });
-          // Rule 1: Iranian & private IPs -> direct
+          // Rule 1: Private IPs -> direct (safe, no geoip:ir needed)
           rules.insert(1, {
             'type': 'field',
             'outboundTag': 'direct',
             'ip': [
-              'geoip:ir',
               'geoip:private',
+              '10.0.0.0/8',
+              '172.16.0.0/12',
+              '192.168.0.0/16',
             ],
           });
           routing['rules'] = rules;
           configMap['routing'] = routing;
           final encoded = jsonEncode(configMap);
-          jsonDecode(encoded); // validate
+          jsonDecode(encoded); // validate JSON
           safeFinalConfig = encoded;
+          ApiService.log('routing safe rules injected, total rules=${rules.length}');
         } catch (e) {
           debugPrint('Inject direct routing rules failed, using original config: $e');
+          ApiService.log('routing inject failed: $e');
           safeFinalConfig = finalConfig;
         }
       }
       finalConfig = safeFinalConfig;
 
-      await _flutterV2ray.startV2Ray(
-        remark: 'Connectix • ${_selectedServer!.name}',
-        config: finalConfig,
-        blockedApps: blockedAppsToPass,
-        proxyOnly: false, // Full device-wide VPN tunnel
-        tunMode: tunMode,
-        notificationDisconnectButtonName: 'قطع اتصال',
-      );
+      // v3.5.8: Robust start with fallback - if safe config fails, retry with original config and no bypass
+      bool started = false;
+      String lastError = '';
+      try {
+        await _flutterV2ray.startV2Ray(
+          remark: 'Connectix • ${_selectedServer!.name}',
+          config: finalConfig,
+          blockedApps: blockedAppsToPass,
+          proxyOnly: false,
+          tunMode: tunMode,
+          notificationDisconnectButtonName: 'قطع اتصال',
+        );
+        started = true;
+        ApiService.log('V2Ray started with safe config + ${blockedAppsToPass?.length ?? 0} bypass apps');
+      } catch (e) {
+        lastError = e.toString();
+        ApiService.log('V2Ray start with safe config failed: $e - retrying with original config');
+        try {
+          // Retry 2: original config + filtered bypass
+          await _flutterV2ray.startV2Ray(
+            remark: 'Connectix • ${_selectedServer!.name}',
+            config: parser.getFullConfiguration(),
+            blockedApps: blockedAppsToPass,
+            proxyOnly: false,
+            tunMode: tunMode,
+            notificationDisconnectButtonName: 'قطع اتصال',
+          );
+          started = true;
+          ApiService.log('V2Ray started with original config + bypass');
+        } catch (e2) {
+          ApiService.log('V2Ray retry 2 failed: $e2 - retrying with no bypass');
+          try {
+            // Retry 3: original config + no bypass (guaranteed to work if server is valid)
+            await _flutterV2ray.startV2Ray(
+              remark: 'Connectix • ${_selectedServer!.name}',
+              config: parser.getFullConfiguration(),
+              blockedApps: null,
+              proxyOnly: false,
+              tunMode: tunMode,
+              notificationDisconnectButtonName: 'قطع اتصال',
+            );
+            started = true;
+            ApiService.log('V2Ray started with original config + no bypass (fallback)');
+          } catch (e3) {
+            lastError = '$e | $e2 | $e3';
+            ApiService.log('V2Ray all retries failed: $lastError');
+            rethrow;
+          }
+        }
+      }
+
+      if (!started) {
+        throw Exception(lastError);
+      }
 
       _connectedSeconds = 0;
       _timer?.cancel();

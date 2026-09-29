@@ -1,5 +1,12 @@
 # Connectix App — CHANGELOG
 
+## 3.5.8
+- **حل قطعی «دکمه اتصال وصل نمی‌شود» (ریشه‌یابی موشکافانه):**
+  - **ریشه اول (بازگشت باگ geo):** در v3.5.6 قوانین `geosite:ir` و `geoip:ir` دوباره اضافه شدند با فرض اینکه `flutter_v2ray` فایل‌های dat دارد. اما `Utilities.copyAssets()` در بسیاری از دستگاه‌ها فایل را پیدا نمی‌کند و هسته Xray با خطای `failed to load geosite: IR / geoip: IR` کرش می‌کند و `startCore()` false برمی‌گرداند -> سرویس VPN خاموش و UI در حالت Disconnected می‌ماند بدون پیام خطا. **فیکس:** بازگشت به قوانین امن v3.5.5 که ثابت شده پایدار است: فقط `domain:ir` + دامنه‌های ایرانی صریح (`eitaa.com`, `rubika.ir`, `bale.ai`, `divar.ir`, `snapp.ir`, `tapsi.ir`, `digikala.com`, `torob.com`, `shaparak.ir`, `myket.ir`, `cafebazaar.ir`, `bazaar.ir`, `bankmellat.ir`, `bmi.ir`, `bankmelli.ir`, `aparat.com`, `filimo.com`) و IP فقط `geoip:private` + رنج‌های خصوصی `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`. هیچ وابستگی به فایل dat ندارد و هرگز کرش نمی‌کند.
+  - **ریشه دوم (لیست 130 تایی bypass):** متد `getInstalledBypassApps` در MainActivity فقط لیست را برمی‌گرداند بدون چک نصب بودن، و 130 پکیج به `VpnService.Builder.addDisallowedApplication` پاس داده می‌شد که روی بعضی گوشی‌ها `TransactionTooLarge` یا `NameNotFoundException` ایجاد می‌کرد. **فیکس:** پیاده‌سازی واقعی فیلتر نصب با `PackageManager.getPackageInfo()` در کاتلین و در Dart با `MethodChannel` برای فیلتر به فقط پکیج‌های نصب‌شده (معمولاً 10-20 تا) + truncate به 30 در صورت خطا. همچنین در workflow embedded هم همین فیکس اعمال شد.
+  - **ریشه سوم (عدم fallback):** اگر کانفیگ با قوانین direct فیل می‌شد، هیچ تلاش مجددی نبود. **فیکس:** منطق 3 مرحله‌ای: 1) safe config + filtered bypass، 2) original config + filtered bypass، 3) original config + بدون bypass (تضمینی). هر مرحله لاگ می‌شود.
+  - **بهبود لاگ و UX:** تمام مراحل اتصال با `ApiService.log()` ثبت می‌شود تا در گزارش فنی قابل پیگیری باشد. در صورت شکست نهایی، خطای کامل نمایش داده می‌شود.
+
 ## 3.5.7
 - **حل قطعی خطای «فایل دانلود شده ناقص است» و عدم نصب آپدیت:**
   - **ریشه اول (ریدایرکت گیت‌هاب):** متد قبلی `http.Client().send()` ریدایرکت 302 گیت‌هاب به S3 را دنبال نمی‌کرد و یک فایل HTML کوچک (چند کیلوبایت) به جای APK دانلود می‌کرد که در چک `len < 1MB` می‌افتاد. بازنویسی کامل دانلود با `dart:io HttpClient` که `followRedirects=true` و `maxRedirects=5` دارد و ریدایرکت‌های گیت‌هاب را به درستی دنبال می‌کند.

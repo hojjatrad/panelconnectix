@@ -268,7 +268,19 @@ class MainActivity: FlutterActivity() {
                     try {
                         val rawList = call.argument<List<*>>("packages") ?: emptyList<Any>()
                         val candidateList = rawList.mapNotNull { it?.toString() }
-                        result.success(candidateList)
+                        // v3.5.8 FIX: Filter to only installed packages to avoid NameNotFoundException and TransactionTooLarge
+                        val pm = context.packageManager
+                        val installed = ArrayList<String>()
+                        for (pkg in candidateList) {
+                            try {
+                                // Use getPackageInfo to check if installed; works on all API levels
+                                pm.getPackageInfo(pkg, 0)
+                                installed.add(pkg)
+                            } catch (_: Exception) {
+                                // Not installed, skip
+                            }
+                        }
+                        result.success(installed)
                     } catch (e: Exception) {
                         result.success(emptyList<String>())
                     }
