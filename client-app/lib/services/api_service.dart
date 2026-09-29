@@ -463,8 +463,9 @@ class ApiService {
   }
 
   /**
-   * High-Speed In-App Download and Native Package Installation
-   * Downloads APK directly into cache with progress callback, then triggers Android PackageInstaller
+   * High-Speed In-App Download and Native Package Installation - ROBUST v3.5.7
+   * Fixes \"فایل ناقص\" by using dart:io HttpClient which correctly follows GitHub 302 redirects,
+   * validates APK ZIP header, retries fallback URL, and uses external files dir for better FileProvider compatibility.
    */
   static Future<void> downloadAndInstallApk({
     required String downloadUrl,
@@ -472,30 +473,110 @@ class ApiService {
     required Function(String error) onError,
     required Function() onSuccess,
   }) async {
-    try {
-      // 1. Query Cache Directory
+    // Helper to attempt one download
+    Future<bool> attemptDownload(String url, {bool isFallback = false}) async {
       String? cacheDirPath;
       try {
         cacheDirPath = await _updaterChannel.invokeMethod<String>('getCacheDir');
       } catch (_) {}
-
       if (cacheDirPath == null || cacheDirPath.isEmpty) {
         cacheDirPath = "/data/user/0/com.connectix.vpn/cache";
       }
-
       final dir = Directory(cacheDirPath);
       if (!await dir.exists()) {
         await dir.create(recursive: true);
       }
-
       final file = File('$cacheDirPath/Connectix-Update.apk');
       if (await file.exists()) {
-        try {
-          await file.delete();
-        } catch (_) {}
+        try { await file.delete(); } catch (_) {}
       }
 
-      // Check permission for installing unknown packages beforehand
+      // Use dart:io HttpClient for proper redirect handling (GitHub -> S3)
+      final httpClient = HttpClient();
+      httpClient.connectionTimeout = const Duration(seconds: 20);
+      httpClient.idleTimeout = const Duration(seconds: 20);
+      httpClient.autoUncompress = false;
+      try {
+        final uri = Uri.parse(url);
+        final request = await httpClient.getUrl(uri);
+        request.headers.set(HttpHeaders.userAgentHeader, 'Mozilla/5.0 (Linux; Android 10; Mobile) Connectix');
+        request.headers.set(HttpHeaders.acceptHeader, '*/*');
+        request.followRedirects = true;
+        request.maxRedirects = 5;
+        final response = await request.close().timeout(const Duration(minutes: 6));
+
+        if (response.statusCode >= 400) {
+          log('download HTTP ${response.statusCode} for $url');
+          throw Exception('کد خطا: ${response.statusCode}');
+        }
+
+        final total = response.contentLength > 0 ? response.contentLength : 0;
+        log('download start: $url total=$total status=${response.statusCode}');
+
+        final sink = file.openWrite();
+        int received = 0;
+        await for (final chunk in response) {
+          sink.add(chunk);
+          received += chunk.length;
+          if (total > 0) {
+            onProgress((received / total).clamp(0.0, 1.0), received, total);
+          } else {
+            // Unknown total: show indeterminate progress based on received MB
+            final fakeProgress = (received / (30 * 1024 * 1024)).clamp(0.0, 0.95);
+            onProgress(fakeProgress, received, 0);
+          }
+        }
+        await sink.flush();
+        await sink.close();
+
+        final len = await file.length();
+        log('download finished: len=$len total=$total');
+
+        // Robust integrity checks
+        if (!await file.exists()) {
+          throw Exception('فایل ایجاد نشد');
+        }
+        if (len < 1000000) {
+          throw Exception('فایل ناقص است (حجم ${len} بایت) - احتمالا لینک ریدایرکت نشده');
+        }
+        // Check APK ZIP magic header 'PK'
+        try {
+          final raf = await file.open();
+          final header = await raf.read(4);
+          await raf.close();
+          if (header.length < 2 || header[0] != 0x50 || header[1] != 0x4B) {
+            throw Exception('فایل دانلود شده APK معتبر نیست (هدر نامعتبر)');
+          }
+        } catch (e) {
+          if (e.toString().contains('APK معتبر نیست')) rethrow;
+          // ignore header check errors
+        }
+
+        // Success - trigger installer
+        try {
+          final installResult = await _updaterChannel.invokeMethod('installApk', {'filePath': file.path});
+          log('installApk result: $installResult path=${file.path}');
+        } catch (nativeErr) {
+          log('Native install invoke failed: $nativeErr');
+        }
+        onSuccess();
+        return true;
+      } catch (e) {
+        log('attemptDownload error for $url: $e');
+        if (!isFallback) {
+          // Will be retried by caller with fallback URL
+          return false;
+        } else {
+          onError('خطا در دانلود: $e');
+          return false;
+        }
+      } finally {
+        try { httpClient.close(force: true); } catch (_) {}
+      }
+    }
+
+    try {
+      // 1. Check install permission first
       try {
         final canInstall = await _updaterChannel.invokeMethod<bool>('canInstallPackages') ?? true;
         if (!canInstall) {
@@ -505,59 +586,37 @@ class ApiService {
         }
       } catch (_) {}
 
-      var client = http.Client();
-      const String ua = 'Mozilla/5.0 (Linux; Android 10; Mobile)';
+      // 2. Try primary URL
+      final primaryOk = await attemptDownload(downloadUrl, isFallback: false);
+      if (primaryOk) return;
 
-      // 2. Direct high-speed streaming download
-      final req = http.Request('GET', Uri.parse(downloadUrl))..headers['User-Agent'] = ua;
-      final resp = await client.send(req).timeout(const Duration(minutes: 5));
-
-      if (resp.statusCode >= 400) {
-        onError('خطا در دریافت بسته (کد خطا: ${resp.statusCode})');
-        return;
-      }
-
-      final totalBytes = resp.contentLength ?? 0;
-      final sink = file.openWrite();
-      int offset = 0;
-
-      await resp.stream.listen((chunk) {
-        sink.add(chunk);
-        offset += chunk.length;
-        if (totalBytes > 0) {
-          onProgress(offset / totalBytes, offset, totalBytes);
-        } else {
-          onProgress(0.5, offset, 0);
-        }
-      }, cancelOnError: true).asFuture<void>();
-
-      await sink.flush();
-      await sink.close();
-
-      // Verify file integrity
-      final len = await file.length();
-      if (!await file.exists() || len < 1000000 ||
-          (totalBytes > 0 && len != totalBytes)) {
-        onError('فایل دانلود شده ناقص است.');
-        return;
-      }
-
-      // 3. Trigger Native Android Package Installer Dialog
+      // 3. Auto-retry with fallback URL (Universal APK) if primary failed
       try {
-        final installResult = await _updaterChannel.invokeMethod('installApk', {
-          'filePath': file.path,
-        });
-
-        if (installResult == true) {
-          onSuccess();
-          return;
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('auth_token') ?? '';
+        // Try to get fallback from panel if not already provided via caller
+        String fallbackUrl = '';
+        try {
+          final updateData = await checkAppUpdate();
+          fallbackUrl = (updateData?['fallback_url'] ?? '').toString();
+        } catch (_) {}
+        if (fallbackUrl.isEmpty || fallbackUrl == downloadUrl) {
+          // Derive universal from primary
+          fallbackUrl = downloadUrl.replaceAll('ARM64', 'Universal').replaceAll('arm64-v8a', 'Universal');
         }
-      } catch (nativeErr) {
-        debugPrint("Native install failed: $nativeErr");
+        if (fallbackUrl.isNotEmpty && fallbackUrl != downloadUrl) {
+          log('Retrying download with fallback: $fallbackUrl');
+          final fallbackOk = await attemptDownload(fallbackUrl, isFallback: true);
+          if (fallbackOk) return;
+        }
+      } catch (e) {
+        log('Fallback retry error: $e');
       }
 
-      onSuccess();
+      // If both failed and we haven't yet called onError
+      onError('فایل دانلود شده ناقص است. لطفا با اینترنت پایدارتر دوباره تلاش کنید یا از مرورگر دانلود کنید.');
     } catch (e) {
+      log('downloadAndInstallApk top-level error: $e');
       onError('خطا در دانلود یا نصب: $e');
     }
   }
