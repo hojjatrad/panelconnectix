@@ -31,6 +31,15 @@ interface PanelDriverInterface {
     public function extendUser(string $username, int $addTrafficBytes, int $addSeconds): bool;
 
     /**
+     * Update user details directly on the remote node (volume limit, expiry, status)
+     *
+     * @param string $username
+     * @param array $params ['traffic_limit_bytes', 'expire_timestamp', 'status']
+     * @return bool
+     */
+    public function updateUser(string $username, array $params): bool;
+
+    /**
      * Delete or revoke user from the remote node
      */
     public function deleteUser(string $username): bool;

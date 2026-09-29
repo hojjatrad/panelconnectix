@@ -927,7 +927,7 @@ class ServerController {
             $names = array_values(array_unique(array_column($users, 'username')));
             $ph = implode(',', array_fill(0, count($names), '?'));
             try {
-                $st = $pdo->prepare("SELECT c.username, c.password, c.status AS panel_status, c.sub_token, c.node_sync,
+                $st = $pdo->prepare("SELECT c.username, c.password, c.customer_name, c.status AS panel_status, c.sub_token, c.node_sync,
                                              u.full_name AS reseller_name, u.username AS reseller_username,
                                              p.title AS plan_title
                                       FROM clients c

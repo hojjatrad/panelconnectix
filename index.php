@@ -326,6 +326,8 @@ $router->post('resellers/update-discount', [ResellerController::class, 'updateDi
 $router->post('resellers/reset-password', [ResellerController::class, 'resetPassword']);
 $router->post('resellers/delete', [ResellerController::class, 'delete']);
 $router->get('resellers/clients', [ResellerController::class, 'clients']);
+$router->get('resellers/invoice', [ResellerController::class, 'invoice']);
+$router->get('resellers/invoice-export', [ResellerController::class, 'exportInvoiceCsv']);
 $router->get('resellers/backup', [ResellerController::class, 'backupAction']);
 $router->get('resellers/export-financial', [ResellerController::class, 'exportFinancial']);
 $router->get('resellers/applications', [ResellerController::class, 'applications']);
@@ -341,6 +343,8 @@ $router->get('reseller/branding', [ResellerPortalController::class, 'branding'])
 $router->post('reseller/branding', [ResellerPortalController::class, 'saveBranding']);
 $router->get('reseller/plans', [ResellerPortalController::class, 'plans']);
 $router->post('reseller/plans', [ResellerPortalController::class, 'savePlans']);
+$router->get('reseller/invoice', [ResellerPortalController::class, 'invoice']);
+$router->get('reseller/invoice-export', [ResellerPortalController::class, 'exportInvoiceCsv']);
 $router->get('reseller/orders', [ResellerPortalController::class, 'orders']);
 $router->post('reseller/orders/approve', [ResellerPortalController::class, 'approveOrder']);
 $router->post('reseller/orders/reject', [ResellerPortalController::class, 'rejectOrder']);
@@ -425,6 +429,7 @@ $router->get('settings/bot', [TelegramBotController::class, 'manage']);
 $router->get('settings/bot-users', [TelegramBotController::class, 'botUsers']);
 $router->post('settings/bot-users/send-msg', [TelegramBotController::class, 'sendUserMessage']);
 $router->post('settings/bot-broadcast', [TelegramBotController::class, 'broadcast']);
+$router->post('settings/bot/channel-post', [TelegramBotController::class, 'channelPost']);
 $router->post('settings/bot', [TelegramBotController::class, 'updateSettings']);
 $router->post('settings/bot/auto-create-topics', [TelegramBotController::class, 'autoCreateTopicsAction']);
 $router->post('bot/auto-create-topics', [TelegramBotController::class, 'autoCreateTopicsAction']);

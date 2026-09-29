@@ -14,8 +14,12 @@ require __DIR__ . '/../layout/header.php';
     <div class="flex items-center gap-2">
         <button onclick="openBroadcastModal()" class="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl transition shadow flex items-center gap-2">
             <i class="fa-solid fa-bullhorn"></i>
-            <span>ارسال پیام همگانی (Broadcast)</span>
+            <span>ارسال پیام همگانی به اعضا</span>
         </button>
+        <a href="<?= Helpers::url('settings/bot') ?>#channelBroadcastCard" class="px-3.5 py-2 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 text-xs font-semibold rounded-xl border border-amber-500/30 transition flex items-center gap-2">
+            <i class="fa-solid fa-tower-broadcast text-amber-400"></i>
+            <span>ارسال به کانال تلگرام</span>
+        </a>
         <a href="<?= Helpers::url('settings/bot') ?>" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center gap-2">
             <i class="fa-brands fa-telegram text-cyan-400"></i>
             <span>تنظیمات ربات</span>

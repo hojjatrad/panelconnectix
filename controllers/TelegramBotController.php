@@ -4088,6 +4088,89 @@ class TelegramBotController {
     }
 
     /**
+     * Broadcast announcement directly to the configured Telegram channel
+     */
+    public function channelPost(): void {
+        Auth::requireAdmin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
+            Helpers::redirect('settings/bot');
+        }
+
+        $message = trim($_POST['message'] ?? '');
+        $channel = trim($_POST['channel'] ?? '');
+        $pin = !empty($_POST['pin']);
+        $silent = !empty($_POST['silent']);
+        $btnText = trim($_POST['btn_text'] ?? '');
+        $btnUrl = trim($_POST['btn_url'] ?? '');
+
+        if (empty($channel)) {
+            $channel = trim((string)Setting::get('bot_force_join_channel', ''));
+        }
+
+        if (empty($message)) {
+            Helpers::flash('error', 'متن پیام اطلاعیه کانال نمی‌تواند خالی باشد.');
+            Helpers::redirect('settings/bot');
+        }
+
+        if (empty($channel)) {
+            Helpers::flash('error', 'آیدی کانال مشخص نشده است. لطفاً آیدی کانال را در کادر مربوطه وارد نمایید.');
+            Helpers::redirect('settings/bot');
+        }
+
+        // Format channel: prefix @ if public username without @ or -
+        if (!str_starts_with($channel, '@') && !str_starts_with($channel, '-') && !is_numeric($channel)) {
+            $channel = '@' . $channel;
+        }
+
+        $replyMarkup = null;
+        if (!empty($btnText) && !empty($btnUrl)) {
+            $replyMarkup = [
+                'inline_keyboard' => [
+                    [
+                        ['text' => $btnText, 'url' => $btnUrl]
+                    ]
+                ]
+            ];
+        }
+
+        $params = [
+            'chat_id' => $channel,
+            'text' => $message,
+            'parse_mode' => 'HTML',
+            'disable_web_page_preview' => false,
+            'disable_notification' => $silent
+        ];
+        if ($replyMarkup !== null) {
+            $params['reply_markup'] = $replyMarkup;
+        }
+
+        $res = TelegramBot::request('sendMessage', $params);
+
+        if ($res && isset($res['ok']) && $res['ok'] === true) {
+            $msgId = $res['result']['message_id'] ?? null;
+            $pinText = '';
+            if ($pin && $msgId) {
+                $pinRes = TelegramBot::request('pinChatMessage', [
+                    'chat_id' => $channel,
+                    'message_id' => $msgId,
+                    'disable_notification' => $silent
+                ]);
+                if ($pinRes && isset($pinRes['ok']) && $pinRes['ok'] === true) {
+                    $pinText = ' و در بالای کانال پین شد';
+                }
+            }
+            Helpers::logActivity('bot_channel_post', "ارسال اطلاعیه به کانال {$channel}", 'system');
+            Helpers::flash('success', "اطلاعیه با موفقیت به کانال تلگرام {$channel} ارسال گردید{$pinText}.");
+        } else {
+            $err = $res['description'] ?? 'عدم برقراری ارتباط با API تلگرام';
+            Helpers::flash('error', "خطا در ارسال پیام به کانال ({$channel}): {$err} — اطمینان حاصل فرمایید ربات به عنوان «مدیر / Administrator» با دسترسی ارسال پیام (Post Messages) در کانال عضو شده باشد.");
+        }
+
+        Helpers::redirect('settings/bot');
+    }
+
+    /**
      * Free Trial Account Handler
      */
     public static function handleFreeTrialRequest(PDO $pdo, string $chatId, string $fromId, ?int $messageId = null): void {

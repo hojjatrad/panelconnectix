@@ -50,6 +50,10 @@ class MockDriver implements PanelDriverInterface {
         return true;
     }
 
+    public function updateUser(string $username, array $params): bool {
+        return true;
+    }
+
     public function deleteUser(string $username): bool {
         return true;
     }

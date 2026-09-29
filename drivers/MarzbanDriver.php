@@ -530,6 +530,22 @@ class MarzbanDriver implements PanelDriverInterface {
         return $res['success'];
     }
 
+    public function updateUser(string $username, array $params): bool {
+        if (!$this->authenticate()) return false;
+        $data = [];
+        if (isset($params['traffic_limit_bytes'])) {
+            $data['data_limit'] = (int)$params['traffic_limit_bytes'] > 0 ? (int)$params['traffic_limit_bytes'] : 0;
+        }
+        if (isset($params['expire_timestamp'])) {
+            $data['expire'] = (int)$params['expire_timestamp'] > 0 ? (int)$params['expire_timestamp'] : null;
+        }
+        if (isset($params['status'])) {
+            $data['status'] = $params['status'];
+        }
+        $res = $this->request($this->apiPrefix . '/user/' . urlencode($username), 'PUT', $data);
+        return $res['success'];
+    }
+
     public function deleteUser(string $username): bool {
         if (!$this->authenticate()) return false;
         $res = $this->request($this->apiPrefix . '/user/' . urlencode($username), 'DELETE');
@@ -567,13 +583,13 @@ class MarzbanDriver implements PanelDriverInterface {
     public function listUsers(): array {
         if (!$this->authenticate()) return [];
 
-        $candidates = [];
-        if ($this->apiPrefix === '/api/v1') {
-            $candidates[] = $this->apiPrefix . '/client/list';
-        } else {
-            $candidates[] = $this->apiPrefix . '/v1/client/list';
-            $candidates[] = $this->apiPrefix . '/client/list';
-        }
+        $candidates = [
+            $this->apiPrefix . '/users',
+            '/api/users',
+            '/api/v1/users',
+            $this->apiPrefix . '/client/list',
+            '/api/client/list',
+        ];
 
         $rawUsers = null;
         foreach ($candidates as $endpoint) {
@@ -603,7 +619,9 @@ class MarzbanDriver implements PanelDriverInterface {
             $expAt = null;
             if (!empty($expRaw)) {
                 if (is_numeric($expRaw)) {
-                    $expAt = ((int)$expRaw > 0) ? date('Y-m-d H:i:s', (int)$expRaw) : null;
+                    $ts = (int)$expRaw;
+                    if ($ts > 20000000000) $ts = (int)round($ts / 1000);
+                    $expAt = ($ts > 0) ? date('Y-m-d H:i:s', $ts) : null;
                 } else {
                     $ts = strtotime((string)$expRaw);
                     $expAt = ($ts !== false && $ts > 0) ? date('Y-m-d H:i:s', $ts) : (string)$expRaw;
@@ -620,12 +638,24 @@ class MarzbanDriver implements PanelDriverInterface {
             $status = (string)($u['status'] ?? 'active');
             if ($expAt !== null && strtotime($expAt) < time()) $status = 'expired';
 
+            $rawLimit = $u['data_limit'] ?? $u['traffic_limit'] ?? 0;
+            $limitBytes = (int)$rawLimit;
+            if ($limitBytes > 0 && $limitBytes < 10000) {
+                $limitBytes = (int)round($limitBytes * 1073741824);
+            }
+
+            $rawUsed = $u['used_traffic'] ?? $u['used_bytes'] ?? 0;
+            $usedBytes = (int)$rawUsed;
+            if ($usedBytes > 0 && $usedBytes < 10000 && $limitBytes > 10000000) {
+                $usedBytes = (int)round($usedBytes * 1073741824);
+            }
+
             $out[] = [
                 'username' => (string)$u['username'],
                 'status' => $status,
                 'online' => ((int)($u['online_at'] ?? 0)) > (time() - 300),
-                'traffic_used_bytes' => (int)($u['used_traffic'] ?? 0),
-                'traffic_limit_bytes' => (int)($u['data_limit'] ?? 0),
+                'traffic_used_bytes' => $usedBytes,
+                'traffic_limit_bytes' => $limitBytes,
                 'expire_at' => $expAt,
                 'subscription_url' => (string)$subUrl,
                 'links' => array_values(array_filter(array_map('strval', (array)($u['links'] ?? [])))),

@@ -13,6 +13,10 @@ $pendingCount = $pendingAppsCount ?? 0;
     </div>
 
     <div class="flex items-center gap-2">
+        <a href="<?= Helpers::url('resellers/invoice') ?>" class="px-3 py-2 bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 text-xs font-semibold rounded-xl border border-cyan-500/30 transition flex items-center gap-1.5" title="مشاهده، چاپ و گزارش فاکتور و ریز صورت‌حساب ماهانه نمایندگان">
+            <i class="fa-solid fa-file-invoice-dollar text-cyan-400"></i>
+            <span>فاکتور ماهانه</span>
+        </a>
         <a href="<?= Helpers::url('resellers/export-financial') ?>" class="px-3 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 text-xs font-semibold rounded-xl border border-emerald-500/30 transition flex items-center gap-1.5" title="دانلود گزارش کامل مالی و ترافیک نمایندگان در قالب اکسل">
             <i class="fa-solid fa-file-excel text-emerald-400"></i>
             <span>خروجی مالی (Excel)</span>
@@ -128,6 +132,9 @@ $pendingCount = $pendingAppsCount ?? 0;
                                 <button onclick="openCreditLimitModal(<?= $r['id'] ?>, '<?= htmlspecialchars($r['username']) ?>', <?= $limit ?>)" class="w-8 h-8 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 transition flex items-center justify-center text-xs" title="تنظیم سقف بدهی و اعتبار مجاز">
                                     <i class="fa-solid fa-scale-balanced"></i>
                                 </button>
+                                <a href="<?= Helpers::url('resellers/invoice?id=' . $r['id']) ?>" class="w-8 h-8 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 transition flex items-center justify-center text-xs" title="مشاهده، صدور و چاپ فاکتور ماهانه نماینده">
+                                    <i class="fa-solid fa-file-invoice-dollar"></i>
+                                </a>
                                 <button onclick="openResetPwdModal(<?= $r['id'] ?>, '<?= htmlspecialchars($r['username']) ?>', '<?= htmlspecialchars($r['panel_password_display'] ?? '') ?>')" class="w-8 h-8 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 transition flex items-center justify-center text-xs" title="تغییر یا مشاهده کلمه عبور پنل این نماینده">
                                     <i class="fa-solid fa-key"></i>
                                 </button>

@@ -167,17 +167,83 @@ class XUiDriver implements PanelDriverInterface {
         return null;
     }
 
+    public function updateUser(string $username, array $params): bool {
+        if (!$this->authenticate()) return false;
+        $res = $this->request('/panel/api/inbounds/list');
+        if (!$res['success'] || empty($res['data']['obj'])) return false;
+
+        foreach ($res['data']['obj'] as $inb) {
+            $settings = json_decode((string)($inb['settings'] ?? '{}'), true) ?: [];
+            $clients = $settings['clients'] ?? [];
+            if (!is_array($clients)) continue;
+
+            foreach ($clients as $c) {
+                if (!is_array($c)) continue;
+                $cEmail = (string)($c['email'] ?? '');
+                $cUuid = (string)($c['id'] ?? '');
+                if ($cEmail === $username || $cUuid === $username) {
+                    $inboundId = (int)$inb['id'];
+                    $updatedClient = $c;
+                    if (isset($params['traffic_limit_bytes'])) {
+                        $updatedClient['totalGB'] = round((float)$params['traffic_limit_bytes'] / 1073741824, 2);
+                    }
+                    if (isset($params['expire_timestamp'])) {
+                        $ts = (int)$params['expire_timestamp'];
+                        $updatedClient['expiryTime'] = ($ts > 0) ? ($ts * 1000) : 0;
+                    }
+                    if (isset($params['status'])) {
+                        $updatedClient['enable'] = ($params['status'] === 'active');
+                    }
+                    $upRes = $this->request('/panel/api/inbounds/updateClient/' . $cUuid, 'POST', [
+                        'id' => $inboundId,
+                        'settings' => json_encode(['clients' => [$updatedClient]])
+                    ]);
+                    return $upRes['success'] ?? false;
+                }
+            }
+        }
+        return false;
+    }
+
     public function extendUser(string $username, int $addTrafficBytes, int $addSeconds): bool {
-        // In 3x-ui client update can reset or increment total
-        return true;
+        if (!$this->authenticate()) return false;
+        $current = $this->getUser($username);
+        $curLimit = $current ? (int)($current['traffic_limit_bytes'] ?? 0) : 0;
+        $curExpire = ($current && !empty($current['expire_at'])) ? strtotime($current['expire_at']) : time();
+        $newLimit = $curLimit + $addTrafficBytes;
+        $newExpire = max($curExpire, time()) + $addSeconds;
+        return $this->updateUser($username, [
+            'traffic_limit_bytes' => $newLimit,
+            'expire_timestamp' => $newExpire,
+            'status' => 'active'
+        ]);
     }
 
     public function deleteUser(string $username): bool {
-        return true;
+        if (!$this->authenticate()) return false;
+        $res = $this->request('/panel/api/inbounds/list');
+        if (!$res['success'] || empty($res['data']['obj'])) return false;
+
+        foreach ($res['data']['obj'] as $inb) {
+            $settings = json_decode((string)($inb['settings'] ?? '{}'), true) ?: [];
+            $clients = $settings['clients'] ?? [];
+            if (!is_array($clients)) continue;
+
+            foreach ($clients as $c) {
+                if (!is_array($c)) continue;
+                if (($c['email'] ?? '') === $username || ($c['id'] ?? '') === $username) {
+                    $inbId = (int)$inb['id'];
+                    $uuid = (string)$c['id'];
+                    $delRes = $this->request("/panel/api/inbounds/{$inbId}/delClient/{$uuid}", 'POST');
+                    return $delRes['success'] ?? false;
+                }
+            }
+        }
+        return false;
     }
 
     public function toggleUserStatus(string $username, bool $active): bool {
-        return true;
+        return $this->updateUser($username, ['status' => $active ? 'active' : 'disabled']);
     }
 
     public function getNodeStats(): array {
@@ -210,6 +276,16 @@ class XUiDriver implements PanelDriverInterface {
             $clients = $settings['clients'] ?? [];
             if (!is_array($clients)) continue;
 
+            // Map clientStats by email and id
+            $clientStats = [];
+            if (!empty($inb['clientStats']) && is_array($inb['clientStats'])) {
+                foreach ($inb['clientStats'] as $cs) {
+                    if (!is_array($cs)) continue;
+                    $emailKey = strtolower(trim((string)($cs['email'] ?? '')));
+                    if ($emailKey !== '') $clientStats[$emailKey] = $cs;
+                }
+            }
+
             foreach ($clients as $c) {
                 if (!is_array($c)) continue;
                 $uuid = (string)($c['id'] ?? '');
@@ -222,6 +298,39 @@ class XUiDriver implements PanelDriverInterface {
                 elseif ($protocol === 'trojan' && $trojanPass !== '') $username = $trojanPass;
                 elseif ($protocol === 'shadowsocks' && $trojanPass !== '') $username = $trojanPass;
                 else continue;
+
+                $cs = $clientStats[strtolower($username)] ?? $clientStats[strtolower($email)] ?? null;
+                $usedBytes = 0;
+                $limitBytes = 0;
+                $expireAt = null;
+
+                if ($cs) {
+                    $up = (int)($cs['up'] ?? 0);
+                    $down = (int)($cs['down'] ?? 0);
+                    $usedBytes = $up + $down;
+                    $limitBytes = (int)($cs['total'] ?? 0);
+                    if (!empty($cs['expiryTime']) && (int)$cs['expiryTime'] > 0) {
+                        $expMs = (int)$cs['expiryTime'];
+                        $expSec = ($expMs > 20000000000) ? (int)round($expMs / 1000) : $expMs;
+                        $expireAt = date('Y-m-d H:i:s', $expSec);
+                    }
+                }
+
+                if ($limitBytes <= 0) {
+                    $totalGB = (float)($c['totalGB'] ?? 0);
+                    if ($totalGB > 0) {
+                        $limitBytes = (int)round($totalGB * 1073741824);
+                    } elseif (!empty($c['total'])) {
+                        $t = (int)$c['total'];
+                        $limitBytes = ($t > 0 && $t < 10000) ? (int)round($t * 1073741824) : $t;
+                    }
+                }
+
+                if (!$expireAt && !empty($c['expiryTime']) && (int)$c['expiryTime'] > 0) {
+                    $expMs = (int)$c['expiryTime'];
+                    $expSec = ($expMs > 20000000000) ? (int)round($expMs / 1000) : $expMs;
+                    $expireAt = date('Y-m-d H:i:s', $expSec);
+                }
 
                 $link = '';
                 $security = (string)($stream['security'] ?? 'none');
@@ -266,12 +375,12 @@ class XUiDriver implements PanelDriverInterface {
                     'username' => $username,
                     'status' => (($c['enable'] ?? true) === true) ? 'active' : 'disabled',
                     'online' => false,
-                    'traffic_used_bytes' => 0,
-                    'traffic_limit_bytes' => (int)((float)($c['totalGB'] ?? 0) * 1073741824),
-                    'expire_at' => !empty($c['expiryTime']) ? date('Y-m-d H:i:s', (int)($c['expiryTime'] / 1000)) : null,
+                    'traffic_used_bytes' => $usedBytes,
+                    'traffic_limit_bytes' => $limitBytes,
+                    'expire_at' => $expireAt,
                     'subscription_url' => $subUrl,
                     'links' => $link !== '' ? [$link] : [],
-                    'usage_unknown' => true,
+                    'usage_unknown' => false,
                 ];
             }
         }

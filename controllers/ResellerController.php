@@ -551,4 +551,194 @@ class ResellerController {
         fclose($output);
         exit;
     }
+
+    /**
+     * Reseller Monthly Invoices & Billing Breakdown
+     */
+    public function invoice(): void {
+        Auth::requireAdmin();
+        $pdo = Database::getConnection();
+
+        $resellerId = (int)($_GET['id'] ?? $_GET['reseller_id'] ?? 0);
+        $month = trim($_GET['month'] ?? date('Y-m'));
+        if (!preg_match('/^\d{4}-\d{2}$/', $month)) {
+            $month = date('Y-m');
+        }
+
+        // Get all resellers for switcher
+        $allResellers = $pdo->query("SELECT id, username, full_name, brand_name FROM users WHERE role = 'reseller' ORDER BY username ASC")->fetchAll(PDO::FETCH_ASSOC);
+
+        if ($resellerId <= 0 && !empty($allResellers)) {
+            $resellerId = (int)$allResellers[0]['id'];
+        }
+
+        $reseller = null;
+        if ($resellerId > 0) {
+            $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ? AND role = 'reseller'");
+            $stmt->execute([$resellerId]);
+            $reseller = $stmt->fetch(PDO::FETCH_ASSOC);
+        }
+
+        if (!$reseller) {
+            Helpers::flash('error', 'هیچ نماینده‌ای یافت نشد.');
+            Helpers::redirect('resellers');
+            return;
+        }
+
+        // Build itemized clients created this month for this reseller
+        $stmtClients = $pdo->prepare("SELECT c.*, s.name as server_name, p.title as plan_title, 
+                                             p.traffic_gb as plan_traffic, p.duration_days as plan_duration, 
+                                             p.base_price, p.reseller_price
+                                      FROM clients c
+                                      LEFT JOIN server_nodes s ON c.server_id = s.id
+                                      LEFT JOIN plans p ON c.plan_id = p.id
+                                      WHERE c.reseller_id = ? AND c.created_at LIKE ?
+                                      ORDER BY c.id DESC");
+        $stmtClients->execute([$resellerId, $month . '%']);
+        $clients = $stmtClients->fetchAll(PDO::FETCH_ASSOC);
+
+        // Calculate Plan Breakdown and Totals
+        $planBreakdown = [];
+        $totalGross = 0;
+        $totalNet = 0;
+        $totalTrafficBytes = 0;
+        $totalTrafficUsedBytes = 0;
+        $discountPercent = (int)($reseller['discount_percent'] ?? 0);
+
+        foreach ($clients as &$client) {
+            $basePrice = (int)($client['base_price'] ?? 0);
+            $resellerPrice = (int)($client['reseller_price'] ?? 0);
+
+            if ($resellerPrice > 0) {
+                $effectiveUnit = $resellerPrice;
+                $grossUnit = $basePrice > 0 ? $basePrice : $resellerPrice;
+            } elseif ($basePrice > 0) {
+                $effectiveUnit = (int)round($basePrice * (1 - ($discountPercent / 100)));
+                $grossUnit = $basePrice;
+            } else {
+                $effectiveUnit = 0;
+                $grossUnit = 0;
+            }
+
+            $client['calculated_unit_price'] = $effectiveUnit;
+            $client['calculated_gross_price'] = $grossUnit;
+            $totalGross += $grossUnit;
+            $totalNet += $effectiveUnit;
+            $totalTrafficBytes += (int)($client['traffic_limit_bytes'] ?? 0);
+            $totalTrafficUsedBytes += (int)($client['traffic_used_bytes'] ?? 0);
+
+            $pKey = !empty($client['plan_title']) ? $client['plan_title'] : 'سفارشی / آزاد';
+            if (!isset($planBreakdown[$pKey])) {
+                $planBreakdown[$pKey] = [
+                    'title' => $pKey,
+                    'count' => 0,
+                    'traffic_gb' => (int)($client['plan_traffic'] ?? 0),
+                    'duration_days' => (int)($client['plan_duration'] ?? 0),
+                    'unit_price' => $effectiveUnit,
+                    'total_amount' => 0,
+                ];
+            }
+            $planBreakdown[$pKey]['count']++;
+            $planBreakdown[$pKey]['total_amount'] += $effectiveUnit;
+        }
+        unset($client);
+
+        $totalDiscount = max(0, $totalGross - $totalNet);
+
+        // Fetch wallet activities for this month
+        $stmtTx = $pdo->prepare("SELECT * FROM transactions WHERE user_id = ? AND created_at LIKE ? ORDER BY id DESC");
+        $stmtTx->execute([$resellerId, $month . '%']);
+        $transactions = $stmtTx->fetchAll(PDO::FETCH_ASSOC);
+
+        $totalDeposited = 0;
+        foreach ($transactions as $tx) {
+            if ($tx['type'] === 'wallet_topup' && $tx['amount'] > 0) {
+                $totalDeposited += (int)$tx['amount'];
+            }
+        }
+
+        require __DIR__ . '/../views/resellers/invoice.php';
+    }
+
+    /**
+     * Export Reseller Monthly Invoice CSV
+     */
+    public function exportInvoiceCsv(): void {
+        Auth::requireAdmin();
+        $pdo = Database::getConnection();
+
+        $resellerId = (int)($_GET['id'] ?? $_GET['reseller_id'] ?? 0);
+        $month = trim($_GET['month'] ?? date('Y-m'));
+        if (!preg_match('/^\d{4}-\d{2}$/', $month)) {
+            $month = date('Y-m');
+        }
+
+        $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ? AND role = 'reseller'");
+        $stmt->execute([$resellerId]);
+        $reseller = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$reseller) {
+            Helpers::flash('error', 'نماینده یافت نشد.');
+            Helpers::redirect('resellers');
+            return;
+        }
+
+        $stmtClients = $pdo->prepare("SELECT c.*, s.name as server_name, p.title as plan_title,
+                                             p.traffic_gb as plan_traffic, p.duration_days as plan_duration,
+                                             p.base_price, p.reseller_price
+                                      FROM clients c
+                                      LEFT JOIN server_nodes s ON c.server_id = s.id
+                                      LEFT JOIN plans p ON c.plan_id = p.id
+                                      WHERE c.reseller_id = ? AND c.created_at LIKE ?
+                                      ORDER BY c.id DESC");
+        $stmtClients->execute([$resellerId, $month . '%']);
+        $clients = $stmtClients->fetchAll(PDO::FETCH_ASSOC);
+
+        $discountPercent = (int)($reseller['discount_percent'] ?? 0);
+        $safeUsername = preg_replace('/[^a-zA-Z0-9_-]/', '', (string)$reseller['username']);
+        $filename = "invoice_{$safeUsername}_{$month}.csv";
+
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        echo "\xEF\xBB\xBF"; // UTF-8 BOM
+
+        $output = fopen('php://output', 'w');
+        fputcsv($output, ['صورت‌حساب ماهانه نماینده']);
+        fputcsv($output, ['نام کاربری نماینده', $reseller['username']]);
+        fputcsv($output, ['نام و برند', $reseller['brand_name'] ?: $reseller['full_name']]);
+        fputcsv($output, ['دوره صورت‌حساب', $month]);
+        fputcsv($output, ['تاریخ صدور خروجی', date('Y-m-d H:i:s')]);
+        fputcsv($output, []);
+        fputcsv($output, ['ردیف', 'نام و نام خانوادگی خریدار', 'نام کاربری اکانت', 'پلن سرویس', 'سرور اختصاصی', 'حجم کل (GB)', 'مصرفی (GB)', 'تاریخ صدور', 'تاریخ انقضا', 'وضعیت', 'مبلغ واحد صورت‌حساب (تومان)']);
+
+        $i = 1;
+        $totalSum = 0;
+        foreach ($clients as $c) {
+            $resellerPrice = (int)($c['reseller_price'] ?? 0);
+            $basePrice = (int)($c['base_price'] ?? 0);
+            $unit = $resellerPrice > 0 ? $resellerPrice : ($basePrice > 0 ? (int)round($basePrice * (1 - $discountPercent / 100)) : 0);
+            $totalSum += $unit;
+
+            $limitGb = round(($c['traffic_limit_bytes'] ?? 0) / (1024 * 1024 * 1024), 2);
+            $usedGb = round(($c['traffic_used_bytes'] ?? 0) / (1024 * 1024 * 1024), 2);
+
+            fputcsv($output, [
+                $i++,
+                $c['customer_name'] ?? '—',
+                $c['username'],
+                $c['plan_title'] ?? 'سفارشی',
+                $c['server_name'] ?? '—',
+                $limitGb,
+                $usedGb,
+                $c['created_at'],
+                $c['expire_at'] ?? 'نامحدود',
+                $c['status'],
+                $unit
+            ]);
+        }
+        fputcsv($output, []);
+        fputcsv($output, ['', '', '', '', '', '', '', '', 'مجموع کل صورت‌حساب:', $totalSum]);
+
+        fclose($output);
+        exit;
+    }
 }

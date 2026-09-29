@@ -43,6 +43,19 @@ require __DIR__ . '/../layout/header.php';
                 </div>
             </div>
 
+            <!-- Customer Name -->
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-2 flex items-center justify-between">
+                    <span class="flex items-center gap-1.5">
+                        <i class="fa-solid fa-user text-cyan-400"></i>
+                        <span>نام و نام خانوادگی خریدار / مشتری (اختیاری)</span>
+                    </span>
+                    <span class="text-[10px] text-slate-400 font-normal">جهت شناسایی مالک سرویس در لیست کلاینت‌ها</span>
+                </label>
+                <input type="text" name="customer_name" placeholder="مثلاً: علی رضایی یا شرکت البرز"
+                       class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white text-xs focus:outline-none focus:ring-1 focus:ring-purple-500">
+            </div>
+
             <!-- Plan Selection -->
             <div>
                 <label class="block text-xs font-semibold text-slate-300 mb-2">انتخاب تعرفه و پلن *</label>

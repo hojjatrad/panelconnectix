@@ -242,6 +242,12 @@ require __DIR__ . '/../layout/header.php';
 
                                 <td class="p-3.5">
                                     <div class="font-bold text-white text-sm font-mono"><?= htmlspecialchars($c['username']) ?></div>
+                                    <?php if (!empty($c['customer_name'])): ?>
+                                        <div class="text-[11px] font-semibold text-cyan-300 flex items-center gap-1 mt-0.5">
+                                            <i class="fa-solid fa-user text-[10px] text-cyan-400"></i>
+                                            <span><?= htmlspecialchars($c['customer_name']) ?></span>
+                                        </div>
+                                    <?php endif; ?>
                                     <div class="text-[10px] text-slate-400 font-mono mt-0.5 truncate max-w-[140px]"><?= htmlspecialchars($c['uuid']) ?></div>
                                     <?php if (!empty($c['node_sync'])): ?>
                                         <span class="inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded bg-emerald-950/60 text-emerald-300 border border-emerald-800/40" title="این کلاینت مستقیم روی سرور ساخته شده و از طریق همگام‌سازی در پنل ثبت شده است">
@@ -721,6 +727,9 @@ ${c.sub_url}`;
         document.getElementById('editClientId').value = c.id;
         document.getElementById('editUsername').value = c.username || '';
         document.getElementById('editPassword').value = c.password || '';
+        if (document.getElementById('editCustomerName')) {
+            document.getElementById('editCustomerName').value = c.customer_name || '';
+        }
         document.getElementById('editServerId').value = c.server_id || '';
         document.getElementById('editPlanId').value = c.plan_id || '';
         document.getElementById('editStatus').value = c.status || 'active';
@@ -776,6 +785,17 @@ ${c.sub_url}`;
                     <label class="block text-slate-300 mb-1 font-semibold">کلمه عبور (Password)</label>
                     <input type="text" name="password" id="editPassword" dir="ltr" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-xs focus:border-amber-500 focus:outline-none">
                 </div>
+            </div>
+
+            <div>
+                <label class="block text-slate-300 mb-1 font-semibold flex items-center justify-between">
+                    <span class="flex items-center gap-1.5">
+                        <i class="fa-solid fa-user text-cyan-400"></i>
+                        <span>نام و نام خانوادگی خریدار / مشتری</span>
+                    </span>
+                    <span class="text-[10px] text-slate-400 font-normal">جهت شناسایی دارنده اکانت</span>
+                </label>
+                <input type="text" name="customer_name" id="editCustomerName" placeholder="مثلاً: علی رضایی یا شرکت آوا" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white text-xs focus:border-amber-500 focus:outline-none">
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-3">

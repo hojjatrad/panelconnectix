@@ -112,9 +112,15 @@ $isXui = in_array(strtolower((string)$server['driver']), ['3xui', 'xui'], true);
                                 . (!empty($u['links']) ? "\nکانفیگ‌ها:\n" . implode("\n", $u['links']) : '');
                             $linksBlock = implode("\n", $u['links']);
                         ?>
-                        <tr class="hover:bg-slate-800/30 transition" data-search="<?= htmlspecialchars(strtolower($u['username'] . ' ' . ($u['subscription_url'] ?? '') . ' ' . $u['status'])) ?>">
+                        <tr class="hover:bg-slate-800/30 transition" data-search="<?= htmlspecialchars(strtolower($u['username'] . ' ' . ($pi['customer_name'] ?? '') . ' ' . ($u['subscription_url'] ?? '') . ' ' . $u['status'])) ?>">
                             <td class="px-4 py-3">
                                 <div class="font-mono text-slate-100 font-bold" dir="ltr"><?= htmlspecialchars($u['username']) ?></div>
+                                <?php if (!empty($pi['customer_name'])): ?>
+                                    <div class="text-[10px] text-cyan-300 font-medium flex items-center gap-1 mt-0.5">
+                                        <i class="fa-solid fa-user text-[9px]"></i>
+                                        <span><?= htmlspecialchars($pi['customer_name']) ?></span>
+                                    </div>
+                                <?php endif; ?>
                                 <div class="flex items-center gap-2 mt-0.5">
                                     <?php if (!empty($u['online'])): ?><span class="text-[10px] text-emerald-400 font-bold">● آنلاین</span><?php endif; ?>
                                 </div>

@@ -92,8 +92,17 @@ class NodeSync {
             if ($username === '' || strlen($username) > 190) continue;
 
             $expireAt = !empty($u['expire_at']) ? (string)$u['expire_at'] : null;
+            if ($expireAt && is_numeric($expireAt)) {
+                $ts = (int)$expireAt;
+                if ($ts > 20000000000) $ts = (int)round($ts / 1000);
+                $expireAt = ($ts > 0) ? date('Y-m-d H:i:s', $ts) : null;
+            }
             $status   = (string)($u['status'] ?? 'active');
             $limit    = (int)($u['traffic_limit_bytes'] ?? 0);
+            if ($limit > 0 && $limit < 10000) {
+                // If limit was returned in GB, convert to bytes
+                $limit = (int)round($limit * 1073741824);
+            }
             $used     = (int)($u['traffic_used_bytes'] ?? 0);
             $nodeSub  = (string)($u['subscription_url'] ?? '');
 

@@ -353,6 +353,8 @@ class Database {
             }
 
             $clientCols = [
+                'customer_name' => 'VARCHAR(128) NULL',
+                'updated_at' => 'DATETIME NULL',
                 'alert_80_sent' => 'TINYINT(1) DEFAULT 0',
                 'alert_95_sent' => 'TINYINT(1) DEFAULT 0',
                 'alert_exp_sent' => 'TINYINT(1) DEFAULT 0',

@@ -23,7 +23,8 @@ class ClientController {
         $params = [];
 
         if (!empty($search)) {
-            $where[] = "(c.username LIKE ? OR c.uuid LIKE ? OR c.custom_note LIKE ?)";
+            $where[] = "(c.username LIKE ? OR c.uuid LIKE ? OR c.custom_note LIKE ? OR c.customer_name LIKE ?)";
+            $params[] = "%$search%";
             $params[] = "%$search%";
             $params[] = "%$search%";
             $params[] = "%$search%";
@@ -160,6 +161,7 @@ class ClientController {
 
         $username = strtolower(trim($_POST['username'] ?? ''));
         $password = trim($_POST['password'] ?? '');
+        $customerName = trim($_POST['customer_name'] ?? '');
         $planId = (int)($_POST['plan_id'] ?? 0);
         $customNote = trim($_POST['custom_note'] ?? '');
 
@@ -324,9 +326,9 @@ class ClientController {
             if ($nodeSublink && str_contains($nodeSublink, 'montago-shop.ir')) {
                 $nodeSublink = preg_replace('#https?://[^/]+#i', 'https://sub.speedur.org:2096', $nodeSublink);
             }
-            $stmtInsert = $pdo->prepare("INSERT INTO clients (reseller_id, server_id, plan_id, username, password, uuid, sub_token, traffic_limit_bytes, traffic_used_bytes, expire_at, ip_limit, max_devices, start_on_first_use, duration_days, status, custom_note, node_sublink) 
-                                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmtInsert->execute([$userId, $serverId, $planId, $username, $password, $uuid, $subToken, $trafficBytes, $expireAt, $ipLimit, $maxDevices, $startOnFirstUse ? 1 : 0, $durationDays, $clientStatus, $customNote, $nodeSublink]);
+            $stmtInsert = $pdo->prepare("INSERT INTO clients (reseller_id, server_id, plan_id, username, password, customer_name, uuid, sub_token, traffic_limit_bytes, traffic_used_bytes, expire_at, ip_limit, max_devices, start_on_first_use, duration_days, status, custom_note, node_sublink) 
+                                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmtInsert->execute([$userId, $serverId, $planId, $username, $password, $customerName ?: null, $uuid, $subToken, $trafficBytes, $expireAt, $ipLimit, $maxDevices, $startOnFirstUse ? 1 : 0, $durationDays, $clientStatus, $customNote, $nodeSublink]);
             $newClientId = $pdo->lastInsertId();
 
             $pdo->commit();
@@ -386,6 +388,7 @@ class ClientController {
 
         $username = trim($_POST['username'] ?? $client['username']);
         $password = trim($_POST['password'] ?? $client['password']);
+        $customerName = trim($_POST['customer_name'] ?? ($client['customer_name'] ?? ''));
         $serverId = (int)($_POST['server_id'] ?? $client['server_id']);
         $planId = !empty($_POST['plan_id']) ? (int)$_POST['plan_id'] : null;
         $status = in_array($_POST['status'] ?? '', ['active', 'disabled', 'expired', 'limited']) ? $_POST['status'] : $client['status'];
@@ -430,13 +433,20 @@ class ClientController {
                 }
             } catch (Throwable $e) {}
         } else {
-            // Sync status with current remote node if changed
-            if ($client['status'] !== $status) {
-                try {
-                    $driver = DriverFactory::create($client);
+            // Sync status and details with current remote node
+            try {
+                $driver = DriverFactory::create($client);
+                if ($client['status'] !== $status) {
                     $driver->toggleUserStatus($client['username'], ($status === 'active'));
-                } catch (Throwable $e) {}
-            }
+                }
+                if (method_exists($driver, 'updateUser')) {
+                    $driver->updateUser($client['username'], [
+                        'traffic_limit_bytes' => $trafficLimitBytes,
+                        'expire_timestamp' => $expireAt ? strtotime($expireAt) : 0,
+                        'status' => $status
+                    ]);
+                }
+            } catch (Throwable $e) {}
         }
 
         // Reset alert flags if traffic was reset or limit was increased
@@ -445,39 +455,45 @@ class ClientController {
             $resetAlertsSql = ", alert_80_sent = 0, alert_95_sent = 0";
         }
 
-        $stmtUp = $pdo->prepare("UPDATE clients SET 
-            username = ?, 
-            password = ?, 
-            server_id = ?, 
-            plan_id = ?, 
-            status = ?, 
-            traffic_limit_bytes = ?, 
-            traffic_used_bytes = ?, 
-            expire_at = ?, 
-            ip_limit = ?,
-            telegram_chat_id = ?,
-            custom_note = ?,
-            node_sublink = ?
-            {$resetAlertsSql},
-            updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?");
-        $stmtUp->execute([
-            $username,
-            $password,
-            $serverId,
-            $planId,
-            $status,
-            $trafficLimitBytes,
-            $trafficUsedBytes,
-            $expireAt,
-            $ipLimit,
-            $telegramChatId,
-            $customNote,
-            $nodeSublink,
-            $id
-        ]);
+        try {
+            $stmtUp = $pdo->prepare("UPDATE clients SET 
+                username = ?, 
+                password = ?, 
+                customer_name = ?,
+                server_id = ?, 
+                plan_id = ?, 
+                status = ?, 
+                traffic_limit_bytes = ?, 
+                traffic_used_bytes = ?, 
+                expire_at = ?, 
+                ip_limit = ?,
+                telegram_chat_id = ?,
+                custom_note = ?,
+                node_sublink = ?
+                {$resetAlertsSql},
+                updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?");
+            $stmtUp->execute([
+                $username,
+                $password,
+                $customerName ?: null,
+                $serverId,
+                $planId,
+                $status,
+                $trafficLimitBytes,
+                $trafficUsedBytes,
+                $expireAt,
+                $ipLimit,
+                $telegramChatId,
+                $customNote,
+                $nodeSublink,
+                $id
+            ]);
 
-        Helpers::flash('success', "مشخصات سرویس کاربر '{$username}' با موفقیت به‌روزرسانی شد.");
+            Helpers::flash('success', "مشخصات سرویس کاربر '{$username}' با موفقیت به‌روزرسانی شد.");
+        } catch (Throwable $e) {
+            Helpers::flash('error', "خطا در به‌روزرسانی مشخصات کلاینت: " . $e->getMessage());
+        }
         Helpers::redirect('clients');
     }
 

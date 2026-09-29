@@ -196,10 +196,18 @@ if (!function_exists('isActiveRoute')) {
                             <i class="fa-solid fa-user-group w-4 text-center text-cyan-400"></i>
                             <span>کاربران نمایندگان</span>
                         </a>
+                        <a href="<?= Helpers::url('resellers/invoice') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('resellers/invoice', $currentUri) ? 'bg-indigo-600/15 text-indigo-300 font-bold border-r-2 border-indigo-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
+                            <i class="fa-solid fa-file-invoice-dollar w-4 text-center text-emerald-400"></i>
+                            <span>فاکتور ماهانه همکاران</span>
+                        </a>
                     <?php else: ?>
                         <a href="<?= Helpers::url('reseller/orders') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('reseller/orders', $currentUri) ? 'bg-indigo-600/15 text-indigo-300 font-bold border-r-2 border-indigo-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
                             <i class="fa-solid fa-cart-shopping w-4 text-center text-cyan-400"></i>
                             <span>سفارشات ربات من</span>
+                        </a>
+                        <a href="<?= Helpers::url('reseller/invoice') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('reseller/invoice', $currentUri) ? 'bg-indigo-600/15 text-indigo-300 font-bold border-r-2 border-indigo-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
+                            <i class="fa-solid fa-file-invoice-dollar w-4 text-center text-emerald-400"></i>
+                            <span>صورت‌حساب و فاکتور ماهانه من</span>
                         </a>
                         <a href="<?= Helpers::url('reseller/plans') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('reseller/plans', $currentUri) ? 'bg-indigo-600/15 text-indigo-300 font-bold border-r-2 border-indigo-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
                             <i class="fa-solid fa-tags w-4 text-center text-indigo-400"></i>

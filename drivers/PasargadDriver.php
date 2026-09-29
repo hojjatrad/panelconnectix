@@ -32,6 +32,7 @@ class PasargadDriver implements PanelDriverInterface {
         if (empty($raw)) return null;
         if (is_numeric($raw)) {
             $ts = (int)$raw;
+            if ($ts > 20000000000) $ts = (int)round($ts / 1000);
             return ($ts > 0) ? date('Y-m-d H:i:s', $ts) : null;
         }
         if (is_string($raw)) {
@@ -632,6 +633,27 @@ class PasargadDriver implements PanelDriverInterface {
         }
     }
 
+    public function updateUser(string $username, array $params): bool {
+        if (!$this->authenticate()) return false;
+        $data = [];
+        if (isset($params['traffic_limit_bytes'])) {
+            $data['data_limit'] = (int)$params['traffic_limit_bytes'];
+        }
+        if (isset($params['expire_timestamp'])) {
+            $data['expire'] = (int)$params['expire_timestamp'] > 0 ? (int)$params['expire_timestamp'] : null;
+        }
+        if (isset($params['status'])) {
+            $data['status'] = $params['status'];
+        }
+        if ($this->isPasarGuard) {
+            $res = $this->request($this->apiPrefix . '/user/' . urlencode($username), 'PUT', $data);
+            return $res['success'];
+        } else {
+            $res = $this->request('/api/users/' . urlencode($username), 'PUT', $data);
+            return $res['success'];
+        }
+    }
+
     public function deleteUser(string $username): bool {
         if (!$this->authenticate()) return false;
         $endpoint = $this->isPasarGuard ? ($this->apiPrefix . '/user/' . urlencode($username)) : ('/api/users/' . urlencode($username));
@@ -752,12 +774,26 @@ class PasargadDriver implements PanelDriverInterface {
 
             $links = (array)($u['links'] ?? []);
 
+            $rawLimit = $u['data_limit'] ?? $u['traffic_limit'] ?? $u['total_traffic'] ?? $u['package_size'] ?? 0;
+            $limitBytes = (int)$rawLimit;
+            if ($limitBytes > 0 && $limitBytes < 10000) {
+                // Specified in GB, convert to bytes
+                $limitBytes = (int)round($limitBytes * 1073741824);
+            }
+
+            $rawUsed = $u['used_traffic'] ?? $u['used_bytes'] ?? $u['traffic_used'] ?? $u['used'] ?? 0;
+            $usedBytes = (int)$rawUsed;
+            if ($usedBytes > 0 && $usedBytes < 10000 && $limitBytes > 10000000) {
+                // If used was reported in GB
+                $usedBytes = (int)round($usedBytes * 1073741824);
+            }
+
             $out[] = [
                 'username' => $username,
                 'status' => $status,
                 'online' => ((int)($u['online_at'] ?? $u['last_login'] ?? 0)) > (time() - 300),
-                'traffic_used_bytes' => (int)($u['used_traffic'] ?? $u['used_bytes'] ?? 0),
-                'traffic_limit_bytes' => (int)($u['data_limit'] ?? $u['traffic_limit'] ?? 0),
+                'traffic_used_bytes' => $usedBytes,
+                'traffic_limit_bytes' => $limitBytes,
                 'expire_at' => $expAt,
                 'subscription_url' => $subUrl,
                 'links' => array_values(array_filter(array_map('strval', $links))),

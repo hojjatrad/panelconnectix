@@ -88,6 +88,11 @@ $isWebhookSet = !empty($webhookInfo['result']['url'] ?? '');
                 </button>
             </form>
 
+            <a href="#channelBroadcastCard" onclick="document.getElementById('channelBroadcastCard').scrollIntoView({behavior: 'smooth'})" class="px-3.5 py-2 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-bold transition flex items-center gap-1.5" title="ارسال پیام و اطلاعیه به کانال تلگرام">
+                <i class="fa-solid fa-bullhorn text-amber-400"></i>
+                <span>ارسال به کانال</span>
+            </a>
+
             <form method="POST" action="<?= Helpers::url('settings/bot/delete-webhook') ?>" onsubmit="return confirm('آیا از حذف وبهوک تلگرام اطمینان دارید؟');">
                 <?= Helpers::csrfField() ?>
                 <button type="submit" class="px-3 py-2 bg-slate-800 hover:bg-rose-900/50 hover:text-rose-300 text-slate-300 rounded-xl text-xs font-medium transition border border-slate-700" title="حذف وبهوک">
@@ -620,9 +625,136 @@ $isWebhookSet = !empty($webhookInfo['result']['url'] ?? '');
 
     </div>
 
+    <!-- Channel Broadcast Section (Requirement 4) -->
+    <div id="channelBroadcastCard" class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-800">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-slate-950 font-bold shadow-lg shadow-amber-500/20">
+                    <i class="fa-solid fa-bullhorn text-lg"></i>
+                </div>
+                <div>
+                    <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                        <span>ارسال مستقیم اطلاعیه و پیام به کانال تلگرام</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">کانال اطلاع‌رسانی</span>
+                    </h2>
+                    <p class="text-xs text-slate-400 mt-0.5">ارسال آنی پیام‌ها، آدرس جدید سابسکریپشن، اطلاعیه‌های سرور، آموزش‌ها و تخفیفات مستقیم از پنل به کانال تلگرام</p>
+                </div>
+            </div>
+            <div class="text-xs text-slate-500 flex items-center gap-1.5 font-mono">
+                <i class="fa-solid fa-circle-info text-cyan-400"></i>
+                <span>کانال پیش‌فرض: <?= !empty($forceJoinChannel) ? htmlspecialchars($forceJoinChannel) : 'مشخص نشده' ?></span>
+            </div>
+        </div>
+
+        <form method="POST" action="<?= Helpers::url('settings/bot/channel-post') ?>" class="space-y-4">
+            <?= Helpers::csrfField() ?>
+
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+                <!-- Target Channel ID/Username -->
+                <div class="md:col-span-6 space-y-1">
+                    <label class="block text-xs font-semibold text-slate-300">
+                        آیدی یا شناسه کانال مقصد (Target Channel) *
+                    </label>
+                    <div class="relative">
+                        <input type="text" name="channel" value="<?= htmlspecialchars($forceJoinChannel) ?>" placeholder="@MyChannel یا -1001234567890" required dir="ltr"
+                               class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-amber-500 text-left">
+                    </div>
+                    <p class="text-[10px] text-slate-500">پیش‌فرض: همان کانال عضویت اجباری ربات. می‌توانید آیدی هر کانال دیگری که ربات ادمین آن است را نیز وارد نمایید.</p>
+                </div>
+
+                <!-- Extra Options (Pin & Silent) -->
+                <div class="md:col-span-6 flex flex-col justify-end space-y-2">
+                    <div class="flex items-center gap-6 p-2.5 bg-slate-950/60 rounded-xl border border-slate-800/80">
+                        <label class="inline-flex items-center gap-2 cursor-pointer text-xs text-slate-300 hover:text-white">
+                            <input type="checkbox" name="pin" value="1" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-amber-500 focus:ring-0 focus:ring-offset-0">
+                            <span class="flex items-center gap-1 font-medium">
+                                <i class="fa-solid fa-thumbtack text-amber-400"></i>
+                                <span>پین کردن در بالای کانال (Pin)</span>
+                            </span>
+                        </label>
+                        <label class="inline-flex items-center gap-2 cursor-pointer text-xs text-slate-300 hover:text-white">
+                            <input type="checkbox" name="silent" value="1" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-indigo-500 focus:ring-0 focus:ring-offset-0">
+                            <span class="flex items-center gap-1 font-medium">
+                                <i class="fa-solid fa-bell-slash text-indigo-400"></i>
+                                <span>ارسال بی‌صدا (Silent)</span>
+                            </span>
+                        </label>
+                    </div>
+                    <p class="text-[10px] text-slate-500">در صورت انتخاب «پین کردن»، پیام ارسالی به طور خودکار در بالاترین بخش کانال سنجاق می‌گردد.</p>
+                </div>
+            </div>
+
+            <!-- Message Body & Formatting Helper Pills -->
+            <div class="space-y-1.5">
+                <div class="flex items-center justify-between">
+                    <label class="block text-xs font-semibold text-slate-300">
+                        متن اطلاعیه یا پیام کانال *
+                    </label>
+                    <div class="flex items-center gap-1 text-[11px]">
+                        <span class="text-slate-500 ml-1">تگ‌های HTML:</span>
+                        <button type="button" onclick="insertTag('b')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono text-[10px]">&lt;b&gt;بولد&lt;/b&gt;</button>
+                        <button type="button" onclick="insertTag('i')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono text-[10px]">&lt;i&gt;ایتالیک&lt;/i&gt;</button>
+                        <button type="button" onclick="insertTag('code')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono text-[10px]">&lt;code&gt;کد&lt;/code&gt;</button>
+                        <button type="button" onclick="insertTag('a')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono text-[10px]">&lt;a&gt;لینک&lt;/a&gt;</button>
+                    </div>
+                </div>
+
+                <textarea id="channelMsgTextarea" name="message" rows="5" required
+                          placeholder="متن پیام خود را اینجا بنویسید... (برای نمونه: اطلاعیه وضعیت سرورها، کانفیگ‌های تست، آدرس جدید اپلیکیشن و ...)"
+                          class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3.5 text-xs text-white focus:outline-none focus:border-amber-500 leading-relaxed font-sans"></textarea>
+            </div>
+
+            <!-- Optional Inline Button -->
+            <div class="p-3.5 bg-slate-950/60 rounded-xl border border-slate-800 space-y-2">
+                <div class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                    <i class="fa-solid fa-arrow-up-right-from-square text-cyan-400"></i>
+                    <span>دکمه شیشه‌ای زیر پیام (اختیاری)</span>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] text-slate-400 mb-1">عنوان دکمه (Button Text)</label>
+                        <input type="text" name="btn_text" placeholder="مثلاً: ورود به ربات یا دانلود اپلیکیشن"
+                               class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-slate-400 mb-1">لینک اینترنتی یا تلگرامی دکمه (URL)</label>
+                        <input type="text" name="btn_url" dir="ltr" placeholder="https://t.me/<?= htmlspecialchars($botUsername ?: 'MyBot') ?>"
+                               class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-cyan-500 text-left">
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+                <div class="text-[11px] text-slate-400 flex items-center gap-1.5">
+                    <i class="fa-solid fa-triangle-exclamation text-amber-400"></i>
+                    <span>ربات تلگرام باید در کانال مربوطه مدیر (Administrator) با دسترسی «ارسال پیام / Post Messages» باشد.</span>
+                </div>
+
+                <button type="submit" class="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-bold rounded-xl text-xs shadow-lg shadow-amber-500/20 transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-paper-plane"></i>
+                    <span>ارسال فوری به کانال تلگرام</span>
+                </button>
+            </div>
+        </form>
+    </div>
+
 </div>
 
 <script>
+function insertTag(tag) {
+    const el = document.getElementById('channelMsgTextarea');
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const selected = el.value.substring(start, end);
+    let replacement = '';
+    if (tag === 'b') replacement = `<b>${selected || 'متن بولد'}</b>`;
+    else if (tag === 'i') replacement = `<i>${selected || 'متن ایتالیک'}</i>`;
+    else if (tag === 'code') replacement = `<code>${selected || 'کد / متن'}</code>`;
+    else if (tag === 'a') replacement = `<a href="https://t.me/...">${selected || 'عنوان لینک'}</a>`;
+    el.setRangeText(replacement, start, end, 'end');
+    el.focus();
+}
 function switchBotTab(tab) {
     const tabs = ['core', 'payment', 'growth', 'ui'];
     tabs.forEach(t => {
