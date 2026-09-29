@@ -231,6 +231,26 @@ class MainActivity: FlutterActivity() {
                         result.success("")
                     }
                 }
+                "getInstalledBypassApps" -> {
+                    try {
+                        val candidateList = call.argument<List<String>>("packages") ?: emptyList()
+                        val installedList = mutableListOf<String>()
+                        val pm = context.packageManager
+                        for (pkg in candidateList) {
+                            try {
+                                pm.getPackageInfo(pkg, 0)
+                                installedList.add(pkg)
+                            } catch (_: PackageManager.NameNotFoundException) {
+                                // Package not installed on this device, skip safely
+                            } catch (_: Exception) {
+                                // Any other error, skip safely
+                            }
+                        }
+                        result.success(installedList)
+                    } catch (e: Exception) {
+                        result.success(emptyList<String>())
+                    }
+                }
                 else -> {
                     result.notImplemented()
                 }

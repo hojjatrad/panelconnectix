@@ -65,35 +65,134 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Map<String, dynamic>? _updateInfo;
   bool _isCheckingUpdate = false;
 
-  static const String currentAppVersion = '3.5.1';
+  static const String currentAppVersion = '3.5.2';
 
   // "Download over Wi-Fi only" for update packages
   bool _updateWifiOnly = false;
 
-  // Iranian & Banking Apps Bypass List (Snapp, Divar, Rubika, Neshan, Torob, Digikala, Banking)
+  // Iranian & Banking Apps Bypass List (Eitaa, Rubika, Bale, Snapp, Divar, Neshan, Torob, Digikala, Banking)
   static const List<String> defaultDomesticBypassApps = [
+    // Messengers & Social (پیام‌رسان‌ها و ارتباطی)
+    'ir.eitaa.messenger',
+    'ir.resanememaran.rubika',
+    'ir.resanememaran.rubikax',
+    'ir.ble.messenger',
+    'mobi.mmdt.ott',
+    'i.gap.im',
+    'net.iGap',
+    'ir.soroush.app',
+
+    // Bank Refah (بانک رفاه کارگران)
+    'ir.refah.mobilebank',
+    'com.refah.mobilebank',
+    'ir.refah.omidbank',
+    'com.refah.fara',
+
+    // Bank Melli (بانک ملی ایران - بام و ایوا)
+    'com.bmi.bam',
+    'ir.bmi.bam',
+    'ir.sadad.mobilebank',
+    'com.sadadpsp.eva',
+    'com.sadad.shast',
+    'ir.melli.app',
+
+    // Bank Mellat (بانک ملت)
+    'com.mellat.mobilebank',
+    'ir.bankmellat.mobilebank',
+    'com.mellat.mobilebank.new',
+    'ir.bankmellat.sekeh',
+
+    // Bank Tejarat (بانک تجارت)
+    'com.tejaratbank.mobilebank',
+    'ir.mbt.android',
+    'com.tejarat.hamrah',
+
+    // Bank Saderat (بانک صادرات)
+    'ir.bsi.mobilebank',
+    'com.saderat.mobilebank',
+    'com.saderat.sipa',
+    'com.saderat.rimor',
+
+    // Bank Sepah (بانک سپه و ادغامی)
+    'ir.sepah.mobilebank',
+    'com.sepah.mobilebank',
+    'ir.sepah.omid',
+    'com.ansar.mobilebank',
+    'com.ghavamin.mobilebank',
+
+    // Neobanks & Crypto (بلو بانک، بانکینو، ویپاد و...)
+    'com.modern.blubank',
+    'com.bankino.mobile',
+    'ir.mizan.wepod',
+    'ir.ba.abank',
+    'ir.abantether.app',
+    'ir.nobitex.app',
+    'ir.wallex.app',
+    'ir.ramzinex.app',
+
+    // Bank Pasargad (بانک پاسارگاد)
+    'com.pasargad.mobilebank',
+    'ir.pasargad.mobilebank',
+
+    // Bank Saman (بانک سامان)
+    'com.samanpr.mb',
+    'ir.sep.seso',
+    'com.saman.mobilebank',
+
+    // Bank Parsian (بانک پارسیان و تاپ)
+    'ir.parsian.mobile',
+    'com.pec.parsian',
+    'ir.parsian.parsianbank',
+
+    // Bank Shahr (بانک شهر)
+    'com.tosan.shahr',
+    'ir.tosan.shahr',
+    'ir.shahr.hamrah',
+
+    // Bank Maskan (بانک مسکن)
+    'ir.maskan.mobilebank',
+    'com.maskan.mobilebank',
+
+    // Bank Keshavarzi (بانک کشاورزی)
+    'ir.keshavarzibank.mobilebank',
+    'com.bki.mobilebank',
+
+    // Bank Sina (بانک سینا)
+    'ir.sinabank.mobilebank',
+    'com.tosan.sina',
+
+    // Bank Day & Tourism (بانک دی و گردشگری)
+    'ir.daybank.mobilebank',
+    'com.tosan.day',
+    'ir.tourismbank.mobilebank',
+    'com.tosan.gardeshgari',
+
+    // Bank Resalat & Mehr (بانک رسالت و مهر ایران)
+    'ir.rqbank.mobilebank',
+    'com.melli.resalat',
+    'ir.qmb.mobilebank',
+    'com.qmb.mobilebank',
+    'ir.ttbank.mobilebank',
+
+    // Payments & Fintech (پرداخت و کارت‌به‌کارت)
+    'com.asanpardakht.app',
+    'ir.mcoin.hamrahcard',
+    'com.tosan.saman.sekeh',
+    'com.snapp.pay',
+
+    // Daily Iranian Services (تاکسی اینترنتی، خرید، نقشه)
     'cab.snapp.passenger',
     'cab.snapp.driver',
+    'com.tapsi.passenger',
+    'com.tapsi.driver',
     'ir.divar',
     'com.farsitel.bazaar',
+    'com.myket.android',
     'ir.torob',
     'com.digikala',
     'ir.neshan.sp',
     'ir.balad',
-    'ir.resanememaran.rubika',
-    'com.bmi.bam',
-    'com.asanpardakht.app',
-    'com.sadadpsp.eva',
-    'com.tosan.shahr',
-    'com.tejaratbank.mobilebank',
-    'ir.sep.seso',
-    'ir.mbt.android',
-    'com.mellat.mobilebank',
-    'com.modern.blubank',
-    'com.bankino.mobile',
-    'com.samanpr.mb',
-    'ir.parsian.mobile',
-    'com.pasargad.mobilebank'
+    'com.takhfifan'
   ];
 
   @override
@@ -962,11 +1061,27 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       final configUri = _selectedServer!.configUri;
       final parser = FlutterV2ray.parseFromURL(configUri);
 
-      // Pass Split Tunneling blocked apps to exclude domestic/banking apps natively
+      // Pass Split Tunneling blocked apps to exclude domestic/banking apps natively (without crashes)
+      List<String>? blockedAppsToPass;
+      if (Platform.isAndroid && _splitTunnelingEnabled) {
+        try {
+          const channel = MethodChannel('com.connectix.vpn/updater');
+          final List<dynamic>? installed = await channel.invokeMethod<List<dynamic>>(
+            'getInstalledBypassApps',
+            {'packages': defaultDomesticBypassApps},
+          );
+          if (installed != null && installed.isNotEmpty) {
+            blockedAppsToPass = installed.map((e) => e.toString()).toList();
+          }
+        } catch (e) {
+          debugPrint('Bypass apps check: $e');
+        }
+      }
+
       await _flutterV2ray.startV2Ray(
         remark: 'Connectix • ${_selectedServer!.name}',
         config: parser.getFullConfiguration(),
-        blockedApps: null,
+        blockedApps: blockedAppsToPass,
         proxyOnly: false, // Full device-wide VPN tunnel
         tunMode: tunMode,
         notificationDisconnectButtonName: 'قطع اتصال',
