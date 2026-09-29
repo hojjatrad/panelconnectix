@@ -67,6 +67,9 @@ jobs:
           import io.flutter.embedding.engine.FlutterEngine
           import io.flutter.plugin.common.MethodChannel
           import java.io.File
+          import java.util.ArrayList
+          import java.util.HashMap
+          import java.util.HashSet
 
           class MainActivity: FlutterActivity() {
               private val CHANNEL = "com.connectix.vpn/updater"
@@ -101,7 +104,6 @@ jobs:
                       channel.invokeMethod("onNotificationDisconnect", null)
                   }
 
-                  // Request POST_NOTIFICATIONS runtime permission on Android 13+ (API 33+)
                   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                       try {
                           if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
@@ -283,6 +285,69 @@ jobs:
                                   result.success("")
                               }
                           }
+                          "getInstalledBypassApps" -> {
+                              try {
+                                  val rawList = call.argument<List<*>>("packages") ?: emptyList<Any>()
+                                  val candidateList = rawList.mapNotNull { it?.toString() }
+                                  result.success(candidateList)
+                              } catch (e: Exception) {
+                                  result.success(emptyList<String>())
+                              }
+                          }
+                          "getAllInstalledApps" -> {
+                              Thread {
+                                  try {
+                                      val pm = context.packageManager
+                                      val mainIntent = Intent(Intent.ACTION_MAIN, null).apply {
+                                          addCategory(Intent.CATEGORY_LAUNCHER)
+                                      }
+                                      val resolveInfos = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                          pm.queryIntentActivities(mainIntent, PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_ALL.toLong()))
+                                      } else {
+                                          @Suppress("DEPRECATION")
+                                          pm.queryIntentActivities(mainIntent, PackageManager.MATCH_ALL)
+                                      }
+                                      val appsList = ArrayList<Map<String, String>>()
+                                      val selfPkg = context.packageName
+                                      val seenPackages = HashSet<String>()
+
+                                      for (ri in resolveInfos) {
+                                          try {
+                                              val pkg = ri.activityInfo?.packageName ?: continue
+                                              if (pkg == selfPkg || seenPackages.contains(pkg)) continue
+                                              seenPackages.add(pkg)
+
+                                              val label = try {
+                                                  ri.loadLabel(pm)?.toString() ?: pkg
+                                              } catch (_: Exception) {
+                                                  pkg
+                                              }
+
+                                              val map = HashMap<String, String>()
+                                              map["packageName"] = pkg
+                                              map["appName"] = label
+                                              appsList.add(map)
+                                          } catch (_: Exception) {
+                                              continue
+                                          }
+                                      }
+
+                                      appsList.sortBy { it["appName"]?.lowercase() ?: "" }
+
+                                      runOnUiThread {
+                                          try {
+                                              result.success(appsList)
+                                          } catch (_: Exception) {}
+                                      }
+                                  } catch (e: Exception) {
+                                      runOnUiThread {
+                                          try {
+                                              result.error("GET_APPS_ERROR", e.message ?: "Unknown error", null)
+                                          } catch (_: Exception) {}
+                                      }
+                                  }
+                              }.start()
+                          }
                           else -> {
                               result.notImplemented()
                           }
@@ -291,6 +356,7 @@ jobs:
               }
           }
           EOF
+
 
           # Native crash capture: Application subclass (manifest android:name points to it)
           cat << 'EOF' > android/app/src/main/kotlin/com/connectix/vpn/ConnectixApplication.kt
@@ -467,7 +533,7 @@ jobs:
           sed -i "s/__VERSION_CODE__/${BASE_VERSION_CODE}/; s/__VERSION_NAME__/${APP_VER}/" android/app/build.gradle
           grep -n "versionCode\|versionName" android/app/build.gradle
 
-          # Ensure AndroidManifest has extractNativeLibs, VPN permissions, package installer and launcher activity
+          # Ensure AndroidManifest has extractNativeLibs, VPN permissions, package installer and launcher activity + queries for package visibility
           cat << 'EOF' > android/app/src/main/AndroidManifest.xml
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"
               xmlns:tools="http://schemas.android.com/tools">
@@ -480,6 +546,17 @@ jobs:
               <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"/>
               <uses-permission android:name="android.permission.WAKE_LOCK"/>
               <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
+
+              <queries>
+                  <intent>
+                      <action android:name="android.intent.action.MAIN" />
+                      <category android:name="android.intent.category.LAUNCHER" />
+                  </intent>
+                  <intent>
+                      <action android:name="android.intent.action.VIEW" />
+                      <data android:mimeType="application/vnd.android.package-archive" />
+                  </intent>
+              </queries>
               
               <application
                   android:label="Connectix VPN"
@@ -487,11 +564,6 @@ jobs:
                   android:icon="@mipmap/ic_launcher"
                   android:extractNativeLibs="true"
                   android:usesCleartextTraffic="true">
-                  <!-- 3.3.3: disable androidx auto-startup initializers (ProcessLifecycle /
-                       EmojiCompat / ProfileInstaller). Their transitive version drift with
-                       flutter_v2ray's dependency tree caused an instant launch crash
-                       (Application.onCreate, before the first frame). They are optional
-                       optimizations; the app does not use them. -->
                   <provider android:name="androidx.startup.InitializationProvider"
                       tools:node="remove" />
                   <activity

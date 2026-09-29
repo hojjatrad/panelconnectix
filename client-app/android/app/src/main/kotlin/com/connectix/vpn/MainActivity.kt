@@ -6,9 +6,6 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -17,7 +14,6 @@ import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.ArrayList
 import java.util.HashMap
@@ -56,7 +52,6 @@ class MainActivity: FlutterActivity() {
             channel.invokeMethod("onNotificationDisconnect", null)
         }
 
-        // Request POST_NOTIFICATIONS runtime permission on Android 13+ (API 33+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             try {
                 if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
@@ -254,36 +249,49 @@ class MainActivity: FlutterActivity() {
                             val mainIntent = Intent(Intent.ACTION_MAIN, null).apply {
                                 addCategory(Intent.CATEGORY_LAUNCHER)
                             }
-                            val resolveInfos = pm.queryIntentActivities(mainIntent, 0)
+                            val resolveInfos = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                pm.queryIntentActivities(mainIntent, PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_ALL.toLong()))
+                            } else {
+                                @Suppress("DEPRECATION")
+                                pm.queryIntentActivities(mainIntent, PackageManager.MATCH_ALL)
+                            }
                             val appsList = ArrayList<Map<String, String>>()
                             val selfPkg = context.packageName
                             val seenPackages = HashSet<String>()
 
                             for (ri in resolveInfos) {
-                                val pkg = ri.activityInfo.packageName
-                                if (pkg == selfPkg || seenPackages.contains(pkg)) continue
-                                seenPackages.add(pkg)
+                                try {
+                                    val pkg = ri.activityInfo?.packageName ?: continue
+                                    if (pkg == selfPkg || seenPackages.contains(pkg)) continue
+                                    seenPackages.add(pkg)
 
-                                val label = try {
-                                    ri.loadLabel(pm).toString()
+                                    val label = try {
+                                        ri.loadLabel(pm)?.toString() ?: pkg
+                                    } catch (_: Exception) {
+                                        pkg
+                                    }
+
+                                    val map = HashMap<String, String>()
+                                    map["packageName"] = pkg
+                                    map["appName"] = label
+                                    appsList.add(map)
                                 } catch (_: Exception) {
-                                    pkg
+                                    continue
                                 }
-
-                                val map = HashMap<String, String>()
-                                map["packageName"] = pkg
-                                map["appName"] = label
-                                appsList.add(map)
                             }
 
                             appsList.sortBy { it["appName"]?.lowercase() ?: "" }
 
                             runOnUiThread {
-                                result.success(appsList)
+                                try {
+                                    result.success(appsList)
+                                } catch (_: Exception) {}
                             }
                         } catch (e: Exception) {
                             runOnUiThread {
-                                result.error("GET_APPS_ERROR", e.message ?: "Unknown error", null)
+                                try {
+                                    result.error("GET_APPS_ERROR", e.message ?: "Unknown error", null)
+                                } catch (_: Exception) {}
                             }
                         }
                     }.start()

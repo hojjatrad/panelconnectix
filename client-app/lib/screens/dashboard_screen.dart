@@ -14,6 +14,7 @@ import '../services/v2ray_compat.dart';
 import 'login_screen.dart';
 import 'server_list_modal.dart';
 import 'bypass_apps_screen.dart';
+import 'advanced_settings_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final ClientModel client;
@@ -66,7 +67,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Map<String, dynamic>? _updateInfo;
   bool _isCheckingUpdate = false;
 
-  static const String currentAppVersion = '3.5.4';
+  static const String currentAppVersion = '3.5.5';
 
   // "Download over Wi-Fi only" for update packages
   bool _updateWifiOnly = false;
@@ -1146,7 +1147,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       String finalConfig = parser.getFullConfiguration();
 
       // Pass Split Tunneling blocked apps to exclude domestic/banking apps natively (without crashes)
+      // Layer 1: System-level disallowed apps (Android VpnService.Builder.addDisallowedApplication)
       List<String>? blockedAppsToPass;
+      String safeFinalConfig = finalConfig;
       if (Platform.isAndroid && _splitTunnelingEnabled) {
         try {
           final prefs = await SharedPreferences.getInstance();
@@ -1159,7 +1162,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           blockedAppsToPass = defaultDomesticBypassApps;
         }
 
-        // Layer 2: Inject direct routing rules into V2Ray config for Iranian domains & IPs
+        // Layer 2: Inject SAFE direct routing rules into V2Ray config (NO geosite/geoip/regexp - those need dat files and crash core)
         try {
           final Map<String, dynamic> configMap = jsonDecode(finalConfig);
           final routing = (configMap['routing'] as Map<String, dynamic>?) != null
@@ -1169,13 +1172,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               ? List<dynamic>.from(routing['rules'] as List<dynamic>)
               : <dynamic>[];
 
+          // Only use plain domain matching - 100% safe, no dat files required, never crashes Xray core
           rules.insert(0, {
             'type': 'field',
             'outboundTag': 'direct',
             'domain': [
               'domain:ir',
-              'geosite:ir',
-              'regexp:.*\\.ir\$',
               'eitaa.com',
               'rubika.ir',
               'bale.ai',
@@ -1185,23 +1187,25 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               'digikala.com',
               'torob.com',
               'shaparak.ir',
-            ],
-          });
-          rules.insert(1, {
-            'type': 'field',
-            'outboundTag': 'direct',
-            'ip': [
-              'geoip:ir',
-              'geoip:private',
+              'myket.ir',
+              'bazaar.ir',
+              'bankmellat.ir',
+              'bmi.ir',
+              'bankmelli.ir',
             ],
           });
           routing['rules'] = rules;
           configMap['routing'] = routing;
-          finalConfig = jsonEncode(configMap);
+          final encoded = jsonEncode(configMap);
+          // Validate that encoded is parseable
+          jsonDecode(encoded);
+          safeFinalConfig = encoded;
         } catch (e) {
-          debugPrint('Inject direct routing rules: $e');
+          debugPrint('Inject direct routing rules failed, using original config: $e');
+          safeFinalConfig = finalConfig;
         }
       }
+      finalConfig = safeFinalConfig;
 
       await _flutterV2ray.startV2Ray(
         remark: 'Connectix • ${_selectedServer!.name}',
@@ -1657,6 +1661,39 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     );
   }
 
+  void _openAdvancedSettings() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AdvancedSettingsScreen(
+          defaultBypassList: defaultDomesticBypassApps,
+          splitTunnelingEnabled: _splitTunnelingEnabled,
+          autoReconnectEnabled: _autoReconnectEnabled,
+          winTunnelMode: _winTunnelMode,
+          onSplitTunnelingChanged: (val) {
+            setState(() => _splitTunnelingEnabled = val);
+            if (_isConnected) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('جهت اعمال تغییرات، یک‌بار اتصال را مجدداً برقرار کنید.')),
+              );
+            }
+          },
+          onAutoReconnectChanged: (val) {
+            setState(() => _autoReconnectEnabled = val);
+          },
+          onWinTunnelModeChanged: (val) {
+            _setWinTunnelMode(val);
+            if (_isConnected) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('حالت جدید در اتصال بعدی اعمال می‌شود.')),
+              );
+            }
+          },
+        ),
+      ),
+    );
+  }
+
   // Quick Support & Account Drawer Modal
   void _openSupportSheet() {
     showModalBottomSheet(
@@ -1899,6 +1936,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 : const Icon(Icons.refresh, color: Color(0xFF94A3B8)),
             onPressed: _manualRefresh,
             tooltip: 'بروزرسانی وضعیت و کانکشن‌ها',
+          ),
+          // Advanced Settings (Split Tunneling + Bypass Apps Manager moved here to keep main page clean)
+          IconButton(
+            icon: const Icon(Icons.settings_rounded, color: Color(0xFF94A3B8)),
+            onPressed: _openAdvancedSettings,
+            tooltip: 'تنظیمات پیشرفته',
           ),
           // Support & Links Drawer
           IconButton(
@@ -2509,114 +2552,58 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
               const SizedBox(height: 16),
 
-              // Pro Settings Switch (Split Tunneling & Auto-Reconnect)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0F172A),
+              // Clean Advanced Settings Entry (replaces crowded Pro Settings on main page)
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _openAdvancedSettings,
                   borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: const Color(0xFF1E293B)),
-                ),
-                child: Column(
-                  children: [
-                    // Split Tunneling Switch
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text(
-                        'دور زدن برنامه‌های بانکی و ایرانی',
-                        style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: const Text(
-                        'اسنپ، دیوار، روبیکا و همراه بانک‌ها بدون فیلترشکن باز می‌شوند',
-                        style: TextStyle(color: Color(0xFF64748B), fontSize: 10),
-                      ),
-                      value: _splitTunnelingEnabled,
-                      activeColor: const Color(0xFF10B981),
-                      onChanged: (val) async {
-                        final prefs = await SharedPreferences.getInstance();
-                        await prefs.setBool('split_tunneling_enabled', val);
-                        setState(() {
-                          _splitTunnelingEnabled = val;
-                        });
-                        if (_isConnected) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('جهت اعمال تغییرات، یک‌بار اتصال را مجدداً برقرار کنید.')),
-                          );
-                        }
-                      },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F172A),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: const Color(0xFF1E293B)),
                     ),
-                    if (_splitTunnelingEnabled && Platform.isAndroid) ...[
-                      const Divider(color: Color(0xFF1E293B), height: 1),
-                      InkWell(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const BypassAppsScreen(
-                                defaultBypassList: defaultDomesticBypassApps,
-                              ),
-                            ),
-                          );
-                        },
-                        borderRadius: BorderRadius.circular(12),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-                          child: Row(
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF6366F1).withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.tune_rounded, color: Color(0xFF818CF8), size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF10B981).withOpacity(0.15),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: const Icon(Icons.apps_rounded, color: Color(0xFF10B981), size: 18),
-                              ),
-                              const SizedBox(width: 12),
-                              const Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'مدیریت برنامه‌های عبور مستقیم (Bypass Apps)',
-                                      style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                              Row(
+                                children: [
+                                  const Text('تنظیمات پیشرفته', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                                  const SizedBox(width: 8),
+                                  if (_splitTunnelingEnabled)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(color: const Color(0xFF10B981).withOpacity(0.2), borderRadius: BorderRadius.circular(6)),
+                                      child: const Text('فعال', style: TextStyle(color: Color(0xFF10B981), fontSize: 9, fontWeight: FontWeight.bold)),
                                     ),
-                                    SizedBox(height: 2),
-                                    Text(
-                                      'مشاهده و انتخاب دستی برنامه‌هایی که از فیلترشکن عبور نکنند',
-                                      style: TextStyle(color: Color(0xFF64748B), fontSize: 10),
-                                    ),
-                                  ],
-                                ),
+                                ],
                               ),
-                              const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: Color(0xFF64748B)),
+                              const SizedBox(height: 2),
+                              Text(
+                                _splitTunnelingEnabled ? 'عبور مستقیم بانک‌ها فعال • مدیریت برنامه‌ها' : 'مدیریت عبور مستقیم، اتصال خودکار، حالت ویندوز',
+                                style: const TextStyle(color: Color(0xFF64748B), fontSize: 11),
+                              ),
                             ],
                           ),
                         ),
-                      ),
-                    ],
-                    const Divider(color: Color(0xFF1E293B), height: 1),
-                    // Auto Reconnect Switch
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text(
-                        'اتصال خودکار و جایگزینی سرور (Failover)',
-                        style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: const Text(
-                        'در صورت قطع اینترنت یا کندی، سرور به طور خودکار بازتنظیم می‌گردد',
-                        style: TextStyle(color: Color(0xFF64748B), fontSize: 10),
-                      ),
-                      value: _autoReconnectEnabled,
-                      activeColor: const Color(0xFF6366F1),
-                      onChanged: (val) async {
-                        final prefs = await SharedPreferences.getInstance();
-                        await prefs.setBool('auto_reconnect_enabled', val);
-                        setState(() {
-                          _autoReconnectEnabled = val;
-                        });
-                      },
+                        const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF64748B)),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
 
