@@ -581,12 +581,12 @@ class Database {
                 id $autoInc,
                 title VARCHAR(191) NOT NULL,
                 keywords VARCHAR(255) NULL,
-                category VARCHAR(64) DEFAULT 'فنی',
+                category VARCHAR(64) DEFAULT 'general',
                 content TEXT NULL,
                 is_active TINYINT(1) DEFAULT 1,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )");
+            ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
 
             $pdo->exec("CREATE TABLE IF NOT EXISTS ai_logs (
                 id $autoInc,
