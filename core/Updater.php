@@ -193,36 +193,75 @@ class Updater {
         $bust = 't=' . (string)time() . rand(1000, 9999);
         $apiSha = '';
         $atomSha = '';
+        $branchSha = '';
         $rawVer = '';
 
-        // Source 1: GitHub REST API (commits/{branch})
+        // Source 1: GitHub REST API (commits/{branch}) - try with token and without
         $apiBody = (string)self::httpGet("https://api.github.com/repos/{$repo}/commits/{$branch}?{$bust}");
         if (preg_match('/"sha"\s*:\s*"([0-9a-f]{40})"/', $apiBody, $m)) {
             $apiSha = $m[1];
         }
+        // If failed, try without token via githubRequest (which retries without token on 401)
+        if ($apiSha === '') {
+            $commitRes = self::githubRequest("https://api.github.com/repos/{$repo}/commits/{$branch}?{$bust}", self::getToken());
+            if (!empty($commitRes['sha']) && preg_match('/^[0-9a-f]{40}$/', $commitRes['sha'])) {
+                $apiSha = $commitRes['sha'];
+            }
+        }
 
-        // Source 2: GitHub Atom feed (independent pipeline, incident-proven)
+        // Source 2: GitHub Branches API (more reliable, less rate-limited)
+        if ($apiSha === '') {
+            $branchRes = self::githubRequest("https://api.github.com/repos/{$repo}/branches/{$branch}?{$bust}", self::getToken());
+            if (!empty($branchRes['commit']['sha']) && preg_match('/^[0-9a-f]{40}$/', $branchRes['commit']['sha'])) {
+                $branchSha = $branchRes['commit']['sha'];
+            }
+        }
+
+        // Source 3: GitHub Atom feed (independent pipeline, incident-proven)
         $atomBody = (string)self::httpGet("https://github.com/{$repo}/commits/{$branch}.atom?{$bust}");
         if (preg_match('/tag:github\.com,2008:Repository\/\d+\/commit\/([0-9a-f]{40})/', $atomBody, $m)) {
             $atomSha = $m[1];
         }
 
-        // Cross-check: API is only trusted when the atom feed agrees, otherwise
-        // the atom feed wins (it survived the 2026-09-25 stale-cache incident).
+        // Cross-check: prefer agreed SHA, then atom, then API, then branch API
         $sha = '';
         $source = '';
-        if ($apiSha !== '' && $atomSha !== '') {
-            if ($apiSha === $atomSha) { $sha = $apiSha; $source = 'api+atom (agreed)'; }
-            else { $sha = $atomSha; $source = 'atom (API differed)'; }
+        if ($apiSha !== '' && $atomSha !== '' && $apiSha === $atomSha) {
+            $sha = $apiSha; $source = 'api+atom (agreed)';
         } elseif ($atomSha !== '') {
             $sha = $atomSha; $source = 'atom feed';
         } elseif ($apiSha !== '') {
-            $sha = $apiSha; $source = 'api.github.com (no atom cross-check)';
+            $sha = $apiSha; $source = 'api.github.com';
+        } elseif ($branchSha !== '') {
+            $sha = $branchSha; $source = 'branches API';
         }
 
-        if ($sha === '') return null;
+        // If still empty, try to get SHA from raw.githubusercontent redirect or try public API without token
+        if ($sha === '') {
+            // Try raw API without any auth header
+            $ch = curl_init("https://api.github.com/repos/{$repo}/commits/{$branch}");
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_TIMEOUT => 8,
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_USERAGENT => 'Connectix-Panel-Updater',
+                CURLOPT_HTTPHEADER => ['Accept: application/vnd.github.v3+json', 'Cache-Control: no-cache'],
+            ]);
+            $body = curl_exec($ch);
+            curl_close($ch);
+            if (preg_match('/"sha"\s*:\s*"([0-9a-f]{40})"/', (string)$body, $m)) {
+                $sha = $m[1];
+                $source = 'api.github.com (no token fallback)';
+            }
+        }
 
-        // Source 3: Fetch remote Updater.php pinned to this EXACT commit SHA (immutable, 0 stale cache)
+        if ($sha === '') {
+            // Return null to trigger branch fallback in applyUpdate (which will still update via branch zip)
+            return null;
+        }
+
+        // Fetch remote version from Updater.php pinned to this SHA
         $rawUrls = [
             "https://raw.githubusercontent.com/{$repo}/{$sha}/core/Updater.php",
             "https://github.com/{$repo}/raw/{$sha}/core/Updater.php",
@@ -241,24 +280,38 @@ class Updater {
     }
 
     private static function httpGet(string $url): string {
-        $ch = curl_init($url);
-        $headers = ['Cache-Control: no-cache, no-store', 'Pragma: no-cache'];
         $token = self::getToken();
-        if (!empty($token) && (str_contains($url, 'api.github.com') || str_contains($url, 'github.com'))) {
-            $headers[] = "Authorization: token {$token}";
+        $attempts = [];
+        if (!empty($token)) $attempts[] = $token;
+        $attempts[] = ''; // fallback without token
+
+        foreach ($attempts as $attemptToken) {
+            $ch = curl_init($url);
+            $headers = ['Cache-Control: no-cache, no-store', 'Pragma: no-cache'];
+            if (!empty($attemptToken) && (str_contains($url, 'api.github.com') || str_contains($url, 'github.com'))) {
+                $headers[] = "Authorization: token {$attemptToken}";
+            }
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_TIMEOUT => 12,
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_SSL_VERIFYHOST => false,
+                CURLOPT_USERAGENT => 'Connectix-Panel-Updater',
+                CURLOPT_HTTPHEADER => $headers,
+            ]);
+            $body = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            
+            if (is_string($body) && $body !== '' && $httpCode < 400) {
+                return $body;
+            }
+            // If 401/403 with token, retry without token
+            if ($httpCode >= 400 && !empty($attemptToken)) continue;
+            if (is_string($body) && $body !== '') return $body;
         }
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_TIMEOUT => 12,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_SSL_VERIFYHOST => false,
-            CURLOPT_USERAGENT => 'Connectix-Panel-Updater',
-            CURLOPT_HTTPHEADER => $headers,
-        ]);
-        $body = curl_exec($ch);
-        curl_close($ch);
-        return is_string($body) ? $body : '';
+        return '';
     }
 
     /**
