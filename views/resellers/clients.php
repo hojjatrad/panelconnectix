@@ -170,6 +170,14 @@ function gbR($b){ return round(((int)$b)/1073741824,2); }
                             <td class="p-3.5"><span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-bold <?= $statusCfg['cls'] ?>"><span class="w-1.5 h-1.5 rounded-full <?= $statusCfg['dot'] ?>"></span><?= $statusCfg['label'] ?></span></td>
                             <td class="p-3.5 text-center">
                                 <div class="flex items-center justify-center gap-1">
+                                    <button type="button"
+                                        data-username="<?= htmlspecialchars($c['username'],ENT_QUOTES) ?>"
+                                        data-password="<?= htmlspecialchars($c['password'] ?? '',ENT_QUOTES) ?>"
+                                        data-sub="<?= htmlspecialchars($subUrl,ENT_QUOTES) ?>"
+                                        data-customer="<?= htmlspecialchars($c['customer_name'] ?? '',ENT_QUOTES) ?>"
+                                        data-plan="<?= htmlspecialchars($c['plan_title'] ?? '',ENT_QUOTES) ?>"
+                                        onclick="copyResellerDelivery(this)"
+                                        class="w-7 h-7 flex items-center justify-center bg-gradient-to-br from-emerald-600/30 to-teal-600/30 hover:from-emerald-600/50 hover:to-teal-600/50 text-emerald-300 rounded-lg border border-emerald-700/40 transition" title="کپی یوزر+پسورد+ساب برای مشتری"><i class="fa-solid fa-share-nodes text-[11px]"></i></button>
                                     <button onclick="copyToClipboard('<?= $subUrl ?>', this)" class="w-7 h-7 flex items-center justify-center bg-slate-800 hover:bg-cyan-900/40 text-cyan-300 rounded-lg border border-slate-700 transition" title="کپی ساب"><i class="fa-solid fa-copy text-[11px]"></i></button>
                                     <a href="<?= $subUrl ?>" target="_blank" class="w-7 h-7 flex items-center justify-center bg-slate-800 hover:bg-indigo-900/40 text-indigo-300 rounded-lg border border-slate-700 transition" title="باز کردن"><i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i></a>
                                 </div>
@@ -199,6 +207,27 @@ function filterResellerClients(){
         const matchQ=s.includes(q);
         const matchS=!statusF||st===statusF;
         tr.style.display=(matchQ&&matchS)?'':'none';
+    });
+}
+function copyResellerDelivery(btn){
+    const username = btn.getAttribute('data-username') || '';
+    const password = btn.getAttribute('data-password') || '';
+    const sub = btn.getAttribute('data-sub') || '';
+    const customer = btn.getAttribute('data-customer') || '';
+    const plan = btn.getAttribute('data-plan') || '';
+    let text = '';
+    if(customer) text += `👤 نام مشتری: ${customer}\n`;
+    text += `👤 یوزرنیم: ${username}\n`;
+    if(password) text += `🔑 پسورد: ${password}\n`;
+    if(plan) text += `📦 پلن: ${plan}\n`;
+    text += `🔗 ساب لینک:\n${sub}\n\n📱 آموزش: لینک را کپی و در Hiddify/V2rayNG Import کنید`;
+    navigator.clipboard.writeText(text).then(()=>{
+        const orig=btn.innerHTML;
+        btn.innerHTML='<i class="fa-solid fa-check text-[11px]"></i>';
+        setTimeout(()=>{btn.innerHTML=orig;},2000);
+    }).catch(()=>{
+        const ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+        alert('✅ کپی شد:\n\n'+text);
     });
 }
 </script>

@@ -137,8 +137,8 @@ class ClientController {
         $pdo = Database::getConnection();
         $user = Auth::user();
 
-        // Fetch active servers
-        $servers = $pdo->query("SELECT * FROM server_nodes WHERE is_active = 1")->fetchAll();
+        // Fetch active servers - include VIP Connectix even if marked inactive (auto-fixed)
+        $servers = $pdo->query("SELECT * FROM server_nodes WHERE is_active = 1 OR driver = 'connectix_seller' OR api_url LIKE '%connectix.vip%' ORDER BY CASE WHEN driver='connectix_seller' THEN 0 ELSE 1 END, name ASC")->fetchAll();
         // Fetch active plans
         $plans = $pdo->query("SELECT * FROM plans WHERE is_active = 1 ORDER BY is_free DESC, base_price ASC")->fetchAll();
 
@@ -220,7 +220,7 @@ class ClientController {
             }
         } else {
             $serverId = (int)($_POST['server_id'] ?? 0);
-            $stmtServer = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ? AND is_active = 1");
+            $stmtServer = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ? AND (is_active = 1 OR driver = 'connectix_seller' OR api_url LIKE '%connectix.vip%')");
             $stmtServer->execute([$serverId]);
             $server = $stmtServer->fetch();
 
@@ -258,7 +258,28 @@ class ClientController {
         $trafficBytes = $plan['traffic_gb'] * 1024 * 1024 * 1024;
         $expireAt = date('Y-m-d H:i:s', strtotime("+{$plan['duration_days']} days"));
         $expireTimestamp = strtotime($expireAt);
-        $ipLimit = isset($_POST['ip_limit']) && $_POST['ip_limit'] !== '' ? max(0, (int)$_POST['ip_limit']) : (int)($plan['ip_limit'] ?? 0);
+        // Default IP limit 4 (VIP style) if not set or 0
+        $rawIpLimit = $_POST['ip_limit'] ?? '';
+        if ($rawIpLimit === '' || $rawIpLimit === null) {
+            $ipLimit = (int)($plan['ip_limit'] ?? 4);
+            if ($ipLimit <= 0) $ipLimit = 4;
+        } else {
+            $ipLimit = max(0, (int)$rawIpLimit);
+            if ($ipLimit === 0) {
+                // If user explicitly sets 0 (unlimited) keep 0, but default to 4 when empty
+                // Check if POST was empty vs 0 - we already handled empty, so 0 is intentional unlimited
+                // But for VIP server, enforce 4
+                $ipLimit = 0;
+            }
+        }
+        // For Connectix Seller VIP server, always enforce 4 as cap (user requested)
+        if (!empty($server['driver']) && strtolower($server['driver']) === 'connectix_seller' && $ipLimit === 0) {
+            $ipLimit = 4;
+        }
+        // If still 0 and no plan limit, default to 4 (professional)
+        if ($ipLimit === 0 && (int)($plan['ip_limit'] ?? 0) === 0) {
+            $ipLimit = 4;
+        }
 
         // 1. Provision on Remote Server Node via Driver
         $driver = DriverFactory::create($server);
@@ -278,8 +299,14 @@ class ClientController {
             Helpers::redirect('clients/create');
         }
 
-        // First-Connect Calculation & Status
-        $startOnFirstUse = !empty($plan['start_on_first_use']) || !empty($_POST['start_on_first_use']);
+        // First-Connect Calculation & Status - default checked (professional)
+        $startOnFirstUse = true; // Always default to true as user requested
+        if (isset($_POST['start_on_first_use'])) {
+            $startOnFirstUse = !empty($_POST['start_on_first_use']);
+        } else {
+            // If plan has explicit setting, respect it, otherwise default true
+            $startOnFirstUse = !empty($plan['start_on_first_use']) ? true : true;
+        }
         $durationDays = (int)($plan['duration_days'] ?? 30);
         $maxDevices = max(0, (int)($plan['max_devices'] ?? $ipLimit ?? 0));
 

@@ -82,26 +82,45 @@ require __DIR__ . '/../layout/header.php';
                 </select>
             </div>
 
-            <!-- Server Selection -->
+            <!-- Server Selection - Improved with VIP badge -->
             <div>
-                <label class="block text-xs font-semibold text-slate-300 mb-2">انتخاب سرور مقصد (پروتکل و کلاستر) *</label>
+                <label class="block text-xs font-semibold text-slate-300 mb-2 flex items-center justify-between">
+                    <span>انتخاب سرور مقصد (پروتکل و کلاستر) *</span>
+                    <span class="text-[10px] text-slate-400">VIP هم نمایش داده می‌شود</span>
+                </label>
                 <select name="server_id" id="serverSelect" required
                         class="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:ring-1 focus:ring-purple-500">
                     <option value="auto" selected>⚡️ انتخاب خودکار هوشمند (پایدارترین و کم‌ترافیک‌ترین سرور)</option>
-                    <?php foreach ($servers as $s): ?>
-                        <option value="<?= $s['id'] ?>" data-group="<?= $s['server_group'] ?>">
-                            <?= htmlspecialchars($s['name']) ?> (هسته: <?= strtoupper($s['driver']) ?> - دسته: <?= $s['server_group'] ?>)
+                    <?php foreach ($servers as $s):
+                        $isVip = in_array(strtolower($s['driver']), ['connectix_seller','connectix','seller']);
+                        $badge = $isVip ? '🌟 VIP Connectix (85 کلاینت)' : '';
+                        $driverLabel = $isVip ? 'Connectix Seller API' : strtoupper($s['driver']);
+                    ?>
+                        <option value="<?= $s['id'] ?>" data-group="<?= $s['server_group'] ?>" data-driver="<?= $s['driver'] ?>" <?= $isVip ? 'style="background:#7f1d1d;color:#fca5a5;font-weight:bold;"' : '' ?>>
+                            <?= $isVip ? '🌟 ' : '' ?><?= htmlspecialchars($s['name']) ?> (هسته: <?= $driverLabel ?> - دسته: <?= $s['server_group'] ?>) <?= $badge ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
+                <p class="text-[11px] text-slate-500 mt-1">اگر VIP را نمی‌بینی، <a href="<?= Helpers::url('servers') ?>" class="text-cyan-400 underline">سرورها</a> را چک کن که فعال باشد — سیستم خودکار آن را فعال می‌کند.</p>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-xs font-semibold text-slate-300 mb-2">سقف اتصال همزمان (تعداد کاربر/IP)</label>
-                    <input type="number" name="ip_limit" id="clientIpLimit" value="0" min="0" placeholder="0 = نامحدود"
-                           class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white font-mono text-xs focus:outline-none focus:ring-1 focus:ring-purple-500">
-                    <span class="text-[10px] text-slate-500 mt-1 block">مقدار 0 به معنای نامحدود بودن تعداد کاربر است</span>
+                    <label class="block text-xs font-semibold text-slate-300 mb-2 flex items-center justify-between">
+                        <span>سقف اتصال همزمان (تعداد کاربر/IP)</span>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-900/30 text-emerald-300 border border-emerald-700/30">پیشفرض VIP: 4 نفر</span>
+                    </label>
+                    <div class="relative">
+                        <input type="number" name="ip_limit" id="clientIpLimit" value="4" min="0" max="100" placeholder="4 = پیشفرض حرفه‌ای"
+                               class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white font-mono text-xs focus:outline-none focus:ring-1 focus:ring-purple-500 text-center font-bold">
+                        <div class="absolute inset-y-0 left-0 flex items-center gap-1 pl-2">
+                            <button type="button" onclick="setIpLimit(1)" class="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-[10px] text-slate-300">1</button>
+                            <button type="button" onclick="setIpLimit(2)" class="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-[10px] text-slate-300">2</button>
+                            <button type="button" onclick="setIpLimit(4)" class="px-2 py-1 bg-emerald-800 hover:bg-emerald-700 rounded text-[10px] text-emerald-200 font-bold border border-emerald-700">4</button>
+                            <button type="button" onclick="setIpLimit(0)" class="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-[10px] text-slate-300">∞</button>
+                        </div>
+                    </div>
+                    <span class="text-[10px] text-slate-400 mt-1 block">💡 پیشفرض حرفه‌ای 4 نفره (مثل پنل VIP) — 0 = نامحدود</span>
                 </div>
 
                 <div>
@@ -111,12 +130,16 @@ require __DIR__ . '/../layout/header.php';
                 </div>
             </div>
 
-            <!-- First-Connect Activation Option -->
-            <div class="p-3 bg-indigo-950/40 border border-indigo-800/40 rounded-xl flex items-center gap-3">
-                <input type="checkbox" name="start_on_first_use" id="start_on_first_use" value="1" class="rounded bg-slate-800 border-slate-700 text-indigo-600 focus:ring-0">
-                <label for="start_on_first_use" class="text-xs text-indigo-200 font-semibold cursor-pointer select-none">
-                    🕒 فعال‌سازی با اولین اتصال (زمان انقضا دقیقاً پس از اتصال اول مشتری آغاز شود)
-                </label>
+            <!-- First-Connect Activation Option - Default Checked -->
+            <div class="p-4 bg-gradient-to-r from-indigo-950/50 to-purple-950/30 border border-indigo-700/40 rounded-xl flex items-start gap-3 shadow-inner">
+                <input type="checkbox" name="start_on_first_use" id="start_on_first_use" value="1" checked class="mt-0.5 rounded bg-slate-800 border-slate-700 text-indigo-600 focus:ring-indigo-500 w-4 h-4">
+                <div class="flex-1">
+                    <label for="start_on_first_use" class="text-xs text-indigo-200 font-bold cursor-pointer select-none flex items-center gap-2">
+                        <span>🕒 فعال‌سازی با اولین اتصال</span>
+                        <span class="px-2 py-0.5 rounded-full bg-indigo-600 text-white text-[10px]">پیشفرض فعال ✅</span>
+                    </label>
+                    <p class="text-[11px] text-indigo-300/70 mt-1 leading-relaxed">زمان انقضا دقیقاً پس از اولین اتصال مشتری آغاز می‌شود — حرفه‌ای برای فروش (مثل VIP). اگر خاموش باشد، از لحظه ساخت محاسبه می‌شود.</p>
+                </div>
             </div>
 
             <!-- Live Cost Summary Box -->
@@ -148,7 +171,10 @@ require __DIR__ . '/../layout/header.php';
         const rand = Math.random().toString(36).substring(2, 8);
         document.getElementById('usernameInput').value = 'user_' + rand;
     }
-
+    function setIpLimit(v){
+        const el=document.getElementById('clientIpLimit');
+        if(el) el.value=v;
+    }
     function calculateCost() {
         const planSelect = document.getElementById('planSelect');
         const selected = planSelect.options[planSelect.selectedIndex];
@@ -162,8 +188,11 @@ require __DIR__ . '/../layout/header.php';
         if (boundServerId && document.getElementById('serverSelect')) {
             document.getElementById('serverSelect').value = boundServerId;
         }
-        if (planIpLimit && document.getElementById('clientIpLimit')) {
+        // Only override IP limit if plan has explicit >0, otherwise keep default 4 (VIP style)
+        if (planIpLimit && parseInt(planIpLimit) > 0 && document.getElementById('clientIpLimit')) {
             document.getElementById('clientIpLimit').value = planIpLimit;
+        } else if (document.getElementById('clientIpLimit') && !document.getElementById('clientIpLimit').value) {
+            document.getElementById('clientIpLimit').value = 4;
         }
 
         if (isFree) {
@@ -174,6 +203,13 @@ require __DIR__ . '/../layout/header.php';
             document.getElementById('finalCostText').innerText = price.toLocaleString('fa-IR') + ' تومان';
         }
     }
+    // Ensure defaults on load
+    document.addEventListener('DOMContentLoaded', function(){
+        const cb=document.getElementById('start_on_first_use');
+        if(cb) cb.checked=true;
+        const ip=document.getElementById('clientIpLimit');
+        if(ip && (!ip.value || ip.value=='0')) ip.value=4;
+    });
 </script>
 
 <?php

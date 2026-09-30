@@ -4,7 +4,7 @@ require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Setting.php';
 
 class Updater {
-    public const CURRENT_VERSION = '5.6.0';
+    public const CURRENT_VERSION = '5.6.1';
 
     public static function getCurrentVersion(): string {
         $dbVer = Setting::get('current_version', '');
@@ -588,7 +588,7 @@ class Updater {
         try {
             if (!$pdo) $pdo = Database::getConnection();
             // Fix servers with old seller-api URL or connectix.vip URL that have wrong driver
-            $stmt = $pdo->query("SELECT id, driver, api_url FROM server_nodes WHERE api_url LIKE '%connectix.vip%'");
+            $stmt = $pdo->query("SELECT id, driver, api_url, is_active FROM server_nodes WHERE api_url LIKE '%connectix.vip%'");
             $rows = $stmt->fetchAll();
             foreach ($rows as $r) {
                 $id = (int)$r['id'];
@@ -598,8 +598,8 @@ class Updater {
                 if (str_contains($url, 'seller-api.connectix.vip')) $needsFix = true;
                 if ($driver === 'mock' && str_contains($url, 'connectix.vip')) $needsFix = true;
                 if ($driver !== 'connectix_seller' && (str_contains($url, 'api.connectix.vip') || str_contains($url, 'seller.connectix.vip'))) $needsFix = true;
-                if ($needsFix) {
-                    $pdo->prepare("UPDATE server_nodes SET driver = 'connectix_seller', api_url = 'https://api.connectix.vip' WHERE id = ?")->execute([$id]);
+                if ($needsFix || (int)($r['is_active'] ?? 0) === 0) {
+                    $pdo->prepare("UPDATE server_nodes SET driver = 'connectix_seller', api_url = 'https://api.connectix.vip', is_active = 1 WHERE id = ?")->execute([$id]);
                 }
             }
         } catch (Throwable $e) {}

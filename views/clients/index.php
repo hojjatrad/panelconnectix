@@ -198,9 +198,20 @@ if(preg_match('/(\d+)\s*روز/', $daysRemText, $m)){
 <?php if(!empty($c['reserved_id'])): ?><div class="mt-2"><span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-[10px] font-bold"><i class="fa-solid fa-sparkles text-[9px]"></i>رزرو: <?= $c['reserved_gb'] ?>GB</span></div>
 <?php else: ?><button type="button" onclick="openReserveModal(<?= $c['id'] ?>,'<?= htmlspecialchars($c['username']) ?>')" class="mt-2 text-[10px] text-slate-500 hover:text-cyan-400 flex items-center gap-1 transition"><i class="fa-solid fa-plus text-[8px]"></i>رزرو پلن</button><?php endif; ?>
 </td>
-<!-- Actions -->
+<!-- Actions - with Copy Delivery button -->
 <td class="p-3.5 text-center">
-<div class="flex items-center justify-center gap-1 flex-wrap max-w-[140px] mx-auto">
+<div class="flex items-center justify-center gap-1 flex-wrap max-w-[180px] mx-auto">
+<!-- Copy Delivery: username + password + sublink together -->
+<button type="button" 
+        data-username="<?= htmlspecialchars($c['username'],ENT_QUOTES) ?>"
+        data-password="<?= htmlspecialchars($c['password'],ENT_QUOTES) ?>"
+        data-sub="<?= htmlspecialchars($subUrl,ENT_QUOTES) ?>"
+        data-customer="<?= htmlspecialchars($c['customer_name'] ?? '',ENT_QUOTES) ?>"
+        data-plan="<?= htmlspecialchars($c['plan_title'] ?? '',ENT_QUOTES) ?>"
+        onclick="copyDelivery(this)"
+        class="w-8 h-8 flex items-center justify-center bg-gradient-to-br from-emerald-600/30 to-teal-600/30 hover:from-emerald-600/50 hover:to-teal-600/50 text-emerald-300 hover:text-emerald-200 rounded-xl border border-emerald-700/40 transition group/btn shadow-sm" title="کپی یوزر + پسورد + ساب لینک برای ارسال به مشتری">
+    <i class="fa-solid fa-share-nodes text-[12px] group-hover/btn:scale-110 transition"></i>
+</button>
 <button type="button" onclick="openInspectModal(<?= $c['id'] ?>,'<?= htmlspecialchars($c['username']) ?>','<?= $subUrl ?>')" class="w-8 h-8 flex items-center justify-center bg-slate-800 hover:bg-purple-900/40 text-purple-300 hover:text-purple-200 rounded-xl border border-slate-700 hover:border-purple-700/40 transition group/btn" title="QR و ساب‌لینک"><i class="fa-solid fa-qrcode text-[12px] group-hover/btn:scale-110 transition"></i></button>
 <button type="button" data-copy="<?= htmlspecialchars($subUrl,ENT_QUOTES) ?>" onclick="copyToClipboard(this.getAttribute('data-copy'),this)" class="w-8 h-8 flex items-center justify-center bg-slate-800 hover:bg-cyan-900/40 text-cyan-300 hover:text-cyan-200 rounded-xl border border-slate-700 hover:border-cyan-700/40 transition group/btn" title="کپی ساب"><i class="fa-solid fa-link text-[12px] group-hover/btn:scale-110 transition"></i></button>
 <button type="button" onclick='openEditClientModal(<?= json_encode($c, JSON_HEX_APOS|JSON_HEX_QUOT) ?>)' class="w-8 h-8 flex items-center justify-center bg-slate-800 hover:bg-amber-900/40 text-amber-300 hover:text-amber-200 rounded-xl border border-slate-700 hover:border-amber-700/40 transition group/btn" title="ویرایش نام/یوزر/پسورد"><i class="fa-solid fa-pen text-[11px] group-hover/btn:scale-110 transition"></i></button>
@@ -306,6 +317,37 @@ function togglePwd(el){
     const span=document.getElementById('pwd_'+id);
     if(span.textContent==='••••••'){ span.textContent=real; el.innerHTML='<i class="fa-solid fa-eye-slash text-[10px]"></i>'; }
     else { span.textContent='••••••'; el.innerHTML='<i class="fa-solid fa-eye text-[10px]"></i>'; }
+}
+function copyDelivery(btn){
+    const username = btn.getAttribute('data-username') || '';
+    const password = btn.getAttribute('data-password') || '';
+    const sub = btn.getAttribute('data-sub') || '';
+    const customer = btn.getAttribute('data-customer') || '';
+    const plan = btn.getAttribute('data-plan') || '';
+    let text = '';
+    if(customer) text += `👤 نام مشتری: ${customer}\n`;
+    text += `👤 نام کاربری: ${username}\n`;
+    text += `🔑 رمز عبور: ${password}\n`;
+    if(plan) text += `📦 پلن: ${plan}\n`;
+    text += `🔗 لینک سابسکریپشن:\n${sub}\n\n`;
+    text += `📱 آموزش اتصال:\n1. لینک بالا را کپی کنید\n2. در اپلیکیشن Hiddify / V2rayNG گزینه Import from Clipboard را بزنید\n3. متصل شوید\n\n`;
+    text += `🤖 ربات: @${window.location.hostname}bot`;
+    
+    navigator.clipboard.writeText(text).then(()=>{
+        const orig = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-check text-[12px]"></i>';
+        btn.classList.add('bg-emerald-600','text-white');
+        setTimeout(()=>{ btn.innerHTML=orig; btn.classList.remove('bg-emerald-600','text-white'); }, 2000);
+    }).catch(()=>{
+        // Fallback
+        const ta=document.createElement('textarea');
+        ta.value=text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        alert('✅ کپی شد:\n\n'+text);
+    });
 }
 function openInspectModal(id,username,subUrl){
     document.getElementById('inspectUsername').innerText=username;
