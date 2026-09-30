@@ -308,6 +308,12 @@ $router->post('plans/delete', [PlanController::class, 'delete']);
 $router->post('plans/purge-all', [PlanController::class, 'purgeAll']);
 $router->get('plans/purge-all', [PlanController::class, 'purgeAll']);
 
+// VIP Plans Mapping - Economic / ویژه / Iran Access
+$router->get('vip_plans', [VipPlanController::class, 'index']);
+$router->post('vip_plans/save-mapping', [VipPlanController::class, 'saveMapping']);
+$router->post('vip_plans/auto-map', [VipPlanController::class, 'autoMap']);
+$router->get('vip_plans/auto-map', [VipPlanController::class, 'autoMap']);
+
 // Server Nodes Management (Admin only)
 $router->get('servers', [ServerController::class, 'index']);
 $router->post('servers/store', [ServerController::class, 'store']);

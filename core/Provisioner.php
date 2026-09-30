@@ -88,6 +88,15 @@ class Provisioner {
                 'ip_limit' => $ipLimit,
                 'selected_inbounds' => $server['selected_inbounds'] ?? null
             ];
+            // VIP mapping: if plan has vip_plan_id and server is connectix_seller, use it
+            if (!empty($plan['vip_plan_id']) && $server['driver'] === 'connectix_seller') {
+                $driverPayload['plan_id'] = $plan['vip_plan_id'];
+                if (!empty($plan['vip_group_id'])) {
+                    $driverPayload['group_id'] = $plan['vip_group_id'];
+                }
+                // Also pass traffic for fallback
+                $driverPayload['traffic_gb'] = $plan['traffic_gb'];
+            }
             $driverResult = $driver->createUser($driverPayload);
             if (!$driverResult['success']) {
                 return ['success' => false, 'error' => 'خطا در ثبت کاربر روی سرور نود: ' . ($driverResult['error'] ?? 'خطای نامشخص')];
@@ -152,7 +161,7 @@ class Provisioner {
     }
 
     /**
-     * Create client from custom reseller plan specs (hybrid)
+     * Create client from custom reseller plan specs (hybrid) - now supports VIP plan selection
      */
     public static function createClientCustom(
         float $trafficGb,
@@ -161,7 +170,9 @@ class Provisioner {
         ?int $serverId = null,
         int $resellerId = 1,
         string $customNote = '',
-        ?string $telegramChatId = null
+        ?string $telegramChatId = null,
+        ?string $vipPlanId = null,
+        ?string $vipGroupId = null
     ): array {
         $pdo = Database::getConnection();
 
@@ -208,11 +219,18 @@ class Provisioner {
                 'ip_limit' => $ipLimit,
                 'selected_inbounds' => $server['selected_inbounds'] ?? null
             ];
+            if (!empty($vipPlanId) && $server['driver'] === 'connectix_seller') {
+                $driverPayload['plan_id'] = $vipPlanId;
+                if (!empty($vipGroupId)) $driverPayload['group_id'] = $vipGroupId;
+            }
             $driverResult = $driver->createUser($driverPayload);
             if (!$driverResult['success']) {
                 return ['success' => false, 'error' => 'خطا در ثبت کاربر روی سرور: ' . ($driverResult['error'] ?? 'نامشخص')];
             }
             $nodeSublink = $driverResult['sublink'] ?? null;
+            if (empty($nodeSublink)) {
+                $nodeSublink = $driverResult['subscription_url'] ?? $driverResult['outline_link'] ?? null;
+            }
             if (empty($nodeSublink)) {
                 return ['success' => false, 'error' => 'سرور نتوانست ساب‌لینک تولید کند.'];
             }

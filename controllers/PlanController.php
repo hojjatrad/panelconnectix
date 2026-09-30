@@ -92,6 +92,10 @@ class PlanController {
 
         $startOnFirstUse = isset($_POST['start_on_first_use']) ? 1 : 0;
         $maxDevices = max(0, (int)($_POST['max_devices'] ?? $ipLimit));
+        $vipPlanId = trim($_POST['vip_plan_id'] ?? '');
+        $vipGroupId = trim($_POST['vip_group_id'] ?? '');
+        $vipGroupName = trim($_POST['vip_group_name'] ?? '');
+        $vipPlanTitle = trim($_POST['vip_plan_title'] ?? '');
 
         // Intelligently detect available columns in plans table
         $availableCols = [];
@@ -127,6 +131,10 @@ class PlanController {
         if (isset($availableCols['max_devices'])) $data['max_devices'] = $maxDevices;
         if (isset($availableCols['start_on_first_use'])) $data['start_on_first_use'] = $startOnFirstUse;
         if (isset($availableCols['show_in_bot'])) $data['show_in_bot'] = $showInBot;
+        if (isset($availableCols['vip_plan_id'])) $data['vip_plan_id'] = $vipPlanId ?: null;
+        if (isset($availableCols['vip_group_id'])) $data['vip_group_id'] = $vipGroupId ?: null;
+        if (isset($availableCols['vip_group_name'])) $data['vip_group_name'] = $vipGroupName ?: null;
+        if (isset($availableCols['vip_plan_title'])) $data['vip_plan_title'] = $vipPlanTitle ?: null;
 
         $fields = array_keys($data);
         $placeholders = array_fill(0, count($fields), '?');
@@ -193,6 +201,10 @@ class PlanController {
 
         $startOnFirstUse = isset($_POST['start_on_first_use']) ? 1 : 0;
         $maxDevices = max(0, (int)($_POST['max_devices'] ?? $ipLimit));
+        $vipPlanId = trim($_POST['vip_plan_id'] ?? '');
+        $vipGroupId = trim($_POST['vip_group_id'] ?? '');
+        $vipGroupName = trim($_POST['vip_group_name'] ?? '');
+        $vipPlanTitle = trim($_POST['vip_plan_title'] ?? '');
 
         // Intelligently detect available columns in plans table
         $availableCols = [];
@@ -228,6 +240,10 @@ class PlanController {
         if (isset($availableCols['max_devices'])) $data['max_devices'] = $maxDevices;
         if (isset($availableCols['start_on_first_use'])) $data['start_on_first_use'] = $startOnFirstUse;
         if (isset($availableCols['show_in_bot'])) $data['show_in_bot'] = $showInBot;
+        if (isset($availableCols['vip_plan_id'])) $data['vip_plan_id'] = $vipPlanId ?: null;
+        if (isset($availableCols['vip_group_id'])) $data['vip_group_id'] = $vipGroupId ?: null;
+        if (isset($availableCols['vip_group_name'])) $data['vip_group_name'] = $vipGroupName ?: null;
+        if (isset($availableCols['vip_plan_title'])) $data['vip_plan_title'] = $vipPlanTitle ?: null;
 
         $setParts = [];
         $values = [];

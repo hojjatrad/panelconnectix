@@ -406,7 +406,11 @@ class Database {
                 'max_devices' => 'INT DEFAULT 0',
                 'start_on_first_use' => 'TINYINT(1) DEFAULT 0',
                 'server_id' => 'INT NULL DEFAULT NULL',
-                'category_id' => 'INT NULL DEFAULT NULL'
+                'category_id' => 'INT NULL DEFAULT NULL',
+                'vip_plan_id' => 'VARCHAR(128) NULL',
+                'vip_group_id' => 'VARCHAR(128) NULL',
+                'vip_group_name' => 'VARCHAR(64) NULL',
+                'vip_plan_title' => 'VARCHAR(255) NULL'
             ];
             foreach ($planCols as $c => $d) {
                 self::safeAddColumn($pdo, 'plans', $c, $d);

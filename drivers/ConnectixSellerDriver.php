@@ -552,6 +552,17 @@ class ConnectixSellerDriver implements PanelDriverInterface {
         return false;
     }
 
+    public function getVipPlans(): array {
+        // Returns ['plans'=>[], 'groups'=>[]] from meta-data, cached
+        $res = $this->request('/v1/seller/clients/meta-data');
+        if ($res['success'] && !empty($res['data'])) {
+            $plans = $res['data']['seller_plans'] ?? $res['data']['plans'] ?? [];
+            $groups = $res['data']['groups'] ?? [];
+            return ['plans'=>$plans, 'groups'=>$groups, 'raw'=>$res['data']];
+        }
+        return ['plans'=>[], 'groups'=>[], 'raw'=>null];
+    }
+
     public function toggleUserStatus(string $username, bool $active): bool {
         // Try to find id and toggle via API - attempt common endpoints
         $users = $this->listUsers();
