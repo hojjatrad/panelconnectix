@@ -492,6 +492,20 @@ class Database {
                             $stmtCat->execute($dpc);
                         }
                     }
+
+                    // FIX: Correct 1-day VIP plans that were wrongly categorized as هفتگی, and ensure daily categories exist
+                    try {
+                        // Ensure daily categories exist
+                        $dailyExists = (int)$pdo->query("SELECT COUNT(*) FROM categories WHERE slug IN ('period_1d', 'daily', '1d')")->fetchColumn();
+                        if ($dailyExists === 0) {
+                            $pdo->exec("INSERT INTO categories (name, slug, type, icon, badge_color, description, sort_order) VALUES ('پلن‌های ۱ روزه', 'period_1d', 'plans', 'fa-calendar-day', 'rose', 'پلن‌های تست یک روزه', 5)");
+                            $pdo->exec("INSERT INTO categories (name, slug, type, icon, badge_color, description, sort_order) VALUES ('پلن‌های ۳ روزه', 'period_3d', 'plans', 'fa-calendar-days', 'amber', 'پلن‌های کوتاه‌مدت ۳ روزه', 6)");
+                        }
+                        // Fix existing 1-day plans categorized as هفتگی
+                        $pdo->exec("UPDATE plans SET category = '۱ روزه' WHERE duration_days = 1 AND category = 'هفتگی'");
+                        $pdo->exec("UPDATE plans SET category = '۳ روزه' WHERE duration_days IN (2,3) AND category = 'هفتگی'");
+                        $pdo->exec("UPDATE plans SET category = '۱ روزه' WHERE duration_days = 1 AND category IN ('۱ ماهه', 'عمومی')");
+                    } catch (Throwable $e) {}
                 }
             } catch (Throwable $e) {}
 

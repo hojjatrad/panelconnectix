@@ -283,14 +283,14 @@ class VipPlanController {
                     continue;
                 }
 
-                // Parse traffic GB
+                // Parse traffic GB - SUPPORT DECIMAL like 0.1GB, 0.25GB, 0.5GB
                 $trafficGb = 10; // default
-                if (preg_match('/(\d+)\s*GB/i', $vpTitle, $m)) {
-                    $trafficGb = (int)$m[1];
+                if (preg_match('/([\d\.]+)\s*GB/i', $vpTitle, $m)) {
+                    $trafficGb = (float)$m[1];
                 } elseif (stripos($vpTitle, 'Unlimited') !== false) {
                     $trafficGb = 1000; // represent unlimited as 1000GB
-                } elseif (preg_match('/(\d+)\s*MB/i', $vpTitle, $m)) {
-                    $trafficGb = round((int)$m[1] / 1024, 3);
+                } elseif (preg_match('/([\d\.]+)\s*MB/i', $vpTitle, $m)) {
+                    $trafficGb = round((float)$m[1] / 1024, 4);
                 }
 
                 // Parse duration
@@ -308,11 +308,7 @@ class VipPlanController {
                 }
                 // Special handling for +10D
                 if (preg_match('/\+\s*(\d+)\s*D/i', $vpTitle, $m)) {
-                    // If we already have months, add days
-                    if ($durationDays >= 30) {
-                        // Keep months + add days if title like 100GB-3M + 10D
-                        // Already handled above, but ensure
-                    } else {
+                    if ($durationDays < 30) {
                         $durationDays += (int)$m[1];
                     }
                 }
@@ -368,17 +364,22 @@ class VipPlanController {
                 $persianTitle = str_replace(['Economic', 'Iran Access', 'Business Class', 'BCSublink', 'Sublink', 'Free', 'Unlimited'], ['اقتصادی', 'ایران‌اکسس', 'بیزنس', 'بیزنس ساب‌لینک', 'ساب‌لینک', 'رایگان', 'نامحدود'], $persianTitle);
                 $localTitle = $persianTitle . ' - VIP';
 
-                // Determine category based on duration
+                // Determine category based on duration - FIXED for 1-day plans
                 $category = '۱ ماهه';
                 if ($durationDays >= 365) $category = '۱۲ ماهه';
                 elseif ($durationDays >= 180) $category = '۶ ماهه';
                 elseif ($durationDays >= 90) $category = '۳ ماهه';
                 elseif ($durationDays >= 60) $category = '۲ ماهه';
+                elseif ($durationDays == 1) $category = '۱ روزه';
+                elseif ($durationDays <= 3) $category = '۳ روزه';
                 elseif ($durationDays <= 7) $category = 'هفتگی';
+                elseif ($durationDays <= 15) $category = 'نیمه ماه';
 
-                // Base price - auto calculate based on traffic
+                // Base price - auto calculate based on traffic - SUPPORT <1GB
                 $basePrice = 100000; // default
-                if ($trafficGb <= 1) $basePrice = 50000;
+                if ($trafficGb <= 0.3) $basePrice = 20000;
+                elseif ($trafficGb <= 0.5) $basePrice = 30000;
+                elseif ($trafficGb <= 1) $basePrice = 50000;
                 elseif ($trafficGb <= 5) $basePrice = 80000;
                 elseif ($trafficGb <= 10) $basePrice = 120000;
                 elseif ($trafficGb <= 20) $basePrice = 180000;

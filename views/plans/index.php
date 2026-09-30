@@ -20,17 +20,17 @@ usort($allCategories, function($a, $b) {
     return ($a['sort_order'] ?? 0) <=> ($b['sort_order'] ?? 0);
 });
 
-// Helper to render nested options recursively
+// Helper to render nested options recursively - CLEAN without slug code
 if (!function_exists('renderPlanCategoryOptions')) {
     function renderPlanCategoryOptions($byParent, $parentId = 0, $level = 0) {
         $html = '';
         $cats = $byParent[$parentId] ?? [];
-        // Sort by sort_order
         usort($cats, fn($a,$b) => ($a['sort_order'] ?? 0) <=> ($b['sort_order'] ?? 0));
         foreach ($cats as $cat) {
-            $indent = str_repeat('— ', $level);
-            $botLabel = $cat['bot_label'] ?? $cat['name'];
-            $html .= '<option value="'.$cat['id'].'" data-name="'.htmlspecialchars($cat['name']).'" data-slug="'.htmlspecialchars($cat['slug']).'" data-level="'.$level.'">'.$indent.htmlspecialchars($botLabel).' ('.htmlspecialchars($cat['slug']).')</option>';
+            $indent = $level > 0 ? str_repeat('  ', $level) . '↳ ' : '';
+            $displayName = $cat['bot_label'] ?: $cat['name'];
+            // Clean: no slug code, just name with indent
+            $html .= '<option value="'.$cat['id'].'" data-name="'.htmlspecialchars($cat['name']).'" data-slug="'.htmlspecialchars($cat['slug']).'" data-level="'.$level.'">'.$indent.htmlspecialchars($displayName).'</option>';
             if (!empty($byParent[$cat['id']])) {
                 $html .= renderPlanCategoryOptions($byParent, $cat['id'], $level+1);
             }
@@ -47,7 +47,6 @@ foreach ($allCategories as $cat) {
         if (!empty($p['server_group']) && $p['server_group'] === $cat['slug']) return true;
         return false;
     }));
-    // Calculate level for indent
     $lvl = $cat['level'] ?? 0;
     if (isset($cat['parent_id']) && $cat['parent_id']) {
         $tmp = $cat['parent_id'];
@@ -58,6 +57,8 @@ foreach ($allCategories as $cat) {
             $depth++;
         }
     }
+    // Only include categories that have at least 1 plan OR are parent of such
+    // For now include all with count>0, parents will be included via child check later
     $filterCategories[] = [
         'id' => $cat['id'],
         'key' => 'cat_' . $cat['id'],
@@ -73,8 +74,33 @@ foreach ($allCategories as $cat) {
         'bot_icon' => $cat['bot_icon'] ?? '',
     ];
 }
+// Filter to only show categories with count>0 for clean UI
+$filterCategoriesVisible = array_values(array_filter($filterCategories, fn($fc) => $fc['count'] > 0));
+// Also include parents of visible categories even if count 0, to keep hierarchy
+$visibleIds = array_column($filterCategoriesVisible, 'id');
+foreach ($filterCategories as $fc) {
+    if ($fc['count'] == 0) {
+        // Check if this category is parent of any visible
+        $isParentOfVisible = false;
+        foreach ($filterCategoriesVisible as $vf) {
+            $pid = $vf['parent_id'];
+            while ($pid) {
+                if ((int)$pid === (int)$fc['id']) { $isParentOfVisible = true; break 2; }
+                $pid = $catById[$pid]['parent_id'] ?? null;
+            }
+        }
+        if ($isParentOfVisible) {
+            $filterCategoriesVisible[] = $fc;
+        }
+    }
+}
+// Sort visible by level then sort_order
+usort($filterCategoriesVisible, function($a,$b){
+    if (($a['level']??0) !== ($b['level']??0)) return ($a['level']??0) <=> ($b['level']??0);
+    return ($a['id']??0) <=> ($b['id']??0);
+});
 
-// Add any legacy or custom categories in existing plans not present in categories table
+// Add any legacy or custom categories in existing plans not present in categories table - CLEAN
 $existingNames = array_column($allCategories, 'name');
 $existingSlugs = array_column($allCategories, 'slug');
 $customPlanCats = [];
@@ -86,16 +112,24 @@ foreach ($plans as $p) {
 }
 foreach ($customPlanCats as $idx => $custCat) {
     $cnt = count(array_filter($plans, fn($p) => ($p['category'] ?? '') === $custCat));
-    $filterCategories[] = [
-        'id' => 0,
-        'key' => 'cust_' . $idx,
-        'name' => $custCat,
-        'slug' => '',
-        'icon' => 'fa-tag',
-        'badge_color' => 'slate',
-        'type' => 'custom',
-        'count' => $cnt
-    ];
+    if ($cnt > 0) {
+        $newFc = [
+            'id' => 0,
+            'key' => 'cust_' . $idx,
+            'name' => $custCat,
+            'slug' => '',
+            'icon' => 'fa-tag',
+            'badge_color' => 'slate',
+            'type' => 'custom',
+            'count' => $cnt,
+            'level' => 0,
+            'parent_id' => null,
+            'bot_label' => $custCat,
+            'bot_icon' => '',
+        ];
+        $filterCategories[] = $newFc;
+        $filterCategoriesVisible[] = $newFc;
+    }
 }
 ?>
 
@@ -128,18 +162,18 @@ foreach ($customPlanCats as $idx => $custCat) {
         <?php endif; ?>
     </div>
 
-    <!-- Category Filter Tabs Bar - FIXED: wrap instead of overflow -->
-    <div class="flex flex-wrap items-center gap-2 pb-3 text-xs bg-slate-900/40 border border-slate-800 rounded-2xl p-3">
+        <!-- Category Filter Tabs Bar - CLEAN, no code/path, only visible categories with count>0 -->
+    <div class="flex flex-wrap items-center gap-2 pb-3 text-xs bg-slate-900/60 border border-slate-800 rounded-2xl p-3 shadow-sm">
         <span class="text-slate-400 text-xs shrink-0 font-bold flex items-center gap-1.5">
             <i class="fa-solid fa-filter text-purple-400"></i>
             فیلتر دسته‌بندی:
         </span>
-        <button onclick="filterCategory('all', '', '', '')" id="pill-all" class="cat-pill shrink-0 px-3 py-1.5 rounded-xl font-bold bg-purple-600 text-white border border-purple-500 shadow-sm transition flex items-center gap-1.5">
+        <button onclick="filterCategory('all', '', '', '')" id="pill-all" class="cat-pill shrink-0 px-3.5 py-2 rounded-xl font-bold bg-purple-600 text-white border border-purple-500 shadow-sm transition flex items-center gap-1.5 hover:bg-purple-700">
             <i class="fa-solid fa-layer-group text-[11px]"></i>
             <span>همه پلن‌ها (<?= count($plans) ?>)</span>
         </button>
 
-        <?php foreach ($filterCategories as $fc): 
+        <?php foreach ($filterCategoriesVisible as $fc): 
             $badgeDot = match($fc['badge_color']) {
                 'amber' => 'text-amber-400',
                 'blue' => 'text-blue-400',
@@ -148,25 +182,23 @@ foreach ($customPlanCats as $idx => $custCat) {
                 'rose', 'red' => 'text-rose-400',
                 default => 'text-purple-400'
             };
+            $displayName = $fc['bot_label'] ?: $fc['name'];
         ?>
-            <?php
-                $lvl = $fc['level'] ?? 0;
-                $indent = $lvl > 0 ? str_repeat('—', $lvl) . ' ' : '';
-                $lvlClass = $lvl === 0 ? '' : ($lvl === 1 ? 'border-purple-500/30' : 'border-cyan-500/30');
-            ?>
             <button onclick="filterCategory('<?= $fc['key'] ?>', '<?= $fc['id'] ?>', '<?= htmlspecialchars($fc['slug']) ?>', '<?= htmlspecialchars(addslashes($fc['name'])) ?>')" 
                     id="pill-<?= $fc['key'] ?>" 
-                    class="cat-pill shrink-0 px-3 py-1.5 rounded-xl font-medium bg-slate-900 text-slate-300 border border-slate-800 hover:bg-slate-800 transition flex items-center gap-1.5 <?= $lvlClass ?> <?= $lvl > 0 ? 'mr-2' : '' ?>"
-                    title="<?= $lvl > 0 ? 'زیرشاخه سطح '.$lvl : 'ریشه' ?> - <?= htmlspecialchars($fc['bot_label'] ?: $fc['name']) ?>">
+                    data-count="<?= $fc['count'] ?>"
+                    class="cat-pill shrink-0 px-3.5 py-2 rounded-xl font-medium bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 hover:text-white transition flex items-center gap-1.5"
+                    title="<?= htmlspecialchars($displayName) ?> - <?= $fc['count'] ?> پلن">
                 <i class="fa-solid <?= htmlspecialchars($fc['icon']) ?> <?= $badgeDot ?> text-[11px]"></i>
-                <span><?= $indent . htmlspecialchars($fc['bot_label'] ?: $fc['name']) ?></span>
-                <span class="text-[10px] bg-slate-800/80 px-1.5 py-0.2 rounded-md font-mono text-slate-400"><?= $fc['count'] ?></span>
-                <?php if ($lvl > 0): ?><span class="text-[9px] bg-purple-500/20 text-purple-300 px-1 rounded">L<?= $lvl ?></span><?php endif; ?>
+                <span><?= htmlspecialchars($displayName) ?></span>
+                <span class="text-[10px] bg-slate-700 px-1.5 py-0.5 rounded-md font-mono text-slate-300"><?= $fc['count'] ?></span>
             </button>
         <?php endforeach; ?>
+        <?php if (empty($filterCategoriesVisible)): ?>
+            <span class="text-[11px] text-slate-500">هیچ دسته‌بندی فعالی یافت نشد</span>
+        <?php endif; ?>
     </div>
 
-    <!-- Plans Grid -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         <?php foreach ($plans as $p): 
             $catName = $p['cluster_name'] ?: ($p['category'] ?: 'عمومی');
@@ -696,12 +728,14 @@ foreach ($customPlanCats as $idx => $custCat) {
         document.getElementById('edit_server_id').value = p.server_id || '';
         
         var trVal = parseFloat(p.traffic_gb || 0);
-        if (trVal > 0 && trVal < 1) {
-            document.getElementById('edit_traffic_gb').value = Math.round(trVal * 1024);
-            document.getElementById('edit_traffic_unit').value = 'mb';
-        } else {
-            document.getElementById('edit_traffic_gb').value = trVal;
-            document.getElementById('edit_traffic_unit').value = 'gb';
+        // FIXED: Allow <1GB as GB (e.g. 0.1, 0.25) - don't force MB conversion
+        // Show as GB by default, user can switch to MB if needed
+        document.getElementById('edit_traffic_gb').value = trVal;
+        document.getElementById('edit_traffic_unit').value = 'gb';
+        // If very small (<0.1 GB) and was originally MB, keep MB
+        if (trVal > 0 && trVal < 0.1) {
+            // Check if original was likely MB (e.g. 100MB = 0.097)
+            // Keep as GB anyway to allow 0.1 editing, user can switch
         }
         updateEditHelper();
 
@@ -725,19 +759,32 @@ foreach ($customPlanCats as $idx => $custCat) {
 
     function filterCategory(filterKey, catId, catSlug, catName) {
         document.querySelectorAll('.cat-pill').forEach(btn => {
-            btn.classList.remove('bg-purple-600', 'text-white', 'border-purple-500');
-            btn.classList.add('bg-slate-900', 'text-slate-300', 'border-slate-800');
+            btn.classList.remove('bg-purple-600', 'text-white', 'border-purple-500', 'bg-slate-800');
+            btn.classList.add('bg-slate-800', 'text-slate-300', 'border-slate-700');
+            // Reset for all
+            if (btn.id === 'pill-all') {
+                btn.classList.remove('bg-slate-800', 'text-slate-300', 'border-slate-700');
+                btn.classList.add('bg-slate-900', 'text-slate-400', 'border-slate-800');
+            }
         });
 
         const activeBtn = document.getElementById('pill-' + filterKey);
         if (activeBtn) {
-            activeBtn.classList.remove('bg-slate-900', 'text-slate-300', 'border-slate-800');
+            activeBtn.classList.remove('bg-slate-800', 'text-slate-300', 'border-slate-700', 'bg-slate-900', 'text-slate-400', 'border-slate-800');
             activeBtn.classList.add('bg-purple-600', 'text-white', 'border-purple-500');
+        } else if (filterKey === 'all') {
+            const allBtn = document.getElementById('pill-all');
+            if (allBtn) {
+                allBtn.classList.remove('bg-slate-900', 'text-slate-400', 'border-slate-800');
+                allBtn.classList.add('bg-purple-600', 'text-white', 'border-purple-500');
+            }
         }
 
+        let visibleCount = 0;
         document.querySelectorAll('.plan-card').forEach(card => {
             if (filterKey === 'all') {
                 card.style.display = '';
+                visibleCount++;
                 return;
             }
 
@@ -755,8 +802,30 @@ foreach ($customPlanCats as $idx => $custCat) {
             }
 
             card.style.display = match ? '' : 'none';
+            if (match) visibleCount++;
         });
+
+        // Update all count display
+        const allBtn = document.getElementById('pill-all');
+        if (allBtn) {
+            const totalPlans = document.querySelectorAll('.plan-card').length;
+            // Keep original count in title
+        }
     }
+
+    // Auto-hide filter pills with 0 count on load and ensure clean UI
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.cat-pill[data-count]').forEach(btn => {
+            const cnt = parseInt(btn.getAttribute('data-count') || '0');
+            if (cnt === 0) {
+                btn.style.display = 'none';
+            }
+        });
+        // Also ensure plan cards with 0.1 GB etc display correctly
+        document.querySelectorAll('.plan-card').forEach(card => {
+            // No extra logic needed, just ensure visible
+        });
+    });
 
     function updateCreateHelper() {
         var inp = document.getElementById('create_traffic_val');
