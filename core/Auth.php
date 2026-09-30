@@ -106,6 +106,20 @@ class Auth {
             Helpers::flash('error', 'لطفاً ابتدا وارد حساب کاربری خود شوید.');
             Helpers::redirect('login');
         }
+        // Demo user: block all POST/DELETE/PUT (view-only)
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && self::isDemo()) {
+            // Allow only login and demo page itself, block everything else that modifies
+            $route = $_GET['route'] ?? '';
+            // Allow login, demo, promo, logout
+            $allowed = ['login', 'demo', 'promo', 'logout'];
+            $isAllowed = false;
+            foreach ($allowed as $a) {
+                if (str_starts_with($route, $a)) { $isAllowed = true; break; }
+            }
+            if (!$isAllowed) {
+                self::blockDemo('انجام عملیات');
+            }
+        }
     }
 
     public static function requireAdmin(): void {
@@ -113,6 +127,35 @@ class Auth {
         if (!self::isAdmin()) {
             Helpers::flash('error', 'دسترسی غیرمجاز! این بخش مخصوص مدیریت کل سیستم است.');
             Helpers::redirect('dashboard');
+        }
+    }
+
+    public static function isDemo(): bool {
+        self::init();
+        $username = $_SESSION['username'] ?? '';
+        if ($username === 'demo') return true;
+        try {
+            $user = self::user();
+            if ($user && ($user['username'] ?? '') === 'demo') return true;
+        } catch (Throwable $e) {}
+        return false;
+    }
+
+    public static function blockDemo(string $action = 'این عملیات'): void {
+        if (self::isDemo()) {
+            if (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest' || str_contains($_SERVER['HTTP_ACCEPT'] ?? '', 'application/json')) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => false, 'error' => '👁️ نسخه دمو فقط برای نمایش است - امکان ' . $action . ' وجود ندارد. برای پنل واقعی به @mainAdminpanel پیام دهید.'], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+            Helpers::flash('error', '👁️ نسخه دمو فقط برای نمایش است - امکان ' . $action . ' وجود ندارد. برای پنل واقعی به @mainAdminpanel پیام دهید. (سایت: https://vpbotn.ir)');
+            $referer = $_SERVER['HTTP_REFERER'] ?? '';
+            if ($referer !== '') {
+                header('Location: ' . $referer);
+            } else {
+                Helpers::redirect('dashboard');
+            }
+            exit;
         }
     }
 
