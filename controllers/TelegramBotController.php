@@ -2540,7 +2540,7 @@ class TelegramBotController {
             $srvButtons = [];
             foreach ($serversMap as $srv) {
                 $icon = $srv['is_vip'] ? '🌟' : '🖥';
-                $label = $srv['is_vip'] ? 'ویژه' : 'مولتی سرور';
+                $label = $srv['is_vip'] ? 'VIP' : 'مولتی سرور';
                 // Use slug vip/multi as key to avoid Persian issues, per user request: کلید سرور را vip کن
                 $cbKey = $srv['slug'] . '_' . $srv['id']; // e.g. vip_2, multi_1 - short and English
                 $srvButtons[] = [['text' => "$icon $label", 'callback_data' => 'srv_buy_' . $cbKey]];
@@ -2602,7 +2602,7 @@ class TelegramBotController {
                 $serverFilteredPlans = array_values(array_filter($allPlans, fn($p) => (string)($p['server_id'] ?? '0') === $parsedServerId));
                 foreach ($serversMap as $srv) {
                     if ((string)$srv['id'] === $parsedServerId) {
-                        $serverName = $srv['is_vip'] ? 'ویژه' : 'مولتی سرور';
+                        $serverName = $srv['is_vip'] ? 'VIP' : 'مولتی سرور';
                         $isVipServer = $srv['is_vip'];
                         break;
                     }
@@ -2616,7 +2616,7 @@ class TelegramBotController {
                 $serverFilteredPlans = array_values(array_filter($allPlans, fn($p) => (string)($p['server_id'] ?? '0') === (string)$rawSrv));
                 foreach ($serversMap as $srv) {
                     if ((string)$srv['id'] === (string)$rawSrv) {
-                        $serverName = $srv['is_vip'] ? 'ویژه' : 'مولتی سرور';
+                        $serverName = $srv['is_vip'] ? 'VIP' : 'مولتی سرور';
                         $isVipServer = $srv['is_vip'];
                         break;
                     }
@@ -2627,7 +2627,7 @@ class TelegramBotController {
             if (count($serversMap) === 1) {
                 $onlySrv = array_values($serversMap)[0];
                 $isVipServer = $onlySrv['is_vip'];
-                $serverName = $onlySrv['is_vip'] ? 'ویژه' : 'مولتی سرور';
+                $serverName = $onlySrv['is_vip'] ? 'VIP' : 'مولتی سرور';
                 $parsedServer = $onlySrv['slug'] . '_' . $onlySrv['id'];
                 $parsedServerId = (string)$onlySrv['id'];
                 $serverFilteredPlans = array_values(array_filter($allPlans, fn($p) => (string)($p['server_id'] ?? '0') === $parsedServerId));
@@ -2854,14 +2854,23 @@ class TelegramBotController {
         }
         if (!empty($row)) $buttons[] = $row;
 
+        // FIXED BACK LOGIC: avoid loop when only 1 month category
         if ($parsedCatHash !== null) {
             if ($isVipServer) {
-                $buttons[] = [['text' => '🔙 بازگشت', 'callback_data' => 'type_buy_' . $parsedServer . '_' . $parsedType]];
+                if (count($categories) > 1) {
+                    $buttons[] = [['text' => '🔙 بازگشت به انتخاب مدت', 'callback_data' => 'type_buy_' . $parsedServer . '_' . $parsedType]];
+                } else {
+                    $buttons[] = [['text' => '🔙 بازگشت به انتخاب نوع', 'callback_data' => 'srv_buy_' . $parsedServer]];
+                }
             } else {
-                $buttons[] = [['text' => '🔙 بازگشت', 'callback_data' => 'srv_buy_' . $parsedServer]];
+                if (count($categories) > 1) {
+                    $buttons[] = [['text' => '🔙 بازگشت به انتخاب مدت', 'callback_data' => 'srv_buy_' . $parsedServer]];
+                } else {
+                    $buttons[] = [['text' => '🔙 بازگشت به انتخاب سرور', 'callback_data' => 'menu_buy']];
+                }
             }
         } elseif ($parsedType !== null) {
-            $buttons[] = [['text' => '🔙 بازگشت', 'callback_data' => 'srv_buy_' . $parsedServer]];
+            $buttons[] = [['text' => '🔙 بازگشت به انتخاب نوع', 'callback_data' => 'srv_buy_' . $parsedServer]];
         } else {
             if (count($serversMap) > 1) {
                 $buttons[] = [['text' => '🔙 بازگشت به انتخاب سرور', 'callback_data' => 'menu_buy']];
