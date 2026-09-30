@@ -115,7 +115,7 @@ body{background:#03050A;color:#fff;overflow-x:hidden}
 </p>
 <div class="flex flex-wrap gap-3.5">
 <a href="#request" class="gradient-bg rounded-full px-8 py-4 font-black text-[14px] flex items-center gap-2.5 shadow-[0_0_50px_rgba(124,58,237,.5)]">🚀 ثبت درخواست - 30 دقیقه تحویل فارسی</a>
-<a href="#video" class="bg-white/[0.06] border border-white/[0.08] rounded-full px-7 py-4 font-bold text-[13px] flex items-center gap-2.5"><span class="w-8 h-8 bg-white rounded-full flex items-center justify-center"><i class="fa-solid fa-play text-black text-[12px] ml-0.5"></i></span> ویدیو معرفی 60 ثانیه‌ای فارسی</a>
+<a href="#video" class="bg-white/[0.06] border border-white/[0.08] rounded-full px-7 py-4 font-bold text-[13px] flex items-center gap-2.5"><span class="w-8 h-8 bg-white rounded-full flex items-center justify-center"><i class="fa-solid fa-play text-black text-[12px] ml-0.5"></i></span> دیدن ویدیو معرفی</a>
 </div>
 <div class="grid grid-cols-3 gap-3 max-w-[440px] pt-3">
 <div class="bg-gradient-to-b from-white/[0.06] to-white/[0.02] border border-white/[0.08] rounded-[18px] p-4 text-center"><div class="text-[22px] font-black gradient-text">200+</div><div class="text-[10px] text-white/50">نماینده فعال</div></div>
@@ -155,9 +155,8 @@ body{background:#03050A;color:#fff;overflow-x:hidden}
 <button id="playBtn" class="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-[0_0_60px_rgba(255,255,255,.5)] hover:scale-110 transition"><i class="fa-solid fa-play text-black text-xl ml-1"></i></button>
 </div>
 <div class="absolute bottom-0 left-0 right-0 p-6">
-<div class="flex items-center gap-2 mb-3"><div class="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div><span class="text-[10px] bg-red-500/20 border border-red-500/30 text-red-300 rounded-full px-2.5 py-1">ویدیو معرفی فارسی - با صداگذاری</span><span class="text-[10px] bg-white/10 border border-white/20 rounded-full px-2.5 py-1">60 ثانیه</span></div>
-<h3 class="font-black text-[18px]">ویدیو معرفی پنل نمایندگی - کاملاً فارسی</h3>
-<p class="text-[11px] text-white/50 mt-1">با صداگذاری حرفه‌ای فارسی + تصاویر جذاب - @mainAdminpanel</p>
+<h3 class="font-black text-[18px]">ویدیو معرفی پنل نمایندگی</h3>
+<p class="text-[11px] text-white/50 mt-1">@mainAdminpanel</p>
 </div>
 <!-- Progress -->
 <div class="absolute bottom-0 left-0 right-0 h-1 bg-white/10"><div id="progressBar" class="h-full gradient-bg w-0 transition-all duration-300"></div></div>
@@ -165,9 +164,8 @@ body{background:#03050A;color:#fff;overflow-x:hidden}
 <div class="p-5">
 <audio id="narration" src="<?= $base ?>ads/video-narration-fa.mp3" preload="metadata"></audio>
 <div class="flex items-center gap-3">
-<button id="playPause" class="w-10 h-10 bg-white/[0.08] border border-white/[0.1] rounded-full flex items-center justify-center hover:bg-white/[0.12]"><i class="fa-solid fa-play text-xs"></i></button>
-<div class="flex-1"><div class="text-[11px] text-white/40">صداگذاری فارسی</div><div class="text-[12px] font-bold">معرفی کامل پنل - 60 ثانیه</div></div>
-<div class="text-[10px] bg-violet-500/15 border border-violet-500/20 text-violet-300 rounded-full px-3 py-1.5">🎧 با صدا - فارسی</div>
+<button id="playPause" class="w-10 h-10 bg-white rounded-full flex items-center justify-center hover:scale-105 transition shadow-[0_0_20px_rgba(255,255,255,.3)]"><i class="fa-solid fa-play text-black text-xs ml-0.5"></i></button>
+<div class="flex-1"><div class="text-[13px] font-bold">پخش ویدیو معرفی</div><div class="text-[11px] text-white/40">@mainAdminpanel</div></div>
 </div>
 </div>
 </div>
