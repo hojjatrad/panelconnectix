@@ -4,7 +4,7 @@ require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Setting.php';
 
 class Updater {
-    public const CURRENT_VERSION = '5.5.8';
+    public const CURRENT_VERSION = '5.5.9';
 
     public static function getCurrentVersion(): string {
         $dbVer = Setting::get('current_version', '');
@@ -608,8 +608,8 @@ class Updater {
     public static function ensureCustomerNamesFixed($pdo = null): void {
         try {
             if (!$pdo) $pdo = Database::getConnection();
-            // Only run if there are clients without customer_name
-            $countEmpty = (int)$pdo->query("SELECT COUNT(*) FROM clients WHERE customer_name IS NULL OR customer_name = ''")->fetchColumn();
+            // Always fix empty customer_name - no once-per-day limit for this critical UX
+            $countEmpty = (int)$pdo->query("SELECT COUNT(*) FROM clients WHERE customer_name IS NULL OR customer_name = '' OR TRIM(customer_name) = ''")->fetchColumn();
             if ($countEmpty === 0) return;
 
             // Try to build VIP map from Connectix Seller server
@@ -635,7 +635,7 @@ class Updater {
 
             // First: copy from VIP where username matches
             if (!empty($vipMap)) {
-                $stmt = $pdo->query("SELECT id, username FROM clients WHERE customer_name IS NULL OR customer_name = '' LIMIT 200");
+                $stmt = $pdo->query("SELECT id, username FROM clients WHERE customer_name IS NULL OR customer_name = '' OR TRIM(customer_name) = '' LIMIT 500");
                 $rows = $stmt->fetchAll();
                 foreach ($rows as $r) {
                     $u = trim($r['username']);
@@ -645,13 +645,10 @@ class Updater {
                 }
             }
 
-            // Second: for remaining empties, set customer_name = username as fallback (so view always shows something professional)
-            // But only if still empty after VIP attempt, and only once per day to avoid overwriting intentional empties
-            $lastFix = (int)Setting::get('last_customer_name_autofix', '0');
-            if (time() - $lastFix > 86400) { // once per day
-                $pdo->exec("UPDATE clients SET customer_name = username WHERE customer_name IS NULL OR customer_name = ''");
-                Setting::set('last_customer_name_autofix', (string)time());
-            }
+            // Second: for remaining empties, set customer_name = username as fallback - ALWAYS, not once per day
+            // This ensures professional display like VIP panel (avatar + name)
+            $pdo->exec("UPDATE clients SET customer_name = username WHERE customer_name IS NULL OR customer_name = '' OR TRIM(customer_name) = ''");
+            Setting::set('last_customer_name_autofix', (string)time());
         } catch (Throwable $e) {}
     }
 
