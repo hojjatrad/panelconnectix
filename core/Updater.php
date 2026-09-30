@@ -19,6 +19,7 @@ class Updater {
         try {
             $pdo = Database::getConnection();
             Database::ensureExtendedTablesExist($pdo);
+            self::ensureConnectixDriverFixed($pdo);
         } catch (Throwable $e) {}
     }
 
@@ -576,6 +577,29 @@ class Updater {
         try {
             $pdo = Database::getConnection();
             Database::ensureExtendedTablesExist($pdo);
+            // Auto-fix Connectix Seller driver after any update
+            self::ensureConnectixDriverFixed($pdo);
+        } catch (Throwable $e) {}
+    }
+
+    public static function ensureConnectixDriverFixed($pdo = null): void {
+        try {
+            if (!$pdo) $pdo = Database::getConnection();
+            // Fix servers with old seller-api URL or connectix.vip URL that have wrong driver
+            $stmt = $pdo->query("SELECT id, driver, api_url FROM server_nodes WHERE api_url LIKE '%connectix.vip%'");
+            $rows = $stmt->fetchAll();
+            foreach ($rows as $r) {
+                $id = (int)$r['id'];
+                $driver = strtolower($r['driver'] ?? '');
+                $url = strtolower($r['api_url'] ?? '');
+                $needsFix = false;
+                if (str_contains($url, 'seller-api.connectix.vip')) $needsFix = true;
+                if ($driver === 'mock' && str_contains($url, 'connectix.vip')) $needsFix = true;
+                if ($driver !== 'connectix_seller' && (str_contains($url, 'api.connectix.vip') || str_contains($url, 'seller.connectix.vip'))) $needsFix = true;
+                if ($needsFix) {
+                    $pdo->prepare("UPDATE server_nodes SET driver = 'connectix_seller', api_url = 'https://api.connectix.vip' WHERE id = ?")->execute([$id]);
+                }
+            }
         } catch (Throwable $e) {}
     }
 
