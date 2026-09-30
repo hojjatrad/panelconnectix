@@ -159,11 +159,15 @@ class ResellerPortalController {
     }
 
     /**
-     * Reseller Custom Plans & Pricing Catalog
+     * Reseller Custom Plans & Pricing Catalog - Hybrid 5.6.2
+     * Base plans customization + fully custom plans creation
      */
     public function plans(): void {
         $userId = self::checkResellerAccess();
         $pdo = Database::getConnection();
+
+        // Ensure extended columns exist
+        try { Database::ensureExtendedTablesExist($pdo); } catch (Throwable $e) {}
 
         // Get reseller info for tiered discount rate
         $tier = Provisioner::getResellerTier($userId);
@@ -177,12 +181,35 @@ class ResellerPortalController {
                        rp.retail_price,
                        rp.is_active as reseller_active
                 FROM plans p
-                LEFT JOIN reseller_plans rp ON p.id = rp.plan_id AND rp.reseller_id = ?
+                LEFT JOIN reseller_plans rp ON p.id = rp.plan_id AND rp.reseller_id = ? AND rp.is_custom = 0
                 WHERE p.is_active = 1
                 ORDER BY p.base_price ASC";
         $stmt = $pdo->prepare($sql);
         $stmt->execute([$userId]);
         $plans = $stmt->fetchAll();
+
+        // Get custom plans created by this reseller
+        try {
+            $stmtCustom = $pdo->prepare("SELECT * FROM reseller_plans WHERE reseller_id = ? AND is_custom = 1 ORDER BY custom_category ASC, retail_price ASC");
+            $stmtCustom->execute([$userId]);
+            $customPlans = $stmtCustom->fetchAll();
+        } catch (Throwable $e) {
+            $customPlans = [];
+        }
+
+        // Get servers for custom plan creation (allow all active)
+        try {
+            $servers = $pdo->query("SELECT id, name, driver FROM server_nodes WHERE is_active = 1 OR driver = 'connectix_seller' ORDER BY name ASC")->fetchAll();
+        } catch (Throwable $e) {
+            $servers = [];
+        }
+
+        // Stats for professional display
+        $stats = [
+            'base_count' => count($plans),
+            'custom_count' => count($customPlans),
+            'active_custom' => count(array_filter($customPlans, fn($c) => (int)($c['is_active'] ?? 1) === 1)),
+        ];
 
         require __DIR__ . '/../views/reseller/plans.php';
     }
@@ -233,6 +260,100 @@ class ResellerPortalController {
     }
 
     /**
+     * Create Custom Plan (reseller's own product)
+     */
+    public function createCustomPlan(): void {
+        $userId = self::checkResellerAccess();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
+            Helpers::redirect('reseller/plans');
+        }
+        $pdo = Database::getConnection();
+        try { Database::ensureExtendedTablesExist($pdo); } catch (Throwable $e) {}
+
+        $title = trim($_POST['custom_title'] ?? '');
+        $category = trim($_POST['custom_category'] ?? 'اقتصادی');
+        $traffic = (float)($_POST['traffic_gb'] ?? 0);
+        $duration = max(1, (int)($_POST['duration_days'] ?? 30));
+        $ipLimit = max(1, min(10, (int)($_POST['ip_limit'] ?? 4)));
+        $retailPrice = max(0, (int)str_replace(',', '', $_POST['retail_price'] ?? 0));
+        $baseCost = max(0, (int)str_replace(',', '', $_POST['base_cost'] ?? 0));
+        $serverId = !empty($_POST['server_id']) ? (int)$_POST['server_id'] : null;
+        $desc = trim($_POST['description'] ?? '');
+
+        if ($title === '' || $retailPrice <= 0 || $traffic <= 0) {
+            Helpers::flash('error', 'عنوان، حجم و قیمت فروش الزامی هستند.');
+            Helpers::redirect('reseller/plans');
+        }
+
+        try {
+            $stmt = $pdo->prepare("INSERT INTO reseller_plans (reseller_id, plan_id, custom_title, custom_category, retail_price, is_active, is_custom, traffic_gb, duration_days, ip_limit, server_id, base_cost, description, created_at, updated_at) VALUES (?, 0, ?, ?, ?, 1, 1, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+            $stmt->execute([$userId, $title, $category, $retailPrice, $traffic, $duration, $ipLimit, $serverId, $baseCost, $desc]);
+            Helpers::flash('success', "پلن اختصاصی «{$title}» با موفقیت ساخته شد و در ربات شما نمایش داده می‌شود ⭐");
+        } catch (Throwable $e) {
+            Helpers::flash('error', 'خطا در ساخت پلن اختصاصی: ' . $e->getMessage());
+        }
+        Helpers::redirect('reseller/plans');
+    }
+
+    /**
+     * Update Custom Plan
+     */
+    public function updateCustomPlan(): void {
+        $userId = self::checkResellerAccess();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
+            Helpers::redirect('reseller/plans');
+        }
+        $pdo = Database::getConnection();
+        $id = (int)($_POST['custom_id'] ?? 0);
+        if ($id <= 0) {
+            Helpers::flash('error', 'شناسه پلن نامعتبر است.');
+            Helpers::redirect('reseller/plans');
+        }
+
+        $title = trim($_POST['custom_title'] ?? '');
+        $category = trim($_POST['custom_category'] ?? 'اقتصادی');
+        $traffic = (float)($_POST['traffic_gb'] ?? 0);
+        $duration = max(1, (int)($_POST['duration_days'] ?? 30));
+        $ipLimit = max(1, min(10, (int)($_POST['ip_limit'] ?? 4)));
+        $retailPrice = max(0, (int)str_replace(',', '', $_POST['retail_price'] ?? 0));
+        $baseCost = max(0, (int)str_replace(',', '', $_POST['base_cost'] ?? 0));
+        $serverId = !empty($_POST['server_id']) ? (int)$_POST['server_id'] : null;
+        $desc = trim($_POST['description'] ?? '');
+        $isActive = !empty($_POST['is_active']) ? 1 : 0;
+
+        try {
+            $stmt = $pdo->prepare("UPDATE reseller_plans SET custom_title = ?, custom_category = ?, traffic_gb = ?, duration_days = ?, ip_limit = ?, retail_price = ?, base_cost = ?, server_id = ?, description = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND reseller_id = ? AND is_custom = 1");
+            $stmt->execute([$title, $category, $traffic, $duration, $ipLimit, $retailPrice, $baseCost, $serverId, $desc, $isActive, $id, $userId]);
+            Helpers::flash('success', "پلن اختصاصی «{$title}» به‌روزرسانی شد.");
+        } catch (Throwable $e) {
+            Helpers::flash('error', 'خطا در به‌روزرسانی: ' . $e->getMessage());
+        }
+        Helpers::redirect('reseller/plans');
+    }
+
+    /**
+     * Delete Custom Plan
+     */
+    public function deleteCustomPlan(): void {
+        $userId = self::checkResellerAccess();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
+            Helpers::redirect('reseller/plans');
+        }
+        $pdo = Database::getConnection();
+        $id = (int)($_POST['custom_id'] ?? 0);
+        try {
+            $pdo->prepare("DELETE FROM reseller_plans WHERE id = ? AND reseller_id = ? AND is_custom = 1")->execute([$id, $userId]);
+            Helpers::flash('success', 'پلن اختصاصی حذف شد.');
+        } catch (Throwable $e) {
+            Helpers::flash('error', 'خطا در حذف: ' . $e->getMessage());
+        }
+        Helpers::redirect('reseller/plans');
+    }
+
+    /**
      * Reseller Bot Orders List
      */
     public function orders(): void {
@@ -242,10 +363,12 @@ class ResellerPortalController {
         $status = $_GET['status'] ?? 'all';
         $sql = "SELECT o.*, p.title as base_plan_title, p.traffic_gb, p.duration_days, p.base_price,
                        c.username as client_username, c.sub_token,
-                       rp.custom_title, rp.custom_category
+                       rp.custom_title, rp.custom_category,
+                       rp2.custom_title as custom_plan_title, rp2.traffic_gb as custom_traffic_gb, rp2.duration_days as custom_duration_days
                 FROM bot_orders o
                 LEFT JOIN plans p ON o.plan_id = p.id
-                LEFT JOIN reseller_plans rp ON rp.plan_id = o.plan_id AND rp.reseller_id = o.reseller_id
+                LEFT JOIN reseller_plans rp ON rp.plan_id = o.plan_id AND rp.reseller_id = o.reseller_id AND rp.is_custom = 0
+                LEFT JOIN reseller_plans rp2 ON rp2.id = o.reseller_plan_id AND rp2.reseller_id = o.reseller_id AND rp2.is_custom = 1
                 LEFT JOIN clients c ON o.client_id = c.id
                 WHERE o.reseller_id = ?";
 
@@ -468,46 +591,77 @@ class ResellerPortalController {
     }
 
     /**
-     * AI Assistant — reseller's own feature status (charge with expiry)
+     * AI Assistant — reseller's own feature status (charge with expiry) - FIXED 5.6.2
      */
     public function ai(): void {
         $userId = self::checkResellerAccess();
         $pdo = Database::getConnection();
         require_once __DIR__ . '/../core/AiService.php';
 
-        $st = $pdo->prepare("SELECT * FROM users WHERE id = ?");
-        $st->execute([$userId]);
-        $me = $st->fetch();
+        // Ensure AI tables exist (fix for old installs where migration missed)
+        try {
+            Database::ensureExtendedTablesExist($pdo);
+        } catch (Throwable $e) {
+            // ignore
+        }
 
+        $me = null;
         $sub = null;
         $status = 'none';
-        if (!Auth::isAdmin()) {
-            $stSub = $pdo->prepare("SELECT * FROM ai_subscriptions WHERE reseller_id = ?");
-            $stSub->execute([$userId]);
-            $sub = $stSub->fetch() ?: null;
-            if ($sub && $sub['status'] === 'active' && $sub['expires_at'] > date('Y-m-d H:i:s')) {
-                $status = 'active';
-            } elseif ($sub && $sub['status'] === 'active') {
-                $status = 'expired';
-            } else {
-                $status = $sub ? 'expired' : 'none';
-            }
-        } else {
-            $status = 'admin';
-        }
-
         $daysLeft = 0;
-        if ($status === 'active') {
-            $daysLeft = (int)ceil((strtotime((string)$sub['expires_at']) - time()) / 86400);
-        }
-
-        $price = (int)AiService::cfg('ai_monthly_price');
+        $price = 500000;
         $aiMsgCount = 0;
-        if ($status !== 'admin') {
-            $stM = $pdo->prepare("SELECT COUNT(*) FROM ticket_messages m JOIN tickets t ON t.id = m.ticket_id
-                                  WHERE t.user_id = ? AND m.is_ai = 1");
-            $stM->execute([$userId]);
-            $aiMsgCount = (int)$stM->fetchColumn();
+
+        try {
+            $st = $pdo->prepare("SELECT * FROM users WHERE id = ?");
+            $st->execute([$userId]);
+            $me = $st->fetch();
+
+            if (!Auth::isAdmin()) {
+                try {
+                    $stSub = $pdo->prepare("SELECT * FROM ai_subscriptions WHERE reseller_id = ?");
+                    $stSub->execute([$userId]);
+                    $sub = $stSub->fetch() ?: null;
+                } catch (Throwable $e) {
+                    $sub = null;
+                }
+                if ($sub && $sub['status'] === 'active' && !empty($sub['expires_at']) && $sub['expires_at'] > date('Y-m-d H:i:s')) {
+                    $status = 'active';
+                } elseif ($sub && $sub['status'] === 'active') {
+                    $status = 'expired';
+                } else {
+                    $status = $sub ? 'expired' : 'none';
+                }
+            } else {
+                $status = 'admin';
+            }
+
+            if ($status === 'active' && $sub) {
+                $daysLeft = (int)ceil((strtotime((string)$sub['expires_at']) - time()) / 86400);
+            }
+
+            try {
+                $price = (int)AiService::cfg('ai_monthly_price');
+            } catch (Throwable $e) {
+                $price = 500000;
+            }
+
+            if ($status !== 'admin') {
+                try {
+                    $stM = $pdo->prepare("SELECT COUNT(*) FROM ticket_messages m JOIN tickets t ON t.id = m.ticket_id WHERE t.user_id = ? AND m.is_ai = 1");
+                    $stM->execute([$userId]);
+                    $aiMsgCount = (int)$stM->fetchColumn();
+                } catch (Throwable $e) {
+                    // column is_ai might be missing
+                    try {
+                        Database::getConnection()->exec("ALTER TABLE ticket_messages ADD COLUMN is_ai TINYINT(1) DEFAULT 0");
+                    } catch (Throwable $e2) {}
+                    $aiMsgCount = 0;
+                }
+            }
+        } catch (Throwable $e) {
+            // Fallback to safe defaults, show error in view if needed
+            error_log("Reseller AI error: " . $e->getMessage());
         }
 
         require __DIR__ . '/../views/reseller/ai.php';

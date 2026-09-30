@@ -218,11 +218,18 @@ class Database {
             $pdo->exec("CREATE TABLE IF NOT EXISTS reseller_plans (
                 id $autoInc,
                 reseller_id INT NOT NULL,
-                plan_id INT NOT NULL,
+                plan_id INT NOT NULL DEFAULT 0,
                 custom_title VARCHAR(128) NULL,
                 custom_category VARCHAR(64) DEFAULT 'پیش‌فرض',
                 retail_price BIGINT NOT NULL,
                 is_active TINYINT(1) DEFAULT 1,
+                is_custom TINYINT(1) DEFAULT 0,
+                traffic_gb FLOAT DEFAULT 0,
+                duration_days INT DEFAULT 30,
+                ip_limit INT DEFAULT 4,
+                server_id INT NULL,
+                base_cost BIGINT DEFAULT 0,
+                description TEXT NULL,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )");
@@ -623,6 +630,30 @@ class Database {
 
             // AI-generated ticket messages (sender_id = 0)
             self::safeAddColumn($pdo, 'ticket_messages', 'is_ai', 'TINYINT(1) DEFAULT 0');
+
+            // Reseller Custom Plans (v5.6.2 Hybrid): allow reseller to create own products
+            $rpCols = [
+                'is_custom' => 'TINYINT(1) DEFAULT 0',
+                'traffic_gb' => 'FLOAT DEFAULT 0',
+                'duration_days' => 'INT DEFAULT 30',
+                'ip_limit' => 'INT DEFAULT 4',
+                'server_id' => 'INT NULL',
+                'base_cost' => 'BIGINT DEFAULT 0',
+                'description' => 'TEXT NULL',
+            ];
+            foreach ($rpCols as $c => $d) {
+                self::safeAddColumn($pdo, 'reseller_plans', $c, $d);
+            }
+            // Allow plan_id to be 0 for custom plans (MySQL strict)
+            try {
+                $pdo->exec("ALTER TABLE reseller_plans MODIFY plan_id INT NOT NULL DEFAULT 0");
+            } catch (Throwable $e) {
+                // SQLite or already ok
+            }
+            // bot_orders: link to custom reseller plan
+            self::safeAddColumn($pdo, 'bot_orders', 'reseller_plan_id', 'INT NULL');
+            self::safeAddColumn($pdo, 'bot_orders', 'custom_traffic_gb', 'FLOAT DEFAULT 0');
+            self::safeAddColumn($pdo, 'bot_orders', 'custom_duration_days', 'INT DEFAULT 0');
 
             // Ensure Default Referral Codes for users
             try {

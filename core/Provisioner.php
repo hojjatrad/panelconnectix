@@ -152,8 +152,141 @@ class Provisioner {
     }
 
     /**
+     * Create client from custom reseller plan specs (hybrid)
+     */
+    public static function createClientCustom(
+        float $trafficGb,
+        int $durationDays,
+        int $ipLimit = 4,
+        ?int $serverId = null,
+        int $resellerId = 1,
+        string $customNote = '',
+        ?string $telegramChatId = null
+    ): array {
+        $pdo = Database::getConnection();
+
+        // Fetch Server
+        $server = null;
+        if ($serverId !== null && $serverId > 0) {
+            $stmtServer = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ? AND (is_active = 1 OR driver = 'connectix_seller')");
+            $stmtServer->execute([$serverId]);
+            $server = $stmtServer->fetch();
+        }
+        if (!$server || $server['driver'] === 'mock') {
+            $bestReal = self::findBestServer('default', $pdo);
+            if ($bestReal && $bestReal['driver'] !== 'mock') {
+                $server = $bestReal;
+            } else {
+                return ['success' => false, 'error' => 'هیچ سرور واقعی فعالی برای پلن اختصاصی یافت نشد.'];
+            }
+        }
+
+        $username = 'usr_' . substr(bin2hex(random_bytes(3)), 0, 6);
+        $stmtCheck = $pdo->prepare("SELECT id FROM clients WHERE username = ?");
+        $stmtCheck->execute([$username]);
+        while ($stmtCheck->fetch()) {
+            $username = 'usr_' . substr(bin2hex(random_bytes(4)), 0, 7);
+            $stmtCheck->execute([$username]);
+        }
+        $password = substr(bin2hex(random_bytes(4)), 0, 8);
+        $uuid = Helpers::generateUUID();
+        $subToken = Helpers::generateToken(24);
+        $trafficBytes = (int)($trafficGb * 1024 * 1024 * 1024);
+        $expireAt = date('Y-m-d H:i:s', strtotime("+{$durationDays} days"));
+        $expireTimestamp = strtotime($expireAt);
+        $maxDevices = max(0, $ipLimit);
+
+        try {
+            $driver = DriverFactory::create($server);
+            $driverPayload = [
+                'username' => $username,
+                'password' => $password,
+                'uuid' => $uuid,
+                'sub_token' => $subToken,
+                'traffic_limit_bytes' => $trafficBytes,
+                'expire_timestamp' => $expireTimestamp,
+                'ip_limit' => $ipLimit,
+                'selected_inbounds' => $server['selected_inbounds'] ?? null
+            ];
+            $driverResult = $driver->createUser($driverPayload);
+            if (!$driverResult['success']) {
+                return ['success' => false, 'error' => 'خطا در ثبت کاربر روی سرور: ' . ($driverResult['error'] ?? 'نامشخص')];
+            }
+            $nodeSublink = $driverResult['sublink'] ?? null;
+            if (empty($nodeSublink)) {
+                return ['success' => false, 'error' => 'سرور نتوانست ساب‌لینک تولید کند.'];
+            }
+        } catch (Throwable $e) {
+            return ['success' => false, 'error' => 'استثنا در ارتباط با سرور: ' . $e->getMessage()];
+        }
+
+        try {
+            $stmt = $pdo->prepare("INSERT INTO clients (reseller_id, server_id, plan_id, username, password, uuid, sub_token, node_sublink, traffic_limit_bytes, traffic_used_bytes, expire_at, ip_limit, max_devices, status, custom_note, telegram_chat_id) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, 'active', ?, ?)");
+            $stmt->execute([
+                $resellerId,
+                $server['id'],
+                $username,
+                $password,
+                $uuid,
+                $subToken,
+                $nodeSublink,
+                $trafficBytes,
+                $expireAt,
+                $ipLimit,
+                $maxDevices,
+                $customNote,
+                $telegramChatId
+            ]);
+            $clientId = (int)$pdo->lastInsertId();
+            $subUrl = Helpers::subUrl($subToken);
+            return [
+                'success' => true,
+                'client_id' => $clientId,
+                'username' => $username,
+                'password' => $password,
+                'uuid' => $uuid,
+                'sub_token' => $subToken,
+                'sub_url' => $subUrl,
+                'node_sublink' => $nodeSublink,
+                'vless_link' => $driverResult['vless_link'] ?? '',
+                'links' => $driverResult['links'] ?? [],
+                'expire_at' => $expireAt,
+                'traffic_gb' => $trafficGb,
+                'ip_limit' => $ipLimit,
+                'max_devices' => $maxDevices,
+                'server_id' => (int)$server['id'],
+                'server_name' => $server['name']
+            ];
+        } catch (Throwable $e) {
+            return ['success' => false, 'error' => 'خطا در ذخیره کلاینت: ' . $e->getMessage()];
+        }
+    }
+
+    /**
      * Extend / Renew an existing client or queue reserved plan
      */
+    public static function renewClientCustom(int $clientId, float $trafficGb, int $durationDays): array {
+        $pdo = Database::getConnection();
+        $stmt = $pdo->prepare("SELECT c.*, s.name as server_name, s.driver, s.api_url, s.api_username, s.api_password, s.api_token FROM clients c JOIN server_nodes s ON c.server_id = s.id WHERE c.id = ?");
+        $stmt->execute([$clientId]);
+        $client = $stmt->fetch();
+        if (!$client) {
+            return ['success' => false, 'error' => 'کلاینت مورد نظر یافت نشد.'];
+        }
+        $addBytes = (int)($trafficGb * 1024 * 1024 * 1024);
+        $currentExpire = strtotime($client['expire_at'] ?? 'now');
+        $baseTime = ($currentExpire > time()) ? $currentExpire : time();
+        $newExpire = date('Y-m-d H:i:s', $baseTime + ($durationDays * 86400));
+        try {
+            $driver = DriverFactory::create($client);
+            $driver->extendUser($client['username'], $addBytes, $durationDays * 86400);
+            $pdo->prepare("UPDATE clients SET traffic_limit_bytes = traffic_limit_bytes + ?, expire_at = ?, status = 'active' WHERE id = ?")->execute([$addBytes, $newExpire, $clientId]);
+            return ['success' => true, 'type' => 'extended', 'new_expire' => $newExpire, 'added_gb' => $trafficGb];
+        } catch (Throwable $e) {
+            return ['success' => false, 'error' => 'خطا در تمدید روی سرور: ' . $e->getMessage()];
+        }
+    }
+
     public static function renewClient(int $clientId, int $planId, bool $queueAsReserved = false): array {
         $pdo = Database::getConnection();
 
@@ -170,8 +303,12 @@ class Provisioner {
         $stmtPlan = $pdo->prepare("SELECT * FROM plans WHERE id = ? AND is_active = 1");
         $stmtPlan->execute([$planId]);
         $plan = $stmtPlan->fetch();
-        if (!$plan) {
+        if (!$plan && $planId !== 0) {
             return ['success' => false, 'error' => 'پلن انتخاب‌شده معتبر نیست.'];
+        }
+        if (!$plan) {
+            // Custom renewal with 0 plan id - treat as 10GB 30 days fallback
+            $plan = ['traffic_gb' => 10, 'duration_days' => 30];
         }
 
         if ($queueAsReserved) {

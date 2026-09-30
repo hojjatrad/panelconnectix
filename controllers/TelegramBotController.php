@@ -184,9 +184,11 @@ class TelegramBotController {
                        COALESCE(rp.custom_title, p.title) as display_title,
                        COALESCE(rp.custom_category, p.category, '۱ ماهه') as display_category,
                        COALESCE(rp.retail_price, p.base_price) as display_price,
-                       COALESCE(rp.is_active, 1) as display_active
+                       COALESCE(rp.is_active, 1) as display_active,
+                       0 as is_custom_plan,
+                       0 as reseller_plan_id
                 FROM plans p
-                LEFT JOIN reseller_plans rp ON p.id = rp.plan_id AND rp.reseller_id = ?
+                LEFT JOIN reseller_plans rp ON p.id = rp.plan_id AND rp.reseller_id = ? AND rp.is_custom = 0
                 WHERE p.is_active = 1 AND COALESCE(rp.is_active, 1) = 1 AND COALESCE(p.show_in_bot, 1) = 1";
         if (!$includeFree) {
             $sql .= " AND p.is_free = 0";
@@ -194,7 +196,42 @@ class TelegramBotController {
         $sql .= " ORDER BY display_category ASC, display_price ASC";
         $stmt = $pdo->prepare($sql);
         $stmt->execute([$resellerId]);
-        return $stmt->fetchAll();
+        $basePlans = $stmt->fetchAll();
+
+        // Fetch custom plans created by reseller (is_custom=1)
+        try {
+            $sqlCustom = "SELECT 
+                rp.id as custom_id,
+                rp.custom_title as title,
+                rp.custom_title as display_title,
+                rp.custom_category as category,
+                rp.custom_category as display_category,
+                rp.retail_price as base_price,
+                rp.retail_price as display_price,
+                rp.traffic_gb,
+                rp.duration_days,
+                rp.ip_limit,
+                rp.server_id,
+                rp.base_cost as reseller_price,
+                rp.description,
+                1 as is_custom_plan,
+                rp.id as reseller_plan_id,
+                rp.is_active as display_active,
+                0 as is_free,
+                1 as is_active,
+                rp.id as id,
+                'custom' as server_group,
+                1 as show_in_bot
+                FROM reseller_plans rp
+                WHERE rp.reseller_id = ? AND rp.is_custom = 1 AND rp.is_active = 1
+                ORDER BY rp.custom_category ASC, rp.retail_price ASC";
+            $stmt2 = $pdo->prepare($sqlCustom);
+            $stmt2->execute([$resellerId]);
+            $customPlans = $stmt2->fetchAll();
+            return array_merge($basePlans, $customPlans);
+        } catch (Throwable $e) {
+            return $basePlans;
+        }
     }
 
     /**
@@ -613,6 +650,13 @@ class TelegramBotController {
         }
 
         // Select plan for renewal
+        if (str_starts_with($data, 'select_custom_renew_plan_')) {
+            $parts = explode('_', str_replace('select_custom_renew_plan_', '', $data));
+            $clientId = (int)($parts[0] ?? 0);
+            $customPlanId = (int)($parts[1] ?? 0);
+            self::createCustomOrder($pdo, $cb, $customPlanId, 'renew', $clientId, $messageId);
+            return;
+        }
         if (str_starts_with($data, 'select_renew_plan_')) {
             $parts = explode('_', str_replace('select_renew_plan_', '', $data));
             $clientId = (int)($parts[0] ?? 0);
@@ -622,6 +666,11 @@ class TelegramBotController {
         }
 
         // Customer Actions: Select Plan (New Purchase)
+        if (str_starts_with($data, 'select_custom_plan_')) {
+            $customPlanId = (int)str_replace('select_custom_plan_', '', $data);
+            self::createCustomOrder($pdo, $cb, $customPlanId, 'new', null, $messageId);
+            return;
+        }
         if (str_starts_with($data, 'select_plan_')) {
             $planId = (int)str_replace('select_plan_', '', $data);
             self::createOrder($pdo, $cb, $planId, 'new', null, $messageId);
@@ -1088,6 +1137,114 @@ class TelegramBotController {
         $orderId = (int)$pdo->lastInsertId();
 
         self::renderOrderInvoice($pdo, $orderId, $chatId, $messageId, $botToken);
+    }
+
+    /**
+     * Helper to create bot order for custom reseller plan (hybrid)
+     */
+    private static function createCustomOrder(PDO $pdo, array $cb, int $customPlanId, string $orderType = 'new', ?int $clientId = null, ?int $messageId = null): void {
+        $fromId = (string)($cb['from']['id'] ?? '');
+        $chatId = (string)($cb['message']['chat']['id'] ?? $fromId);
+
+        $ctx = self::getContext($pdo);
+        $resellerId = $ctx['reseller_id'];
+        $botToken = $ctx['bot_token'];
+
+        $stmt = $pdo->prepare("SELECT * FROM reseller_plans WHERE id = ? AND reseller_id = ? AND is_custom = 1 AND is_active = 1");
+        $stmt->execute([$customPlanId, $resellerId]);
+        $plan = $stmt->fetch();
+
+        if (!$plan) {
+            TelegramBot::sendMessage("⚠️ پلن اختصاصی یافت نشد یا غیرفعال است.", $chatId, null, $botToken);
+            return;
+        }
+
+        $orderCode = ($orderType === 'renew' ? 'RNW-C-' : 'ORD-C-') . strtoupper(substr(bin2hex(random_bytes(3)), 0, 6));
+        $userTgName = trim(($cb['from']['first_name'] ?? '') . ' ' . ($cb['from']['last_name'] ?? ''));
+        $userTgUsername = $cb['from']['username'] ?? '';
+        $finalPrice = (int)$plan['retail_price'];
+        $planServerId = !empty($plan['server_id']) ? (int)$plan['server_id'] : null;
+
+        try {
+            $stmtOrder = $pdo->prepare("INSERT INTO bot_orders 
+                (order_code, reseller_id, bot_token, user_tg_id, user_tg_name, user_tg_username, order_type, plan_id, reseller_plan_id, server_id, client_id, amount, custom_traffic_gb, custom_duration_days, payment_method, payment_status) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, 'card', 'pending_receipt')");
+            $stmtOrder->execute([$orderCode, $resellerId, $botToken, $fromId, $userTgName, $userTgUsername, $orderType, $customPlanId, $planServerId, $clientId, $finalPrice, $plan['traffic_gb'], $plan['duration_days']]);
+        } catch (Throwable $e) {
+            // Fallback if columns not yet migrated
+            $stmtOrder = $pdo->prepare("INSERT INTO bot_orders 
+                (order_code, reseller_id, bot_token, user_tg_id, user_tg_name, user_tg_username, order_type, plan_id, server_id, client_id, amount, payment_method, payment_status) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, 'card', 'pending_receipt')");
+            $stmtOrder->execute([$orderCode, $resellerId, $botToken, $fromId, $userTgName, $userTgUsername, $orderType, $planServerId, $clientId, $finalPrice]);
+        }
+        $orderId = (int)$pdo->lastInsertId();
+
+        self::renderCustomOrderInvoice($pdo, $orderId, $chatId, $messageId, $botToken);
+    }
+
+    private static function renderCustomOrderInvoice(PDO $pdo, int $orderId, string $chatId, ?int $messageId = null, ?string $botToken = null): void {
+        try {
+            $stmt = $pdo->prepare("SELECT o.*, rp.custom_title as title, rp.custom_title as display_title, rp.traffic_gb, rp.duration_days, rp.ip_limit
+                                   FROM bot_orders o
+                                   LEFT JOIN reseller_plans rp ON rp.id = o.reseller_plan_id
+                                   WHERE o.id = ?");
+            $stmt->execute([$orderId]);
+            $order = $stmt->fetch();
+        } catch (Throwable $e) {
+            $stmt = $pdo->prepare("SELECT o.* FROM bot_orders o WHERE o.id = ?");
+            $stmt->execute([$orderId]);
+            $order = $stmt->fetch();
+        }
+        if (!$order) return;
+
+        $ctx = self::getContext($pdo);
+        $botToken = $botToken ?: $ctx['bot_token'];
+
+        $priceFa = number_format($order['amount']) . ' تومان';
+        $titlePrefix = ($order['order_type'] === 'renew') ? 'پیش‌فاکتور تمدید (پلن اختصاصی)' : 'پیش‌فاکتور خرید (پلن اختصاصی)';
+
+        $trafficVal = (float)($order['traffic_gb'] ?? $order['custom_traffic_gb'] ?? 0);
+        $trafficText = $trafficVal >= 1 ? ($trafficVal == (int)$trafficVal ? (int)$trafficVal : $trafficVal) . ' گیگ' : ($trafficVal > 0 ? round($trafficVal*1024).' مگ' : 'نامحدود');
+
+        $orderIpLimit = (int)($order['ip_limit'] ?? 4);
+        $userLimitText = $orderIpLimit > 0 ? "{$orderIpLimit} کاربر" : "نامحدود";
+
+        $msg = "🛒 <b>{$titlePrefix}</b>\n\n"
+             . "📦 <b>پلن:</b> " . ($order['display_title'] ?? $order['title'] ?? 'پلن اختصاصی') . " ⭐\n"
+             . "💾 <b>حجم:</b> {$trafficText}\n"
+             . "👥 <b>سقف اتصال:</b> {$userLimitText}\n"
+             . "⏳ <b>مدت:</b> " . ($order['duration_days'] ?? $order['custom_duration_days'] ?? 30) . " روز\n"
+             . "💰 <b>مبلغ:</b> <b>{$priceFa}</b>\n"
+             . "🔢 <b>کد:</b> <code>{$order['order_code']}</code>\n\n"
+             . "روش پرداخت را انتخاب کنید:";
+
+        $stmtUser = $pdo->prepare("SELECT wallet_balance, referral_balance FROM bot_users WHERE tg_id = ?");
+        $stmtUser->execute([$order['user_tg_id']]);
+        $uRow = $stmtUser->fetch();
+        $userWallet = (int)($uRow['wallet_balance'] ?? 0) + (int)($uRow['referral_balance'] ?? 0);
+
+        $buttons = [];
+        if ($userWallet >= (int)$order['amount']) {
+            $buttons[] = [['text' => '⚡️ پرداخت آنی از کیف‌پول (' . number_format($userWallet) . ' ت)', 'callback_data' => 'pay_wallet_' . $orderId]];
+        } else {
+            $deficit = (int)$order['amount'] - $userWallet;
+            $buttons[] = [['text' => '💳 موجودی: ' . number_format($userWallet) . ' ت (کسری: ' . number_format($deficit) . ' ت)', 'callback_data' => 'charge_wallet_for_' . $orderId]];
+        }
+        $buttons[] = [
+            ['text' => '💳 کارت به کارت', 'callback_data' => 'pay_card_' . $orderId],
+            ['text' => '🪙 تتر', 'callback_data' => 'pay_crypto_' . $orderId]
+        ];
+        $buttons[] = [
+            ['text' => '💎 تون', 'callback_data' => 'pay_ton_' . $orderId],
+            ['text' => '❌ انصراف', 'callback_data' => 'cancel_order_' . $orderId]
+        ];
+
+        $keyboard = ['inline_keyboard' => $buttons];
+        if ($messageId) {
+            TelegramBot::editMessageText($msg, $chatId, $messageId, $keyboard, $botToken);
+        } else {
+            TelegramBot::sendMessage($msg, $chatId, $keyboard, $botToken);
+        }
     }
 
     /**
@@ -2170,7 +2327,11 @@ class TelegramBotController {
             $pIp = (int)($p['ip_limit'] ?? 0);
             $ipText = $pIp > 0 ? " | {$pIp}U" : "";
             $btnText = "🔄 {$trafficText} | {$daysText}{$ipText} | {$priceFa}";
-            $buttons[] = [['text' => $btnText, 'callback_data' => 'select_renew_plan_' . $client['id'] . '_' . $p['id']]];
+            if (!empty($p['is_custom_plan'])) {
+                $buttons[] = [['text' => $btnText . ' ⭐', 'callback_data' => 'select_custom_renew_plan_' . $client['id'] . '_' . $p['reseller_plan_id']]];
+            } else {
+                $buttons[] = [['text' => $btnText, 'callback_data' => 'select_renew_plan_' . $client['id'] . '_' . $p['id']]];
+            }
         }
         $buttons[] = [['text' => '🔙 بازگشت', 'callback_data' => 'view_acc_' . $clientId]];
 
@@ -2305,7 +2466,9 @@ class TelegramBotController {
             $pIp = (int)($p['ip_limit'] ?? 0);
             $ipText = $pIp > 0 ? " | {$pIp}U" : "";
             $btnText = "📦 {$trafficText} | {$daysText}{$ipText} | {$priceFa}";
-            $row[] = ['text' => $btnText, 'callback_data' => 'select_plan_' . $p['id']];
+            if (!empty($p['is_custom_plan'])) $btnText .= " ⭐";
+            $cbData = !empty($p['is_custom_plan']) ? ('select_custom_plan_' . $p['reseller_plan_id']) : ('select_plan_' . $p['id']);
+            $row[] = ['text' => $btnText, 'callback_data' => $cbData];
             if (count($row) === 2) {
                 $buttons[] = $row;
                 $row = [];
@@ -2690,7 +2853,31 @@ class TelegramBotController {
             return ['success' => true, 'username' => 'قبلاً فعال شده', 'password' => '---', 'sub_url' => '', 'node_sublink' => '', 'primary_sub' => ''];
         }
 
-        if (empty($order['plan_id'])) {
+        // Detect custom reseller plan order
+        $isCustomOrder = !empty($order['reseller_plan_id']) || (empty($order['plan_id']) && !empty($order['custom_traffic_gb']));
+        if ($isCustomOrder) {
+            // Fetch custom plan details
+            try {
+                $stmtCustom = $pdo->prepare("SELECT * FROM reseller_plans WHERE id = ?");
+                $stmtCustom->execute([$order['reseller_plan_id'] ?? 0]);
+                $customPlan = $stmtCustom->fetch();
+            } catch (Throwable $e) {
+                $customPlan = null;
+            }
+            if (!$customPlan && !empty($order['custom_traffic_gb'])) {
+                // Fallback from order custom fields
+                $customPlan = [
+                    'traffic_gb' => $order['custom_traffic_gb'],
+                    'duration_days' => $order['custom_duration_days'] ?? 30,
+                    'ip_limit' => 4,
+                    'server_id' => $order['server_id'] ?? null,
+                    'base_cost' => 0,
+                ];
+            }
+            if (!$customPlan) {
+                return ['success' => false, 'error' => 'پلن اختصاصی این سفارش یافت نشد.'];
+            }
+        } elseif (empty($order['plan_id'])) {
             return ['success' => false, 'error' => 'پلن این سفارش مشخص نیست یا حذف شده است.'];
         }
 
@@ -2706,9 +2893,17 @@ class TelegramBotController {
             if ($reseller) {
                 $tierInfo = Provisioner::getResellerTier($resellerId);
                 $discount = (int)$tierInfo['discount'];
-                $wholesaleCost = (int)round($order['base_price'] * (1 - ($discount / 100)));
+                if ($isCustomOrder) {
+                    $wholesaleCost = (int)($customPlan['base_cost'] ?? 0);
+                    // If base_cost not set, use 70% of retail as wholesale estimate or 0 if reseller creates free
+                    if ($wholesaleCost <= 0) {
+                        $wholesaleCost = 0; // Reseller's own product, no deduction unless set
+                    }
+                } else {
+                    $wholesaleCost = (int)round($order['base_price'] * (1 - ($discount / 100)));
+                }
 
-                if ($reseller['wallet_balance'] < $wholesaleCost) {
+                if ($wholesaleCost > 0 && $reseller['wallet_balance'] < $wholesaleCost) {
                     $errNotice = "⚠️ <b>خطا در تایید سفارش #{$order['order_code']}</b>\n\nموجودی کیف پول شما کافی نیست!\nموجودی: " . number_format($reseller['wallet_balance']) . " تومان\nهزینه عمده پلن: " . number_format($wholesaleCost) . " تومان\nلطفاً ابتدا کیف پول خود را شارژ فرمایید.";
                     if (!empty($reseller['telegram_admin_chat_id'])) {
                         TelegramBot::sendMessage($errNotice, (string)$reseller['telegram_admin_chat_id'], null, $botToken);
@@ -2716,15 +2911,19 @@ class TelegramBotController {
                     return ['success' => false, 'error' => 'موجودی کیف پول نماینده نزد مدیریت کافی نیست (نیاز به: ' . number_format($wholesaleCost) . ' تومان)'];
                 }
 
-                // Deduct wholesale cost
-                $newBal = $reseller['wallet_balance'] - $wholesaleCost;
-                $pdo->prepare("UPDATE users SET wallet_balance = ? WHERE id = ?")->execute([$newBal, $resellerId]);
-                $pdo->prepare("INSERT INTO transactions (user_id, amount, balance_after, type, description, reference_id, status) VALUES (?, ?, ?, 'plan_purchase', ?, ?, 'completed')")
-                    ->execute([$resellerId, -$wholesaleCost, $newBal, "خرید خودکار از ربات برای سفارش #{$order['order_code']}", $order['order_code']]);
+                if ($wholesaleCost > 0) {
+                    // Deduct wholesale cost
+                    $newBal = $reseller['wallet_balance'] - $wholesaleCost;
+                    $pdo->prepare("UPDATE users SET wallet_balance = ? WHERE id = ?")->execute([$newBal, $resellerId]);
+                    $pdo->prepare("INSERT INTO transactions (user_id, amount, balance_after, type, description, reference_id, status) VALUES (?, ?, ?, 'plan_purchase', ?, ?, 'completed')")
+                        ->execute([$resellerId, -$wholesaleCost, $newBal, "خرید خودکار از ربات برای سفارش #{$order['order_code']}" . ($isCustomOrder ? ' (پلن اختصاصی)' : ''), $order['order_code']]);
+                } else {
+                    $newBal = $reseller['wallet_balance'];
+                }
 
                 // Notify reseller of profit & remaining balance
                 $profit = max(0, $order['amount'] - $wholesaleCost);
-                $resellerReceipt = "💳 <b>گزارش کسر هزینه عمده و سود سفارش #{$order['order_code']}</b>\n\n"
+                $resellerReceipt = "💳 <b>گزارش کسر هزینه عمده و سود سفارش #{$order['order_code']}" . ($isCustomOrder ? ' ⭐ اختصاصی' : '') . "</b>\n\n"
                                  . "💰 دریافتی از مشتری: " . number_format($order['amount']) . " تومان\n"
                                  . "📉 کسر از کیف پول شما: " . number_format($wholesaleCost) . " تومان\n"
                                  . "💵 سود خالص شما: <b>+" . number_format($profit) . " تومان</b>\n"
@@ -2735,9 +2934,19 @@ class TelegramBotController {
             }
         }
 
-        // Renewal order fulfillment
+        // Renewal order fulfillment - handle both base and custom
         if ($order['order_type'] === 'renew' && !empty($order['client_id'])) {
-            $renewResult = Provisioner::renewClient((int)$order['client_id'], (int)$order['plan_id']);
+            if ($isCustomOrder) {
+                // For custom plan renewal, use custom traffic/duration
+                $renewResult = Provisioner::renewClientCustom((int)$order['client_id'], (float)($customPlan['traffic_gb'] ?? $order['custom_traffic_gb'] ?? 10), (int)($customPlan['duration_days'] ?? $order['custom_duration_days'] ?? 30));
+                if (!isset($renewResult['success'])) {
+                    // Fallback to standard renew if custom method not exists
+                    $renewResult = Provisioner::renewClient((int)$order['client_id'], 0);
+                    // Manually extend if needed
+                }
+            } else {
+                $renewResult = Provisioner::renewClient((int)$order['client_id'], (int)$order['plan_id']);
+            }
             if (!$renewResult['success']) {
                 return ['success' => false, 'error' => $renewResult['error']];
             }
@@ -2780,17 +2989,30 @@ class TelegramBotController {
             ];
         }
 
-        // New Purchase Order fulfillment via Provisioner
-        $customNote = "خریداری شده توسط ربات تلگرام ID: " . $order['user_tg_id'];
-        $prov = Provisioner::createClient(
-            (int)$order['plan_id'], 
-            $order['server_id'] ? (int)$order['server_id'] : null, 
-            null, 
-            null, 
-            $resellerId, 
-            $customNote,
-            (string)$order['user_tg_id']
-        );
+        // New Purchase Order fulfillment via Provisioner - handle custom
+        $customNote = "خریداری شده توسط ربات تلگرام ID: " . $order['user_tg_id'] . ($isCustomOrder ? " (پلن اختصاصی ⭐ {$customPlan['custom_title']})" : "");
+        if ($isCustomOrder) {
+            // Create client from custom specs
+            $prov = Provisioner::createClientCustom(
+                (float)($customPlan['traffic_gb'] ?? $order['custom_traffic_gb'] ?? 10),
+                (int)($customPlan['duration_days'] ?? $order['custom_duration_days'] ?? 30),
+                (int)($customPlan['ip_limit'] ?? 4),
+                $customPlan['server_id'] ? (int)$customPlan['server_id'] : ($order['server_id'] ? (int)$order['server_id'] : null),
+                $resellerId,
+                $customNote,
+                (string)$order['user_tg_id']
+            );
+        } else {
+            $prov = Provisioner::createClient(
+                (int)$order['plan_id'], 
+                $order['server_id'] ? (int)$order['server_id'] : null, 
+                null, 
+                null, 
+                $resellerId, 
+                $customNote,
+                (string)$order['user_tg_id']
+            );
+        }
 
         if (!$prov['success']) {
             return ['success' => false, 'error' => $prov['error']];

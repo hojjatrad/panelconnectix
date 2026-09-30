@@ -360,6 +360,9 @@ $router->get('reseller/branding', [ResellerPortalController::class, 'branding'])
 $router->post('reseller/branding', [ResellerPortalController::class, 'saveBranding']);
 $router->get('reseller/plans', [ResellerPortalController::class, 'plans']);
 $router->post('reseller/plans', [ResellerPortalController::class, 'savePlans']);
+$router->post('reseller/custom-plans/create', [ResellerPortalController::class, 'createCustomPlan']);
+$router->post('reseller/custom-plans/update', [ResellerPortalController::class, 'updateCustomPlan']);
+$router->post('reseller/custom-plans/delete', [ResellerPortalController::class, 'deleteCustomPlan']);
 $router->get('reseller/invoice', [ResellerPortalController::class, 'invoice']);
 $router->get('reseller/invoice-export', [ResellerPortalController::class, 'exportInvoiceCsv']);
 $router->get('reseller/orders', [ResellerPortalController::class, 'orders']);
