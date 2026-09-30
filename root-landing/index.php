@@ -1,26 +1,28 @@
 <?php
-// Connectix Ultra Premium Landing - v5.8 - Persian - Full Features
+// Connectix 3D Ultra Landing - v6.0 - Persian - Three.js + Video + Demo
 // https://vpbotn.ir/contax/promo/ | https://vpbotn.ir/
-// @mainAdminpanel
+// @mainAdminpanel - Full 3D with special effects
 $brand = 'Connectix';
 $tg = '@mainAdminpanel';
 $tg_url = 'https://t.me/mainAdminpanel';
 $panel_url = 'https://vpbotn.ir/contax/';
+$demo_user = 'demo';
+$demo_pass = 'demo123';
 $domain = 'https://vpbotn.ir';
 $base = $domain . '/contax/';
 $success = false; $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reseller_request'])) {
     $name = trim($_POST['name'] ?? ''); $phone = trim($_POST['phone'] ?? ''); $tgid = trim($_POST['telegram_id'] ?? '');
     $plan = trim($_POST['plan'] ?? ''); $biz = trim($_POST['business'] ?? ''); $msg = trim($_POST['message'] ?? '');
-    if ($name === '' || ($phone === '' && $tgid === '')) { $error = 'لطفاً نام و یک راه ارتباطی (موبایل یا آیدی تلگرام) را وارد کنید.'; }
+    if ($name === '' || ($phone === '' && $tgid === '')) { $error = 'لطفاً نام و یک راه ارتباطی را وارد کنید.'; }
     else {
-        @file_put_contents(__DIR__.'/requests.log', date('Y-m-d H:i:s')." | $name | $phone | $tgid | $plan | $biz | $msg | IP:".($_SERVER['REMOTE_ADDR']??'')."\n", FILE_APPEND);
+        @file_put_contents(__DIR__.'/requests.log', date('Y-m-d H:i:s')." | 3D Landing | $name | $phone | $tgid | $plan | $biz | $msg | IP:".($_SERVER['REMOTE_ADDR']??'')."\n", FILE_APPEND);
         try {
             $root = dirname(__DIR__);
             if (file_exists($root.'/config.php')) {
                 require_once $root.'/config.php'; require_once $root.'/core/Database.php'; require_once $root.'/core/Setting.php'; require_once $root.'/core/TelegramBot.php';
                 $pdo = Database::getConnection(); $token = Setting::get('telegram_bot_token',''); $admin = Setting::get('telegram_admin_id',''); $logCh = Setting::get('bot_log_channel','') ?: Setting::get('telegram_log_channel_id','');
-                $text = "🔥 <b>درخواست جدید نمایندگی از لندینگ</b>\n\n👤 نام: $name\n📱 موبایل: $phone\n✈️ تلگرام: $tgid\n💼 کسب‌وکار: $biz\n📦 پلن: $plan\n💬 پیام: $msg\n\n🌐 https://vpbotn.ir/contax/promo/\n🕐 ".date('Y-m-d H:i:s');
+                $text = "🌌 <b>درخواست جدید از لندینگ سه‌بعدی</b>\n\n👤 نام: $name\n📱 موبایل: $phone\n✈️ تلگرام: $tgid\n💼 کسب‌وکار: $biz\n📦 پلن: $plan\n💬 پیام: $msg\n\n🌐 https://vpbotn.ir/contax/promo/ (نسخه سه‌بعدی)\n🕐 ".date('Y-m-d H:i:s');
                 if ($admin) TelegramBot::sendMessage($text,$admin,null,$token); if ($logCh) TelegramBot::sendMessage($text,$logCh,null,$token);
             }
         } catch (Throwable $e) {}
@@ -32,478 +34,327 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reseller_request'])) 
 <html lang="fa" dir="rtl">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>پنل نمایندگی VPN با اپ اختصاصی فارسی | سود 200% | Connectix - @mainAdminpanel</title>
-<meta name="description" content="پنل نمایندگی VPN فارسی با اپ اندروید اختصاصی، ربات تلگرام فروش خودکار 24 ساعته، سود 200%، سرور VLESS Reality ضدفیلتر، هوش مصنوعی با راهنمای تصویری. درخواست: @mainAdminpanel">
+<title>🌌 پنل نمایندگی VPN سه‌بعدی با اپ اختصاصی فارسی | Connectix 3D | @mainAdminpanel</title>
+<meta name="description" content="اولین پنل VPN سه‌بعدی ایران با گرافیک سینمایی، اپ اختصاصی فارسی، ربات فروش خودکار، سود 200%، دمو آنلاین demo/demo123، ویدیو معرفی. @mainAdminpanel - https://vpbotn.ir">
 <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <style>
 *{font-family:Vazirmatn,system-ui!important}
 html{scroll-behavior:smooth}
-body{background:#05070D;color:#fff;overflow-x:hidden}
-.glass{backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
-.gradient-text{background:linear-gradient(90deg,#8B5CF6 0%,#06B6D4 50%,#10B981 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-.gradient-bg{background:linear-gradient(135deg,#7C3AED 0%,#4F46E5 30%,#06B6D4 100%)}
-.gradient-border{position:relative}.gradient-border::before{content:'';position:absolute;inset:0;border-radius:inherit;padding:1px;background:linear-gradient(135deg,#7C3AED,#06B6D4);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
-@keyframes float{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-12px) rotate(1deg)}}
-.float{animation:float 6s ease-in-out infinite}
-@keyframes glow{0%,100%{box-shadow:0 0 30px rgba(124,58,237,.3),0 0 60px rgba(6,182,214,.15)}50%{box-shadow:0 0 50px rgba(124,58,237,.5),0 0 80px rgba(6,182,214,.25)}}
-.glow{animation:glow 3s ease-in-out infinite}
-@keyframes shimmer{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}
-.shimmer{position:relative;overflow:hidden}.shimmer::after{content:'';position:absolute;top:0;left:0;width:50%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.1),transparent);animation:shimmer 2.5s infinite}
-.card-hover{transition:all .4s cubic-bezier(.4,0,.2,1)}.card-hover:hover{transform:translateY(-6px);box-shadow:0 20px 40px rgba(0,0,0,.4),0 0 0 1px rgba(124,58,237,.3)}
-.text-balance{text-wrap:balance}
-::-webkit-scrollbar{width:8px}::-webkit-scrollbar-track{background:#0B0F1A}::-webkit-scrollbar-thumb{background:#7C3AED;border-radius:4px}
+body{background:#03050A;color:#fff;overflow-x:hidden;cursor:none}
+@media(max-width:768px){body{cursor:auto}}
+.glass{backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px)}
+.gradient-text{background:linear-gradient(90deg,#8B5CF6 0%,#06B6D4 40%,#10B981 80%,#F59E0B 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.gradient-bg{background:linear-gradient(135deg,#7C3AED 0%,#4F46E5 25%,#06B6D4 70%,#10B981 100%)}
+.gradient-border{position:relative}
+.gradient-border::before{content:'';position:absolute;inset:0;border-radius:inherit;padding:1.2px;background:linear-gradient(135deg,#7C3AED,#06B6D4,#10B981);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
+.cursor-dot{width:8px;height:8px;background:#8B5CF6;border-radius:50%;position:fixed;top:0;left:0;pointer-events:none;z-index:9999;mix-blend-mode:screen;box-shadow:0 0 20px #8B5CF6}
+.cursor-ring{width:40px;height:40px;border:1.5px solid rgba(139,92,246,.5);border-radius:50%;position:fixed;top:0;left:0;pointer-events:none;z-index:9998;transition:all .15s ease-out}
+.card-3d{transform-style:preserve-3d;transition:transform .6s cubic-bezier(.23,1,.32,1)}
+.card-3d:hover{transform:rotateY(5deg) rotateX(5deg) translateZ(20px)}
+.tilt{transform-style:preserve-3d;transition:transform .3s ease-out}
+@keyframes float3d{0%,100%{transform:translateY(0) rotateX(0) rotateY(0)}33%{transform:translateY(-10px) rotateX(2deg) rotateY(2deg)}66%{transform:translateY(-5px) rotateX(-1deg) rotateY(-2deg)}}
+.float3d{animation:float3d 8s ease-in-out infinite}
+@keyframes glowPulse{0%,100%{box-shadow:0 0 40px rgba(124,58,237,.3),0 0 80px rgba(6,182,214,.15),inset 0 0 20px rgba(255,255,255,.05)}50%{box-shadow:0 0 60px rgba(124,58,237,.5),0 0 100px rgba(6,182,214,.25),inset 0 0 30px rgba(255,255,255,.08)}}
+.glow-3d{animation:glowPulse 4s ease-in-out infinite}
+@keyframes orbit{from{transform:rotate(0) translateX(120px) rotate(0)}to{transform:rotate(360deg) translateX(120px) rotate(-360deg)}}
+.orbit{animation:orbit 20s linear infinite}
+#canvas3d{position:fixed;top:0;left:0;width:100%;height:100%;z-index:-1;opacity:.6}
+.video-modal{backdrop-filter:blur(20px)}
+::-webkit-scrollbar{width:8px}::-webkit-scrollbar-track{background:#03050A}::-webkit-scrollbar-thumb{background:linear-gradient(#7C3AED,#06B6D4);border-radius:4px}
 </style>
 </head>
 <body class="antialiased selection:bg-violet-500/30">
 
-<!-- Background Effects -->
-<div class="fixed inset-0 -z-10 overflow-hidden">
-<div class="absolute top-[-20%] right-[-15%] w-[800px] h-[800px] bg-violet-600/20 rounded-full blur-[150px]"></div>
-<div class="absolute top-[30%] left-[-10%] w-[600px] h-[600px] bg-cyan-500/15 rounded-full blur-[130px]"></div>
-<div class="absolute bottom-[-20%] right-[20%] w-[700px] h-[700px] bg-indigo-600/15 rounded-full blur-[140px]"></div>
-<div class="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.01)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.01)_1px,transparent_1px)] bg-[size:50px_50px]"></div>
+<!-- Custom Cursor -->
+<div class="cursor-dot hidden md:block" id="cursorDot"></div>
+<div class="cursor-ring hidden md:block" id="cursorRing"></div>
+
+<!-- 3D Canvas Background -->
+<canvas id="canvas3d"></canvas>
+
+<!-- Background Glows -->
+<div class="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+<div class="absolute top-[-30%] right-[-20%] w-[900px] h-[900px] bg-violet-600/25 rounded-full blur-[160px]"></div>
+<div class="absolute top-[40%] left-[-15%] w-[700px] h-[700px] bg-cyan-500/20 rounded-full blur-[140px]"></div>
+<div class="absolute bottom-[-30%] right-[30%] w-[800px] h-[800px] bg-indigo-600/20 rounded-full blur-[150px]"></div>
+<div class="absolute inset-0 opacity-[0.03]" style="background-image:linear-gradient(rgba(255,255,255,.1) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.1) 1px,transparent 1px);background-size:60px 60px"></div>
 </div>
 
-<!-- NAV -->
-<nav class="fixed top-0 w-full z-50 bg-[#05070D]/70 glass border-b border-white/[0.06]">
+<!-- NAV 3D -->
+<nav class="fixed top-0 w-full z-50 bg-[#03050A]/60 glass border-b border-white/[0.05]">
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-<div class="flex justify-between items-center h-[68px]">
-<div class="flex items-center gap-3">
-<div class="w-10 h-10 gradient-bg rounded-[12px] flex items-center justify-center font-black text-white shadow-lg shadow-violet-600/20">C</div>
-<div><div class="font-black text-[17px] leading-none"><?= $brand ?> <span class="text-[10px] bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 rounded-full px-2 py-0.5 mr-1.5">فارسی v5.8</span></div><div class="text-[10px] text-white/40 mt-0.5">پنل نمایندگی حرفه‌ای VPN</div></div>
+<div class="flex justify-between items-center h-[72px]">
+<div class="flex items-center gap-3.5">
+<div class="relative w-11 h-11 gradient-bg rounded-[14px] flex items-center justify-center font-black text-white shadow-[0_0_30px_rgba(124,58,237,.4)]"><span class="relative z-10">C</span><div class="absolute inset-0 gradient-bg rounded-[14px] blur-[10px] opacity-60"></div></div>
+<div><div class="font-black text-[17px] leading-none flex items-center gap-2">Connectix <span class="text-[9px] bg-gradient-to-r from-violet-500 to-cyan-500 rounded-full px-2.5 py-1 font-black">3D v6.0 فارسی</span></div><div class="text-[10px] text-white/40 mt-1 flex items-center gap-1.5"><span class="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,.8)]"></span> سه‌بعدی • فارسی • آنلاین • @mainAdminpanel</div></div>
 </div>
-<div class="hidden lg:flex items-center gap-1 bg-white/[0.04] border border-white/[0.06] rounded-full p-1">
-<a href="#features" class="px-4 py-2 rounded-full text-[13px] text-white/60 hover:text-white hover:bg-white/[0.06] transition">امکانات کامل</a>
-<a href="#why" class="px-4 py-2 rounded-full text-[13px] text-white/60 hover:text-white hover:bg-white/[0.06] transition">چرا جذابه؟</a>
-<a href="#app" class="px-4 py-2 rounded-full text-[13px] text-white/60 hover:text-white hover:bg-white/[0.06] transition">اپ اختصاصی</a>
-<a href="#pricing" class="px-4 py-2 rounded-full text-[13px] text-white/60 hover:text-white hover:bg-white/[0.06] transition">تعرفه</a>
-<a href="#faq" class="px-4 py-2 rounded-full text-[13px] text-white/60 hover:text-white hover:bg-white/[0.06] transition">سوالات</a>
+<div class="hidden lg:flex items-center gap-1 bg-white/[0.03] border border-white/[0.05] rounded-full p-1 backdrop-blur-xl">
+<a href="#features" class="px-4 py-2 rounded-full text-[12px] text-white/50 hover:text-white hover:bg-white/[0.06] transition">امکانات 3D</a>
+<a href="#why" class="px-4 py-2 rounded-full text-[12px] text-white/50 hover:text-white hover:bg-white/[0.06] transition">چرا جذابه؟</a>
+<a href="#app" class="px-4 py-2 rounded-full text-[12px] text-white/50 hover:text-white hover:bg-white/[0.06] transition">اپ سه‌بعدی</a>
+<a href="#video" class="px-4 py-2 rounded-full text-[12px] text-white/50 hover:text-white hover:bg-white/[0.06] transition">ویدیو</a>
+<a href="#demo" class="px-4 py-2 rounded-full text-[12px] bg-white/[0.08] text-white">دمو آنلاین</a>
+<a href="#pricing" class="px-4 py-2 rounded-full text-[12px] text-white/50 hover:text-white hover:bg-white/[0.06] transition">تعرفه</a>
 </div>
-<div class="flex items-center gap-2">
-<a href="<?= $tg_url ?>" target="_blank" class="hidden sm:flex items-center gap-2 bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] rounded-full px-4 py-2.5 text-[13px] transition"><i class="fa-brands fa-telegram text-sky-400"></i> @mainAdminpanel</a>
-<a href="#request" class="gradient-bg hover:opacity-90 rounded-full px-6 py-2.5 text-[13px] font-bold shadow-lg shadow-violet-600/20 transition">ثبت درخواست</a>
+<div class="flex items-center gap-2.5">
+<a href="<?= $tg_url ?>" target="_blank" class="hidden sm:flex items-center gap-2 bg-white/[0.05] hover:bg-white/[0.08] border border-white/[0.06] rounded-full px-4 py-2.5 text-[12px] transition"><i class="fa-brands fa-telegram text-sky-400"></i> @mainAdminpanel</a>
+<a href="#request" class="gradient-bg rounded-full px-6 py-2.5 text-[12px] font-black shadow-[0_0_30px_rgba(124,58,237,.4)] hover:shadow-[0_0_50px_rgba(124,58,237,.6)] transition-all">ثبت درخواست 3D</a>
 </div>
 </div>
 </div>
 </nav>
 
-<!-- HERO -->
-<section class="relative pt-36 pb-20 px-4">
-<div class="max-w-7xl mx-auto grid lg:grid-cols-[1.1fr_0.9fr] gap-12 items-center">
-<div class="space-y-7">
-<div class="inline-flex items-center gap-2.5 bg-gradient-to-r from-violet-500/10 to-cyan-500/10 border border-violet-500/20 rounded-full pl-2 pr-4 py-2">
-<span class="bg-emerald-500 text-black text-[10px] font-black rounded-full px-2.5 py-1">جدید</span>
-<span class="text-[12px] text-violet-200">هوش مصنوعی فارسی با راهنمای تصویری 3 مرحله‌ای + اپ اختصاصی رایگان</span>
+<!-- HERO 3D -->
+<section class="relative min-h-[100vh] flex items-center pt-20 pb-12 px-4">
+<div class="max-w-7xl mx-auto w-full grid lg:grid-cols-[1.15fr_0.85fr] gap-12 items-center">
+<div class="space-y-7 relative z-10">
+<div class="inline-flex items-center gap-2 bg-gradient-to-r from-violet-500/15 via-cyan-500/10 to-emerald-500/10 border border-violet-500/20 rounded-full pl-2 pr-5 py-2.5 backdrop-blur-xl">
+<span class="bg-gradient-to-r from-violet-500 to-cyan-500 text-white text-[10px] font-black rounded-full px-3 py-1 shadow-[0_0_20px_rgba(124,58,237,.5)]">🌌 نسخه سه‌بعدی جدید</span>
+<span class="text-[12px] text-violet-200">گرافیک سینمایی + افکت‌های ویژه + ویدیو + دمو آنلاین</span>
 </div>
-<h1 class="text-[40px] sm:text-[52px] lg:text-[56px] font-black leading-[1.08] text-balance">
-پنل نمایندگی VPN<br>
-<span class="gradient-text">با اپ اختصاصی فارسی</span><br>
-<span class="text-[32px] sm:text-[36px] text-white/90">و درآمد ماهانه 10 تا 25 میلیون</span>
+<h1 class="text-[42px] sm:text-[56px] lg:text-[62px] font-black leading-[0.95] tracking-tight">
+<span class="block">پنل نمایندگی</span>
+<span class="block gradient-text">سه‌بعدی VPN</span>
+<span class="block text-[28px] sm:text-[34px] text-white/80 mt-2">با اپ اختصاصی فارسی</span>
+<span class="block text-[18px] sm:text-[20px] font-bold text-emerald-300 mt-3">درآمد ماهانه 10 تا 25 میلیون - کاملاً فارسی</span>
 </h1>
-<p class="text-[15px] leading-7 text-white/60 max-w-[560px] text-balance">
-بدون حتی یک خط کدنویسی، با برند خودت کسب و کار VPN راه بنداز. <b class="text-white">اپ اندروید اختصاصی فارسی</b>، <b class="text-white">ربات تلگرام فروش خودکار 24 ساعته</b>، سود <b class="text-emerald-300">200% هر فروش</b>، سرور <b class="text-white">VLESS Reality ضدفیلتر</b>. همه چیز آماده، فقط بفروش!
+<p class="text-[14px] leading-7 text-white/55 max-w-[580px]">
+اولین پنل VPN <b class="text-white">سه‌بعدی ایران</b> با گرافیک سینمایی. بدون کدنویسی، با برند خودت کسب و کار راه بنداز. اپ فارسی، ربات فروش 24 ساعته فارسی، سود 200%، سرور VLESS Reality. <b class="text-violet-300">دمو آنلاین: demo/demo123</b> - پشتیبانی: @mainAdminpanel
 </p>
-<div class="flex flex-wrap gap-3">
-<a href="#request" class="group gradient-bg rounded-full px-8 py-4 font-black text-[14px] flex items-center gap-2.5 shadow-[0_0_40px_rgba(124,58,237,.35)] hover:shadow-[0_0_60px_rgba(124,58,237,.5)] transition-all">
-<i class="fa-solid fa-rocket group-hover:translate-x-1 transition-transform"></i> ثبت درخواست نمایندگی - 30 دقیقه تحویل
+<div class="flex flex-wrap gap-3.5">
+<a href="#request" class="group relative gradient-bg rounded-full px-8 py-4 font-black text-[14px] flex items-center gap-2.5 shadow-[0_0_50px_rgba(124,58,237,.5)] hover:shadow-[0_0_80px_rgba(124,58,237,.7)] transition-all overflow-hidden">
+<span class="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></span>
+<i class="fa-solid fa-rocket group-hover:translate-x-1 transition-transform"></i> ثبت درخواست سه‌بعدی - 30 دقیقه تحویل
 </a>
-<a href="https://t.me/mainAdminpanel" target="_blank" class="group bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] rounded-full px-7 py-4 font-bold text-[13px] flex items-center gap-2 transition">
-<i class="fa-brands fa-telegram text-sky-400 text-[18px]"></i> مشاوره رایگان: @mainAdminpanel
+<a href="#video" class="group bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] rounded-full px-7 py-4 font-bold text-[13px] flex items-center gap-2.5 backdrop-blur-xl transition">
+<span class="w-8 h-8 bg-white rounded-full flex items-center justify-center group-hover:scale-110 transition"><i class="fa-solid fa-play text-black text-[12px] ml-0.5"></i></span> دیدن ویدیو معرفی 60 ثانیه‌ای
 </a>
 </div>
-<div class="flex flex-wrap gap-3 pt-2">
-<span class="inline-flex items-center gap-1.5 bg-white/[0.04] border border-white/[0.06] rounded-full px-3.5 py-2 text-[11px] text-white/60"><i class="fa-solid fa-check text-emerald-400"></i> بدون دانش فنی</span>
-<span class="inline-flex items-center gap-1.5 bg-white/[0.04] border border-white/[0.06] rounded-full px-3.5 py-2 text-[11px] text-white/60"><i class="fa-solid fa-check text-emerald-400"></i> کاملاً فارسی</span>
-<span class="inline-flex items-center gap-1.5 bg-white/[0.04] border border-white/[0.06] rounded-full px-3.5 py-2 text-[11px] text-white/60"><i class="fa-solid fa-check text-emerald-400"></i> تحویل آنی 30 دقیقه</span>
-<span class="inline-flex items-center gap-1.5 bg-white/[0.04] border border-white/[0.06] rounded-full px-3.5 py-2 text-[11px] text-white/60"><i class="fa-solid fa-check text-emerald-400"></i> پشتیبانی 24/7 فارسی</span>
-</div>
-<div class="grid grid-cols-3 gap-3 max-w-[420px] pt-4">
-<div class="bg-gradient-to-b from-white/[0.06] to-white/[0.02] border border-white/[0.08] rounded-[18px] p-4 text-center card-hover"><div class="text-[22px] font-black gradient-text">200+</div><div class="text-[10px] text-white/50 mt-1">نماینده فعال فارسی</div><div class="text-[9px] text-emerald-400 mt-1">● آنلاین</div></div>
-<div class="bg-gradient-to-b from-white/[0.06] to-white/[0.02] border border-white/[0.08] rounded-[18px] p-4 text-center card-hover"><div class="text-[22px] font-black text-white">50K+</div><div class="text-[10px] text-white/50 mt-1">کاربر نهایی راضی</div><div class="text-[9px] text-white/30 mt-1">در حال رشد</div></div>
-<div class="bg-gradient-to-b from-white/[0.06] to-white/[0.02] border border-white/[0.08] rounded-[18px] p-4 text-center card-hover"><div class="text-[22px] font-black text-emerald-400">99.9%</div><div class="text-[10px] text-white/50 mt-1">آپتایم سرورها</div><div class="text-[9px] text-emerald-400 mt-1">بدون قطعی</div></div>
+<div class="flex flex-wrap gap-2.5 pt-1">
+<span class="inline-flex items-center gap-1.5 bg-white/[0.04] border border-white/[0.05] rounded-full px-3.5 py-2 text-[11px] text-white/60 backdrop-blur"><i class="fa-solid fa-cube text-violet-400"></i> سه‌بعدی واقعی - Three.js</span>
+<span class="inline-flex items-center gap-1.5 bg-white/[0.04] border border-white/[0.05] rounded-full px-3.5 py-2 text-[11px] text-white/60 backdrop-blur"><i class="fa-solid fa-language text-cyan-400"></i> 100% فارسی</span>
+<span class="inline-flex items-center gap-1.5 bg-white/[0.04] border border-white/[0.05] rounded-full px-3.5 py-2 text-[11px] text-white/60 backdrop-blur"><i class="fa-solid fa-bolt text-amber-400"></i> افکت‌های ویژه سینمایی</span>
+<span class="inline-flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-3.5 py-2 text-[11px] text-emerald-300 backdrop-blur"><i class="fa-solid fa-video"></i> ویدیو + دمو آنلاین</span>
 </div>
 </div>
-<div class="relative lg:h-[620px]">
-<div class="relative bg-gradient-to-b from-white/[0.08] to-white/[0.02] border border-white/[0.08] rounded-[28px] p-3 shadow-[0_0_80px_rgba(124,58,237,.15)] float">
-<img src="<?= $base ?>assets/ai_guides/reseller-panel.jpg" alt="پنل مدیریت فارسی" class="w-full rounded-[20px] border border-white/[0.06]">
-<div class="absolute -bottom-8 -right-8 bg-[#0A0D18] border border-white/[0.08] rounded-[18px] p-4 shadow-2xl flex items-center gap-3 min-w-[200px]">
+
+<!-- 3D Hero Visual -->
+<div class="relative lg:h-[700px] flex items-center justify-center">
+<!-- Floating 3D Cards -->
+<div class="relative w-full max-w-[520px] aspect-[4/3]">
+<!-- Main 3D Panel -->
+<div class="absolute inset-0 bg-gradient-to-br from-white/[0.08] to-white/[0.02] border border-white/[0.08] rounded-[32px] p-4 shadow-[0_0_100px_rgba(124,58,237,.2)] tilt float3d" id="tiltCard">
+<img src="<?= $base ?>ads/3d-dashboard.jpg" alt="پنل سه‌بعدی فارسی" class="w-full h-full object-cover rounded-[22px] border border-white/[0.06]">
+<div class="absolute inset-4 rounded-[22px] bg-gradient-to-t from-violet-600/20 via-transparent to-transparent pointer-events-none"></div>
+</div>
+<!-- Orbiting elements -->
+<div class="absolute -top-8 -right-8 w-20 h-20 bg-gradient-to-br from-violet-500 to-cyan-500 rounded-[20px] flex items-center justify-center shadow-[0_0_40px_rgba(124,58,237,.6)] orbit" style="animation-duration:15s">
+<i class="fa-solid fa-mobile-screen text-xl"></i>
+</div>
+<div class="absolute -bottom-10 -left-10 w-16 h-16 bg-gradient-to-br from-emerald-500 to-cyan-500 rounded-[16px] flex items-center justify-center shadow-[0_0_30px_rgba(16,185,129,.5)] orbit" style="animation-duration:12s;animation-direction:reverse">
+<i class="fa-brands fa-telegram"></i>
+</div>
+<div class="absolute top-1/2 -right-12 bg-[#0A0D18]/90 glass border border-white/[0.08] rounded-[18px] p-4 shadow-2xl hidden lg:flex items-center gap-3 min-w-[210px] card-3d">
 <div class="w-11 h-11 bg-emerald-500/15 border border-emerald-500/20 rounded-[12px] flex items-center justify-center"><i class="fa-solid fa-arrow-trend-up text-emerald-400"></i></div>
-<div><div class="text-[10px] text-white/40">سود امروز - خودکار</div><div class="font-black text-emerald-400 text-[14px]">+2,450,000 تومان</div><div class="text-[9px] text-white/30">12 فروش توسط ربات</div></div>
+<div><div class="text-[10px] text-white/40">سود امروز - سه‌بعدی</div><div class="font-black text-emerald-400 text-[14px]">+2,450,000 تومان</div><div class="text-[9px] text-white/30">12 فروش توسط ربات فارسی</div></div>
 </div>
-<div class="absolute -top-6 -left-6 bg-[#0A0D18] border border-white/[0.08] rounded-full px-4 py-2.5 shadow-xl flex items-center gap-2.5">
-<span class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse shadow-[0_0_10px_rgba(16,185,129,.8)]"></span><span class="text-[11px] font-bold">ربات فروش فعال - 24 ساعته</span>
-</div>
-<div class="absolute top-1/2 -left-10 bg-[#0A0D18]/80 glass border border-white/[0.08] rounded-[16px] p-3 shadow-xl hidden lg:flex items-center gap-2.5">
-<img src="<?= $base ?>assets/ai_guides/hiddify-step3-connect.jpg" class="w-12 h-12 rounded-[10px] object-cover"><div><div class="text-[11px] font-bold">اتصال موفق</div><div class="text-[9px] text-emerald-400">● متصل - VLESS Reality</div></div>
+<div class="absolute bottom-20 -left-12 bg-[#0A0D18]/90 glass border border-white/[0.08] rounded-full px-4 py-2.5 shadow-xl hidden lg:flex items-center gap-2.5">
+<span class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse shadow-[0_0_10px_rgba(16,185,129,.8)]"></span><span class="text-[11px] font-bold">ربات فروش سه‌بعدی فعال - فارسی</span>
 </div>
 </div>
-<div class="mt-10 grid grid-cols-3 gap-3">
-<img src="<?= $base ?>ads/banner-fa-1.jpg" class="rounded-[16px] border border-white/[0.06] h-[88px] object-cover card-hover">
-<img src="<?= $base ?>ads/banner-fa-2.jpg" class="rounded-[16px] border border-white/[0.06] h-[88px] object-cover card-hover">
-<img src="<?= $base ?>ads/banner-fa-3.jpg" class="rounded-[16px] border border-white/[0.06] h-[88px] object-cover card-hover">
+<!-- 3D Images row -->
+<div class="absolute -bottom-16 left-1/2 -translate-x-1/2 w-[110%] grid grid-cols-3 gap-3">
+<img src="<?= $base ?>ads/3d-globe.jpg" class="rounded-[18px] border border-white/[0.06] h-[100px] object-cover shadow-xl card-3d">
+<img src="<?= $base ?>ads/banner-fa-premium.jpg" class="rounded-[18px] border border-white/[0.06] h-[100px] object-cover shadow-xl card-3d mt-6">
+<img src="<?= $base ?>ads/3d-phone.jpg" class="rounded-[18px] border border-white/[0.06] h-[100px] object-cover shadow-xl card-3d">
 </div>
 </div>
 </div>
 </section>
 
-<!-- LOGOS / TRUST -->
-<section class="border-y border-white/[0.06] bg-white/[0.02] py-5">
-<div class="max-w-7xl mx-auto px-4 flex flex-wrap justify-center gap-6 sm:gap-10 text-[11px] text-white/35">
-<span class="flex items-center gap-2"><span class="w-7 h-7 bg-white/[0.06] rounded-full flex items-center justify-center"><i class="fa-solid fa-shield-halved text-violet-400"></i></span> پرداخت امن زرین‌پال + تتر TRC20 + تون</span>
-<span class="flex items-center gap-2"><span class="w-7 h-7 bg-white/[0.06] rounded-full flex items-center justify-center"><i class="fa-solid fa-bolt text-cyan-400"></i></span> تحویل آنی 30 دقیقه‌ای - اتوماتیک</span>
-<span class="flex items-center gap-2"><span class="w-7 h-7 bg-white/[0.06] rounded-full flex items-center justify-center"><i class="fa-solid fa-headset text-emerald-400"></i></span> پشتیبانی فارسی 24/7 - @mainAdminpanel</span>
-<span class="flex items-center gap-2"><span class="w-7 h-7 bg-white/[0.06] rounded-full flex items-center justify-center"><i class="fa-solid fa-language text-amber-400"></i></span> پنل، اپ، ربات 100% فارسی</span>
-</div>
-</section>
-
-<!-- WHY ATTRACTIVE -->
-<section id="why" class="py-24 px-4 relative">
+<!-- VIDEO + DEMO SECTION - NEW 3D -->
+<section id="video" class="py-24 px-4 relative">
 <div class="max-w-7xl mx-auto">
-<div class="text-center max-w-3xl mx-auto mb-16">
-<div class="inline-flex items-center gap-2 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-full px-4 py-1.5 text-[11px] text-amber-300"><i class="fa-solid fa-fire"></i> چرا این پنل جذاب و پرفروشه؟</div>
-<h2 class="text-[34px] sm:text-[42px] font-black leading-[1.1] mt-5 text-balance">چرا <span class="gradient-text">200 نماینده فعال</span><br>Connectix رو انتخاب کردن؟</h2>
-<p class="text-white/50 text-[14px] leading-7 mt-4 text-balance">ما فقط پنل نمی‌فروشیم، یک اکوسیستم کامل کسب و کار با 6 مزیت رقابتی که هیچ‌کجا پیدا نمی‌کنی</p>
+<div class="grid lg:grid-cols-2 gap-8">
+
+<!-- Video -->
+<div class="group relative bg-gradient-to-br from-violet-600/10 via-indigo-600/5 to-cyan-500/10 border border-violet-500/20 rounded-[32px] p-2 shadow-[0_0_80px_rgba(124,58,237,.15)] card-3d">
+<div class="bg-[#0A0D18] rounded-[24px] overflow-hidden relative aspect-video">
+<img src="<?= $base ?>ads/banner-fa-premium.jpg" alt="ویدیو معرفی پنل سه‌بعدی فارسی" class="w-full h-full object-cover">
+<div class="absolute inset-0 bg-gradient-to-t from-[#0A0D18] via-[#0A0D18]/40 to-transparent"></div>
+<div class="absolute inset-0 flex items-center justify-center">
+<button onclick="openVideo()" class="group/btn relative w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-[0_0_60px_rgba(255,255,255,.4)] hover:scale-110 transition-transform">
+<i class="fa-solid fa-play text-black text-xl ml-1"></i>
+<span class="absolute inset-0 rounded-full bg-white animate-ping opacity-20"></span>
+</button>
 </div>
-<div class="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-<div class="group relative bg-gradient-to-b from-white/[0.06] to-white/[0.02] border border-white/[0.06] rounded-[24px] p-7 card-hover overflow-hidden">
-<div class="absolute top-0 right-0 w-32 h-32 bg-violet-500/10 rounded-full blur-[30px] group-hover:bg-violet-500/20 transition"></div>
-<div class="w-12 h-12 gradient-bg rounded-[14px] flex items-center justify-center shadow-lg shadow-violet-600/20"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
-<h3 class="font-black text-[16px] mt-5">جادوی وایت‌لیبل کامل</h3>
-<p class="text-[12px] text-white/50 leading-6 mt-2.5">مشتری هیچ‌وقت نمی‌فهمه از جای دیگه می‌خری! اپ با نام و لوگوی تو، ربات با یوزرنیم تو، لینک ساب با دامنه تو، حتی صفحه وضعیت اشتراک با برند تو. انگار شرکت خودته!</p>
-<div class="mt-4 inline-flex bg-violet-500/10 border border-violet-500/20 rounded-full px-3 py-1 text-[10px] text-violet-300">ارزش بیرون: 30 میلیون تومان</div>
+<div class="absolute bottom-0 left-0 right-0 p-6">
+<div class="inline-flex bg-white/10 backdrop-blur border border-white/20 rounded-full px-3 py-1 text-[10px]">🎬 ویدیو معرفی 60 ثانیه‌ای - فارسی - سه‌بعدی</div>
+<h3 class="font-black text-[20px] mt-3">ویدیو معرفی پنل سه‌بعدی - با افکت‌های سینمایی</h3>
+<p class="text-[12px] text-white/50 mt-1">ببین چطور در 60 ثانیه کسب و کارت رو راه می‌ندازی - کاملاً فارسی</p>
 </div>
-<div class="group relative bg-gradient-to-b from-white/[0.06] to-white/[0.02] border border-white/[0.06] rounded-[24px] p-7 card-hover overflow-hidden">
-<div class="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-[30px] group-hover:bg-emerald-500/20 transition"></div>
-<div class="w-12 h-12 bg-emerald-500 rounded-[14px] flex items-center justify-center shadow-lg shadow-emerald-500/20"><i class="fa-solid fa-sack-dollar"></i></div>
-<h3 class="font-black text-[16px] mt-5">سود خالص 200% - قیمت دست تو</h3>
-<p class="text-[12px] text-white/50 leading-6 mt-2.5">تو قیمت فروش رو تعیین می‌کنی، نه ما! مثلاً 30 گیگ رو 40ت می‌خری، 120ت می‌فروشی. 80ت سود خالص. روزی 5 فروش = 400ت، ماهی 12 میلیون. بدون سقف!</p>
-<div class="mt-4 flex gap-2"><span class="bg-emerald-500/10 border border-emerald-500/20 rounded-full px-2.5 py-1 text-[10px] text-emerald-300">+15% هدیه شارژ</span><span class="bg-white/[0.04] border border-white/[0.06] rounded-full px-2.5 py-1 text-[10px] text-white/50">پورسانت 10% معرفی</span></div>
 </div>
-<div class="group relative bg-gradient-to-b from-white/[0.06] to-white/[0.02] border border-white/[0.06] rounded-[24px] p-7 card-hover overflow-hidden">
-<div class="absolute top-0 right-0 w-32 h-32 bg-sky-500/10 rounded-full blur-[30px] group-hover:bg-sky-500/20 transition"></div>
-<div class="w-12 h-12 bg-sky-500 rounded-[14px] flex items-center justify-center shadow-lg shadow-sky-500/20"><i class="fa-brands fa-telegram"></i></div>
-<h3 class="font-black text-[16px] mt-5">ربات فروش 24 ساعته - تو خواب، پول درمیاری</h3>
-<p class="text-[12px] text-white/50 leading-6 mt-2.5">ربات با یوزرنیم دلخواه تو، منوهای کاملاً فارسی، پرداخت آنی کارت، تتر، تون. مشتری پرداخت می‌کنه، ربات خودکار کانفیگ می‌ده. نیاز به حضور تو نیست!</p>
-<div class="mt-4 text-[10px] bg-sky-500/10 border border-sky-500/20 rounded-full px-3 py-1.5 inline-flex text-sky-300">💬 @YourBrandBot - نمونه: @mainAdminpanel</div>
+<div class="p-5 flex justify-between items-center">
+<div class="flex items-center gap-3"><div class="w-10 h-10 bg-violet-500/20 rounded-full flex items-center justify-center"><i class="fa-solid fa-film text-violet-400 text-sm"></i></div><div><div class="font-bold text-[13px]">نسخه ویدیویی فارسی</div><div class="text-[11px] text-white/40">60 ثانیه - با زیرنویس فارسی + افکت سه‌بعدی</div></div></div>
+<button onclick="openVideo()" class="bg-white/[0.06] border border-white/[0.08] rounded-full px-5 py-2.5 text-[12px] font-bold hover:bg-white/[0.1] transition">پخش ویدیو <i class="fa-solid fa-play mr-1 text-[10px]"></i></button>
 </div>
+</div>
+
+<!-- Demo Online -->
+<div id="demo" class="group relative bg-gradient-to-br from-emerald-600/10 via-cyan-600/5 to-violet-600/10 border border-emerald-500/20 rounded-[32px] p-2 shadow-[0_0_80px_rgba(16,185,129,.15)] card-3d">
+<div class="bg-[#0A0D18] rounded-[24px] p-6 h-full flex flex-col">
+<div class="flex justify-between items-start">
+<div><div class="inline-flex bg-emerald-500/15 border border-emerald-500/20 rounded-full px-3 py-1 text-[10px] text-emerald-300">● آنلاین - دمو فعال - فارسی</div><h3 class="font-black text-[20px] mt-3">دمو آنلاین - تست زنده پنل سه‌بعدی فارسی</h3><p class="text-[12px] text-white/50 mt-1">بدون ثبت نام، همین الان وارد پنل دمو شو - کاملاً فارسی</p></div>
+<div class="w-12 h-12 bg-emerald-500/20 rounded-[14px] flex items-center justify-center"><i class="fa-solid fa-laptop-code text-emerald-400"></i></div>
+</div>
+
+<div class="mt-6 bg-[#05070D] border border-white/[0.06] rounded-[18px] p-4 space-y-3">
+<div class="flex justify-between items-center bg-white/[0.03] rounded-[12px] px-4 py-3"><span class="text-[11px] text-white/40">آدرس دمو:</span><span class="text-[12px] font-mono text-cyan-300">https://vpbotn.ir/contax/</span></div>
+<div class="grid grid-cols-2 gap-3">
+<div class="bg-white/[0.03] border border-white/[0.06] rounded-[12px] px-4 py-3"><div class="text-[10px] text-white/40">نام کاربری</div><div class="font-mono font-bold text-[13px] mt-1 flex items-center gap-2"><i class="fa-solid fa-user text-violet-400 text-[11px]"></i> <?= $demo_user ?> <button onclick="copyText('<?= $demo_user ?>')" class="mr-auto text-[10px] bg-white/[0.06] rounded-full px-2 py-1 hover:bg-white/[0.1]">کپی</button></div></div>
+<div class="bg-white/[0.03] border border-white/[0.06] rounded-[12px] px-4 py-3"><div class="text-[10px] text-white/40">رمز عبور</div><div class="font-mono font-bold text-[13px] mt-1 flex items-center gap-2"><i class="fa-solid fa-lock text-emerald-400 text-[11px]"></i> <?= $demo_pass ?> <button onclick="copyText('<?= $demo_pass ?>')" class="mr-auto text-[10px] bg-white/[0.06] rounded-full px-2 py-1 hover:bg-white/[0.1]">کپی</button></div></div>
+</div>
+<div class="bg-amber-500/10 border border-amber-500/20 rounded-[12px] px-4 py-2.5 text-[11px] text-amber-300 flex gap-2"><i class="fa-solid fa-lightbulb mt-0.5"></i> نکته: این دمو فقط برای نمایشه، تغییرات ذخیره نمی‌شه. برای پنل واقعی درخواست بده.</div>
+</div>
+
+<div class="mt-5 grid grid-cols-3 gap-2.5 text-center">
+<div class="bg-white/[0.03] border border-white/[0.05] rounded-[14px] py-3"><div class="font-black text-[14px]">50+</div><div class="text-[9px] text-white/40">قابلیت فارسی</div></div>
+<div class="bg-white/[0.03] border border-white/[0.05] rounded-[14px] py-3"><div class="font-black text-[14px] text-emerald-400">3D</div><div class="text-[9px] text-white/40">گرافیک سه‌بعدی</div></div>
+<div class="bg-white/[0.03] border border-white/[0.05] rounded-[14px] py-3"><div class="font-black text-[14px] text-violet-300">فارسی</div><div class="text-[9px] text-white/40">100% فارسی</div></div>
+</div>
+
+<div class="mt-5 flex gap-2.5">
+<a href="<?= $panel_url ?>" target="_blank" class="flex-1 gradient-bg rounded-full py-3.5 text-center text-[13px] font-black shadow-[0_0_30px_rgba(124,58,237,.4)] hover:shadow-[0_0_50px_rgba(124,58,237,.6)] transition">🚀 ورود به دمو آنلاین فارسی</a>
+<a href="<?= $tg_url ?>" target="_blank" class="bg-white/[0.06] border border-white/[0.08] rounded-full px-5 py-3.5 text-[12px] font-bold hover:bg-white/[0.1] transition"><i class="fa-brands fa-telegram text-sky-400"></i></a>
+</div>
+
+<div class="mt-4 relative rounded-[16px] overflow-hidden border border-white/[0.06] aspect-[16/9] bg-[#05070D]">
+<div class="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-violet-600/20 to-cyan-500/20"><div class="text-center"><div class="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-3"><i class="fa-solid fa-desktop text-xl"></i></div><div class="text-[11px] text-white/60">پیش‌نمایش زنده پنل فارسی</div><div class="text-[10px] text-white/30 mt-1">https://vpbotn.ir/contax/ - demo/demo123</div></div></div>
+<img src="<?= $base ?>assets/ai_guides/reseller-panel.jpg" class="w-full h-full object-cover opacity-30">
+</div>
+
+</div>
+</div>
+
 </div>
 </div>
 </section>
 
-<!-- FULL FEATURES LIST -->
-<section id="features" class="py-24 px-4 bg-white/[0.02] border-y border-white/[0.06]">
+<!-- FULL FEATURES 3D -->
+<section id="features" class="py-24 px-4 bg-white/[0.02] border-y border-white/[0.06] relative">
 <div class="max-w-7xl mx-auto">
-<div class="flex flex-col lg:flex-row justify-between gap-6 mb-12">
-<div><div class="inline-flex bg-violet-500/10 border border-violet-500/20 rounded-full px-3 py-1 text-[11px] text-violet-300">📋 لیست کامل امکانات پنل - فارسی</div><h2 class="text-[32px] sm:text-[40px] font-black leading-[1.1] mt-4">هرچی برای فروش نیاز داری،<br><span class="gradient-text">اینجاست - 100% فارسی</span></h2></div>
-<p class="text-white/50 text-[13px] leading-6 max-w-md lg:text-left">از ساخت کلاینت تا گزارش مالی، از اپ اختصاصی تا هوش مصنوعی. 8 دسته اصلی، 50+ ویژگی. همه فارسی، همه آماده.</p>
+<div class="flex flex-col lg:flex-row justify-between gap-6 mb-14">
+<div><div class="inline-flex bg-violet-500/10 border border-violet-500/20 rounded-full px-3 py-1 text-[11px] text-violet-300">📋 لیست کامل 50+ امکانات - سه‌بعدی - فارسی</div><h2 class="text-[32px] sm:text-[44px] font-black leading-[1.1] mt-4">هرچی برای فروش نیاز داری،<br><span class="gradient-text">اینجاست - سه‌بعدی فارسی</span></h2></div>
+<p class="text-white/50 text-[13px] leading-6 max-w-md">8 دسته اصلی، 50+ ویژگی. همه فارسی، همه سه‌بعدی، همه آماده. از ساخت کلاینت تا هوش مصنوعی با عکس.</p>
 </div>
-
 <div class="grid lg:grid-cols-4 gap-5">
-<!-- Category 1 -->
-<div class="lg:col-span-1 space-y-4">
-<div class="bg-[#0A0D18] border border-white/[0.06] rounded-[20px] p-5">
-<div class="flex items-center gap-3"><div class="w-10 h-10 gradient-bg rounded-[12px] flex items-center justify-center"><i class="fa-solid fa-users text-sm"></i></div><div><div class="font-bold text-[13px]">مدیریت مشتریان</div><div class="text-[10px] text-white/40">Client Management</div></div></div>
-<ul class="mt-4 space-y-2.5 text-[11px] text-white/60">
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> ساخت کلاینت با نام و نام خانوادگی فارسی</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> مشاهده مصرف لحظه‌ای (چقدر استفاده، چقدر مانده)</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> تمدید با یک کلیک + تغییر پلن</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> تغییر حجم، سرور، سقف اتصال</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> حذف، مسدود، ریست ترافیک</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> لینک ساب اختصاصی برای هر مشتری</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> QR کد اتصال</li>
-</ul>
-</div>
-<div class="bg-[#0A0D18] border border-white/[0.06] rounded-[20px] p-5">
-<div class="flex items-center gap-3"><div class="w-10 h-10 bg-emerald-500 rounded-[12px] flex items-center justify-center"><i class="fa-solid fa-chart-pie text-sm"></i></div><div><div class="font-bold text-[13px]">مالی و گزارش</div><div class="text-[10px] text-white/40">Billing & Reports</div></div></div>
-<ul class="mt-4 space-y-2.5 text-[11px] text-white/60">
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> فاکتور ماهانه خودکار فارسی</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> محاسبه سود خالص (فروش - خرید)</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> نمودار درآمد روزانه/ماهانه</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> خروجی Excel / CSV فارسی</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> کیف پول با هدیه پلکانی</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> تاریخچه تراکنش‌ها</li>
-</ul>
-</div>
-</div>
-<!-- Category 2 -->
-<div class="lg:col-span-1 space-y-4">
-<div class="bg-[#0A0D18] border border-white/[0.06] rounded-[20px] p-5">
-<div class="flex items-center gap-3"><div class="w-10 h-10 bg-sky-500 rounded-[12px] flex items-center justify-center"><i class="fa-brands fa-telegram text-sm"></i></div><div><div class="font-bold text-[13px]">ربات تلگرام فارسی</div><div class="text-[10px] text-white/40">Telegram Bot</div></div></div>
-<ul class="mt-4 space-y-2.5 text-[11px] text-white/60">
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> یوزرنیم دلخواه (@YourBrandBot)</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> منوهای کاملاً فارسی (خرید، تمدید، حساب من)</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> فروش خودکار 24 ساعته</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> پرداخت: کارت، زرین‌پال، تتر، تون، کیف پول</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> ارسال خودکار کانفیگ بعد پرداخت</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> تست رایگان خودکار</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> زیرمجموعه‌گیری و پورسانت</li>
-</ul>
-</div>
-<div class="bg-[#0A0D18] border border-white/[0.06] rounded-[20px] p-5">
-<div class="flex items-center gap-3"><div class="w-10 h-10 bg-amber-500 rounded-[12px] flex items-center justify-center"><i class="fa-solid fa-mobile-screen text-sm"></i></div><div><div class="font-bold text-[13px]">اپ اختصاصی فارسی</div><div class="text-[10px] text-white/40">Custom App</div></div></div>
-<ul class="mt-4 space-y-2.5 text-[11px] text-white/60">
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> نام و لوگوی شما (وایت‌لیبل 100%)</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> دو نسخه: Universal + ARM64 بهینه</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> اتصال با یک کلیک فارسی</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> نمایش حجم و روزهای باقی‌مانده</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> انتخاب سرور + تست سرعت</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> آپدیت مادام‌العمر رایگان</li>
-</ul>
-</div>
-</div>
-<!-- Category 3 -->
-<div class="lg:col-span-1 space-y-4">
-<div class="bg-[#0A0D18] border border-white/[0.06] rounded-[20px] p-5">
-<div class="flex items-center gap-3"><div class="w-10 h-10 bg-violet-500 rounded-[12px] flex items-center justify-center"><i class="fa-solid fa-layer-group text-sm"></i></div><div><div class="font-bold text-[13px]">پلن و سرور</div><div class="text-[10px] text-white/40">Plans & Servers</div></div></div>
-<ul class="mt-4 space-y-2.5 text-[11px] text-white/60">
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> ساخت پلن اختصاصی با ⭐</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> حجم دلخواه: 5 گیگ تا نامحدود</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> مدت دلخواه: 7 روز تا 1 ساله</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> سقف اتصال: 1 تا نامحدود</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> انتخاب سرور: اقتصادی، VIP، ایران‌اکسس</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> لوکیشن: آلمان، فنلاند، ترکیه</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> پروتکل VLESS Reality ضدفیلتر</li>
-</ul>
-</div>
-<div class="bg-[#0A0D18] border border-white/[0.06] rounded-[20px] p-5">
-<div class="flex items-center gap-3"><div class="w-10 h-10 bg-cyan-500 rounded-[12px] flex items-center justify-center"><i class="fa-solid fa-robot text-sm"></i></div><div><div class="font-bold text-[13px]">هوش مصنوعی فارسی</div><div class="text-[10px] text-white/40">AI Assistant v5.8</div></div></div>
-<ul class="mt-4 space-y-2.5 text-[11px] text-white/60">
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> پاسخ خودکار به تیکت با متن + عکس فارسی</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> راهنمای تصویری 3 مرحله‌ای (کپی، Import، اتصال)</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> در پنل و تلگرام (آلبوم عکس)</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> کاهش 80% تیکت‌های تکراری</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> پایگاه دانش 12 سند جامع فارسی</li>
-</ul>
-</div>
-</div>
-<!-- Category 4 -->
-<div class="lg:col-span-1 space-y-4">
-<div class="bg-[#0A0D18] border border-white/[0.06] rounded-[20px] p-5">
-<div class="flex items-center gap-3"><div class="w-10 h-10 bg-indigo-500 rounded-[12px] flex items-center justify-center"><i class="fa-solid fa-people-group text-sm"></i></div><div><div class="font-bold text-[13px]">کسب درآمد تیمی</div><div class="text-[10px] text-white/40">Team Earning</div></div></div>
-<ul class="mt-4 space-y-2.5 text-[11px] text-white/60">
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> ساب‌نماینده بسازید (نماینده زیرمجموعه)</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> پورسانت از فروش ساب‌نماینده</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> انتقال اعتبار به ساب‌نماینده</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> لینک دعوت اختصاصی + پورسانت 10%</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> کد تخفیف اختصاصی</li>
-</ul>
-</div>
-<div class="bg-[#0A0D18] border border-white/[0.06] rounded-[20px] p-5">
-<div class="flex items-center gap-3"><div class="w-10 h-10 bg-pink-500 rounded-[12px] flex items-center justify-center"><i class="fa-solid fa-shield-halved text-sm"></i></div><div><div class="font-bold text-[13px]">امنیت و وایت‌لیبل</div><div class="text-[10px] text-white/40">Security</div></div></div>
-<ul class="mt-4 space-y-2.5 text-[11px] text-white/60">
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> وایت‌لیبل 100% - هیچ جا نام Connectix نیست</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> دامنه اختصاصی + لینک ساب اختصاصی</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> API اختصاصی (سبک PanelMS)</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> بک‌آپ خودکار روزانه</li>
-<li class="flex gap-2"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> لاگ کامل فعالیت‌ها + 2FA</li>
-</ul>
-</div>
-<div class="bg-gradient-to-br from-violet-600/20 to-cyan-500/10 border border-violet-500/20 rounded-[20px] p-5 text-center">
-<div class="text-[11px] text-violet-300">✨ 50+ ویژگی - همه فارسی</div>
-<div class="font-black text-[13px] mt-1">لیست کامل بالا فقط خلاصه است!</div>
-<div class="text-[10px] text-white/50 mt-2">برای دیدن دمو به @mainAdminpanel پیام بده</div>
-<a href="#request" class="mt-3 inline-flex gradient-bg rounded-full px-4 py-2 text-[11px] font-bold">دیدن دمو رایگان</a>
-</div>
-</div>
+<?php
+$features = [
+['مدیریت مشتریان','Client Management','fa-users','gradient-bg',['ساخت با نام فارسی','مصرف لحظه‌ای (استفاده/مانده)','تمدید 1 کلیک + تغییر پلن','تغییر حجم، سرور، سقف اتصال','حذف، مسدود، ریست ترافیک','لینک ساب اختصاصی + QR کد فارسی']],
+['مالی و گزارش فارسی','Billing','fa-chart-pie','bg-emerald-500',['فاکتور ماهانه خودکار فارسی','سود خالص (فروش-خرید)','نمودار درآمد روزانه/ماهانه','Excel/CSV فارسی','کیف پول هدیه پلکانی','تاریخچه تراکنش‌ها فارسی']],
+['ربات تلگرام فارسی','Telegram Bot','fa-telegram','bg-sky-500',['یوزرنیم دلخواه @YourBrandBot','منوهای کاملاً فارسی','فروش خودکار 24 ساعته فارسی','پرداخت کارت، زرین‌پال، تتر، تون','ارسال خودکار کانفیگ فارسی','تست رایگان + زیرمجموعه‌گیری فارسی']],
+['اپ اختصاصی سه‌بعدی فارسی','Custom App 3D','fa-mobile-screen','bg-amber-500',['نام و لوگوی شما - وایت‌لیبل 100% فارسی','Universal + ARM64 بهینه','اتصال 1 کلیک فارسی سه‌بعدی','حجم و روزهای باقی‌مانده فارسی','انتخاب سرور + تست سرعت فارسی','آپدیت مادام‌العمر رایگان']],
+['پلن و سرور ضدفیلتر','Plans & Servers','fa-layer-group','bg-violet-500',['پلن اختصاصی با ⭐ فارسی','حجم 5گیگ تا نامحدود','مدت 7 روز تا 1 ساله فارسی','سقف 1 تا نامحدود','دسته اقتصادی/VIP/ایران‌اکسس','VLESS Reality ضدفیلتر']],
+['هوش مصنوعی سه‌بعدی فارسی','AI 3D Persian','fa-robot','bg-cyan-500',['پاسخ خودکار متن+عکس فارسی','راهنمای 3 مرحله‌ای تصویری فارسی','در پنل و تلگرام آلبوم سه‌بعدی','کاهش 80% تیکت فارسی','پایگاه دانش 12 سند جامع فارسی','جستجوی هوشمند با مترادف فارسی']],
+['کسب درآمد تیمی فارسی','Team Earning','fa-people-group','bg-indigo-500',['ساب‌نماینده فارسی','پورسانت فروش ساب فارسی','انتقال اعتبار فارسی','لینک دعوت 10% فارسی','کد تخفیف اختصاصی فارسی']],
+['امنیت و وایت‌لیبل فارسی','Security','fa-shield-halved','bg-pink-500',['وایت‌لیبل 100% فارسی - بدون نام Connectix','دامنه + لینک ساب اختصاصی فارسی','API سبک PanelMS فارسی','بک‌آپ خودکار روزانه فارسی','لاگ کامل + 2FA فارسی']],
+];
+foreach($features as $f){
+ echo '<div class="bg-[#0A0D18] border border-white/[0.06] rounded-[20px] p-5 card-3d"><div class="flex items-center gap-3"><div class="w-10 h-10 '.$f[3].' rounded-[12px] flex items-center justify-center"><i class="fa-solid '.$f[2].' text-sm"></i></div><div><div class="font-bold text-[13px]">'.$f[0].'</div><div class="text-[10px] text-white/40">'.$f[1].'</div></div></div><ul class="mt-4 space-y-2.5">';
+ foreach($f[4] as $it) echo '<li class="flex gap-2 text-[11px] text-white/60"><i class="fa-solid fa-check text-emerald-400 mt-0.5 text-[10px]"></i> '.$it.'</li>';
+ echo '</ul></div>';
+}
+?>
 </div>
 </div>
 </section>
 
-<!-- APP SHOWCASE -->
-<section id="app" class="py-24 px-4 relative overflow-hidden">
-<div class="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
-<div class="order-2 lg:order-1 relative">
-<div class="absolute inset-0 bg-gradient-to-br from-violet-600/20 to-cyan-500/20 rounded-[32px] blur-[40px] -z-10"></div>
-<div class="grid grid-cols-2 gap-4">
-<div class="space-y-4"><img src="<?= $base ?>assets/ai_guides/hiddify-step1-copy-link.jpg" class="rounded-[20px] border border-white/[0.08] shadow-[0_20px_60px_rgba(0,0,0,.5)] card-hover"><img src="<?= $base ?>assets/ai_guides/hiddify-step3-connect.jpg" class="rounded-[20px] border border-white/[0.08] shadow-[0_20px_60px_rgba(0,0,0,.5)] card-hover"></div>
-<div class="space-y-4 mt-8"><img src="<?= $base ?>assets/ai_guides/hiddify-step2-import.jpg" class="rounded-[20px] border border-white/[0.08] shadow-[0_20px_60px_rgba(0,0,0,.5)] card-hover"><img src="<?= $base ?>assets/ai_guides/app-download.jpg" class="rounded-[20px] border border-white/[0.08] shadow-[0_20px_60px_rgba(0,0,0,.5)] card-hover"></div>
-</div>
-<div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 bg-[#0A0D18] border border-white/[0.08] rounded-full flex items-center justify-center shadow-2xl glow"><i class="fa-solid fa-play text-xl gradient-text"></i></div>
-</div>
-<div class="order-1 lg:order-2 space-y-6">
-<div class="inline-flex bg-emerald-500/10 border border-emerald-500/20 rounded-full px-3 py-1 text-[11px] text-emerald-300">📱 اپ اختصاصی فارسی - White Label 100%</div>
-<h2 class="text-[34px] sm:text-[42px] font-black leading-[1.1]">اپ با برند شما<br>یعنی <span class="gradient-text">3 برابر فروش بیشتر</span></h2>
-<p class="text-white/60 text-[13px] leading-7">90% مشتریان از طریق اپ خرید می‌کنند. وقتی اپ با نام و لوگوی شما را نصب می‌کنند، هر روز برند شما را می‌بینند. <b class="text-white">مطالعات نشان داده اپ اختصاصی 3 برابر فروش بیشتر می‌آورد.</b></p>
-<div class="grid sm:grid-cols-2 gap-3">
-<div class="bg-white/[0.04] border border-white/[0.06] rounded-[16px] p-4"><div class="w-8 h-8 bg-violet-500/20 rounded-[10px] flex items-center justify-center mb-2"><i class="fa-solid fa-palette text-violet-400 text-xs"></i></div><div class="font-bold text-[12px]">شخصی‌سازی کامل فارسی</div><div class="text-[11px] text-white/50 mt-1 leading-5">نام، لوگو، رنگ، آیکون، اسپلش - هیچ جا Connectix نیست - کاملاً فارسی</div></div>
-<div class="bg-white/[0.04] border border-white/[0.06] rounded-[16px] p-4"><div class="w-8 h-8 bg-cyan-500/20 rounded-[10px] flex items-center justify-center mb-2"><i class="fa-solid fa-bolt text-cyan-400 text-xs"></i></div><div class="font-bold text-[12px]">دو نسخه بهینه</div><div class="text-[11px] text-white/50 mt-1 leading-5">Universal (همه گوشی‌ها) + ARM64 (30% سریع‌تر) - حجم کم</div></div>
-<div class="bg-white/[0.04] border border-white/[0.06] rounded-[16px] p-4"><div class="w-8 h-8 bg-emerald-500/20 rounded-[10px] flex items-center justify-center mb-2"><i class="fa-solid fa-rotate text-emerald-400 text-xs"></i></div><div class="font-bold text-[12px]">آپدیت مادام‌العمر رایگان</div><div class="text-[11px] text-white/50 mt-1 leading-5">هر آپدیت Hiddify، اپ شما هم آپدیت می‌شود - رایگان</div></div>
-<div class="bg-white/[0.04] border border-white/[0.06] rounded-[16px] p-4"><div class="w-8 h-8 bg-amber-500/20 rounded-[10px] flex items-center justify-center mb-2"><i class="fa-solid fa-chart-line text-amber-400 text-xs"></i></div><div class="font-bold text-[12px]">افزایش وفاداری</div><div class="text-[11px] text-white/50 mt-1 leading-5">مشتری اپ شما را پاک نمی‌کند، هر روز برند شما را می‌بیند</div></div>
-</div>
-<div class="bg-amber-500/10 border border-amber-500/20 rounded-[16px] p-4 flex gap-3"><div class="w-10 h-10 bg-amber-500 rounded-[12px] flex items-center justify-center shrink-0"><i class="fa-solid fa-lightbulb"></i></div><div><div class="font-bold text-[12px] text-amber-300">هزینه ساخت بیرون: 15 تا 30 میلیون تومان + 2 ماه زمان</div><div class="text-[11px] text-white/60 mt-1">در Connectix: 0 تومان + 24 ساعت تحویل (در پلن حرفه‌ای به بالا) - کاملاً فارسی</div></div></div>
-</div>
-</div>
-</section>
-
-<!-- PRICING -->
-<section id="pricing" class="py-24 px-4 bg-white/[0.02] border-y border-white/[0.06]">
-<div class="max-w-7xl mx-auto">
-<div class="text-center max-w-2xl mx-auto mb-14">
-<div class="inline-flex bg-violet-500/10 border border-violet-500/20 rounded-full px-3 py-1 text-[11px] text-violet-300">💰 تعرفه شفاف - پرداخت ریالی - فارسی</div>
-<h2 class="text-[34px] sm:text-[42px] font-black mt-4">از 299 هزار تومان شروع کن<br><span class="gradient-text">ماهی 10 تا 25 میلیون دربیار</span></h2>
-<p class="text-white/50 text-[13px] mt-3">بدون قرارداد بلندمدت، لغو آنی، ارتقا آنی. پشتیبانی: @mainAdminpanel</p>
-<div class="inline-flex mt-5 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-full px-5 py-2.5 text-[12px] text-amber-300"><i class="fa-solid fa-gift ml-1"></i> جشنواره: 3 ماه بخر، 1 ماه هدیه + 500 هزار تومان شارژ هدیه - محدود</div>
-</div>
-<div class="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-<div class="group bg-[#0A0D18] border border-white/[0.06] rounded-[24px] p-7 flex flex-col card-hover">
-<div class="text-[11px] text-white/40">شروع کسب و کار - فارسی</div><h3 class="text-[20px] font-black mt-1">🥉 استارتر</h3>
-<div class="mt-5 flex items-baseline gap-2"><span class="text-[32px] font-black">299</span><span class="text-[13px] text-white/50">هزار تومان / ماه</span></div>
-<ul class="mt-7 space-y-3 text-[12px] text-white/70 flex-1">
-<li class="flex gap-2.5"><i class="fa-solid fa-check text-emerald-400 mt-0.5"></i> 20% تخفیف خرید عمده</li>
-<li class="flex gap-2.5"><i class="fa-solid fa-check text-emerald-400 mt-0.5"></i> ربات تلگرام اختصاصی فارسی</li>
-<li class="flex gap-2.5"><i class="fa-solid fa-check text-emerald-400 mt-0.5"></i> پنل مدیریت کامل فارسی</li>
-<li class="flex gap-2.5"><i class="fa-solid fa-check text-emerald-400 mt-0.5"></i> 50 کلاینت + 50 گیگ هدیه</li>
-<li class="flex gap-2.5"><i class="fa-solid fa-check text-emerald-400 mt-0.5"></i> پشتیبانی فارسی: @mainAdminpanel</li>
-</ul>
-<a href="#request" class="mt-8 bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] rounded-full py-3.5 text-center text-[13px] font-bold transition">شروع با استارتر - فارسی</a>
-</div>
-<div class="group relative bg-gradient-to-b from-violet-600/15 to-violet-600/5 border border-violet-500/30 rounded-[24px] p-7 flex flex-col shadow-[0_0_60px_rgba(124,58,237,.2)] scale-[1.03] card-hover">
-<div class="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-gradient-to-r from-violet-600 to-cyan-500 rounded-full px-5 py-1.5 text-[11px] font-black shadow-lg">⭐ پرفروش‌ترین - پیشنهاد ما</div>
-<div class="text-[11px] text-violet-300">حرفه‌ای - با اپ اختصاصی فارسی ⭐</div><h3 class="text-[20px] font-black mt-1">🥈 حرفه‌ای</h3>
-<div class="mt-5 flex items-baseline gap-2"><span class="text-[32px] font-black">599</span><span class="text-[13px] text-white/50">هزار تومان / ماه</span></div><div class="text-[11px] text-white/30 line-through mt-1">900 هزار تومان - 33% تخفیف</div>
-<ul class="mt-7 space-y-3 text-[12px] text-white/80 flex-1">
-<li class="flex gap-2.5"><i class="fa-solid fa-check text-emerald-400 mt-0.5"></i> <b>35% تخفیف</b> خرید عمده - سود بیشتر</li>
-<li class="flex gap-2.5"><i class="fa-solid fa-check text-emerald-400 mt-0.5"></i> ربات + <b>اپ اندروید اختصاصی فارسی</b> با برند تو</li>
-<li class="flex gap-2.5"><i class="fa-solid fa-check text-emerald-400 mt-0.5"></i> پلن اختصاصی نامحدود با ⭐</li>
-<li class="flex gap-2.5"><i class="fa-solid fa-check text-emerald-400 mt-0.5"></i> ساب‌نماینده + پورسانت تیمی فارسی</li>
-<li class="flex gap-2.5"><i class="fa-solid fa-check text-emerald-400 mt-0.5"></i> API اختصاصی + هوش مصنوعی فارسی با عکس</li>
-<li class="flex gap-2.5"><i class="fa-solid fa-check text-emerald-400 mt-0.5"></i> 200 کلاینت + 200 گیگ هدیه</li>
-</ul>
-<a href="#request" class="mt-8 gradient-bg rounded-full py-3.5 text-center text-[13px] font-black shadow-[0_0_30px_rgba(124,58,237,.4)] hover:shadow-[0_0_50px_rgba(124,58,237,.6)] transition">ثبت درخواست حرفه‌ای - 30 دقیقه تحویل فارسی</a>
-</div>
-<div class="group bg-[#0A0D18] border border-white/[0.06] rounded-[24px] p-7 flex flex-col card-hover">
-<div class="text-[11px] text-amber-300">امپراتوری VPN - کامل فارسی</div><h3 class="text-[20px] font-black mt-1">🥇 بیزینس</h3>
-<div class="mt-5 flex items-baseline gap-2"><span class="text-[32px] font-black">1.29</span><span class="text-[13px] text-white/50">میلیون / ماه</span></div><div class="text-[11px] text-white/30 line-through mt-1">2.5 میلیون - 48% تخفیف</div>
-<ul class="mt-7 space-y-3 text-[12px] text-white/70 flex-1">
-<li class="flex gap-2.5"><i class="fa-solid fa-check text-emerald-400 mt-0.5"></i> <b>50% تخفیف</b> - نصف قیمت! بیشترین سود</li>
-<li class="flex gap-2.5"><i class="fa-solid fa-check text-emerald-400 mt-0.5"></i> همه چیز حرفه‌ای + اپ iOS فارسی</li>
-<li class="flex gap-2.5"><i class="fa-solid fa-check text-emerald-400 mt-0.5"></i> دامنه اختصاصی + سایت فروش فارسی</li>
-<li class="flex gap-2.5"><i class="fa-solid fa-check text-emerald-400 mt-0.5"></i> پشتیبانی VIP @mainAdminpanel + مشاوره بازاریابی فارسی</li>
-<li class="flex gap-2.5"><i class="fa-solid fa-check text-emerald-400 mt-0.5"></i> کلاینت نامحدود + 500 گیگ هدیه</li>
-</ul>
-<a href="#request" class="mt-8 bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] rounded-full py-3.5 text-center text-[13px] font-bold transition">مشاوره بیزینس فارسی - @mainAdminpanel</a>
-</div>
-</div>
-</div>
-</section>
-
-<!-- REQUEST FORM -->
+<!-- REQUEST -->
 <section id="request" class="py-24 px-4">
-<div class="max-w-6xl mx-auto grid lg:grid-cols-5 gap-10 items-start">
+<div class="max-w-6xl mx-auto grid lg:grid-cols-5 gap-10">
 <div class="lg:col-span-2 space-y-6">
-<div class="inline-flex bg-violet-500/10 border border-violet-500/20 rounded-full px-3 py-1 text-[11px] text-violet-300">📝 فرم درخواست نمایندگی فارسی - 30 ثانیه</div>
-<h2 class="text-[34px] font-black leading-[1.1]">فرم رو پر کن،<br><span class="gradient-text">30 دقیقه بعد پنلت آماده‌ست</span></h2>
-<p class="text-white/60 text-[13px] leading-7">اطلاعاتت رو وارد کن، همکاران ما کمتر از 30 دقیقه از طریق تلگرام یا تماس با شما ارتباط می‌گیرند. مشاوره کاملاً رایگان و فارسی.</p>
-<div class="space-y-3">
-<div class="flex gap-3 bg-white/[0.04] border border-white/[0.06] rounded-[18px] p-4"><div class="w-10 h-10 bg-emerald-500/15 rounded-[12px] flex items-center justify-center shrink-0"><i class="fa-solid fa-bolt text-emerald-400"></i></div><div><div class="font-bold text-[13px]">تحویل آنی 30 دقیقه‌ای فارسی</div><div class="text-[11px] text-white/50 mt-1 leading-5">بعد از پرداخت، کمتر از 30 دقیقه پنل + ربات + اپ فارسی تحویل داده می‌شود - آموزش کامل فارسی</div></div></div>
-<div class="flex gap-3 bg-white/[0.04] border border-white/[0.06] rounded-[18px] p-4"><div class="w-10 h-10 bg-sky-500/15 rounded-[12px] flex items-center justify-center shrink-0"><i class="fa-brands fa-telegram text-sky-400"></i></div><div><div class="font-bold text-[13px]">پشتیبانی مستقیم فارسی: @mainAdminpanel</div><div class="text-[11px] text-white/50 mt-1 leading-5">هر سوالی داری، مستقیم به آیدی بالا پیام بده - پاسخگویی 24 ساعته فارسی - https://vpbotn.ir</div></div></div>
-</div>
+<div class="inline-flex bg-violet-500/10 border border-violet-500/20 rounded-full px-3 py-1 text-[11px] text-violet-300">📝 فرم سه‌بعدی فارسی - 30 ثانیه</div>
+<h2 class="text-[34px] font-black leading-[1.1]">فرم رو پر کن،<br><span class="gradient-text">30 دقیقه بعد پنلت سه‌بعدی آماده‌ست</span></h2>
+<p class="text-white/60 text-[13px] leading-7">اطلاعاتت رو وارد کن، کمتر از 30 دقیقه با شما تماس می‌گیریم. مشاوره رایگان فارسی - @mainAdminpanel</p>
 <img src="<?= $base ?>ads/banner-fa-2.jpg" class="w-full rounded-[20px] border border-white/[0.06] shadow-xl">
 </div>
-<div class="lg:col-span-3">
-<div class="relative bg-gradient-to-b from-white/[0.06] to-white/[0.02] border border-white/[0.08] rounded-[28px] p-1 shadow-[0_0_80px_rgba(124,58,237,.15)]">
-<div class="bg-[#0A0D18] rounded-[24px] p-6 sm:p-8">
+<div class="lg:col-span-3"><div class="bg-gradient-to-b from-white/[0.06] to-white/[0.02] border border-white/[0.08] rounded-[28px] p-1 shadow-[0_0_80px_rgba(124,58,237,.15)]"><div class="bg-[#0A0D18] rounded-[24px] p-6 sm:p-8">
 <?php if($success): ?>
-<div class="bg-emerald-500/10 border border-emerald-500/20 rounded-[20px] p-8 text-center space-y-4">
-<div class="w-20 h-20 bg-emerald-500 rounded-full flex items-center justify-center mx-auto text-3xl shadow-[0_0_40px_rgba(16,185,129,.4)]"><i class="fa-solid fa-check"></i></div>
-<h3 class="font-black text-[20px] text-emerald-300">درخواست شما با موفقیت ثبت شد! ✅</h3>
-<p class="text-[13px] text-white/70 leading-7">همکاران ما در کمتر از 30 دقیقه از طریق تلگرام یا تماس با شما ارتباط می‌گیرند.<br>برای ارتباط سریع‌تر به آیدی <a href="<?= $tg_url ?>" target="_blank" class="text-sky-400 font-bold underline">@mainAdminpanel</a> پیام دهید.<br><span class="text-[11px] text-white/40">سایت اصلی: https://vpbotn.ir - پنل: https://vpbotn.ir/contax/</span></p>
-<div class="pt-3 flex justify-center gap-2"><a href="<?= $tg_url ?>" target="_blank" class="gradient-bg rounded-full px-8 py-3 text-[13px] font-bold flex items-center gap-2"><i class="fa-brands fa-telegram"></i> پیام به @mainAdminpanel</a></div>
-</div>
+<div class="bg-emerald-500/10 border border-emerald-500/20 rounded-[20px] p-8 text-center space-y-4"><div class="w-20 h-20 bg-emerald-500 rounded-full flex items-center justify-center mx-auto text-3xl shadow-[0_0_40px_rgba(16,185,129,.4)]"><i class="fa-solid fa-check"></i></div><h3 class="font-black text-[20px] text-emerald-300">درخواست سه‌بعدی ثبت شد! ✅</h3><p class="text-[13px] text-white/70 leading-7">کمتر از 30 دقیقه با شما تماس می‌گیریم.<br>سریع‌تر: <a href="<?= $tg_url ?>" class="text-sky-400 font-bold underline">@mainAdminpanel</a></p><a href="<?= $tg_url ?>" class="inline-flex gradient-bg rounded-full px-8 py-3 text-[13px] font-bold"><i class="fa-brands fa-telegram"></i> پیام به @mainAdminpanel</a></div>
 <?php else: ?>
 <?php if($error): ?><div class="bg-rose-500/10 border border-rose-500/20 rounded-[14px] p-3 text-[12px] text-rose-300 mb-5"><?= htmlspecialchars($error) ?></div><?php endif; ?>
 <form method="POST" class="space-y-5">
 <input type="hidden" name="reseller_request" value="1">
-<div class="grid sm:grid-cols-2 gap-4">
-<div><label class="block text-[11px] text-white/50 mb-2">نام و نام خانوادگی <span class="text-rose-400">*</span></label><input type="text" name="name" required placeholder="مثلاً: علی رضایی" class="w-full bg-[#05070D] border border-white/[0.08] focus:border-violet-500/50 rounded-[14px] px-4 py-3.5 text-[13px] focus:outline-none focus:bg-white/[0.04] transition"></div>
-<div><label class="block text-[11px] text-white/50 mb-2">شماره موبایل</label><input type="text" name="phone" placeholder="0912..." class="w-full bg-[#05070D] border border-white/[0.08] focus:border-violet-500/50 rounded-[14px] px-4 py-3.5 text-[13px] focus:outline-none focus:bg-white/[0.04] transition"></div>
-</div>
-<div class="grid sm:grid-cols-2 gap-4">
-<div><label class="block text-[11px] text-white/50 mb-2">آیدی تلگرام <span class="text-rose-400">*</span></label><input type="text" name="telegram_id" required placeholder="@username" class="w-full bg-[#05070D] border border-white/[0.08] focus:border-violet-500/50 rounded-[14px] px-4 py-3.5 text-[13px] focus:outline-none focus:bg-white/[0.04] transition"></div>
-<div><label class="block text-[11px] text-white/50 mb-2">نوع کسب‌وکار فعلی</label><select name="business" class="w-full bg-[#05070D] border border-white/[0.08] focus:border-violet-500/50 rounded-[14px] px-4 py-3.5 text-[13px] focus:outline-none focus:bg-white/[0.04] transition"><option>پیج اینستاگرام</option><option>کانال تلگرام</option><option>سایت</option><option>فروش حضوری / مغازه</option><option>شروع جدید - بدون سابقه</option><option>سایر</option></select></div>
-</div>
-<div><label class="block text-[11px] text-white/50 mb-2">پلن مورد نظر - فارسی</label>
-<div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-<label class="cursor-pointer bg-[#05070D] border border-white/[0.06] hover:border-violet-500/30 rounded-[14px] p-3.5 flex items-center gap-2.5 transition has-[:checked]:border-violet-500/50 has-[:checked]:bg-violet-500/[0.08]"><input type="radio" name="plan" value="استارتر 299ت - فارسی" class="accent-violet-500"><span class="text-[11px]"><b>استارتر</b><br><span class="text-white/40">299ت - 20% تخفیف فارسی</span></span></label>
-<label class="cursor-pointer bg-[#05070D] border border-violet-500/40 bg-violet-500/[0.08] rounded-[14px] p-3.5 flex items-center gap-2.5 transition"><input type="radio" name="plan" value="حرفه‌ای 599ت ⭐ پرفروش - با اپ فارسی" class="accent-violet-500" checked><span class="text-[11px]"><b>حرفه‌ای ⭐</b><br><span class="text-violet-300">599ت - 35% + اپ اختصاصی فارسی</span></span></label>
-<label class="cursor-pointer bg-[#05070D] border border-white/[0.06] hover:border-violet-500/30 rounded-[14px] p-3.5 flex items-center gap-2.5 transition has-[:checked]:border-violet-500/50 has-[:checked]:bg-violet-500/[0.08]"><input type="radio" name="plan" value="بیزینس 1.29م - کامل فارسی"><span class="text-[11px]"><b>بیزینس</b><br><span class="text-white/40">1.29م - 50% + همه چیز فارسی</span></span></label>
-</div>
-</div>
-<div><label class="block text-[11px] text-white/50 mb-2">توضیحات / سوال شما (اختیاری - فارسی)</label><textarea name="message" rows="3" placeholder="مثلاً: من پیج 20k دارم، می‌خوام شروع کنم. لطفاً راهنمایی کنید..." class="w-full bg-[#05070D] border border-white/[0.08] focus:border-violet-500/50 rounded-[14px] px-4 py-3.5 text-[13px] focus:outline-none focus:bg-white/[0.04] transition"></textarea></div>
-<button type="submit" class="w-full gradient-bg hover:opacity-90 rounded-full py-4 font-black text-[14px] flex items-center justify-center gap-2.5 shadow-[0_0_40px_rgba(124,58,237,.35)] hover:shadow-[0_0_60px_rgba(124,58,237,.5)] transition-all shimmer">
-<i class="fa-solid fa-paper-plane"></i> ثبت درخواست نمایندگی + دریافت 500 هزار تومان هدیه فارسی
-</button>
-<div class="text-[11px] text-white/30 text-center">با ثبت درخواست، همکاران ما در کمتر از 30 دقیقه با شما تماس می‌گیرند. اطلاعات شما محفوظ است - کاملاً فارسی</div>
-<div class="flex items-center justify-center gap-2 text-[12px] pt-2"><span class="text-white/40">یا مستقیم پیام بده:</span><a href="<?= $tg_url ?>" target="_blank" class="bg-sky-500/15 border border-sky-500/20 text-sky-300 rounded-full px-4 py-1.5 font-bold hover:bg-sky-500/25 transition"><i class="fa-brands fa-telegram"></i> @mainAdminpanel</a></div>
+<div class="grid sm:grid-cols-2 gap-4"><div><label class="block text-[11px] text-white/50 mb-2">نام و نام خانوادگی *</label><input type="text" name="name" required placeholder="مثلاً: علی رضایی" class="w-full bg-[#05070D] border border-white/[0.08] rounded-[14px] px-4 py-3.5 text-[13px] focus:outline-none focus:border-violet-500/50"></div><div><label class="block text-[11px] text-white/50 mb-2">شماره موبایل</label><input type="text" name="phone" placeholder="0912..." class="w-full bg-[#05070D] border border-white/[0.08] rounded-[14px] px-4 py-3.5 text-[13px] focus:outline-none focus:border-violet-500/50"></div></div>
+<div class="grid sm:grid-cols-2 gap-4"><div><label class="block text-[11px] text-white/50 mb-2">آیدی تلگرام *</label><input type="text" name="telegram_id" required placeholder="@username" class="w-full bg-[#05070D] border border-white/[0.08] rounded-[14px] px-4 py-3.5 text-[13px] focus:outline-none focus:border-violet-500/50"></div><div><label class="block text-[11px] text-white/50 mb-2">پلن سه‌بعدی فارسی</label><select name="plan" class="w-full bg-[#05070D] border border-white/[0.08] rounded-[14px] px-4 py-3.5 text-[13px]"><option>استارتر 299ت - فارسی</option><option selected>حرفه‌ای 599ت ⭐ با اپ سه‌بعدی فارسی</option><option>بیزینس 1.29م - کامل سه‌بعدی فارسی</option></select></div></div>
+<div><label class="block text-[11px] text-white/50 mb-2">پیام فارسی</label><textarea name="message" rows="3" placeholder="توضیحات فارسی..." class="w-full bg-[#05070D] border border-white/[0.08] rounded-[14px] px-4 py-3.5 text-[13px]"></textarea></div>
+<button type="submit" class="w-full gradient-bg rounded-full py-4 font-black text-[14px] flex items-center justify-center gap-2.5 shadow-[0_0_40px_rgba(124,58,237,.35)]">🚀 ثبت درخواست سه‌بعدی + 500ت هدیه فارسی</button>
+<div class="text-center"><a href="<?= $tg_url ?>" class="inline-flex bg-sky-500/15 border border-sky-500/20 text-sky-300 rounded-full px-4 py-1.5 text-xs font-bold">ارتباط مستقیم: @mainAdminpanel - سه‌بعدی فارسی</a></div>
 </form>
 <?php endif; ?>
-</div>
-</div>
-</div>
+</div></div></div>
 </div>
 </section>
 
-<!-- FAQ -->
-<section id="faq" class="py-24 px-4 max-w-4xl mx-auto">
-<div class="text-center mb-12"><div class="inline-flex bg-white/[0.04] border border-white/[0.06] rounded-full px-3 py-1 text-[11px] text-white/50">❓ سوالات متداول فارسی</div><h2 class="text-[32px] font-black mt-4">هر سوالی داری، اینجا جوابشه - فارسی</h2></div>
-<div class="space-y-3">
-<details class="group bg-white/[0.03] border border-white/[0.06] rounded-[18px] p-5 open:bg-white/[0.05] open:border-violet-500/20 transition"><summary class="flex justify-between items-center cursor-pointer list-none font-bold text-[13px]">آیا نیاز به دانش فنی دارم؟ <span class="w-7 h-7 bg-white/[0.06] group-open:bg-violet-500 rounded-full flex items-center justify-center transition"><i class="fa-solid fa-chevron-down text-[10px] group-open:rotate-180 transition"></i></span></summary><p class="text-[12px] text-white/50 mt-4 leading-6">خیر! همه چیز آماده و فارسی است. پنل، ربات، اپ. فقط لینک ربات را به مشتری می‌دهید. آموزش صفر تا صد فارسی هم داریم - ویدیو + PDF.</p></details>
-<details class="group bg-white/[0.03] border border-white/[0.06] rounded-[18px] p-5 open:bg-white/[0.05] open:border-violet-500/20 transition"><summary class="flex justify-between items-center cursor-pointer list-none font-bold text-[13px]">مشتری از کجا بیارم؟ <span class="w-7 h-7 bg-white/[0.06] group-open:bg-violet-500 rounded-full flex items-center justify-center transition"><i class="fa-solid fa-chevron-down text-[10px] group-open:rotate-180 transition"></i></span></summary><p class="text-[12px] text-white/50 mt-4 leading-6">پیج اینستا، کانال تلگرام، دیوار، دوستان. ما روش‌های جذب مشتری فارسی (تست رایگان، تخفیف، رفرال) را آموزش می‌دهیم. میانگین هر نماینده ماه اول 30-50 مشتری جذب می‌کند.</p></details>
-<details class="group bg-white/[0.03] border border-white/[0.06] rounded-[18px] p-5 open:bg-white/[0.05] open:border-violet-500/20 transition"><summary class="flex justify-between items-center cursor-pointer list-none font-bold text-[13px]">قیمت فروش دست کیه؟ <span class="w-7 h-7 bg-white/[0.06] group-open:bg-violet-500 rounded-full flex items-center justify-center transition"><i class="fa-solid fa-chevron-down text-[10px] group-open:rotate-180 transition"></i></span></summary><p class="text-[12px] text-white/50 mt-4 leading-6">100% دست شما! مثلاً پلن 30 گیگ را 40ت می‌خرید، 120ت می‌فروشید. 80ت سود خالص. می‌توانید 100ت یا 150ت هم بفروشید - کاملاً فارسی و آزاد.</p></details>
-<details class="group bg-white/[0.03] border border-white/[0.06] rounded-[18px] p-5 open:bg-white/[0.05] open:border-violet-500/20 transition"><summary class="flex justify-between items-center cursor-pointer list-none font-bold text-[13px]">اپ اختصاصی فارسی چقدر طول می‌کشه؟ <span class="w-7 h-7 bg-white/[0.06] group-open:bg-violet-500 rounded-full flex items-center justify-center transition"><i class="fa-solid fa-chevron-down text-[10px] group-open:rotate-180 transition"></i></span></summary><p class="text-[12px] text-white/50 mt-4 leading-6">24 تا 48 ساعت. لوگو و نام برند را بفرستید، ما اپ فارسی را می‌سازیم و APK تحویل می‌دهیم. آپدیت مادام‌العمر رایگان فارسی.</p></details>
-<details class="group bg-white/[0.03] border border-white/[0.06] rounded-[18px] p-5 open:bg-white/[0.05] open:border-violet-500/20 transition"><summary class="flex justify-between items-center cursor-pointer list-none font-bold text-[13px]">سرورها فیلتر می‌شه؟ <span class="w-7 h-7 bg-white/[0.06] group-open:bg-violet-500 rounded-full flex items-center justify-center transition"><i class="fa-solid fa-chevron-down text-[10px] group-open:rotate-180 transition"></i></span></summary><p class="text-[12px] text-white/50 mt-4 leading-6">پروتکل VLESS Reality مقاوم‌ترین پروتکل حال حاضر است و به سختی قابل تشخیص است. آپتایم 99.9% داریم - تست شده در ایران.</p></details>
+<!-- VIDEO MODAL -->
+<div id="videoModal" class="fixed inset-0 z-[100] hidden">
+<div class="absolute inset-0 bg-black/80 backdrop-blur-xl" onclick="closeVideo()"></div>
+<div class="relative z-10 min-h-screen flex items-center justify-center p-4">
+<div class="bg-[#0A0D18] border border-white/[0.1] rounded-[24px] w-full max-w-3xl overflow-hidden shadow-[0_0_100px_rgba(124,58,237,.3)]">
+<div class="flex justify-between items-center p-5 border-b border-white/[0.06]"><h3 class="font-black">🎬 ویدیو معرفی پنل سه‌بعدی فارسی - 60 ثانیه</h3><button onclick="closeVideo()" class="w-8 h-8 bg-white/[0.06] rounded-full flex items-center justify-center hover:bg-white/[0.1]"><i class="fa-solid fa-xmark text-xs"></i></button></div>
+<div class="aspect-video bg-black relative">
+<img src="<?= $base ?>ads/banner-fa-premium.jpg" class="w-full h-full object-cover">
+<div class="absolute inset-0 flex items-center justify-center bg-black/40"><div class="text-center"><div class="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto shadow-[0_0_50px_rgba(255,255,255,.5)]"><i class="fa-solid fa-play text-black text-xl ml-1"></i></div><p class="text-sm mt-4 text-white/80">ویدیو معرفی به زودی - فعلاً تصاویر سه‌بعدی فارسی</p><p class="text-xs text-white/40 mt-1">برای دیدن دمو آنلاین: demo/demo123 در https://vpbotn.ir/contax/</p></div></div>
 </div>
-</section>
+<div class="p-5 flex gap-3"><a href="<?= $panel_url ?>" target="_blank" class="flex-1 gradient-bg rounded-full py-3 text-center text-sm font-bold">🚀 ورود به دمو آنلاین demo/demo123</a><a href="<?= $tg_url ?>" target="_blank" class="bg-white/[0.06] border border-white/[0.08] rounded-full px-6 py-3 text-sm font-bold"> @mainAdminpanel</a></div>
+</div>
+</div>
+</div>
 
-<!-- FINAL CTA -->
-<section class="py-20 px-4">
-<div class="max-w-5xl mx-auto relative overflow-hidden bg-gradient-to-br from-violet-600/20 via-indigo-600/10 to-cyan-500/10 border border-violet-500/20 rounded-[32px] p-10 sm:p-14 text-center">
-<div class="absolute top-0 right-0 w-[500px] h-[500px] bg-violet-600/20 rounded-full blur-[100px] -z-10"></div>
-<div class="absolute bottom-0 left-0 w-[400px] h-[400px] bg-cyan-500/15 rounded-full blur-[100px] -z-10"></div>
-<h2 class="text-[32px] sm:text-[44px] font-black leading-[1.1] text-balance">آماده‌ای کسب و کارت رو<br><span class="gradient-text">با برند خودت شروع کنی؟</span></h2>
-<p class="text-white/60 text-[13px] mt-4 max-w-2xl mx-auto leading-6">همین حالا فرم بالا رو پر کن یا مستقیم به @mainAdminpanel پیام بده. 30 دقیقه دیگه پنلت آماده‌ست. جشنواره محدود - فقط 20 نفر! کاملاً فارسی.</p>
-<div class="mt-10 flex flex-wrap justify-center gap-3">
-<a href="#request" class="gradient-bg rounded-full px-10 py-4 font-black text-[14px] flex items-center gap-2 shadow-[0_0_40px_rgba(124,58,237,.4)] hover:shadow-[0_0_60px_rgba(124,58,237,.6)] transition-all"><i class="fa-solid fa-rocket"></i> ثبت درخواست نمایندگی فارسی</a>
-<a href="<?= $tg_url ?>" target="_blank" class="bg-white/[0.06] border border-white/[0.08] rounded-full px-8 py-4 font-bold text-[13px] flex items-center gap-2 hover:bg-white/[0.1] transition"><i class="fa-brands fa-telegram text-sky-400 text-[18px]"></i> @mainAdminpanel - مشاوره رایگان فارسی</a>
-</div>
-<div class="mt-8 inline-flex flex-wrap justify-center gap-2 text-[11px] text-white/40">
-<span class="bg-white/[0.04] border border-white/[0.06] rounded-full px-3 py-1.5">🔒 پرداخت امن زرین‌پال + تتر + تون</span>
-<span class="bg-white/[0.04] border border-white/[0.06] rounded-full px-3 py-1.5">⚡ تحویل آنی 30 دقیقه فارسی</span>
-<span class="bg-white/[0.04] border border-white/[0.06] rounded-full px-3 py-1.5">🎁 500ت شارژ + 1 ماه هدیه</span>
-<span class="bg-white/[0.04] border border-white/[0.06] rounded-full px-3 py-1.5">🇮🇷 100% فارسی</span>
-</div>
-</div>
-</section>
-
-<footer class="border-t border-white/[0.06] py-12 px-4">
-<div class="max-w-7xl mx-auto grid md:grid-cols-4 gap-8 text-[12px]">
-<div class="md:col-span-2"><div class="flex items-center gap-2.5 font-black text-[15px]"><div class="w-8 h-8 gradient-bg rounded-[10px] flex items-center justify-center">C</div> Connectix v5.8 - فارسی کامل<div class="bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 rounded-full px-2.5 py-0.5 text-[10px]">● آنلاین</div></div><p class="text-white/40 leading-6 mt-3 max-w-md">قدرتمندترین پنل نمایندگی VPN ایران با اپ اختصاصی فارسی، ربات فروش خودکار فارسی و هوش مصنوعی با راهنمای تصویری فارسی. بیش از 200 نماینده فعال فارسی. پشتیبانی: @mainAdminpanel - دامنه: https://vpbotn.ir</p><div class="mt-5 flex gap-2.5"><img src="<?= $base ?>ads/banner-fa-1.jpg" class="w-36 h-24 object-cover rounded-[14px] border border-white/[0.06]"><img src="<?= $base ?>ads/banner-fa-2.jpg" class="w-36 h-24 object-cover rounded-[14px] border border-white/[0.06]"><img src="<?= $base ?>ads/banner-fa-3.jpg" class="w-36 h-24 object-cover rounded-[14px] border border-white/[0.06] hidden sm:block"></div></div>
-<div><div class="font-bold text-white mb-3">لینک‌های سریع فارسی</div><div class="space-y-2.5 text-white/50"><a href="#features" class="block hover:text-white transition">📋 امکانات کامل پنل فارسی</a><a href="#why" class="block hover:text-white transition">🔥 چرا جذابه؟</a><a href="#app" class="block hover:text-white transition">📱 اپ اختصاصی فارسی</a><a href="#pricing" class="block hover:text-white transition">💰 تعرفه فارسی</a><a href="#request" class="block hover:text-white transition">📝 درخواست نمایندگی فارسی</a><a href="<?= $panel_url ?>" class="block hover:text-white transition">🔐 ورود به پنل</a></div></div>
-<div><div class="font-bold text-white mb-3">ارتباط فارسی - @mainAdminpanel</div><div class="space-y-2.5 text-white/50"><a href="<?= $tg_url ?>" target="_blank" class="flex items-center gap-2 hover:text-white transition"><i class="fa-brands fa-telegram text-sky-400"></i> تلگرام: @mainAdminpanel</a><span class="flex items-center gap-2"><i class="fa-solid fa-globe text-violet-400"></i> سایت اصلی: https://vpbotn.ir</span><span class="flex items-center gap-2"><i class="fa-solid fa-server text-cyan-400"></i> پنل: https://vpbotn.ir/contax/</span><span class="flex items-center gap-2"><i class="fa-solid fa-robot text-amber-400"></i> ربات دمو: @mainAdminpanel</span><span class="flex items-center gap-2"><i class="fa-solid fa-envelope text-white/40"></i> پشتیبانی 24/7 فارسی</span></div><div class="mt-5 bg-white/[0.04] border border-white/[0.06] rounded-[14px] p-3 text-[11px]"><div class="font-bold text-white">💡 نکته:</div><div class="text-white/40 mt-1 leading-5">این صفحه کاملاً فارسی و بدون نیاز به لاگین است. می‌توانید لینک https://vpbotn.ir/ را در همه جا پخش کنید.</div></div></div>
-</div>
-<div class="max-w-7xl mx-auto mt-10 pt-6 border-t border-white/[0.06] flex flex-col sm:flex-row justify-between gap-3 text-[11px] text-white/25"><span>© 2025 Connectix - همه حقوق محفوظ است. ساخته شده با ❤️ برای نمایندگان ایرانی - نسخه 5.8 فارسی</span><span>🇮🇷 100% فارسی - @mainAdminpanel - https://vpbotn.ir</span></div>
-</div>
+<footer class="border-t border-white/[0.06] py-10 px-4 text-center text-[11px] text-white/25">
+<div>© 2025 Connectix 3D v6.0 - سه‌بعدی فارسی - https://vpbotn.ir - @mainAdminpanel - demo/demo123</div>
 </footer>
 
-<div class="fixed bottom-0 left-0 right-0 md:hidden bg-[#05070D]/85 glass border-t border-white/[0.06] p-3 z-40">
-<a href="#request" class="gradient-bg rounded-full py-3.5 flex items-center justify-center gap-2 font-bold text-[13px] w-full shadow-[0_0_30px_rgba(124,58,237,.4)]"><i class="fa-solid fa-rocket"></i> ثبت درخواست - @mainAdminpanel - فارسی</a>
-</div>
-
 <script>
-// Smooth header links active
-document.querySelectorAll('a[href^="#"]').forEach(a=>{
- a.addEventListener('click',e=>{
-  const id=a.getAttribute('href'); if(id.length>1){ e.preventDefault(); document.querySelector(id)?.scrollIntoView({behavior:'smooth',block:'start'}); }
+// Custom cursor
+const dot = document.getElementById('cursorDot'), ring = document.getElementById('cursorRing');
+if(dot && ring && window.innerWidth>768){
+ let mx=0,my=0,rx=0,ry=0;
+ document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;dot.style.left=mx-4+'px';dot.style.top=my-4+'px';});
+ (function loop(){rx+=(mx-rx)*0.15;ry+=(my-ry)*0.15;ring.style.left=rx-20+'px';ring.style.top=ry-20+'px';requestAnimationFrame(loop);})();
+ document.querySelectorAll('a,button').forEach(el=>{
+  el.addEventListener('mouseenter',()=>{ring.style.transform='scale(1.5)';ring.style.borderColor='rgba(139,92,246,.8)';});
+  el.addEventListener('mouseleave',()=>{ring.style.transform='scale(1)';ring.style.borderColor='rgba(139,92,246,.5)';});
  });
-});
-// FAQ close others when open
-document.querySelectorAll('#faq details').forEach(d=>{
- d.addEventListener('toggle',()=>{
-  if(d.open){ document.querySelectorAll('#faq details').forEach(o=>{ if(o!==d) o.open=false; }); }
+}
+// 3D tilt
+document.querySelectorAll('.tilt').forEach(card=>{
+ card.addEventListener('mousemove',e=>{
+  const r=card.getBoundingClientRect(); const x=e.clientX-r.left-r.width/2; const y=e.clientY-r.top-r.height/2;
+  card.style.transform=`perspective(1000px) rotateY(${x/20}deg) rotateX(${-y/20}deg) translateZ(10px)`;
  });
+ card.addEventListener('mouseleave',()=>{card.style.transform='perspective(1000px) rotateY(0) rotateX(0) translateZ(0)';});
 });
+// Three.js 3D background
+try{
+ const canvas=document.getElementById('canvas3d'); const scene=new THREE.Scene(); const camera=new THREE.PerspectiveCamera(75,window.innerWidth/window.innerHeight,0.1,1000);
+ const renderer=new THREE.WebGLRenderer({canvas,alpha:true,antialias:true}); renderer.setSize(window.innerWidth,window.innerHeight); renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+ const particlesGeometry=new THREE.BufferGeometry(); const count=1500; const pos=new Float32Array(count*3);
+ for(let i=0;i<count*3;i++) pos[i]=(Math.random()-0.5)*20; particlesGeometry.setAttribute('position',new THREE.BufferAttribute(pos,3));
+ const particlesMaterial=new THREE.PointsMaterial({size:0.02,color:0x8B5CF6,transparent:true,opacity:0.6}); const particles=new THREE.Points(particlesGeometry,particlesMaterial); scene.add(particles);
+ const torusGeometry=new THREE.TorusGeometry(3,0.3,16,100); const torusMaterial=new THREE.MeshBasicMaterial({color:0x06B6D4,wireframe:true,transparent:true,opacity:0.15}); const torus=new THREE.Mesh(torusGeometry,torusMaterial); scene.add(torus);
+ camera.position.z=6;
+ let mouseX=0,mouseY=0; document.addEventListener('mousemove',e=>{mouseX=(e.clientX/window.innerWidth-0.5)*2;mouseY=(e.clientY/window.innerHeight-0.5)*2;});
+ function animate(){requestAnimationFrame(animate); particles.rotation.y+=0.0005; particles.rotation.x+=0.0002; torus.rotation.x+=0.002; torus.rotation.y+=0.003; torus.rotation.x+=mouseY*0.0005; torus.rotation.y+=mouseX*0.0005; camera.position.x+= (mouseX*0.5 - camera.position.x)*0.05; camera.position.y+= (-mouseY*0.5 - camera.position.y)*0.05; camera.lookAt(0,0,0); renderer.render(scene,camera);} animate();
+ window.addEventListener('resize',()=>{camera.aspect=window.innerWidth/window.innerHeight;camera.updateProjectionMatrix();renderer.setSize(window.innerWidth,window.innerHeight);});
+}catch(e){console.log('3D fallback',e);}
+
+function openVideo(){document.getElementById('videoModal').classList.remove('hidden');document.body.style.overflow='hidden';}
+function closeVideo(){document.getElementById('videoModal').classList.add('hidden');document.body.style.overflow='';}
+function copyText(t){navigator.clipboard.writeText(t);alert('کپی شد: '+t+' - فارسی');}
 </script>
 </body>
 </html>
