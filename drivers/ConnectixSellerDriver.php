@@ -267,15 +267,127 @@ class ConnectixSellerDriver implements PanelDriverInterface {
     // We return false or try best effort
 
     public function createUser(array $payload): array {
-        // TODO: Implement via POST /v1/seller/clients - needs plan_id, name, etc.
-        // For now, we don't have plan mapping from traffic limit to plan_id
-        // So return error instructing to create manually in seller panel
-        return [
-            'success'=>false,
-            'error'=>'ایجاد کاربر مستقیم از طریق API فروشنده Connectix هنوز پیاده‌سازی نشده است. لطفاً از پنل seller.connectix.vip کلاینت بسازید و سپس در این پنل Sync کنید.',
-            'uuid'=>'',
-            'sublink'=>''
-        ];
+        // NEW: Implemented via POST /v1/seller/clients/store - discovered 2026-09-30
+        // Endpoint requires: name, username, password (max 8 chars), plan_id, group_id
+        // Tested: password must not be >8 chars, plan_id must be valid from meta-data
+        try {
+            // Fetch plans and groups if not provided
+            $planId = $payload['plan_id'] ?? $payload['seller_plan_id'] ?? null;
+            $groupId = $payload['group_id'] ?? null;
+
+            // If plan_id not provided, try to auto-select based on traffic and duration
+            if (empty($planId)) {
+                $metaRes = $this->request('/v1/seller/clients/meta-data');
+                if ($metaRes['success'] && !empty($metaRes['data'])) {
+                    $plans = $metaRes['data']['seller_plans'] ?? $metaRes['data']['plans'] ?? [];
+                    // Try to match by traffic GB from payload
+                    $trafficBytes = $payload['traffic_limit_bytes'] ?? $payload['traffic'] ?? 0;
+                    if (is_numeric($trafficBytes) && $trafficBytes > 0) {
+                        $trafficGb = $trafficBytes / 1073741824;
+                        // Find closest plan
+                        $bestPlan = null;
+                        $bestDiff = PHP_FLOAT_MAX;
+                        foreach ($plans as $pl) {
+                            $title = $pl['title'] ?? '';
+                            // Parse GB from title like "(4x) 10GB-1M + 3D" or "(1x) Unlimited-1M"
+                            if (preg_match('/(\d+)\s*GB/i', $title, $m)) {
+                                $gb = (int)$m[1];
+                                $diff = abs($gb - $trafficGb);
+                                if ($diff < $bestDiff) {
+                                    $bestDiff = $diff;
+                                    $bestPlan = $pl;
+                                }
+                            } elseif (stripos($title, 'Unlimited') !== false && $trafficGb >= 100) {
+                                // Unlimited for large traffic
+                                if ($bestPlan === null) $bestPlan = $pl;
+                            }
+                        }
+                        if ($bestPlan) $planId = $bestPlan['id'];
+                    }
+                    // Fallback to first plan if still empty
+                    if (empty($planId) && !empty($plans)) {
+                        $planId = $plans[0]['id'];
+                    }
+                }
+            }
+
+            // Group fallback to default (ویژه) - always allowed
+            if (empty($groupId)) {
+                $groupId = '762dc040-28af-42d9-9d35-139b0d0f6df2'; // default / ویژه
+            }
+
+            if (empty($planId)) {
+                return ['success'=>false, 'error'=>'پلن معتبر یافت نشد. لطفاً از meta-data پلن‌ها را بررسی کنید.', 'uuid'=>'', 'sublink'=>''];
+            }
+
+            $username = $payload['username'] ?? ('u'.time().rand(10,99));
+            $name = $payload['name'] ?? $payload['customer_name'] ?? $username;
+            $password = $payload['password'] ?? substr(str_shuffle('ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'),0,6);
+            // Password max 8 chars - truncate
+            if (strlen($password) > 8) $password = substr($password,0,8);
+            if (strlen($password) < 4) $password = $password . rand(10,99);
+
+            $postData = [
+                'name' => $name,
+                'username' => $username,
+                'password' => $password,
+                'plan_id' => $planId,
+                'group_id' => $groupId,
+            ];
+
+            // Optional: try to add email if provided
+            if (!empty($payload['email'])) $postData['email'] = $payload['email'];
+
+            $res = $this->request('/v1/seller/clients/store', 'POST', $postData);
+
+            if ($res['success']) {
+                $data = $res['data'];
+                // Response may be client object directly or wrapped
+                $client = $data['client'] ?? $data['data'] ?? $data;
+                $sublink = $client['subscription_link'] ?? $client['subscription_url'] ?? $data['subscription_link'] ?? '';
+                $outline = $client['outline_link'] ?? $data['outline_link'] ?? '';
+                $uuid = $client['id'] ?? $client['uuid'] ?? '';
+
+                // If we didn't get links, try to fetch user immediately
+                if (empty($sublink) && !empty($username)) {
+                    $u = $this->getUser($username);
+                    if ($u) {
+                        $sublink = $u['subscription_url'] ?? '';
+                        $uuid = $u['id'] ?? $uuid;
+                    }
+                }
+
+                return [
+                    'success'=>true,
+                    'error'=>'',
+                    'uuid'=>$uuid ?: $username,
+                    'sublink'=>$sublink ?: $outline,
+                    'password'=>$password,
+                    'raw'=>$data,
+                ];
+            } else {
+                // Return validation errors
+                $errMsg = $this->lastError;
+                if (!empty($res['data'])) {
+                    $msg = $res['data']['message'] ?? '';
+                    $errors = $res['data']['errors'] ?? [];
+                    if (!empty($errors)) {
+                        $errDetails = [];
+                        foreach ($errors as $field => $msgs) {
+                            $errDetails[] = $field . ': ' . implode(', ', (array)$msgs);
+                        }
+                        $errMsg = $msg . ' - ' . implode(' | ', $errDetails);
+                    } elseif ($msg) {
+                        $errMsg = $msg;
+                    }
+                }
+                return ['success'=>false, 'error'=>$errMsg ?: 'خطا در ساخت کاربر', 'uuid'=>'', 'sublink'=>'', 'payload'=>$postData, 'raw'=>$res['data']];
+            }
+
+        } catch (Throwable $e) {
+            $this->lastError = $e->getMessage();
+            return ['success'=>false, 'error'=>'Exception: '.$e->getMessage(), 'uuid'=>'', 'sublink'=>''];
+        }
     }
 
     public function getUser(string $username): ?array {
@@ -308,8 +420,7 @@ class ConnectixSellerDriver implements PanelDriverInterface {
     }
 
     public function deleteUser(string $username): bool {
-        // Try to find id and delete via API
-        // Need to discover delete endpoint: try DELETE /v1/seller/clients/{id}
+        // Find id
         $users = $this->listUsers();
         $targetId = null;
         foreach ($users as $u) {
@@ -319,15 +430,64 @@ class ConnectixSellerDriver implements PanelDriverInterface {
             }
         }
         if (!$targetId) {
+            // Try to find via direct API call if list missed
+            $res = $this->request("/v1/seller/clients?search=$username&page=1&recordPerPage=10");
+            if ($res['success'] && !empty($res['data'])) {
+                $clients = $res['data']['clients']['data'] ?? $res['data']['data'] ?? [];
+                foreach ($clients as $c) {
+                    if (($c['username'] ?? '') === $username) {
+                        $targetId = $c['id'] ?? null;
+                        break;
+                    }
+                }
+            }
+        }
+        if (!$targetId) {
             $this->lastError = "کاربر $username در لیست Connectix یافت نشد.";
             return false;
         }
-        $res = $this->request("/v1/seller/clients/$targetId", 'DELETE');
-        return $res['success'];
+        // Try multiple delete endpoints
+        $endpoints = [
+            "/v1/seller/clients/$targetId" => 'DELETE',
+            "/v1/seller/clients/$targetId/delete" => 'DELETE',
+            "/v1/seller/clients/delete/$targetId" => 'DELETE',
+            "/v1/seller/clients/$targetId/destroy" => 'POST',
+            "/v1/seller/clients/$targetId/remove" => 'DELETE',
+        ];
+        foreach ($endpoints as $ep => $method) {
+            $res = $this->request($ep, $method);
+            if ($res['success']) return true;
+        }
+        return false;
     }
 
     public function toggleUserStatus(string $username, bool $active): bool {
-        $this->lastError = "تغییر وضعیت از طریق API فروشنده Connectix پشتیبانی نمی‌شود.";
+        // Try to find id and toggle via API - attempt common endpoints
+        $users = $this->listUsers();
+        $targetId = null;
+        foreach ($users as $u) {
+            if ($u['username'] === $username) {
+                $targetId = $u['id'] ?? null;
+                break;
+            }
+        }
+        if (!$targetId) {
+            $this->lastError = "کاربر $username یافت نشد.";
+            return false;
+        }
+        // Try toggle endpoints
+        $endpoints = [
+            "/v1/seller/clients/$targetId/toggle" => ['is_active' => $active ? 1 : 0],
+            "/v1/seller/clients/$targetId/status" => ['is_active' => $active ? 1 : 0],
+            "/v1/seller/clients/$targetId/update" => ['is_active' => $active ? 1 : 0],
+        ];
+        foreach ($endpoints as $ep => $data) {
+            $res = $this->request($ep, 'POST', $data);
+            if ($res['success']) return true;
+            $res2 = $this->request($ep, 'PUT', $data);
+            if ($res2['success']) return true;
+        }
+        $this->lastError = "تغییر وضعیت از طریق API فروشنده Connectix پشتیبانی نمی‌شود یا endpoint یافت نشد.";
         return false;
     }
 }
