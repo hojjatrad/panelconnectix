@@ -269,27 +269,23 @@ class ConnectixSellerDriver implements PanelDriverInterface {
     public function createUser(array $payload): array {
         // NEW: Implemented via POST /v1/seller/clients/store - discovered 2026-09-30
         // Endpoint requires: name, username, password (max 8 chars), plan_id, group_id
-        // Tested: password must not be >8 chars, plan_id must be valid from meta-data
+        // IMPORTANT: API auto-generates username! Returns text_to_copy with actual username like `8cl55hfm`
+        // Response: {"message":"client has been created","client_id":"...","text_to_copy":"plan: ... username: `8cl55hfm` password: `a1b2c`"}
         try {
-            // Fetch plans and groups if not provided
             $planId = $payload['plan_id'] ?? $payload['seller_plan_id'] ?? null;
             $groupId = $payload['group_id'] ?? null;
 
-            // If plan_id not provided, try to auto-select based on traffic and duration
             if (empty($planId)) {
                 $metaRes = $this->request('/v1/seller/clients/meta-data');
                 if ($metaRes['success'] && !empty($metaRes['data'])) {
                     $plans = $metaRes['data']['seller_plans'] ?? $metaRes['data']['plans'] ?? [];
-                    // Try to match by traffic GB from payload
                     $trafficBytes = $payload['traffic_limit_bytes'] ?? $payload['traffic'] ?? 0;
                     if (is_numeric($trafficBytes) && $trafficBytes > 0) {
                         $trafficGb = $trafficBytes / 1073741824;
-                        // Find closest plan
                         $bestPlan = null;
                         $bestDiff = PHP_FLOAT_MAX;
                         foreach ($plans as $pl) {
                             $title = $pl['title'] ?? '';
-                            // Parse GB from title like "(4x) 10GB-1M + 3D" or "(1x) Unlimited-1M"
                             if (preg_match('/(\d+)\s*GB/i', $title, $m)) {
                                 $gb = (int)$m[1];
                                 $diff = abs($gb - $trafficGb);
@@ -298,32 +294,28 @@ class ConnectixSellerDriver implements PanelDriverInterface {
                                     $bestPlan = $pl;
                                 }
                             } elseif (stripos($title, 'Unlimited') !== false && $trafficGb >= 100) {
-                                // Unlimited for large traffic
                                 if ($bestPlan === null) $bestPlan = $pl;
                             }
                         }
                         if ($bestPlan) $planId = $bestPlan['id'];
                     }
-                    // Fallback to first plan if still empty
                     if (empty($planId) && !empty($plans)) {
                         $planId = $plans[0]['id'];
                     }
                 }
             }
 
-            // Group fallback to default (ویژه) - always allowed
             if (empty($groupId)) {
-                $groupId = '762dc040-28af-42d9-9d35-139b0d0f6df2'; // default / ویژه
+                $groupId = '762dc040-28af-42d9-9d35-139b0d0f6df2';
             }
 
             if (empty($planId)) {
-                return ['success'=>false, 'error'=>'پلن معتبر یافت نشد. لطفاً از meta-data پلن‌ها را بررسی کنید.', 'uuid'=>'', 'sublink'=>''];
+                return ['success'=>false, 'error'=>'پلن معتبر یافت نشد.', 'uuid'=>'', 'sublink'=>''];
             }
 
             $username = $payload['username'] ?? ('u'.time().rand(10,99));
             $name = $payload['name'] ?? $payload['customer_name'] ?? $username;
             $password = $payload['password'] ?? substr(str_shuffle('ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'),0,6);
-            // Password max 8 chars - truncate
             if (strlen($password) > 8) $password = substr($password,0,8);
             if (strlen($password) < 4) $password = $password . rand(10,99);
 
@@ -334,39 +326,75 @@ class ConnectixSellerDriver implements PanelDriverInterface {
                 'plan_id' => $planId,
                 'group_id' => $groupId,
             ];
-
-            // Optional: try to add email if provided
             if (!empty($payload['email'])) $postData['email'] = $payload['email'];
 
             $res = $this->request('/v1/seller/clients/store', 'POST', $postData);
 
             if ($res['success']) {
                 $data = $res['data'];
-                // Response may be client object directly or wrapped
-                $client = $data['client'] ?? $data['data'] ?? $data;
-                $sublink = $client['subscription_link'] ?? $client['subscription_url'] ?? $data['subscription_link'] ?? '';
-                $outline = $client['outline_link'] ?? $data['outline_link'] ?? '';
-                $uuid = $client['id'] ?? $client['uuid'] ?? '';
+                $clientId = $data['client_id'] ?? $data['id'] ?? $data['data']['id'] ?? null;
+                $textToCopy = $data['text_to_copy'] ?? '';
 
-                // If we didn't get links, try to fetch user immediately
-                if (empty($sublink) && !empty($username)) {
-                    $u = $this->getUser($username);
-                    if ($u) {
-                        $sublink = $u['subscription_url'] ?? '';
-                        $uuid = $u['id'] ?? $uuid;
+                // Parse actual username from text_to_copy: username: `8cl55hfm`
+                $actualUsername = $username;
+                if (preg_match('/username:\s*`([^`]+)`/i', $textToCopy, $m)) {
+                    $actualUsername = trim($m[1]);
+                } elseif (preg_match('/username:\s*([a-zA-Z0-9]+)/i', $textToCopy, $m)) {
+                    $actualUsername = trim($m[1]);
+                }
+
+                // Parse actual password from text_to_copy if API changed it
+                $actualPassword = $password;
+                if (preg_match('/password:\s*`([^`]+)`/i', $textToCopy, $m)) {
+                    $actualPassword = trim($m[1]);
+                }
+
+                // Try to get subscription link by listing clients and finding by client_id
+                $sublink = '';
+                $outlineLink = '';
+                $expireAt = null;
+                $trafficLimit = $payload['traffic_limit_bytes'] ?? 0;
+
+                // Fetch client details via list (search by client_id)
+                // Small delay for API to propagate
+                usleep(800000);
+                $listRes = $this->request('/v1/seller/clients?page=1&recordPerPage=100');
+                if ($listRes['success'] && !empty($listRes['data'])) {
+                    $clients = $listRes['data']['clients']['data'] ?? $listRes['data']['data'] ?? $listRes['data']['clients'] ?? [];
+                    foreach ($clients as $c) {
+                        if (($c['id'] ?? '') === $clientId || ($c['username'] ?? '') === $actualUsername) {
+                            $sublink = $c['subscription_link'] ?? '';
+                            $outlineLink = $c['outline_link'] ?? '';
+                            $actualUsername = $c['username'] ?? $actualUsername;
+                            $actualPassword = $c['password'] ?? $actualPassword;
+                            break;
+                        }
+                    }
+                }
+
+                // Fallback: try to get by client_id directly if endpoint exists
+                if (empty($sublink) && $clientId) {
+                    $singleRes = $this->request("/v1/seller/clients/$clientId");
+                    if ($singleRes['success'] && !empty($singleRes['data'])) {
+                        $c = $singleRes['data']['client'] ?? $singleRes['data']['data'] ?? $singleRes['data'];
+                        $sublink = $c['subscription_link'] ?? $sublink;
+                        $outlineLink = $c['outline_link'] ?? $outlineLink;
                     }
                 }
 
                 return [
                     'success'=>true,
                     'error'=>'',
-                    'uuid'=>$uuid ?: $username,
-                    'sublink'=>$sublink ?: $outline,
-                    'password'=>$password,
+                    'uuid'=>$clientId ?: $actualUsername,
+                    'username'=>$actualUsername,
+                    'password'=>$actualPassword,
+                    'sublink'=>$sublink ?: $outlineLink,
+                    'subscription_url'=>$sublink,
+                    'outline_link'=>$outlineLink,
+                    'client_id'=>$clientId,
                     'raw'=>$data,
                 ];
             } else {
-                // Return validation errors
                 $errMsg = $this->lastError;
                 if (!empty($res['data'])) {
                     $msg = $res['data']['message'] ?? '';
@@ -391,9 +419,32 @@ class ConnectixSellerDriver implements PanelDriverInterface {
     }
 
     public function getUser(string $username): ?array {
+        // username can be actual username or client_id
+        $isUuid = preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $username);
+        if ($isUuid) {
+            $res = $this->request("/v1/seller/clients/$username");
+            if ($res['success'] && !empty($res['data'])) {
+                $c = $res['data']['client'] ?? $res['data']['data'] ?? $res['data'];
+                if (!empty($c['username'])) {
+                    [$usedBytes, $limitBytes] = $this->parseTraffic($c['used_traffic'] ?? '0/0');
+                    return [
+                        'traffic_used_bytes'=>$usedBytes,
+                        'traffic_limit_bytes'=>$limitBytes,
+                        'expire_at'=>$this->parseExpire($c['expire_date'] ?? null, $c['remains_days'] ?? null),
+                        'status'=>($c['is_expired'] ?? false) ? 'expired' : 'active',
+                        'online'=>!empty($c['used_devices']),
+                        'links'=>!empty($c['outline_link']) ? [$c['outline_link']] : [],
+                        'subscription_url'=>$c['subscription_link'] ?? '',
+                        'username'=>$c['username'] ?? '',
+                        'id'=>$c['id'] ?? '',
+                    ];
+                }
+            }
+        }
+
         $users = $this->listUsers();
         foreach ($users as $u) {
-            if ($u['username'] === $username) {
+            if ($u['username'] === $username || ($u['id'] ?? '') === $username) {
                 return [
                     'traffic_used_bytes'=>$u['traffic_used_bytes'],
                     'traffic_limit_bytes'=>$u['traffic_limit_bytes'],
@@ -401,7 +452,9 @@ class ConnectixSellerDriver implements PanelDriverInterface {
                     'status'=>$u['status'],
                     'online'=>$u['online'],
                     'links'=>$u['links'],
-                    'subscription_url'=>$u['subscription_url']
+                    'subscription_url'=>$u['subscription_url'],
+                    'username'=>$u['username'],
+                    'id'=>$u['id'] ?? '',
                 ];
             }
         }
@@ -420,44 +473,66 @@ class ConnectixSellerDriver implements PanelDriverInterface {
     }
 
     public function deleteUser(string $username): bool {
-        // Find id
-        $users = $this->listUsers();
+        // username can be actual username like 8cl55hfm or client_id UUID
         $targetId = null;
-        foreach ($users as $u) {
-            if ($u['username'] === $username) {
-                $targetId = $u['id'] ?? null;
-                break;
+        $isUuid = (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $username));
+
+        if ($isUuid) {
+            $targetId = $username;
+        } else {
+            // Find id by username
+            $users = $this->listUsers();
+            foreach ($users as $u) {
+                if ($u['username'] === $username) {
+                    $targetId = $u['id'] ?? null;
+                    break;
+                }
             }
-        }
-        if (!$targetId) {
-            // Try to find via direct API call if list missed
-            $res = $this->request("/v1/seller/clients?search=$username&page=1&recordPerPage=10");
-            if ($res['success'] && !empty($res['data'])) {
-                $clients = $res['data']['clients']['data'] ?? $res['data']['data'] ?? [];
-                foreach ($clients as $c) {
-                    if (($c['username'] ?? '') === $username) {
-                        $targetId = $c['id'] ?? null;
-                        break;
+            if (!$targetId) {
+                $res = $this->request("/v1/seller/clients?search=$username&page=1&recordPerPage=10");
+                if ($res['success'] && !empty($res['data'])) {
+                    $clients = $res['data']['clients']['data'] ?? $res['data']['data'] ?? [];
+                    foreach ($clients as $c) {
+                        if (($c['username'] ?? '') === $username) {
+                            $targetId = $c['id'] ?? null;
+                            break;
+                        }
                     }
                 }
             }
         }
+
+        if (!$targetId && !$isUuid) {
+            // If we still don't have ID, try using username as ID directly (some APIs accept username)
+            $targetId = $username;
+        }
+
         if (!$targetId) {
             $this->lastError = "کاربر $username در لیست Connectix یافت نشد.";
             return false;
         }
-        // Try multiple delete endpoints
+
+        // Try multiple delete endpoints - discovered via testing
         $endpoints = [
             "/v1/seller/clients/$targetId" => 'DELETE',
             "/v1/seller/clients/$targetId/delete" => 'DELETE',
             "/v1/seller/clients/delete/$targetId" => 'DELETE',
             "/v1/seller/clients/$targetId/destroy" => 'POST',
             "/v1/seller/clients/$targetId/remove" => 'DELETE',
+            "/v1/seller/clients/destroy/$targetId" => 'POST',
         ];
         foreach ($endpoints as $ep => $method) {
             $res = $this->request($ep, $method);
             if ($res['success']) return true;
+            // Some APIs return 200 with message even if not success flag, check raw
+            if ($res['code'] == 200 && stripos($res['raw'] ?? '', 'deleted') !== false) return true;
         }
+
+        // Last resort: try POST to /v1/seller/clients/{id}/delete with empty body
+        $res = $this->request("/v1/seller/clients/$targetId", 'POST', ['_method'=>'DELETE']);
+        if ($res['success']) return true;
+
+        $this->lastError = "حذف $username (ID: $targetId) ناموفق - endpoint حذف یافت نشد. پاسخ: " . ($this->lastError ?? 'unknown');
         return false;
     }
 
