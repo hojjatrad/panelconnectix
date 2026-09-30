@@ -2497,23 +2497,43 @@ class TelegramBotController {
             }
         }
 
-        // Get unique servers
+        // Get unique servers - ROBUST VIP DETECTION + short hash helper
+        $shortHash = function($str): string {
+            return substr(md5($str), 0, 8);
+        };
         $serversMap = [];
         foreach ($allPlans as $p) {
             $sid = $p['server_id'] ?? 0;
             $sname = $p['server_name'] ?? 'سرور '.$sid;
             $sdriver = $p['server_driver'] ?? '';
+            $sgroup = $p['server_node_group'] ?? $p['server_group'] ?? '';
+            $isVip = stripos($sdriver, 'connectix') !== false 
+                  || stripos($sdriver, 'seller') !== false
+                  || stripos($sname, 'vip') !== false
+                  || stripos($sname, 'ویژه') !== false
+                  || stripos($sgroup, 'vip') !== false
+                  || strtolower($sgroup) === 'default'
+                  || strtolower($sgroup) === 'economic' // economic also part of vip server in some setups
+                  || $sid == 0; // fallback
+            // More precise: if driver is marzban/marzneshin/xui etc => multi
+            $isMultiDriver = stripos($sdriver, 'marzban') !== false || stripos($sdriver, 'marzneshin') !== false || stripos($sdriver, 'xui') !== false || stripos($sdriver, 'sanaei') !== false;
+            if ($isMultiDriver) $isVip = false;
+            // If server_group explicitly vip or has connectix, force vip
+            if (stripos($sgroup, 'vip') !== false || stripos($sdriver, 'connectix') !== false) $isVip = true;
+
             if (!isset($serversMap[$sid])) {
                 $serversMap[$sid] = [
                     'id' => $sid,
                     'name' => $sname,
                     'driver' => $sdriver,
-                    'is_vip' => stripos($sdriver, 'connectix') !== false || stripos($sdriver, 'seller') !== false,
+                    'group' => $sgroup,
+                    'is_vip' => $isVip,
+                    'slug' => $isVip ? 'vip' : 'multi',
                 ];
             }
         }
 
-        // LEVEL 1: Server selection - CLEAN without count
+        // LEVEL 1: Server selection - CLEAN without count, use vip/multi slug as key per user request
         if ($parsedServer === null && count($serversMap) > 1) {
             $msg = "🖥 <b>انتخاب سرور ({$ctx['brand_name']})</b>\n\nلطفاً سرور مورد نظر را انتخاب کنید:";
 
@@ -2521,7 +2541,9 @@ class TelegramBotController {
             foreach ($serversMap as $srv) {
                 $icon = $srv['is_vip'] ? '🌟' : '🖥';
                 $label = $srv['is_vip'] ? 'ویژه' : 'مولتی سرور';
-                $srvButtons[] = [['text' => "$icon $label", 'callback_data' => 'srv_buy_' . $srv['id']]];
+                // Use slug vip/multi as key to avoid Persian issues, per user request: کلید سرور را vip کن
+                $cbKey = $srv['slug'] . '_' . $srv['id']; // e.g. vip_2, multi_1 - short and English
+                $srvButtons[] = [['text' => "$icon $label", 'callback_data' => 'srv_buy_' . $cbKey]];
             }
             $srvButtons[] = [['text' => '🔙 بازگشت به منوی اصلی', 'callback_data' => 'menu_main']];
 
@@ -2534,17 +2556,70 @@ class TelegramBotController {
             return;
         }
 
-        // Filter by server
+        // Filter by server - SUPPORT vip/multi slug keys
         $serverFilteredPlans = $allPlans;
         $serverName = 'همه سرورها';
         $isVipServer = false;
+        $parsedServerId = null; // numeric id after resolving slug
         if ($parsedServer !== null && $parsedServer !== '0') {
-            $serverFilteredPlans = array_values(array_filter($allPlans, fn($p) => (string)($p['server_id'] ?? '0') === (string)$parsedServer));
-            foreach ($serversMap as $srv) {
-                if ((string)$srv['id'] === (string)$parsedServer) {
-                    $serverName = $srv['is_vip'] ? 'ویژه' : 'مولتی سرور';
-                    $isVipServer = $srv['is_vip'];
-                    break;
+            $rawSrv = $parsedServer;
+            // Parse vip_2 or multi_1 or just id or slug
+            $resolvedId = null;
+            $resolvedIsVip = null;
+            if (str_contains($rawSrv, '_')) {
+                $parts = explode('_', $rawSrv, 2);
+                $slugPart = $parts[0];
+                $idPart = $parts[1] ?? null;
+                if (is_numeric($idPart)) {
+                    $resolvedId = $idPart;
+                    $resolvedIsVip = ($slugPart === 'vip');
+                } else {
+                    // rawSrv is like vip or multi without id
+                    foreach ($serversMap as $srv) {
+                        if ($srv['slug'] === $rawSrv || strtolower($srv['name']) === strtolower($rawSrv) || (string)$srv['id'] === $rawSrv) {
+                            $resolvedId = $srv['id'];
+                            $resolvedIsVip = $srv['is_vip'];
+                            break;
+                        }
+                    }
+                }
+            } else {
+                // Check if raw is slug vip/multi or id
+                foreach ($serversMap as $srv) {
+                    if ((string)$srv['id'] === (string)$rawSrv || $srv['slug'] === $rawSrv) {
+                        $resolvedId = $srv['id'];
+                        $resolvedIsVip = $srv['is_vip'];
+                        break;
+                    }
+                }
+                if ($resolvedId === null && is_numeric($rawSrv)) {
+                    $resolvedId = $rawSrv;
+                }
+            }
+
+            if ($resolvedId !== null) {
+                $parsedServerId = (string)$resolvedId;
+                $serverFilteredPlans = array_values(array_filter($allPlans, fn($p) => (string)($p['server_id'] ?? '0') === $parsedServerId));
+                foreach ($serversMap as $srv) {
+                    if ((string)$srv['id'] === $parsedServerId) {
+                        $serverName = $srv['is_vip'] ? 'ویژه' : 'مولتی سرور';
+                        $isVipServer = $srv['is_vip'];
+                        break;
+                    }
+                }
+                if ($resolvedIsVip !== null) $isVipServer = $resolvedIsVip;
+                // Keep parsedServer as resolved slug+id for further callbacks
+                $parsedServer = $rawSrv;
+            } else {
+                // Fallback: treat as id directly
+                $parsedServerId = $rawSrv;
+                $serverFilteredPlans = array_values(array_filter($allPlans, fn($p) => (string)($p['server_id'] ?? '0') === (string)$rawSrv));
+                foreach ($serversMap as $srv) {
+                    if ((string)$srv['id'] === (string)$rawSrv) {
+                        $serverName = $srv['is_vip'] ? 'ویژه' : 'مولتی سرور';
+                        $isVipServer = $srv['is_vip'];
+                        break;
+                    }
                 }
             }
             if (empty($serverFilteredPlans)) $serverFilteredPlans = $allPlans;
@@ -2553,8 +2628,9 @@ class TelegramBotController {
                 $onlySrv = array_values($serversMap)[0];
                 $isVipServer = $onlySrv['is_vip'];
                 $serverName = $onlySrv['is_vip'] ? 'ویژه' : 'مولتی سرور';
-                $parsedServer = (string)$onlySrv['id'];
-                $serverFilteredPlans = array_values(array_filter($allPlans, fn($p) => (string)($p['server_id'] ?? '0') === $parsedServer));
+                $parsedServer = $onlySrv['slug'] . '_' . $onlySrv['id'];
+                $parsedServerId = (string)$onlySrv['id'];
+                $serverFilteredPlans = array_values(array_filter($allPlans, fn($p) => (string)($p['server_id'] ?? '0') === $parsedServerId));
                 if (empty($serverFilteredPlans)) $serverFilteredPlans = $allPlans;
             }
         }
@@ -2603,7 +2679,7 @@ class TelegramBotController {
                 $info = $typeMap[$typeKey] ?? ['label' => $typeKey, 'icon' => '📦'];
                 $typeButtons[] = [[
                     'text' => "{$info['icon']} {$info['label']}",
-                    'callback_data' => 'type_buy_' . $parsedServer . '_' . md5($typeKey)
+                    'callback_data' => 'type_buy_' . $parsedServer . '_' . $shortHash($typeKey)
                 ]];
             }
 
@@ -2622,12 +2698,14 @@ class TelegramBotController {
             return;
         }
 
-        // Filter by type - with normalized comparison
+        // Filter by type - with normalized comparison + SHORT HASH support
         $typeFilteredPlans = $serverFilteredPlans;
         $typeLabel = '';
         if ($parsedType !== null) {
             foreach ($vipTypes as $typeKey) {
-                if (md5($typeKey) === $parsedType || $typeKey === $parsedType || md5(strtolower($typeKey)) === $parsedType) {
+                $full = md5($typeKey);
+                $short = substr($full, 0, 8);
+                if ($full === $parsedType || $short === $parsedType || $typeKey === $parsedType || strtolower($typeKey) === strtolower($parsedType) || md5(strtolower($typeKey)) === $parsedType || substr(md5(strtolower($typeKey)),0,8) === $parsedType) {
                     $typeLabel = $typeKey;
                     $typeFilteredPlans = array_values(array_filter($serverFilteredPlans, function($pp) use ($typeKey, $normalizeGroup) {
                         $gn = $pp['vip_group_name'] ?? $pp['server_group'] ?? '';
@@ -2636,12 +2714,13 @@ class TelegramBotController {
                     break;
                 }
             }
-            // Fallback: if still empty, try direct hash match on raw values
+            // Fallback: if still empty, try direct hash match on raw values (both full and short)
             if (empty($typeFilteredPlans)) {
                 foreach ($serverFilteredPlans as $pp) {
                     $gn = $pp['vip_group_name'] ?? $pp['server_group'] ?? '';
-                    if (md5($gn) === $parsedType || md5($normalizeGroup($gn)) === $parsedType) {
-                        $typeLabel = $normalizeGroup($gn);
+                    $gnNorm = $normalizeGroup($gn);
+                    if (md5($gn) === $parsedType || substr(md5($gn),0,8) === $parsedType || md5($gnNorm) === $parsedType || substr(md5($gnNorm),0,8) === $parsedType || $gn === $parsedType || $gnNorm === $parsedType) {
+                        $typeLabel = $gnNorm;
                         $typeFilteredPlans = array_values(array_filter($serverFilteredPlans, function($ppp) use ($typeLabel, $normalizeGroup) {
                             return $normalizeGroup($ppp['vip_group_name'] ?? $ppp['server_group'] ?? '') === $typeLabel;
                         }));
@@ -2678,12 +2757,12 @@ class TelegramBotController {
                     default => '📦'
                 };
                 if ($isVipServer && $parsedType !== null) {
-                    $cb = 'month_buy_' . $parsedServer . '_' . $parsedType . '_' . md5($cat);
+                    $cb = 'month_buy_' . $parsedServer . '_' . $parsedType . '_' . $shortHash($cat);
                 } elseif ($isVipServer) {
                     $singleType = array_values($vipTypes)[0] ?? 'default';
-                    $cb = 'month_buy_' . $parsedServer . '_' . md5($singleType) . '_' . md5($cat);
+                    $cb = 'month_buy_' . $parsedServer . '_' . $shortHash($singleType) . '_' . $shortHash($cat);
                 } else {
-                    $cb = 'cat_buy_' . $parsedServer . '_' . md5($cat);
+                    $cb = 'cat_buy_' . $parsedServer . '_' . $shortHash($cat);
                 }
                 $catButtons[] = [['text' => "$icon $cat", 'callback_data' => $cb]];
             }
@@ -2715,14 +2794,23 @@ class TelegramBotController {
             return;
         }
 
-        // LEVEL 4: Final plans - volume + price only
+        // LEVEL 4: Final plans - volume + price only - SHORT HASH support
         $finalPlans = $typeFilteredPlans;
         if ($parsedCatHash !== null) {
             foreach ($categories as $c) {
-                if (md5($c) === $parsedCatHash || $c === $parsedCatHash) {
+                $full = md5($c);
+                $short = substr($full, 0, 8);
+                if ($full === $parsedCatHash || $short === $parsedCatHash || $c === $parsedCatHash) {
                     $finalPlans = array_values(array_filter($typeFilteredPlans, fn($p) => ($p['display_category'] ?: '۱ ماهه') === $c));
                     break;
                 }
+            }
+            // Fallback: try short hash match directly on plans if still empty
+            if (empty($finalPlans)) {
+                $finalPlans = array_values(array_filter($typeFilteredPlans, function($p) use ($parsedCatHash) {
+                    $cat = $p['display_category'] ?: '۱ ماهه';
+                    return md5($cat) === $parsedCatHash || substr(md5($cat),0,8) === $parsedCatHash || $cat === $parsedCatHash;
+                }));
             }
         }
 
