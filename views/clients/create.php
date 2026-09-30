@@ -58,7 +58,10 @@ require __DIR__ . '/../layout/header.php';
 
             <!-- Plan Selection -->
             <div>
-                <label class="block text-xs font-semibold text-slate-300 mb-2">انتخاب تعرفه و پلن *</label>
+                <label class="block text-xs font-semibold text-slate-300 mb-2 flex justify-between">
+                    <span>انتخاب تعرفه و پلن *</span>
+                    <span id="planFilterInfo" class="text-[10px] text-violet-300"></span>
+                </label>
                 <select name="plan_id" id="planSelect" required onchange="calculateCost()"
                         class="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:ring-1 focus:ring-purple-500">
                     <option value="" disabled selected>لطفاً یک پلن انتخاب کنید...</option>
@@ -75,8 +78,8 @@ require __DIR__ . '/../layout/header.php';
                         $trVal = (float)$p['traffic_gb'];
                         $trTxt = ($trVal > 0 && $trVal < 1) ? round($trVal * 1024) . ' مگابایت' : (($trVal == (int)$trVal ? (int)$trVal : $trVal) . ' گیگابایت');
                     ?>
-                        <option value="<?= $p['id'] ?>" data-price="<?= $effectivePrice ?>" data-group="<?= $p['server_group'] ?>" data-server-id="<?= $p['server_id'] ?? '' ?>" data-ip-limit="<?= $p['ip_limit'] ?? 0 ?>" data-free="<?= $p['is_free'] ?>">
-                            <?= htmlspecialchars($p['title']) ?> (<?= $trTxt ?> / <?= $p['duration_days'] ?> روزه) - <?= $p['is_free'] ? 'رایگان (تست)' : Helpers::formatMoney($effectivePrice) ?>
+                        <option value="<?= $p['id'] ?>" data-price="<?= $effectivePrice ?>" data-group="<?= $p['server_group'] ?>" data-server-id="<?= $p['server_id'] ?? '' ?>" data-ip-limit="<?= $p['ip_limit'] ?? 0 ?>" data-free="<?= $p['is_free'] ?>" data-vip-plan-id="<?= htmlspecialchars($p['vip_plan_id'] ?? '') ?>" data-vip-group="<?= htmlspecialchars($p['vip_group_name'] ?? '') ?>">
+                            <?= htmlspecialchars($p['title']) ?> (<?= $trTxt ?> / <?= $p['duration_days'] ?> روزه) <?= !empty($p['vip_plan_id']) ? '🌟 VIP: '.htmlspecialchars($p['vip_plan_title'] ?? $p['vip_group_name'] ?? '') : '' ?> - <?= $p['is_free'] ? 'رایگان (تست)' : Helpers::formatMoney($effectivePrice) ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
@@ -209,6 +212,79 @@ require __DIR__ . '/../layout/header.php';
         if(cb) cb.checked=true;
         const ip=document.getElementById('clientIpLimit');
         if(ip && (!ip.value || ip.value=='0')) ip.value=4;
+        
+        // Server-specific plan filtering (VIP vs Multi)
+        const serverSelect = document.getElementById('serverSelect');
+        const planSelect = document.getElementById('planSelect');
+        if (serverSelect && planSelect) {
+            const allPlanOptions = Array.from(planSelect.options).map(o => o.cloneNode(true));
+            
+            function filterPlansByServer() {
+                const selectedServer = serverSelect.options[serverSelect.selectedIndex];
+                const serverId = serverSelect.value;
+                const serverDriver = selectedServer?.dataset?.driver || '';
+                const serverGroup = selectedServer?.dataset?.group || '';
+                const isVipServer = serverDriver === 'connectix_seller' || serverId === 'auto' ? false : (serverDriver.includes('connectix') || serverDriver.includes('seller'));
+                const isAuto = serverId === 'auto';
+                
+                // Clear and re-add filtered
+                const currentVal = planSelect.value;
+                planSelect.innerHTML = '<option value="" disabled>لطفاً یک پلن انتخاب کنید...</option>';
+                
+                let visibleCount = 0;
+                allPlanOptions.forEach(opt => {
+                    if (!opt.value) return; // skip placeholder
+                    const planServerId = opt.dataset.serverId;
+                    const planGroup = opt.dataset.group;
+                    const planVip = opt.dataset.vipPlanId || '';
+                    
+                    let show = false;
+                    if (isAuto) {
+                        show = true; // auto shows all
+                    } else if (isVipServer) {
+                        // VIP server: only show plans with vip_plan_id or server_id matches VIP
+                        if (planServerId == serverId || planVip) show = true;
+                        // Also if plan group is economic/iran/default and server is VIP, show
+                        if (planServerId === '' && (planGroup === 'economic' || planGroup === 'default' || planGroup === 'iran_access')) {
+                            // These are likely VIP-mapped plans
+                            show = true;
+                        }
+                    } else {
+                        // Multi server: only show plans for that server or without VIP mapping
+                        if (planServerId == serverId) show = true;
+                        if (!planServerId && !planVip) show = true; // generic plans
+                        if (planServerId === '' && planGroup === serverGroup) show = true;
+                    }
+                    
+                    if (show) {
+                        planSelect.appendChild(opt.cloneNode(true));
+                        visibleCount++;
+                    }
+                });
+                
+                // Restore selection if still visible
+                if (currentVal) {
+                    const stillExists = Array.from(planSelect.options).some(o => o.value === currentVal);
+                    if (stillExists) planSelect.value = currentVal;
+                }
+                
+                // Update info text
+                const info = document.getElementById('planFilterInfo');
+                if (info) {
+                    if (isAuto) {
+                        info.innerHTML = `⚡️ حالت خودکار: همه ${visibleCount} پلن نمایش داده می‌شود`;
+                    } else if (isVipServer) {
+                        info.innerHTML = `🌟 سرور VIP انتخاب شد: فقط ${visibleCount} پلن VIP (اقتصادی/ویژه/ایران‌اکسس) نمایش داده می‌شود`;
+                    } else {
+                        info.innerHTML = `🖥 سرور مولتی انتخاب شد: ${visibleCount} پلن مخصوص این سرور`;
+                    }
+                }
+            }
+            
+            serverSelect.addEventListener('change', filterPlansByServer);
+            // Initial filter
+            filterPlansByServer();
+        }
     });
 </script>
 

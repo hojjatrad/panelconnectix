@@ -313,6 +313,8 @@ $router->get('vip_plans', [VipPlanController::class, 'index']);
 $router->post('vip_plans/save-mapping', [VipPlanController::class, 'saveMapping']);
 $router->post('vip_plans/auto-map', [VipPlanController::class, 'autoMap']);
 $router->get('vip_plans/auto-map', [VipPlanController::class, 'autoMap']);
+$router->post('vip_plans/import-all', [VipPlanController::class, 'importAll']);
+$router->get('vip_plans/import-all', [VipPlanController::class, 'importAll']);
 
 // Server Nodes Management (Admin only)
 $router->get('servers', [ServerController::class, 'index']);

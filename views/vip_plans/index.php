@@ -13,14 +13,20 @@
                     <p class="text-rose-400 text-sm mt-2">خطا: <?= htmlspecialchars($error) ?></p>
                 <?php endif; ?>
             </div>
-            <div class="flex gap-2">
+            <div class="flex gap-2 flex-wrap">
+                <form method="post" action="<?= Helpers::url('vip_plans/import-all') ?>">
+                    <input type="hidden" name="csrf_token" value="<?= Helpers::csrfToken() ?>">
+                    <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-emerald-900/30" onclick="return confirm('همه پلن‌های VIP (<?= count($vipPlans) ?>) به صورت خودکار به پنل شما ایمپورت می‌شوند - دیگر نیازی به ساخت دستی نیست. ادامه؟')">
+                        <i class="fa-solid fa-download"></i> ایمپورت خودکار همه پلن‌های VIP (<?= count($vipPlans) ?>)
+                    </button>
+                </form>
                 <form method="post" action="<?= Helpers::url('vip_plans/auto-map') ?>">
                     <input type="hidden" name="csrf_token" value="<?= Helpers::csrfToken() ?>">
                     <button type="submit" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold rounded-xl">
-                        <i class="fa-solid fa-wand-magic-sparkles"></i> نگاشت خودکار هوشمند
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> نگاشت خودکار
                     </button>
                 </form>
-                <a href="<?= Helpers::url('plans') ?>" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-sm">بازگشت به پلن‌ها</a>
+                <a href="<?= Helpers::url('plans') ?>" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-sm">پلن‌ها</a>
             </div>
         </div>
     </div>
