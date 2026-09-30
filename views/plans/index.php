@@ -321,6 +321,17 @@ foreach ($customPlanCats as $idx => $custCat) {
                     </select>
                 </div>
 
+                <div class="col-span-2 md:col-span-1">
+                    <label class="block text-slate-300 mb-1 font-semibold">نوع پلن VIP (برای ربات)</label>
+                    <select name="vip_group_name" id="create_vip_group_name" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white">
+                        <option value="">-- خودکار / پیش‌فرض --</option>
+                        <option value="default">⭐ ویژه (default)</option>
+                        <option value="Economic">💰 اقتصادی (Economic)</option>
+                        <option value="Iran Access">🇮🇷 ایران‌اکسس (Iran Access)</option>
+                    </select>
+                    <span class="text-[10px] text-slate-500 mt-0.5 block">برای سرور ویژه: دسته‌بندی ربات اول اقتصادی/ویژه سپس ماه</span>
+                </div>
+
                 <div class="col-span-2">
                     <label class="block text-slate-300 mb-1 font-semibold">سرور / نود اختصاصی صدور کانفیگ</label>
                     <select name="server_id" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white text-xs">
@@ -487,6 +498,16 @@ foreach ($customPlanCats as $idx => $custCat) {
                     </select>
                 </div>
 
+                <div class="col-span-2 md:col-span-1">
+                    <label class="block text-slate-300 mb-1 font-semibold">نوع پلن VIP (برای ربات)</label>
+                    <select name="vip_group_name" id="edit_vip_group_name" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white">
+                        <option value="">-- خودکار / پیش‌فرض --</option>
+                        <option value="default">⭐ ویژه (default)</option>
+                        <option value="Economic">💰 اقتصادی (Economic)</option>
+                        <option value="Iran Access">🇮🇷 ایران‌اکسس (Iran Access)</option>
+                    </select>
+                </div>
+
                 <div class="col-span-2">
                     <label class="block text-slate-300 mb-1 font-semibold">سرور / نود اختصاصی صدور کانفیگ</label>
                     <select name="server_id" id="edit_server_id" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white text-xs">
@@ -642,6 +663,10 @@ foreach ($customPlanCats as $idx => $custCat) {
         const grpSelect = document.getElementById('edit_server_group');
         if (grpSelect) {
             grpSelect.value = p.server_group || 'default';
+        }
+        const vipGrpSelect = document.getElementById('edit_vip_group_name');
+        if (vipGrpSelect) {
+            vipGrpSelect.value = p.vip_group_name || '';
         }
 
         document.getElementById('edit_server_id').value = p.server_id || '';

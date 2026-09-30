@@ -189,7 +189,9 @@ class TelegramBotController {
                        0 as reseller_plan_id,
                        s.name as server_name,
                        s.driver as server_driver,
-                       s.server_group as server_node_group
+                       s.server_group as server_node_group,
+                       p.server_group as server_group,
+                       p.vip_group_name as vip_group_name
                 FROM plans p
                 LEFT JOIN reseller_plans rp ON p.id = rp.plan_id AND rp.reseller_id = ? AND rp.is_custom = 0
                 LEFT JOIN server_nodes s ON p.server_id = s.id
@@ -225,8 +227,13 @@ class TelegramBotController {
                 1 as is_active,
                 rp.id as id,
                 'custom' as server_group,
+                '' as vip_group_name,
+                s.name as server_name,
+                s.driver as server_driver,
+                s.server_group as server_node_group,
                 1 as show_in_bot
                 FROM reseller_plans rp
+                LEFT JOIN server_nodes s ON rp.server_id = s.id
                 WHERE rp.reseller_id = ? AND rp.is_custom = 1 AND rp.is_active = 1
                 ORDER BY rp.custom_category ASC, rp.retail_price ASC";
             $stmt2 = $pdo->prepare($sqlCustom);
@@ -863,7 +870,15 @@ class TelegramBotController {
         }
         if (str_starts_with($data, 'type_buy_')) {
             $typeData = str_replace('type_buy_', '', $data);
+            // type_{server}_{typeHash}
+            // Need to reconstruct as type_ callback but showPlansMenu parses it
             self::showPlansMenu($pdo, $chatId, $messageId, 'type_' . $typeData, null, null);
+            return;
+        }
+        if (str_starts_with($data, 'month_buy_')) {
+            $monthData = str_replace('month_buy_', '', $data);
+            // month_{server}_{typeHash}_{catHash}
+            self::showPlansMenu($pdo, $chatId, $messageId, 'month_' . $monthData, null, null);
             return;
         }
 
@@ -2426,6 +2441,10 @@ class TelegramBotController {
      * Show Plans Menu - NEW 3-Level Hierarchy: Server -> Duration -> Type (Economic/ویژه) -> Plans
      * User request: دسته بندی ربات اول انتخاب سرور (مولتی/ویژه) بعد یکماهه/دو ماهه بعد اقتصادی/ویژه بعد پلن‌ها با حجم و قیمت بدون روز
      */
+        /**
+     * Show Plans Menu - Professional 3-Level: Server -> Type (for VIP: Economic/ویژه) -> Duration -> Plans (volume+price only, no count, no days)
+     * User request: no plan count on buttons, just Multi and ویژه, for ویژه first Economic/ویژه then month then volume+price, all manageable in panel
+     */
     private static function showPlansMenu(PDO $pdo, string $chatId, ?int $messageId = null, ?string $selectedCategory = null, ?string $selectedServer = null, ?string $selectedType = null): void {
         $ctx = self::getContext($pdo);
         $resellerId = $ctx['reseller_id'];
@@ -2444,7 +2463,7 @@ class TelegramBotController {
             return;
         }
 
-        // Parse selectedCategory if it contains encoded hierarchy
+        // Parse hierarchy
         $parsedServer = $selectedServer;
         $parsedCatHash = null;
         $parsedType = $selectedType;
@@ -2460,18 +2479,25 @@ class TelegramBotController {
                     $parsedCatHash = $parts[2];
                 }
             } elseif (str_starts_with($selectedCategory, 'type_')) {
+                // type_{server}_{typeHash}
+                $parts = explode('_', $selectedCategory, 3);
+                if (count($parts) >= 3) {
+                    $parsedServer = $parts[1];
+                    $parsedType = $parts[2];
+                }
+            } elseif (str_starts_with($selectedCategory, 'month_')) {
                 $parts = explode('_', $selectedCategory, 4);
                 if (count($parts) >= 4) {
                     $parsedServer = $parts[1];
-                    $parsedCatHash = $parts[2];
-                    $parsedType = $parts[3];
+                    $parsedType = $parts[2];
+                    $parsedCatHash = $parts[3];
                 }
             } else {
                 $parsedCatHash = $selectedCategory;
             }
         }
 
-        // Get unique servers from plans
+        // Get unique servers
         $serversMap = [];
         foreach ($allPlans as $p) {
             $sid = $p['server_id'] ?? 0;
@@ -2487,19 +2513,15 @@ class TelegramBotController {
             }
         }
 
-        // LEVEL 1: Server selection
+        // LEVEL 1: Server selection - CLEAN without count
         if ($parsedServer === null && count($serversMap) > 1) {
-            $msg = "🖥 <b>انتخاب سرور ({$ctx['brand_name']})</b>\n\n"
-                 . "لطفاً سرور مورد نظر را انتخاب کنید:\n"
-                 . "• مولتی = سرور معمولی\n"
-                 . "• ویژه = سرور VIP پرسرعت (اقتصادی/ویژه/ایران‌اکسس)";
+            $msg = "🖥 <b>انتخاب سرور ({$ctx['brand_name']})</b>\n\nلطفاً سرور مورد نظر را انتخاب کنید:";
 
             $srvButtons = [];
             foreach ($serversMap as $srv) {
                 $icon = $srv['is_vip'] ? '🌟' : '🖥';
-                $label = $srv['is_vip'] ? 'سرور ویژه (VIP)' : 'سرور مولتی';
-                $cnt = count(array_filter($allPlans, fn($pl) => ($pl['server_id'] ?? 0) == $srv['id']));
-                $srvButtons[] = [['text' => "$icon $label ($cnt پلن) - {$srv['name']}", 'callback_data' => 'srv_buy_' . $srv['id']]];
+                $label = $srv['is_vip'] ? 'ویژه' : 'مولتی سرور';
+                $srvButtons[] = [['text' => "$icon $label", 'callback_data' => 'srv_buy_' . $srv['id']]];
             }
             $srvButtons[] = [['text' => '🔙 بازگشت به منوی اصلی', 'callback_data' => 'menu_main']];
 
@@ -2515,51 +2537,143 @@ class TelegramBotController {
         // Filter by server
         $serverFilteredPlans = $allPlans;
         $serverName = 'همه سرورها';
+        $isVipServer = false;
         if ($parsedServer !== null && $parsedServer !== '0') {
             $serverFilteredPlans = array_values(array_filter($allPlans, fn($p) => (string)($p['server_id'] ?? '0') === (string)$parsedServer));
             foreach ($serversMap as $srv) {
                 if ((string)$srv['id'] === (string)$parsedServer) {
-                    $serverName = $srv['is_vip'] ? 'سرور ویژه (VIP)' : 'سرور مولتی';
-                    $serverName .= ' - ' . $srv['name'];
+                    $serverName = $srv['is_vip'] ? 'ویژه' : 'مولتی سرور';
+                    $isVipServer = $srv['is_vip'];
                     break;
                 }
             }
             if (empty($serverFilteredPlans)) $serverFilteredPlans = $allPlans;
+        } else {
+            if (count($serversMap) === 1) {
+                $onlySrv = array_values($serversMap)[0];
+                $isVipServer = $onlySrv['is_vip'];
+                $serverName = $onlySrv['is_vip'] ? 'ویژه' : 'مولتی سرور';
+                $parsedServer = (string)$onlySrv['id'];
+                $serverFilteredPlans = array_values(array_filter($allPlans, fn($p) => (string)($p['server_id'] ?? '0') === $parsedServer));
+                if (empty($serverFilteredPlans)) $serverFilteredPlans = $allPlans;
+            }
         }
 
-        $categories = array_values(array_unique(array_map(fn($p) => $p['display_category'] ?: '۱ ماهه', $serverFilteredPlans)));
+        // Get VIP types
+        $vipTypes = [];
+        foreach ($serverFilteredPlans as $p) {
+            $gname = $p['vip_group_name'] ?? $p['server_group'] ?? '';
+            if (!empty($gname)) {
+                $norm = $gname;
+                if (in_array($gname, ['Economic', 'economic'])) $norm = 'Economic';
+                elseif (in_array($gname, ['default', 'ویژه', 'vip'])) $norm = 'default';
+                elseif (stripos($gname, 'Iran') !== false || $gname === 'iran_access') $norm = 'Iran Access';
+                $vipTypes[$norm] = $norm;
+            }
+        }
 
-        // LEVEL 2: Category (duration)
-        if ($parsedCatHash === null && count($categories) > 1) {
-            $msg = "📅 <b>انتخاب مدت اشتراک - $serverName</b>\n\n"
-                 . "لطفاً دوره زمانی را انتخاب کنید:";
+        // LEVEL 2: For VIP, Type (Economic/ویژه) BEFORE month
+        if ($isVipServer && $parsedType === null && count($vipTypes) > 1) {
+            $msg = "💎 <b>انتخاب نوع پلن - $serverName</b>\n\nلطفاً نوع پلن را انتخاب کنید:";
 
-            $catButtons = [];
-            $row = [];
-            foreach ($categories as $cat) {
-                $icon = match($cat) {
-                    '۱ ماهه', 'یک ماهه', '1 ماهه' => '📅',
-                    '۲ ماهه', 'دو ماهه', '2 ماهه' => '📆',
-                    '۳ ماهه', 'سه ماهه', '3 ماهه' => '🗓️',
-                    '۶ ماهه', 'شش ماهه', '6 ماهه' => '📊',
-                    '۱۲ ماهه', 'یک ساله', '1 ساله' => '🏆',
-                    default => '📦'
-                };
-                $cnt = count(array_filter($serverFilteredPlans, fn($p) => ($p['display_category'] ?: '۱ ماهه') === $cat));
-                $row[] = [
-                    'text' => "$icon $cat ($cnt)",
-                    'callback_data' => 'cat_buy_' . $parsedServer . '_' . md5($cat)
-                ];
-                if (count($row) === 2) {
-                    $catButtons[] = $row;
-                    $row = [];
+            $typeButtons = [];
+            $typeMap = [
+                'default' => ['label' => '⭐ ویژه', 'icon' => '⭐'],
+                'Economic' => ['label' => '💰 اقتصادی', 'icon' => '💰'],
+                'economic' => ['label' => '💰 اقتصادی', 'icon' => '💰'],
+                'Iran Access' => ['label' => '🇮🇷 ایران‌اکسس', 'icon' => '🇮🇷'],
+                'iran_access' => ['label' => '🇮🇷 ایران‌اکسس', 'icon' => '🇮🇷'],
+            ];
+
+            foreach ($vipTypes as $typeKey) {
+                $info = $typeMap[$typeKey] ?? ['label' => $typeKey, 'icon' => '📦'];
+                $typeButtons[] = [[
+                    'text' => "{$info['icon']} {$info['label']}",
+                    'callback_data' => 'type_buy_' . $parsedServer . '_' . md5($typeKey)
+                ]];
+            }
+
+            if (count($serversMap) > 1) {
+                $typeButtons[] = [['text' => '🔙 بازگشت به انتخاب سرور', 'callback_data' => 'menu_buy']];
+            } else {
+                $typeButtons[] = [['text' => '🔙 بازگشت به منوی اصلی', 'callback_data' => 'menu_main']];
+            }
+
+            $kb = ['inline_keyboard' => $typeButtons];
+            if ($messageId) {
+                TelegramBot::editMessageText($msg, $chatId, $messageId, $kb, $botToken);
+            } else {
+                TelegramBot::sendMessage($msg, $chatId, $kb, $botToken);
+            }
+            return;
+        }
+
+        // Filter by type
+        $typeFilteredPlans = $serverFilteredPlans;
+        $typeLabel = '';
+        if ($parsedType !== null) {
+            foreach ($vipTypes as $typeKey) {
+                if (md5($typeKey) === $parsedType || $typeKey === $parsedType) {
+                    $typeLabel = $typeKey;
+                    $typeFilteredPlans = array_values(array_filter($serverFilteredPlans, fn($p) => ($p['vip_group_name'] ?? $p['server_group'] ?? '') === $typeKey));
+                    break;
                 }
             }
-            if (!empty($row)) $catButtons[] = $row;
-            if (count($serversMap) > 1) {
-                $catButtons[] = [['text' => '🔙 بازگشت به انتخاب سرور', 'callback_data' => 'menu_buy']];
+        }
+
+        $categories = array_values(array_unique(array_map(fn($p) => $p['display_category'] ?: '۱ ماهه', $typeFilteredPlans)));
+
+        // LEVEL 3: Month selection
+        if ($parsedCatHash === null && count($categories) > 1) {
+            $title = $serverName;
+            if ($typeLabel) {
+                $typeDisplay = match($typeLabel) {
+                    'default' => 'ویژه',
+                    'Economic', 'economic' => 'اقتصادی',
+                    'Iran Access', 'iran_access' => 'ایران‌اکسس',
+                    default => $typeLabel
+                };
+                $title .= " - $typeDisplay";
+            }
+            $msg = "📅 <b>انتخاب مدت - $title</b>\n\nلطفاً مدت اشتراک را انتخاب کنید:";
+
+            $catButtons = [];
+            foreach ($categories as $cat) {
+                $icon = match($cat) {
+                    '۱ ماهه', 'یک ماهه', '1 ماهه', 'یکماهه' => '📅',
+                    '۲ ماهه', 'دو ماهه', '2 ماهه', 'دوماهه' => '📆',
+                    '۳ ماهه', 'سه ماهه', '3 ماهه', 'سه‌ماهه' => '🗓️',
+                    '۶ ماهه', 'شش ماهه', '6 ماهه' => '📊',
+                    '۱۲ ماهه', 'یک ساله', '1 ساله', 'یکساله' => '🏆',
+                    default => '📦'
+                };
+                if ($isVipServer && $parsedType !== null) {
+                    $cb = 'month_buy_' . $parsedServer . '_' . $parsedType . '_' . md5($cat);
+                } elseif ($isVipServer) {
+                    $singleType = array_values($vipTypes)[0] ?? 'default';
+                    $cb = 'month_buy_' . $parsedServer . '_' . md5($singleType) . '_' . md5($cat);
+                } else {
+                    $cb = 'cat_buy_' . $parsedServer . '_' . md5($cat);
+                }
+                $catButtons[] = [['text' => "$icon $cat", 'callback_data' => $cb]];
+            }
+
+            if ($isVipServer && $parsedType !== null) {
+                // Back from month list to type list (server selection shows types)
+                $catButtons[] = [['text' => '🔙 بازگشت به انتخاب نوع', 'callback_data' => 'srv_buy_' . $parsedServer]];
+            } elseif ($isVipServer) {
+                // Single type case - back to server list
+                if (count($serversMap) > 1) {
+                    $catButtons[] = [['text' => '🔙 بازگشت به انتخاب سرور', 'callback_data' => 'menu_buy']];
+                } else {
+                    $catButtons[] = [['text' => '🔙 بازگشت به منوی اصلی', 'callback_data' => 'menu_main']];
+                }
             } else {
-                $catButtons[] = [['text' => '🔙 بازگشت به منوی اصلی', 'callback_data' => 'menu_main']];
+                if (count($serversMap) > 1) {
+                    $catButtons[] = [['text' => '🔙 بازگشت به انتخاب سرور', 'callback_data' => 'menu_buy']];
+                } else {
+                    $catButtons[] = [['text' => '🔙 بازگشت به منوی اصلی', 'callback_data' => 'menu_main']];
+                }
             }
 
             $kb = ['inline_keyboard' => $catButtons];
@@ -2571,92 +2685,18 @@ class TelegramBotController {
             return;
         }
 
-        // Filter by category
-        $catFilteredPlans = $serverFilteredPlans;
-        $titleCat = 'کلیه بسته‌ها';
+        // LEVEL 4: Final plans - volume + price only
+        $finalPlans = $typeFilteredPlans;
         if ($parsedCatHash !== null) {
             foreach ($categories as $c) {
                 if (md5($c) === $parsedCatHash || $c === $parsedCatHash) {
-                    $parsedCatName = $c;
-                    $titleCat = $c;
-                    $catFilteredPlans = array_values(array_filter($serverFilteredPlans, fn($p) => ($p['display_category'] ?: '۱ ماهه') === $c));
+                    $finalPlans = array_values(array_filter($typeFilteredPlans, fn($p) => ($p['display_category'] ?: '۱ ماهه') === $c));
                     break;
                 }
             }
         }
 
-        $isVipServer = false;
-        foreach ($serversMap as $srv) {
-            if ((string)$srv['id'] === (string)$parsedServer && $srv['is_vip']) {
-                $isVipServer = true;
-                break;
-            }
-        }
-        $hasVipTypes = false;
-        $vipTypes = [];
-        foreach ($catFilteredPlans as $p) {
-            $gname = $p['vip_group_name'] ?? $p['server_group'] ?? '';
-            if (!empty($gname)) {
-                $vipTypes[$gname] = $gname;
-                if (in_array($gname, ['Economic', 'default', 'Iran Access', 'economic', 'iran_access', 'business'])) {
-                    $hasVipTypes = true;
-                }
-            }
-        }
-
-        // LEVEL 3: Type selection for VIP
-        if ($isVipServer && $parsedType === null && $hasVipTypes && count($vipTypes) > 1) {
-            $msg = "💎 <b>انتخاب نوع پلن - $serverName - $titleCat</b>\n\n"
-                 . "لطفاً نوع پلن را انتخاب کنید:\n"
-                 . "• اقتصادی = ارزان‌تر، مناسب عمومی\n"
-                 . "• ویژه = پرسرعت، کیفیت بالا\n"
-                 . "• ایران‌اکسس = دسترسی به سایت‌های ایران";
-
-            $typeButtons = [];
-            $typeMap = [
-                'default' => ['label' => '⭐ ویژه', 'icon' => '⭐'],
-                'Economic' => ['label' => '💰 اقتصادی', 'icon' => '💰'],
-                'economic' => ['label' => '💰 اقتصادی', 'icon' => '💰'],
-                'Iran Access' => ['label' => '🇮🇷 ایران‌اکسس', 'icon' => '🇮🇷'],
-                'iran_access' => ['label' => '🇮🇷 ایران‌اکسس', 'icon' => '🇮🇷'],
-                'Business Class' => ['label' => '💼 بیزنس', 'icon' => '💼'],
-                'business' => ['label' => '💼 بیزنس', 'icon' => '💼'],
-            ];
-
-            foreach ($vipTypes as $typeKey) {
-                $info = $typeMap[$typeKey] ?? ['label' => $typeKey, 'icon' => '📦'];
-                $cnt = count(array_filter($catFilteredPlans, fn($p) => ($p['vip_group_name'] ?? $p['server_group'] ?? '') === $typeKey));
-                $typeButtons[] = [[
-                    'text' => "{$info['icon']} {$info['label']} ($cnt پلن)",
-                    'callback_data' => 'type_buy_' . $parsedServer . '_' . $parsedCatHash . '_' . md5($typeKey)
-                ]];
-            }
-
-            $typeButtons[] = [['text' => '🔙 بازگشت به انتخاب مدت', 'callback_data' => 'srv_buy_' . $parsedServer]];
-
-            $kb = ['inline_keyboard' => $typeButtons];
-            if ($messageId) {
-                TelegramBot::editMessageText($msg, $chatId, $messageId, $kb, $botToken);
-            } else {
-                TelegramBot::sendMessage($msg, $chatId, $kb, $botToken);
-            }
-            return;
-        }
-
-        // LEVEL 4: Final plans list - volume + price only (no days)
-        $finalPlans = $catFilteredPlans;
-        $typeLabel = '';
-        if ($parsedType !== null) {
-            foreach ($vipTypes as $typeKey) {
-                if (md5($typeKey) === $parsedType) {
-                    $typeLabel = $typeKey;
-                    $finalPlans = array_values(array_filter($catFilteredPlans, fn($p) => ($p['vip_group_name'] ?? $p['server_group'] ?? '') === $typeKey));
-                    break;
-                }
-            }
-        }
-
-        $title = "🛒 $serverName - $titleCat";
+        $title = "🛒 $serverName";
         if ($typeLabel) {
             $typeDisplay = match($typeLabel) {
                 'default' => 'ویژه',
@@ -2666,9 +2706,11 @@ class TelegramBotController {
             };
             $title .= " - $typeDisplay";
         }
+        if (isset($c) && $parsedCatHash !== null) {
+            $title .= " - $c";
+        }
 
-        $msg = "<b>$title</b>\n\n"
-             . "لطفاً پلن مورد نظر را انتخاب کنید (حجم + قیمت):";
+        $msg = "<b>$title</b>\n\nلطفاً پلن مورد نظر را انتخاب کنید:";
 
         $buttons = [];
         $row = [];
@@ -2679,18 +2721,10 @@ class TelegramBotController {
                 $trafficText = round($trafficVal * 1024) . 'MB';
             } elseif ($trafficVal >= 1 && $trafficVal < 1000) {
                 $trafficText = ($trafficVal == (int)$trafficVal ? (int)$trafficVal : $trafficVal) . 'GB';
-            } elseif ($trafficVal >= 1000) {
-                $trafficText = 'نامحدود';
             } else {
                 $trafficText = 'نامحدود';
             }
-            $btnText = "📦 $trafficText | $priceFa";
-            if (!empty($p['vip_group_name'])) {
-                $g = $p['vip_group_name'];
-                if ($g === 'Economic' || $g === 'economic') $btnText = "💰 $trafficText | $priceFa";
-                elseif ($g === 'default') $btnText = "⭐ $trafficText | $priceFa";
-                elseif (stripos($g, 'Iran') !== false) $btnText = "🇮🇷 $trafficText | $priceFa";
-            }
+            $btnText = "$trafficText | $priceFa";
             if (!empty($p['is_custom_plan'])) $btnText .= " ⭐";
             
             $cbData = !empty($p['is_custom_plan']) ? ('select_custom_plan_' . $p['reseller_plan_id']) : ('select_plan_' . $p['id']);
@@ -2702,14 +2736,14 @@ class TelegramBotController {
         }
         if (!empty($row)) $buttons[] = $row;
 
-        if ($parsedType !== null) {
-            $buttons[] = [['text' => '🔙 بازگشت به انتخاب نوع', 'callback_data' => 'cat_buy_' . $parsedServer . '_' . $parsedCatHash]];
-        } elseif ($parsedCatHash !== null) {
-            if (count($serversMap) > 1) {
-                $buttons[] = [['text' => '🔙 بازگشت به انتخاب مدت', 'callback_data' => 'srv_buy_' . $parsedServer]];
+        if ($parsedCatHash !== null) {
+            if ($isVipServer) {
+                $buttons[] = [['text' => '🔙 بازگشت', 'callback_data' => 'type_buy_' . $parsedServer . '_' . $parsedType]];
             } else {
-                $buttons[] = [['text' => '🔙 بازگشت به دسته‌بندی‌ها', 'callback_data' => 'menu_buy']];
+                $buttons[] = [['text' => '🔙 بازگشت', 'callback_data' => 'srv_buy_' . $parsedServer]];
             }
+        } elseif ($parsedType !== null) {
+            $buttons[] = [['text' => '🔙 بازگشت', 'callback_data' => 'srv_buy_' . $parsedServer]];
         } else {
             if (count($serversMap) > 1) {
                 $buttons[] = [['text' => '🔙 بازگشت به انتخاب سرور', 'callback_data' => 'menu_buy']];
@@ -2725,6 +2759,7 @@ class TelegramBotController {
             TelegramBot::sendMessage($msg, $chatId, $kb, $botToken);
         }
     }
+
 
 
     /**
