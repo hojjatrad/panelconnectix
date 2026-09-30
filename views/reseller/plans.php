@@ -92,8 +92,9 @@ $customCount = count($customPlans ?? []);
                                 $wholesaleCost = (int)round($p['base_price'] * (1 - ($discount / 100)));
                                 $retailPrice = !empty($p['retail_price']) ? (int)$p['retail_price'] : (int)$p['base_price'];
                                 $profit = max(0, $retailPrice - $wholesaleCost);
+                                $managerCategory = !empty($p['category']) ? $p['category'] : '۱ ماهه';
                                 $displayTitle = !empty($p['custom_title']) ? $p['custom_title'] : $p['title'];
-                                $displayCategory = !empty($p['custom_category']) ? $p['custom_category'] : 'پیش‌فرض';
+                                $displayCategory = !empty($p['custom_category']) ? $p['custom_category'] : $managerCategory;
                                 $isActive = isset($p['reseller_active']) ? ((int)$p['reseller_active'] === 1) : true;
                                 ?>
                                 <tr class="hover:bg-slate-800/30 transition-colors">
@@ -112,9 +113,10 @@ $customCount = count($customPlans ?? []);
                                             ?>
                                             <?= $trTxt ?> | <?= $p['duration_days'] ?> روزه | <?= (int)($p['ip_limit'] ?? 0) >0 ? (int)$p['ip_limit'].' کاربره' : 'نامحدود' ?>
                                         </span>
+                                        <span class="inline-flex mt-1 px-1.5 py-0.5 rounded text-[9px] bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">دسته مدیر: <?= htmlspecialchars($managerCategory) ?></span>
                                     </td>
                                     <td class="p-3.5">
-                                        <input type="text" name="plans[<?= $p['id'] ?>][custom_category]" value="<?= htmlspecialchars($displayCategory) ?>" placeholder="اقتصادی / VIP" class="bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 w-28 focus:border-indigo-500 focus:outline-none <?= $allowPrice ? '' : 'opacity-50' ?>" <?= $allowPrice ? '' : 'readonly' ?>>
+                                        <input type="text" name="plans[<?= $p['id'] ?>][custom_category]" value="<?= htmlspecialchars($displayCategory) ?>" placeholder="<?= htmlspecialchars($managerCategory) ?>" class="bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 w-28 focus:border-indigo-500 focus:outline-none <?= $allowPrice ? '' : 'opacity-50' ?>" <?= $allowPrice ? '' : 'readonly' ?>>
                                     </td>
                                     <td class="p-3.5">
                                         <input type="text" name="plans[<?= $p['id'] ?>][custom_title]" value="<?= htmlspecialchars($displayTitle) ?>" class="bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white w-44 focus:border-indigo-500 focus:outline-none <?= $allowPrice ? '' : 'opacity-50' ?>" <?= $allowPrice ? '' : 'readonly' ?>>
