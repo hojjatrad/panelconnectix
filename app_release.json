@@ -1,17 +1,17 @@
 {
-  "version": "3.5.1",
-  "code": 31,
-  "changelog": "- **رفع ریشه‌ای و دائمی خطای عدم نصب آپدیت روی نسخه قبلی**: حذف ارجاعات قدیمی به نگارش‌های گذشته در مانیفست دانلود خودکار، تصحیح داینامیک آدرس دانلود بسته‌ها، ارتقای مبنای versionCode به مقادیر قطعی بالاتر از ۲۰۳۰ جهت جلوگیری همیشگی از خطای دانگرید اندروید، و اعطای دسترسی مستقیم به نصاب اندروید از طریق حافظه استاندارد کش داخلی.",
-  "date": "2026-09-28",
+  "version": "3.5.8",
+  "code": 38,
+  "changelog": "- **v3.5.8 بهینه شده برای ایران**: باندل CDN لوکال (بدون نیاز به cdn.tailwindcss.com و cdnjs)، رفع تایم‌اوت پنل (حذف Recursive کپی 2.8s و curl 30s)، رفع SSL self-signed، رفع صف تلگرام (pending queue)، بهبود اتصال اپ اندروید با سرور\n- **رفع ریشه‌ای خطای عدم نصب آپدیت**: ارتقای versionCode به 38 جهت جلوگیری از دانگرید",
+  "date": "2026-09-29",
   "apk": {
-    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.1/Connectix-Android-ARM64.apk",
-    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.1/Connectix-Android-Universal.apk",
-    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.1/Connectix-Android-ARM32.apk"
+    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.8/Connectix-Android-ARM64.apk",
+    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.8/Connectix-Android-Universal.apk",
+    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.8/Connectix-Android-ARM32.apk"
   },
   "windows": {
-    "version": "3.5.1",
+    "version": "3.5.8",
     "file": "Connectix-Windows-x64.zip",
-    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.1/Connectix-Windows-x64.zip",
+    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.8/Connectix-Windows-x64.zip",
     "min_os": "Windows 10 64-bit"
   }
 }

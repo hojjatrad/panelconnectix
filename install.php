@@ -283,12 +283,33 @@ if (APP_DEBUG) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>نصب‌کننده آسان و خودکار پنل (Connectix Easy Installer)</title>
+    <!-- v3.5.8 SAFE: Local assets for Iran with CDN fallback -->
+    <?php
+    $base = '/contax';
+    if (isset($_SERVER['SCRIPT_NAME'])) {
+        $sd = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME']));
+        $base = ($sd === '/' || $sd === '.') ? '' : rtrim($sd, '/');
+    }
+    $localTailwind = __DIR__ . '/assets/js/tailwind.js';
+    $localFA = __DIR__ . '/assets/css/fontawesome.min.css';
+    $localVazir = __DIR__ . '/assets/css/vazirmatn.css';
+    ?>
+    <?php if (file_exists($localTailwind)): ?>
+    <script src="<?= $base ?>/assets/js/tailwind.js"></script>
+    <?php else: ?>
     <script src="https://cdn.tailwindcss.com"></script>
+    <?php endif; ?>
+    <?php if (file_exists($localFA)): ?>
+    <link rel="stylesheet" href="<?= $base ?>/assets/css/fontawesome.min.css">
+    <?php else: ?>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap');
-        * { font-family: 'Vazirmatn', sans-serif; }
-    </style>
+    <?php endif; ?>
+    <?php if (file_exists($localVazir)): ?>
+    <link rel="stylesheet" href="<?= $base ?>/assets/css/vazirmatn.css">
+    <?php else: ?>
+    <style>@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap');</style>
+    <?php endif; ?>
+    <style>* { font-family: 'Vazirmatn', sans-serif; }</style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center p-4 py-12 selection:bg-purple-600 selection:text-white relative overflow-x-hidden">
 

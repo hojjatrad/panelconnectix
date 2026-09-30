@@ -7,9 +7,14 @@ if (session_status() === PHP_SESSION_NONE && !headers_sent()) {
     @session_start();
 }
 
-// Auto-detect and relocate if files were extracted into nested connectix-panel folder
+// v3.5.8 SAFE: Heavy nested folder relocation DISABLED on every request for performance
+// Original code caused 2-3s delay on every page load (RecursiveIteratorIterator)
+// Now only runs if explicitly enabled via data/enable_heavy_bootstrap flag or ?force_bootstrap=1
+// To revert: create file data/enable_heavy_bootstrap or restore from backups/20260929-panel-optimizations/
+// To rollback completely: cp backups/20260929-panel-optimizations/index.php.backup index.php
 $subfolder = __DIR__ . '/connectix-panel';
-if (is_dir($subfolder) && file_exists($subfolder . '/index.php')) {
+$enableHeavyBootstrap = file_exists(__DIR__ . '/data/enable_heavy_bootstrap') || isset($_GET['force_bootstrap']);
+if ($enableHeavyBootstrap && is_dir($subfolder) && file_exists($subfolder . '/index.php')) {
     try {
         $iter = new RecursiveIteratorIterator(
             new RecursiveDirectoryIterator($subfolder, RecursiveDirectoryIterator::SKIP_DOTS),
@@ -153,56 +158,69 @@ foreach ($expectedControllers as $ctrl) {
     }
 }
 
-// 4. If critical controllers are missing, attempt instant self-heal
+// 4. If critical controllers are missing - v3.5.8 SAFE: NO GitHub download on web request (moved to cron)
+// Original code did curl to GitHub with 30s timeout on EVERY request if a controller was missing, causing 30s block
+// Now: Show fast error page with local assets, self-heal only if flag file exists or via repair.php / cron
+// To revert: restore from backups/20260929-panel-optimizations/index.php.backup
+// To enable auto-heal on web (old behavior): create file data/enable_autheal
 if (!empty($missingControllers)) {
+    $enableAutoHeal = file_exists(__DIR__ . '/data/enable_autheal') || isset($_GET['force_heal']);
     $healed = false;
-    $repo = 'hojjatrad/panelconnectix';
-    $token = '';
-    try {
-        if (class_exists('Setting')) {
-            $repo = Setting::get('github_repo', $repo);
-            $token = Setting::get('github_token', '');
+
+    if ($enableAutoHeal) {
+        // Only if explicitly enabled - attempt heal with short timeout (5s not 30s)
+        $repo = 'hojjatrad/panelconnectix';
+        $token = '';
+        try {
+            if (class_exists('Setting')) {
+                $repo = Setting::get('github_repo', $repo);
+                $token = Setting::get('github_token', '');
+            }
+        } catch (Throwable $e) {}
+
+        $url = "https://api.github.com/repos/{$repo}/zipball/main";
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 5); // v3.5.8: 5s not 30s
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        $headers = ['User-Agent: Connectix-AutoHeal'];
+        if (!empty($token)) $headers[] = "Authorization: token {$token}";
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        $zipData = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode === 200 && strlen($zipData) > 5000) {
+            $tmpZip = sys_get_temp_dir() . '/heal_' . time() . '.zip';
+            $tmpExtract = sys_get_temp_dir() . '/heal_ext_' . time();
+            file_put_contents($tmpZip, $zipData);
+
+            if (class_exists('Updater') && Updater::extractZip($tmpZip, $tmpExtract)) {
+                $subDirs = glob($tmpExtract . '/*', GLOB_ONLYDIR);
+                $sourceDir = (!empty($subDirs) && is_dir($subDirs[0])) ? $subDirs[0] : $tmpExtract;
+                if (is_dir($sourceDir . '/controllers')) {
+                    Updater::copyDirectory($sourceDir . '/controllers', __DIR__ . '/controllers', []);
+                    $healed = true;
+                }
+            }
+            @unlink($tmpZip);
         }
-    } catch (Throwable $e) {}
 
-    $url = "https://api.github.com/repos/{$repo}/zipball/main";
-    $ch = curl_init($url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    $headers = ['User-Agent: Connectix-AutoHeal'];
-    if (!empty($token)) $headers[] = "Authorization: token {$token}";
-    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-    $zipData = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-
-    if ($httpCode === 200 && strlen($zipData) > 5000) {
-        $tmpZip = sys_get_temp_dir() . '/heal_' . time() . '.zip';
-        $tmpExtract = sys_get_temp_dir() . '/heal_ext_' . time();
-        file_put_contents($tmpZip, $zipData);
-
-        if (class_exists('Updater') && Updater::extractZip($tmpZip, $tmpExtract)) {
-            $subDirs = glob($tmpExtract . '/*', GLOB_ONLYDIR);
-            $sourceDir = (!empty($subDirs) && is_dir($subDirs[0])) ? $subDirs[0] : $tmpExtract;
-            if (is_dir($sourceDir . '/controllers')) {
-                Updater::copyDirectory($sourceDir . '/controllers', __DIR__ . '/controllers', []);
-                $healed = true;
+        if ($healed) {
+            foreach ($missingControllers as $ctrl) {
+                $file = __DIR__ . '/controllers/' . $ctrl . '.php';
+                if (file_exists($file)) {
+                    require_once $file;
+                }
             }
         }
-        @unlink($tmpZip);
     }
 
-    if ($healed) {
-        foreach ($missingControllers as $ctrl) {
-            $file = __DIR__ . '/controllers/' . $ctrl . '.php';
-            if (file_exists($file)) {
-                require_once $file;
-            }
-        }
-    } else {
+    if (!$healed) {
         http_response_code(500);
+        // v3.5.8: Use local assets, not CDN (for Iran)
+        $baseUrl = Helpers::basePath();
         ?>
         <!DOCTYPE html>
         <html lang="fa" dir="rtl">
@@ -210,12 +228,10 @@ if (!empty($missingControllers)) {
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>بازیابی اضطراری سیستم | Connectix Panel</title>
-            <script src="https://cdn.tailwindcss.com"></script>
-            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-            <style>
-                @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;600;700;800;900&display=swap');
-                * { font-family: 'Vazirmatn', sans-serif; }
-            </style>
+            <link rel="stylesheet" href="<?= $baseUrl ?>/assets/css/fontawesome.min.css">
+            <link rel="stylesheet" href="<?= $baseUrl ?>/assets/css/vazirmatn.css">
+            <script src="<?= $baseUrl ?>/assets/js/tailwind.js"></script>
+            <style> * { font-family: 'Vazirmatn', sans-serif; } </style>
         </head>
         <body class="bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center p-4">
             <div class="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 text-center space-y-4 shadow-2xl">
@@ -224,7 +240,7 @@ if (!empty($missingControllers)) {
                 </div>
                 <h1 class="text-lg font-bold text-white">برخی فایل‌های کنترلی سیستم در هاست یافت نشدند</h1>
                 <p class="text-xs text-slate-400 leading-relaxed">
-                    فایل‌های زیر در مسیر controllers یافت نشدند (احتمالاً به دلیل اکسترکت ناقص یا اختلال دسترسی فایل‌ها در هاست):<br>
+                    فایل‌های زیر در مسیر controllers یافت نشدند (احتمالاً به دلیل اکسترکت ناقص):<br>
                     <code class="text-amber-300 font-mono text-[11px] mt-2 inline-block bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800"><?= htmlspecialchars(implode(', ', $missingControllers)) ?></code>
                 </p>
                 <div class="pt-3 space-y-2">
@@ -235,6 +251,7 @@ if (!empty($missingControllers)) {
                     <a href="index.php" class="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium rounded-xl text-xs transition block">
                         تلاش مجدد و بارگذاری صفحه
                     </a>
+                    <p class="text-[10px] text-slate-500 mt-2">برای بازگشت به حالت قبل: <code>cp backups/20260929-panel-optimizations/index.php.backup index.php</code></p>
                 </div>
             </div>
         </body>

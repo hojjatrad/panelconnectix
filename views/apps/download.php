@@ -3,11 +3,11 @@
  * Connectix Panel - Public Apps Download & Connection Guides Center
  */
 $manifest = $manifest ?? [];
-$appVersion = $manifest['version'] ?? '3.5.1';
-$apkUniversalUrl = $manifest['apk']['universal'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.1/Connectix-Android-Universal.apk';
-$apkArm64Url = $manifest['apk']['arm64'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.1/Connectix-Android-ARM64.apk';
-$apkArm32Url = $manifest['apk']['arm32'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.1/Connectix-Android-ARM32.apk';
-$windowsUrl = $manifest['windows']['url'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.1/Connectix-Windows-x64.zip';
+$appVersion = $manifest['version'] ?? '3.5.8';
+$apkUniversalUrl = $manifest['apk']['universal'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.8/Connectix-Android-Universal.apk';
+$apkArm64Url = $manifest['apk']['arm64'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.8/Connectix-Android-ARM64.apk';
+$apkArm32Url = $manifest['apk']['arm32'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.8/Connectix-Android-ARM32.apk';
+$windowsUrl = $manifest['windows']['url'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.8/Connectix-Windows-x64.zip';
 $brandName = htmlspecialchars($brandName ?? 'Connectix VPN');
 $logoUrl = $logoUrl ?? '';
 $guides = $guides ?? [];
@@ -34,12 +34,29 @@ foreach ($guides as $g) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#0f172a">
     <title><?= $brandName ?> | مرکز دانلود نرم‌افزارها و راهنمای اتصال</title>
+    <!-- v3.5.8 SAFE: Local assets for Iran -->
+    <?php
+    $base = defined('Helpers::class') && method_exists('Helpers','basePath') ? Helpers::basePath() : '/contax';
+    $localTailwind = __DIR__ . '/../../assets/js/tailwind.js';
+    $localFA = __DIR__ . '/../../assets/css/fontawesome.min.css';
+    $localVazir = __DIR__ . '/../../assets/css/vazirmatn.css';
+    ?>
+    <?php if (file_exists($localTailwind)): ?>
+    <script src="<?= $base ?>/assets/js/tailwind.js"></script>
+    <?php else: ?>
     <script src="https://cdn.tailwindcss.com"></script>
+    <?php endif; ?>
+    <?php if (file_exists($localFA)): ?>
+    <link rel="stylesheet" href="<?= $base ?>/assets/css/fontawesome.min.css">
+    <?php else: ?>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap');
-        * { font-family: 'Vazirmatn', sans-serif; }
-    </style>
+    <?php endif; ?>
+    <?php if (file_exists($localVazir)): ?>
+    <link rel="stylesheet" href="<?= $base ?>/assets/css/vazirmatn.css">
+    <?php else: ?>
+    <style>@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap');</style>
+    <?php endif; ?>
+    <style>* { font-family: 'Vazirmatn', sans-serif; }</style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen selection:bg-purple-600 selection:text-white relative overflow-x-hidden">
     <!-- Ambient Background Lighting -->

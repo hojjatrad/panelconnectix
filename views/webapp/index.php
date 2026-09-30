@@ -4,9 +4,35 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title><?= htmlspecialchars($brandName) ?> - Mini App</title>
-    <!-- Tailwind CSS (Offline-friendly CDN) -->
+    <!-- v3.5.8 SAFE: Local assets for Iran -->
+    <?php
+    $base = method_exists('Helpers','basePath') ? Helpers::basePath() : '/contax';
+    $localTailwind = __DIR__ . '/../../assets/js/tailwind.js';
+    $localFA = __DIR__ . '/../../assets/css/fontawesome.min.css';
+    $localVazir = __DIR__ . '/../../assets/css/vazirmatn.css';
+    ?>
+    <?php if (file_exists($localTailwind)): ?>
+    <script src="<?= $base ?>/assets/js/tailwind.js"></script>
+    <?php else: ?>
     <script src="https://cdn.tailwindcss.com"></script>
+    <?php endif; ?>
+    <?php if (file_exists($localFA)): ?>
+    <link rel="stylesheet" href="<?= $base ?>/assets/css/fontawesome.min.css">
+    <?php else: ?>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <?php endif; ?>
+    <?php if (file_exists($localVazir)): ?>
+    <link rel="stylesheet" href="<?= $base ?>/assets/css/vazirmatn.css">
+    <?php else: ?>
+    <style>@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap');</style>
+    <?php endif; ?>
+    <?php
+    $localQR = __DIR__ . '/../../assets/js/qrcode.min.js';
+    if (file_exists($localQR)): ?>
+    <script src="<?= $base ?>/assets/js/qrcode.min.js"></script>
+    <?php else: ?>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <?php endif; ?>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         @font-face {
@@ -272,7 +298,8 @@
         <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-xs w-full text-center space-y-4">
             <h4 class="text-xs font-bold text-white">اسکن بارکد QR اتصال</h4>
             <div class="bg-white p-3 rounded-2xl inline-block shadow-inner">
-                <img id="qrImage" src="" alt="QR Code" class="w-48 h-48 mx-auto">
+                <div id="qrContainer" class="w-48 h-48 mx-auto flex items-center justify-center"></div>
+                <img id="qrImage" src="" alt="QR Code" class="w-48 h-48 mx-auto hidden">
             </div>
             <p class="text-[10px] text-slate-400">کافیست در نرم‌افزار خود علامت + و سپس اسکن بارکد را انتخاب فرمایید.</p>
             <button onclick="closeQrModal()" class="w-full py-2.5 bg-slate-800 text-slate-300 font-bold rounded-xl text-xs">
@@ -409,7 +436,30 @@
         }
 
         function openQrModal(subUrl) {
-            document.getElementById('qrImage').src = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(subUrl);
+            // v3.5.8 SAFE: Use local QRCode.js first, fallback to external only if needed
+            try {
+                var container = document.getElementById('qrContainer');
+                if (!container) {
+                    // Create container if img exists
+                    var img = document.getElementById('qrImage');
+                    if (img && img.parentNode) {
+                        container = document.createElement('div');
+                        container.id = 'qrContainer';
+                        container.className = 'w-48 h-48 mx-auto bg-white p-2 rounded-xl flex items-center justify-center';
+                        img.parentNode.replaceChild(container, img);
+                    }
+                }
+                if (container && typeof QRCode !== 'undefined') {
+                    container.innerHTML = '';
+                    new QRCode(container, { text: subUrl, width: 180, height: 180, correctLevel: QRCode.CorrectLevel.M });
+                } else {
+                    document.getElementById('qrImage').src = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(subUrl);
+                }
+            } catch(e) {
+                try {
+                    document.getElementById('qrImage').src = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(subUrl);
+                } catch(e2) {}
+            }
             const m = document.getElementById('qrModal');
             m.classList.remove('hidden');
             m.classList.add('flex');

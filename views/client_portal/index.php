@@ -25,10 +25,10 @@ $manifest = [];
 if (is_file($manifestPath)) {
     $manifest = @json_decode(file_get_contents($manifestPath), true) ?: [];
 }
-$appVersion = (string)($manifest['version'] ?? '3.5.1');
-$apkUniversalUrl = (string)($manifest['apk']['universal'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.1/Connectix-Android-Universal.apk');
-$apkArm64Url = (string)($manifest['apk']['arm64'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.1/Connectix-Android-ARM64.apk');
-$windowsUrl = (string)($manifest['windows']['url'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.1/Connectix-Windows-x64.zip');
+$appVersion = (string)($manifest['version'] ?? '3.5.8');
+$apkUniversalUrl = (string)($manifest['apk']['universal'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.8/Connectix-Android-Universal.apk');
+$apkArm64Url = (string)($manifest['apk']['arm64'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.8/Connectix-Android-ARM64.apk');
+$windowsUrl = (string)($manifest['windows']['url'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.8/Connectix-Windows-x64.zip');
 
 // Sanitized Client Data
 $clientUsername = htmlspecialchars((string)($client['username'] ?? 'user'));
@@ -76,13 +76,35 @@ $userLimitText = $clientIpLimit > 0 ? "{$clientIpLimit} دستگاه" : "نام�
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="robots" content="noindex, nofollow">
     <title><?= $brandName ?> | پورتال خودخدمت مشتری</title>
+    <!-- v3.5.8 SAFE: Local assets for Iran -->
+    <?php
+    $base = Helpers::basePath();
+    $localTailwind = __DIR__ . '/../../assets/js/tailwind.js';
+    $localFA = __DIR__ . '/../../assets/css/fontawesome.min.css';
+    $localVazir = __DIR__ . '/../../assets/css/vazirmatn.css';
+    $localQR = __DIR__ . '/../../assets/js/qrcode.min.js';
+    ?>
+    <?php if (file_exists($localTailwind)): ?>
+    <script src="<?= $base ?>/assets/js/tailwind.js"></script>
+    <?php else: ?>
     <script src="https://cdn.tailwindcss.com"></script>
+    <?php endif; ?>
+    <?php if (file_exists($localFA)): ?>
+    <link rel="stylesheet" href="<?= $base ?>/assets/css/fontawesome.min.css">
+    <?php else: ?>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <?php endif; ?>
+    <?php if (file_exists($localVazir)): ?>
+    <link rel="stylesheet" href="<?= $base ?>/assets/css/vazirmatn.css">
+    <?php else: ?>
+    <style>@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap');</style>
+    <?php endif; ?>
+    <?php if (file_exists($localQR)): ?>
+    <script src="<?= $base ?>/assets/js/qrcode.min.js"></script>
+    <?php else: ?>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap');
-        * { font-family: 'Vazirmatn', sans-serif; }
-    </style>
+    <?php endif; ?>
+    <style>* { font-family: 'Vazirmatn', sans-serif; }</style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center p-3 md:p-6 selection:bg-purple-600 selection:text-white relative overflow-x-hidden">
     <!-- Ambient Glow Background Effects -->
@@ -416,6 +438,7 @@ $userLimitText = $clientIpLimit > 0 ? "{$clientIpLimit} دستگاه" : "نام�
     <script>
         // Render QR Code
         <?php if ($client && $subUrl !== ''): ?>
+        // v3.5.8 SAFE: Local QR generation only, no external api.qrserver.com (blocked in Iran)
         try {
             if (typeof QRCode !== 'undefined') {
                 new QRCode(document.getElementById("qrcode"), {
@@ -427,10 +450,10 @@ $userLimitText = $clientIpLimit > 0 ? "{$clientIpLimit} دستگاه" : "نام�
                     correctLevel : QRCode.CorrectLevel.M
                 });
             } else {
-                document.getElementById("qrcode").innerHTML = '<img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=<?= $subUrlEncoded ?>" alt="QR" class="w-40 h-40">';
+                document.getElementById("qrcode").innerHTML = '<div class="text-[10px] text-slate-500 p-2">بارکد در دسترس نیست - لینک را کپی کنید<br><span class="text-[9px]">QR library not loaded</span></div>';
             }
         } catch(e) {
-            document.getElementById("qrcode").innerHTML = '<img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=<?= $subUrlEncoded ?>" alt="QR" class="w-40 h-40">';
+            document.getElementById("qrcode").innerHTML = '<div class="text-[10px] text-slate-500 p-2">خطا در تولید بارکد<br>' + e.message + '</div>';
         }
         <?php endif; ?>
 
