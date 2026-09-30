@@ -4,7 +4,7 @@ require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Setting.php';
 
 class Updater {
-    public const CURRENT_VERSION = '5.5.7';
+    public const CURRENT_VERSION = '5.5.8';
 
     public static function getCurrentVersion(): string {
         $dbVer = Setting::get('current_version', '');
@@ -20,6 +20,7 @@ class Updater {
             $pdo = Database::getConnection();
             Database::ensureExtendedTablesExist($pdo);
             self::ensureConnectixDriverFixed($pdo);
+            self::ensureCustomerNamesFixed($pdo);
         } catch (Throwable $e) {}
     }
 
@@ -579,6 +580,7 @@ class Updater {
             Database::ensureExtendedTablesExist($pdo);
             // Auto-fix Connectix Seller driver after any update
             self::ensureConnectixDriverFixed($pdo);
+            self::ensureCustomerNamesFixed($pdo);
         } catch (Throwable $e) {}
     }
 
@@ -599,6 +601,56 @@ class Updater {
                 if ($needsFix) {
                     $pdo->prepare("UPDATE server_nodes SET driver = 'connectix_seller', api_url = 'https://api.connectix.vip' WHERE id = ?")->execute([$id]);
                 }
+            }
+        } catch (Throwable $e) {}
+    }
+
+    public static function ensureCustomerNamesFixed($pdo = null): void {
+        try {
+            if (!$pdo) $pdo = Database::getConnection();
+            // Only run if there are clients without customer_name
+            $countEmpty = (int)$pdo->query("SELECT COUNT(*) FROM clients WHERE customer_name IS NULL OR customer_name = ''")->fetchColumn();
+            if ($countEmpty === 0) return;
+
+            // Try to build VIP map from Connectix Seller server
+            $vipMap = [];
+            try {
+                $vipServer = $pdo->query("SELECT * FROM server_nodes WHERE driver = 'connectix_seller' LIMIT 1")->fetch();
+                if (!$vipServer) {
+                    $vipServer = $pdo->query("SELECT * FROM server_nodes WHERE api_url LIKE '%connectix.vip%' LIMIT 1")->fetch();
+                }
+                if ($vipServer) {
+                    require_once __DIR__ . '/../drivers/DriverFactory.php';
+                    $driver = \DriverFactory::create($vipServer);
+                    if ($driver->authenticate()) {
+                        $vipUsers = $driver->listUsers();
+                        foreach ($vipUsers as $vu) {
+                            if (!empty($vu['name']) && !empty($vu['username'])) {
+                                $vipMap[trim($vu['username'])] = trim($vu['name']);
+                            }
+                        }
+                    }
+                }
+            } catch (Throwable $e) {}
+
+            // First: copy from VIP where username matches
+            if (!empty($vipMap)) {
+                $stmt = $pdo->query("SELECT id, username FROM clients WHERE customer_name IS NULL OR customer_name = '' LIMIT 200");
+                $rows = $stmt->fetchAll();
+                foreach ($rows as $r) {
+                    $u = trim($r['username']);
+                    if (isset($vipMap[$u]) && $vipMap[$u] !== '') {
+                        $pdo->prepare("UPDATE clients SET customer_name = ? WHERE id = ?")->execute([$vipMap[$u], $r['id']]);
+                    }
+                }
+            }
+
+            // Second: for remaining empties, set customer_name = username as fallback (so view always shows something professional)
+            // But only if still empty after VIP attempt, and only once per day to avoid overwriting intentional empties
+            $lastFix = (int)Setting::get('last_customer_name_autofix', '0');
+            if (time() - $lastFix > 86400) { // once per day
+                $pdo->exec("UPDATE clients SET customer_name = username WHERE customer_name IS NULL OR customer_name = ''");
+                Setting::set('last_customer_name_autofix', (string)time());
             }
         } catch (Throwable $e) {}
     }
