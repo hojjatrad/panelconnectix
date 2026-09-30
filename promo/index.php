@@ -151,8 +151,35 @@ body{background:#03050A;color:#fff;overflow-x:hidden}
 <div class="relative aspect-video bg-black overflow-hidden" id="videoContainer">
 <img id="slideImage" src="<?= $base ?>ads/banner-fa-1.jpg" class="w-full h-full object-cover transition-all duration-700">
 <div class="absolute inset-0 bg-gradient-to-t from-[#0A0D18] via-transparent to-transparent"></div>
-<div class="absolute inset-0 flex items-center justify-center">
-<button id="playBtn" class="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-[0_0_60px_rgba(255,255,255,.5)] hover:scale-110 transition"><i class="fa-solid fa-play text-black text-xl ml-1"></i></button>
+<div class="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/20 group-hover:bg-black/10 transition">
+<!-- Animated pulse rings to show video exists -->
+<div class="relative">
+<div class="absolute inset-0 bg-white/20 rounded-full animate-ping" style="animation-duration: 2s"></div>
+<div class="absolute -inset-4 bg-gradient-to-br from-violet-600 to-cyan-400 rounded-full opacity-40 blur-2xl animate-pulse"></div>
+<div class="absolute -inset-2 bg-white/10 rounded-full"></div>
+<button id="playBtn" class="relative w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-[0_0_80px_rgba(255,255,255,.7),0_12px_40px_rgba(0,0,0,.5)] hover:scale-110 hover:shadow-[0_0_100px_rgba(255,255,255,.9)] transition-all duration-300 group/btn cursor-pointer">
+<i class="fa-solid fa-play text-black text-[26px] ml-1 group-hover/btn:scale-110 transition-transform duration-300"></i>
+</button>
+<!-- Small play indicator dot -->
+<div class="absolute -top-1 -right-1 w-7 h-7 bg-red-500 rounded-full border-4 border-[#0A0D18] flex items-center justify-center shadow-lg">
+<div class="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+</div>
+</div>
+<!-- Clear label that this is video -->
+<div class="flex flex-col items-center gap-2">
+<div class="bg-black/70 backdrop-blur-xl border border-white/15 rounded-full px-6 py-2.5 flex items-center gap-2.5 shadow-[0_8px_32px_rgba(0,0,0,.5)] hover:bg-black/80 transition">
+<div class="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(239,68,68,.5)]">
+<i class="fa-solid fa-play text-white text-[11px] ml-0.5"></i>
+</div>
+<span class="text-[13px] font-black text-white tracking-wide">پخش ویدیو معرفی</span>
+<span class="w-px h-4 bg-white/20"></span>
+<span class="text-[11px] text-white/60">کلیک کنید</span>
+</div>
+<div class="bg-violet-600/20 backdrop-blur-md border border-violet-500/30 rounded-full px-3 py-1 flex items-center gap-1.5">
+<i class="fa-solid fa-video text-violet-300 text-[10px]"></i>
+<span class="text-[10px] font-bold text-violet-200">ویدیو موجود - با صداگذاری فارسی</span>
+</div>
+</div>
 </div>
 <div class="absolute bottom-0 left-0 right-0 p-6">
 <h3 class="font-black text-[18px]">ویدیو معرفی پنل نمایندگی</h3>
@@ -164,8 +191,9 @@ body{background:#03050A;color:#fff;overflow-x:hidden}
 <div class="p-5">
 <audio id="narration" src="<?= $base ?>ads/video-narration-fa.mp3" preload="metadata"></audio>
 <div class="flex items-center gap-3">
-<button id="playPause" class="w-10 h-10 bg-white rounded-full flex items-center justify-center hover:scale-105 transition shadow-[0_0_20px_rgba(255,255,255,.3)]"><i class="fa-solid fa-play text-black text-xs ml-0.5"></i></button>
-<div class="flex-1"><div class="text-[13px] font-bold">پخش ویدیو معرفی</div><div class="text-[11px] text-white/40">@mainAdminpanel</div></div>
+<button id="playPause" class="w-11 h-11 bg-white rounded-full flex items-center justify-center hover:scale-105 transition shadow-[0_0_20px_rgba(255,255,255,.4)] group/btn2"><i class="fa-solid fa-play text-black text-[13px] ml-0.5 group-hover/btn2:scale-110 transition"></i></button>
+<div class="flex-1"><div class="text-[13px] font-black flex items-center gap-2"><i class="fa-solid fa-circle-play text-violet-400"></i> پخش ویدیو معرفی</div><div class="text-[11px] text-white/50 flex items-center gap-1.5 mt-0.5"><i class="fa-solid fa-volume-high text-[10px]"></i> با صداگذاری فارسی - @mainAdminpanel</div></div>
+<div class="bg-white/[0.06] border border-white/[0.1] rounded-full px-3 py-1.5 flex items-center gap-1.5"><div class="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div><span class="text-[10px] font-bold">VIDEO</span></div>
 </div>
 </div>
 </div>
