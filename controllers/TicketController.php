@@ -220,8 +220,15 @@ class TicketController {
             Helpers::redirect('tickets');
         }
         $text = $log['answer'] . "\n\n— 🤖 پیشنهاد توسط دستیار هوش مصنوعی (تأیید و ارسال توسط پشتیبان)";
-        $pdo->prepare("INSERT INTO ticket_messages (ticket_id, sender_id, message, created_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)")
-            ->execute([$ticketId, Auth::id(), $text]);
+        $imgUrl = $log['image_url'] ?? null;
+        $imgsJson = $log['images_json'] ?? null;
+        try {
+            $pdo->prepare("INSERT INTO ticket_messages (ticket_id, sender_id, message, attachment_url, attachments_json, created_at) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)")
+                ->execute([$ticketId, Auth::id(), $text, $imgUrl, $imgsJson]);
+        } catch (Throwable $e) {
+            $pdo->prepare("INSERT INTO ticket_messages (ticket_id, sender_id, message, created_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)")
+                ->execute([$ticketId, Auth::id(), $text]);
+        }
         $pdo->prepare("UPDATE tickets SET status='answered', updated_at=CURRENT_TIMESTAMP WHERE id=?")->execute([$ticketId]);
         $pdo->prepare("UPDATE ai_logs SET accepted = 1 WHERE id = ?")->execute([$logId]);
         Helpers::flash('success', 'پاسخ هوش مصنوعی به نام شما ارسال شد.');

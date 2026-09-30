@@ -69,6 +69,26 @@ $categories = ['فنی', 'پولی', 'نماینده', 'گزارش خطا', 'س�
             <label class="block text-[11px] text-slate-400 mb-1">متن مستند (پاسخ پیشنهادی کامل)</label>
             <textarea name="content" rows="6" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white leading-relaxed focus:border-teal-500 focus:outline-none"><?= htmlspecialchars((string)$editing['content']) ?></textarea>
         </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+                <label class="block text-[11px] text-slate-400 mb-1"><i class="fa-solid fa-image text-violet-400"></i> لینک عکس اصلی (اختیاری) — مثلاً https://.../hiddify-step1.jpg</label>
+                <input type="url" name="image_url" value="<?= htmlspecialchars((string)($editing['image_url'] ?? '')) ?>" placeholder="https://example.com/guide.jpg" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:border-violet-500 focus:outline-none">
+                <?php if (!empty($editing['image_url'])): ?><div class="mt-2"><img src="<?= htmlspecialchars($editing['image_url']) ?>" class="max-h-28 rounded-lg border border-slate-700"></div><?php endif; ?>
+            </div>
+            <div>
+                <label class="block text-[11px] text-slate-400 mb-1">گالری تصاویر (هر خط یک URL — برای راهنمای چند مرحله‌ای مثل کپی لینک، Import، اتصال)</label>
+                <textarea name="images_json" rows="3" placeholder="https://example.com/step1.jpg
+https://example.com/step2.jpg
+https://example.com/step3.jpg" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white font-mono focus:border-violet-500 focus:outline-none"><?= htmlspecialchars(implode("\n", json_decode($editing['images_json'] ?? '[]', true) ?: [])) ?></textarea>
+                <?php
+                $editGallery = json_decode($editing['images_json'] ?? '[]', true);
+                if (!empty($editGallery)): ?>
+                <div class="mt-2 grid grid-cols-3 gap-1">
+                    <?php foreach ($editGallery as $gi): ?><img src="<?= htmlspecialchars($gi) ?>" class="h-16 w-full object-cover rounded border border-slate-700"><?php endforeach; ?>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
         <label class="flex items-center gap-2 text-xs text-slate-300">
             <input type="checkbox" name="is_active" value="1" <?= $editing['is_active'] ? 'checked' : '' ?> class="w-4 h-4 accent-teal-500"> فعال
         </label>
@@ -81,11 +101,11 @@ $categories = ['فنی', 'پولی', 'نماینده', 'گزارش خطا', 'س�
     <!-- New form -->
     <form action="<?= Helpers::url('settings/ai/knowledge/store') ?>" method="POST" class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-sm space-y-3">
         <?= Helpers::csrfField() ?>
-        <h3 class="text-xs font-bold text-white flex items-center gap-2"><i class="fa-solid fa-plus text-teal-400"></i> مستند جدید</h3>
+        <h3 class="text-xs font-bold text-white flex items-center gap-2"><i class="fa-solid fa-plus text-teal-400"></i> مستند جدید — با راهنمای تصویری</h3>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div class="md:col-span-2">
                 <label class="block text-[11px] text-slate-400 mb-1">عنوان</label>
-                <input type="text" name="title" required placeholder="مثلاً: روش پرداخت و فعال‌سازی سرویس" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:border-teal-500 focus:outline-none">
+                <input type="text" name="title" required placeholder="مثلاً: راهنمای اتصال Hiddify مرحله‌به‌مرحله" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:border-teal-500 focus:outline-none">
             </div>
             <div>
                 <label class="block text-[11px] text-slate-400 mb-1">دسته</label>
@@ -96,14 +116,26 @@ $categories = ['فنی', 'پولی', 'نماینده', 'گزارش خطا', 'س�
         </div>
         <div>
             <label class="block text-[11px] text-slate-400 mb-1">کلیدواژه‌ها (با ویرایش جدا کنید)</label>
-            <input type="text" name="keywords" placeholder="پرداخت,خرید,شارژ,کارت" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:border-teal-500 focus:outline-none">
+            <input type="text" name="keywords" placeholder="Hiddify,اتصال,Import,کپی لینک,وصل شدن" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:border-teal-500 focus:outline-none">
         </div>
         <div>
             <label class="block text-[11px] text-slate-400 mb-1">متن مستند</label>
-            <textarea name="content" rows="5" required placeholder="پاسخ کامل و مرحله‌به‌مرحله که می‌خواهید AI بدهد..." class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white leading-relaxed focus:border-teal-500 focus:outline-none"></textarea>
+            <textarea name="content" rows="5" required placeholder="پاسخ کامل و مرحله‌به‌مرحله که می‌خواهید AI بدهد... مثلاً: 1. کپی لینک از پنل 2. باز کردن Hiddify و زدن + 3. ..." class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white leading-relaxed focus:border-teal-500 focus:outline-none"></textarea>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+                <label class="block text-[11px] text-slate-400 mb-1"><i class="fa-solid fa-image text-violet-400"></i> لینک عکس اصلی (اختیاری)</label>
+                <input type="url" name="image_url" placeholder="https://example.com/guide.jpg" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:border-violet-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="block text-[11px] text-slate-400 mb-1">گالری (هر خط یک URL — 3 عکس برای اتصال: کپی، Import، اتصال)</label>
+                <textarea name="images_json" rows="3" placeholder="https://example.com/step1.jpg
+https://example.com/step2.jpg
+https://example.com/step3.jpg" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white font-mono focus:border-violet-500 focus:outline-none"></textarea>
+            </div>
         </div>
         <div class="flex justify-end">
-            <button type="submit" class="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold">افزودن مستند</button>
+            <button type="submit" class="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold">افزودن مستند + تصاویر</button>
         </div>
     </form>
     <?php endif; ?>

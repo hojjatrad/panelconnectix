@@ -131,6 +131,29 @@ class AiController {
         require __DIR__ . '/../views/settings/ai_knowledge.php';
     }
 
+    private static function parseImageInputs(): array {
+        $imageUrl = trim($_POST['image_url'] ?? '');
+        if ($imageUrl !== '' && !filter_var($imageUrl, FILTER_VALIDATE_URL)) $imageUrl = '';
+        $rawGallery = trim($_POST['images_json'] ?? '');
+        $gallery = [];
+        if ($rawGallery !== '') {
+            // Accept either JSON array or newline separated URLs
+            $decoded = json_decode($rawGallery, true);
+            if (is_array($decoded)) {
+                $gallery = $decoded;
+            } else {
+                foreach (preg_split('/[\r\n]+/', $rawGallery) as $line) {
+                    $line = trim($line);
+                    if ($line !== '' && filter_var($line, FILTER_VALIDATE_URL)) $gallery[] = $line;
+                }
+            }
+            // Filter valid URLs
+            $gallery = array_values(array_unique(array_filter($gallery, fn($u) => filter_var($u, FILTER_VALIDATE_URL))));
+        }
+        $imagesJson = !empty($gallery) ? json_encode($gallery, JSON_UNESCAPED_UNICODE) : null;
+        return [$imageUrl ?: null, $imagesJson];
+    }
+
     public function knowledgeStore(): void {
         self::adminOnly();
         if (!Helpers::verifyCsrf()) {
@@ -146,12 +169,20 @@ class AiController {
             Helpers::flash('error', 'عنوان و متن سند الزامی است.');
             Helpers::redirect('settings/ai/knowledge');
         }
+        [$imageUrl, $imagesJson] = self::parseImageInputs();
         $now = date('Y-m-d H:i:s');
         $pdo = Database::getConnection();
-        $pdo->prepare("INSERT INTO ai_knowledge (title, keywords, category, content, is_active, created_at, updated_at)
-                       VALUES (?,?,?,?,?,?,?)")
-            ->execute([$title, $keywords, $category, $content, $active, $now, $now]);
-        Helpers::flash('success', 'سند به پایگاه دانش اضافه شد.');
+        try {
+            $pdo->prepare("INSERT INTO ai_knowledge (title, keywords, category, content, image_url, images_json, is_active, created_at, updated_at)
+                           VALUES (?,?,?,?,?,?,?,?,?)")
+                ->execute([$title, $keywords, $category, $content, $imageUrl, $imagesJson, $active, $now, $now]);
+        } catch (Throwable $e) {
+            // Fallback for old schema without image columns
+            $pdo->prepare("INSERT INTO ai_knowledge (title, keywords, category, content, is_active, created_at, updated_at)
+                           VALUES (?,?,?,?,?,?,?)")
+                ->execute([$title, $keywords, $category, $content, $active, $now, $now]);
+        }
+        Helpers::flash('success', 'سند به پایگاه دانش اضافه شد.' . ($imageUrl || $imagesJson ? ' + تصاویر' : ''));
         Helpers::redirect('settings/ai/knowledge');
     }
 
@@ -171,10 +202,16 @@ class AiController {
             Helpers::flash('error', 'ورودی نامعتبر.');
             Helpers::redirect('settings/ai/knowledge');
         }
+        [$imageUrl, $imagesJson] = self::parseImageInputs();
         $pdo = Database::getConnection();
-        $pdo->prepare("UPDATE ai_knowledge SET title=?, keywords=?, category=?, content=?, is_active=?, updated_at=? WHERE id=?")
-            ->execute([$title, $keywords, $category, $content, $active, date('Y-m-d H:i:s'), $id]);
-        Helpers::flash('success', 'سند به‌روزرسانی شد.');
+        try {
+            $pdo->prepare("UPDATE ai_knowledge SET title=?, keywords=?, category=?, content=?, image_url=?, images_json=?, is_active=?, updated_at=? WHERE id=?")
+                ->execute([$title, $keywords, $category, $content, $imageUrl, $imagesJson, $active, date('Y-m-d H:i:s'), $id]);
+        } catch (Throwable $e) {
+            $pdo->prepare("UPDATE ai_knowledge SET title=?, keywords=?, category=?, content=?, is_active=?, updated_at=? WHERE id=?")
+                ->execute([$title, $keywords, $category, $content, $active, date('Y-m-d H:i:s'), $id]);
+        }
+        Helpers::flash('success', 'سند به‌روزرسانی شد.' . ($imageUrl || $imagesJson ? ' + تصاویر ذخیره شد' : ''));
         Helpers::redirect('settings/ai/knowledge');
     }
 

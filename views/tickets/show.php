@@ -68,6 +68,23 @@ require __DIR__ . '/../layout/header.php';
                 <span class="text-[10px] text-slate-500 font-mono"><?= substr((string)$aiDraft['created_at'], 0, 16) ?></span>
             </div>
             <div class="text-xs text-slate-200 leading-relaxed whitespace-pre-wrap bg-slate-950/50 border border-slate-800 rounded-xl p-4"><?= htmlspecialchars((string)$aiDraft['answer']) ?></div>
+            <?php
+            $draftImages = [];
+            if (!empty($aiDraft['images_json'])) {
+                $d = json_decode($aiDraft['images_json'], true);
+                if (is_array($d)) $draftImages = $d;
+            }
+            if (!empty($aiDraft['image_url']) && !in_array($aiDraft['image_url'], $draftImages)) array_unshift($draftImages, $aiDraft['image_url']);
+            $draftImages = array_values(array_unique(array_filter($draftImages)));
+            if (!empty($draftImages)): ?>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <?php foreach ($draftImages as $img): ?>
+                <a href="<?= htmlspecialchars($img) ?>" target="_blank" class="block overflow-hidden rounded-xl border border-violet-700/40 hover:border-violet-400/60 transition">
+                    <img src="<?= htmlspecialchars($img) ?>" alt="پیش‌نمایش راهنما" class="w-full h-auto max-h-[220px] object-contain bg-slate-950">
+                </a>
+                <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
             <?php if ($ticket['status'] !== 'closed'): ?>
             <div class="flex items-center gap-2 justify-end">
                 <form action="<?= Helpers::url('tickets/ai-draft/discard') ?>" method="POST" class="m-0">
@@ -122,6 +139,28 @@ require __DIR__ . '/../layout/header.php';
                 <div class="text-xs text-slate-200 leading-relaxed whitespace-pre-wrap font-sans">
                     <?= htmlspecialchars($msg['message']) ?>
                 </div>
+                <?php
+                $msgImages = [];
+                if (!empty($msg['attachments_json'])) {
+                    $dec = json_decode($msg['attachments_json'], true);
+                    if (is_array($dec)) $msgImages = $dec;
+                }
+                if (!empty($msg['attachment_url']) && !in_array($msg['attachment_url'], $msgImages)) {
+                    array_unshift($msgImages, $msg['attachment_url']);
+                }
+                $msgImages = array_values(array_unique(array_filter($msgImages)));
+                if (!empty($msgImages)): ?>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                    <?php foreach ($msgImages as $img): ?>
+                    <a href="<?= htmlspecialchars($img) ?>" target="_blank" class="group block overflow-hidden rounded-xl border border-slate-700/60 hover:border-emerald-500/40 transition">
+                        <img src="<?= htmlspecialchars($img) ?>" alt="راهنمای تصویری" loading="lazy" class="w-full h-auto max-h-[320px] object-contain bg-slate-950 group-hover:scale-[1.02] transition-transform duration-300">
+                    </a>
+                    <?php endforeach; ?>
+                </div>
+                <?php endif; ?>
+                <?php if ($isAiMsg && !empty($msg['attachments_json'])): ?>
+                <div class="text-[10px] text-emerald-400/70 pt-1 flex items-center gap-1"><i class="fa-solid fa-image"></i> راهنمای تصویری ضمیمه شده توسط هوش مصنوعی</div>
+                <?php endif; ?>
             </div>
         <?php endforeach; ?>
     </div>

@@ -1430,13 +1430,47 @@ class TelegramBotController {
                 );
                 if ($ai['handled']) {
                     if ($ai['auto']) {
-                        TelegramBot::sendMessage(
-                            "🤖 <b>دستیار هوشمند</b>\n\n" . nl2br(htmlspecialchars($ai['answer'], ENT_QUOTES))
-                            . "\n\n<i>اگر پاسخ مورد نظرتان نبود، از منوی اصلی دکمهٔ «پشتیبانی» را دوباره بزنید.</i>",
-                            $chatId,
-                            null,
-                            $ctxAi['bot_token']
-                        );
+                        $images = $ai['images'] ?? [];
+                        if (!empty($ai['image_url']) && !in_array($ai['image_url'], $images)) $images[] = $ai['image_url'];
+                        $images = array_values(array_unique(array_filter($images)));
+                        // If images exist: send photo(s) with caption, then text footer if needed
+                        if (!empty($images)) {
+                            // Telegram: first image with full answer as caption, rest as album if multiple
+                            $caption = "🤖 <b>دستیار هوشمند</b>\n\n" . $ai['answer'] . "\n\n<i>اگر پاسخ مورد نظرتان نبود، از منوی اصلی دکمهٔ «پشتیبانی» را دوباره بزنید.</i>";
+                            if (count($images) === 1) {
+                                TelegramBot::sendPhoto(
+                                    $images[0],
+                                    $caption,
+                                    $chatId,
+                                    null,
+                                    $ctxAi['bot_token']
+                                );
+                            } else {
+                                // Send as media group (up to 3 images)
+                                $media = [];
+                                foreach (array_slice($images, 0, 10) as $idx => $img) {
+                                    $media[] = [
+                                        'type' => 'photo',
+                                        'media' => $img,
+                                        'caption' => $idx === 0 ? $caption : '',
+                                        'parse_mode' => 'HTML'
+                                    ];
+                                }
+                                // Use direct request for sendMediaGroup
+                                TelegramBot::request('sendMediaGroup', [
+                                    'chat_id' => $chatId,
+                                    'media' => $media
+                                ], $ctxAi['bot_token']);
+                            }
+                        } else {
+                            TelegramBot::sendMessage(
+                                "🤖 <b>دستیار هوشمند</b>\n\n" . nl2br(htmlspecialchars($ai['answer'], ENT_QUOTES))
+                                . "\n\n<i>اگر پاسخ مورد نظرتان نبود، از منوی اصلی دکمهٔ «پشتیبانی» را دوباره بزنید.</i>",
+                                $chatId,
+                                null,
+                                $ctxAi['bot_token']
+                            );
+                        }
                     } else {
                         $supportUser = ltrim((string)($ctxAi['support_username'] ?: Setting::get('support_telegram', '')), '@');
                         $kbAi = null;

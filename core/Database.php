@@ -588,6 +588,8 @@ class Database {
                 keywords VARCHAR(255) NULL,
                 category VARCHAR(64) DEFAULT 'general',
                 content TEXT NULL,
+                image_url VARCHAR(512) NULL,
+                images_json TEXT NULL,
                 is_active TINYINT(1) DEFAULT 1,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -605,6 +607,8 @@ class Database {
                 is_sensitive TINYINT(1) DEFAULT 0,
                 needs_human TINYINT(1) DEFAULT 0,
                 answer TEXT NULL,
+                image_url VARCHAR(512) NULL,
+                images_json TEXT NULL,
                 latency_ms INT DEFAULT 0,
                 error TEXT NULL,
                 accepted TINYINT(1) DEFAULT 0,
@@ -649,6 +653,23 @@ class Database {
             foreach ($rpCols as $c => $d) {
                 self::safeAddColumn($pdo, 'reseller_plans', $c, $d);
             }
+            // AI Knowledge images (v5.7.1 - visual guide)
+            $aiKnowCols = [
+                'image_url' => 'VARCHAR(512) NULL',
+                'images_json' => 'TEXT NULL',
+            ];
+            foreach ($aiKnowCols as $c => $d) {
+                self::safeAddColumn($pdo, 'ai_knowledge', $c, $d);
+            }
+            $aiLogCols = [
+                'image_url' => 'VARCHAR(512) NULL',
+                'images_json' => 'TEXT NULL',
+            ];
+            foreach ($aiLogCols as $c => $d) {
+                self::safeAddColumn($pdo, 'ai_logs', $c, $d);
+            }
+            self::safeAddColumn($pdo, 'ticket_messages', 'attachment_url', 'VARCHAR(512) NULL');
+            self::safeAddColumn($pdo, 'ticket_messages', 'attachments_json', 'TEXT NULL');
             // Allow plan_id to be 0 for custom plans (MySQL strict)
             try {
                 $pdo->exec("ALTER TABLE reseller_plans MODIFY plan_id INT NOT NULL DEFAULT 0");

@@ -98,6 +98,17 @@ require __DIR__ . '/../layout/header.php';
                             <details class="text-[10px]">
                                 <summary class="cursor-pointer text-slate-400 hover:text-slate-200 line-clamp-2"><?= htmlspecialchars(mb_substr((string)$l['answer'], 0, 120)) ?>...</summary>
                                 <div class="mt-2 bg-slate-950/60 border border-slate-800 rounded-lg p-2.5 text-slate-300 leading-relaxed whitespace-pre-wrap"><?= htmlspecialchars((string)$l['answer']) ?></div>
+                                <?php
+                                $logImgs = [];
+                                if (!empty($l['image_url'])) $logImgs[] = $l['image_url'];
+                                if (!empty($l['images_json'])) { $d = json_decode($l['images_json'], true); if (is_array($d)) $logImgs = array_merge($logImgs, $d); }
+                                $logImgs = array_values(array_unique(array_filter($logImgs)));
+                                if (!empty($logImgs)): ?>
+                                <div class="mt-2 flex gap-1 flex-wrap">
+                                    <?php foreach (array_slice($logImgs, 0, 3) as $li): ?><a href="<?= htmlspecialchars($li) ?>" target="_blank"><img src="<?= htmlspecialchars($li) ?>" class="h-12 w-12 object-cover rounded border border-slate-700"></a><?php endforeach; ?>
+                                    <span class="text-[9px] text-violet-400"><?= count($logImgs) ?> عکس</span>
+                                </div>
+                                <?php endif; ?>
                             </details>
                         <?php elseif (!empty($l['error'])): ?>
                             <details class="text-[10px]">

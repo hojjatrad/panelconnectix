@@ -207,17 +207,25 @@ class AiService {
              "ساب‌نماینده:\n\n**چیست:**\n- شما می‌توانید نماینده‌های زیرمجموعه خودتان بسازید (ساب‌نماینده)\n- ساب‌نماینده پنل جداگانه دارد و می‌تواند مشتری بسازد\n- شما از فروش ساب‌نماینده پورسانت می‌گیرید (درصد پورسانت قابل تنظیم)\n\n**انتقال اعتبار:**\n- می‌توانید از کیف پول خود به ساب‌نماینده اعتبار منتقل کنید\n- ساب‌نماینده با آن اعتبار می‌تواند مشتری بسازد"],
 
         ];
-        $st = $pdo->prepare("INSERT INTO ai_knowledge (title, keywords, category, content, is_active, created_at, updated_at)
-                            VALUES (?, ?, ?, ?, 1, ?, ?)");
+        try {
+            $st = $pdo->prepare("INSERT INTO ai_knowledge (title, keywords, category, content, image_url, images_json, is_active, created_at, updated_at)
+                                VALUES (?, ?, ?, ?, NULL, NULL, 1, ?, ?)");
+        } catch (Throwable $e) {
+            $st = $pdo->prepare("INSERT INTO ai_knowledge (title, keywords, category, content, is_active, created_at, updated_at)
+                                VALUES (?, ?, ?, ?, 1, ?, ?)");
+        }
         foreach ($seeds as $s) {
             try {
-                // Check if title already exists to avoid duplicates
                 $exists = $pdo->prepare("SELECT id FROM ai_knowledge WHERE title = ?");
                 $exists->execute([$s[0]]);
                 if ($exists->fetch()) continue;
                 $st->execute([$s[0], $s[1], $s[2], $s[3], $now, $now]);
             } catch (Throwable $e) {
-                // ignore duplicate
+                // ignore duplicate / old schema
+                try {
+                    $st2 = $pdo->prepare("INSERT INTO ai_knowledge (title, keywords, category, content, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?)");
+                    $st2->execute([$s[0], $s[1], $s[2], $s[3], $now, $now]);
+                } catch (Throwable $e2) {}
             }
         }
     }
@@ -295,11 +303,18 @@ class AiService {
             $fallback = array_slice($rows, 0, 2);
             $out = [];
             foreach ($fallback as $c) {
+                $images = [];
+                if (!empty($c['image_url'])) $images[] = $c['image_url'];
+                if (!empty($c['images_json'])) {
+                    try { $dec = json_decode($c['images_json'], true); if (is_array($dec)) $images = array_merge($images, $dec); } catch (Throwable $e) {}
+                }
                 $out[] = [
                     'title' => $c['title'],
                     'category' => $c['category'],
                     'content' => mb_substr((string)$c['content'], 0, 1500),
                     'score' => 1,
+                    'image_url' => $c['image_url'] ?? null,
+                    'images' => array_values(array_unique(array_filter($images))),
                 ];
             }
             return $out;
@@ -308,11 +323,18 @@ class AiService {
         $out = [];
         foreach (array_slice($scored, 0, $limit) as $s) {
             $c = $s['row'];
+            $images = [];
+            if (!empty($c['image_url'])) $images[] = $c['image_url'];
+            if (!empty($c['images_json'])) {
+                try { $dec = json_decode($c['images_json'], true); if (is_array($dec)) $images = array_merge($images, $dec); } catch (Throwable $e) {}
+            }
             $out[] = [
                 'title' => $c['title'],
                 'category' => $c['category'],
                 'content' => mb_substr((string)$c['content'], 0, 1800),
                 'score' => $s['score'],
+                'image_url' => $c['image_url'] ?? null,
+                'images' => array_values(array_unique(array_filter($images))),
             ];
         }
         return $out;
@@ -661,14 +683,17 @@ PROMPT;
         }
 
         self::ensureSeedKnowledge();
-        $knowledge = self::searchKnowledge($text, 4);
+        $knowledge = self::searchKnowledge($text, 5);
         $kb = '';
+        $allImages = [];
         foreach ($knowledge as $k) {
             $kb .= "\n### {$k['title']} (دسته: {$k['category']})\n" . $k['content'] . "\n";
+            if (!empty($k['images'])) $allImages = array_merge($allImages, $k['images']);
         }
+        $allImages = array_values(array_unique(array_filter($allImages)));
         if (trim($kb) === '') $kb = "\n(مورد مرتبط پیدا نشد — برای سؤال‌های مبهم needs_human=true بگذار.)\n";
 
-        $prompt = "پایگاه دانش (فقط از این استفاده کن):\n{$kb}\n\n"
+        $prompt = "پایگاه دانش جامع (از این استخراج کن):\n{$kb}\n\n"
                 . "سؤال مشتری: " . self::maskPii($text) . "\n"
                 . "پاسخ را فقط به‌صورت JSON بده.";
 
@@ -682,22 +707,40 @@ PROMPT;
             && $parsed['confidence'] >= (float)self::cfg('ai_min_confidence')
             && $parsed['answer'] !== '';
 
+        $mainImage = $allImages[0] ?? null;
+        $imagesJson = !empty($allImages) ? json_encode($allImages, JSON_UNESCAPED_UNICODE) : null;
+
         try {
             Database::getConnection()->prepare("INSERT INTO ai_logs (ticket_id, stage, provider, model, status, category, confidence,
-                                        is_sensitive, needs_human, answer, latency_ms, error, accepted, created_at)
-                                       VALUES (0, 'bot', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP)")
+                                        is_sensitive, needs_human, answer, image_url, images_json, latency_ms, error, accepted, created_at)
+                                       VALUES (0, 'bot', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP)")
                 ->execute([
                     $llm['provider'], $llm['model'],
                     $canAuto ? 'auto_replied' : ($llm['ok'] ? 'handover' : 'failed'),
                     $parsed['category'], $parsed['confidence'], $parsed['is_sensitive'] ? 1 : 0,
                     $parsed['needs_human'] ? 1 : 0,
                     $canAuto ? $parsed['answer'] : self::maskPii(mb_substr($text, 0, 200)),
+                    $mainImage, $imagesJson,
                     $llm['latency_ms'], $llm['error'],
                 ]);
-        } catch (Throwable $e) {}
+        } catch (Throwable $e) {
+            try {
+                Database::getConnection()->prepare("INSERT INTO ai_logs (ticket_id, stage, provider, model, status, category, confidence,
+                                            is_sensitive, needs_human, answer, latency_ms, error, accepted, created_at)
+                                           VALUES (0, 'bot', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP)")
+                    ->execute([
+                        $llm['provider'], $llm['model'],
+                        $canAuto ? 'auto_replied' : ($llm['ok'] ? 'handover' : 'failed'),
+                        $parsed['category'], $parsed['confidence'], $parsed['is_sensitive'] ? 1 : 0,
+                        $parsed['needs_human'] ? 1 : 0,
+                        $canAuto ? $parsed['answer'] : self::maskPii(mb_substr($text, 0, 200)),
+                        $llm['latency_ms'], $llm['error'],
+                    ]);
+            } catch (Throwable $e2) {}
+        }
 
         if ($canAuto) {
-            return ['handled' => true, 'auto' => true, 'answer' => $parsed['answer']];
+            return ['handled' => true, 'auto' => true, 'answer' => $parsed['answer'], 'images' => $allImages, 'image_url' => $mainImage];
         }
 
         // Human handover: alert supergroup with customer context
@@ -791,22 +834,50 @@ PROMPT;
 
         $status = $llm['ok'] ? ($canAuto ? 'auto_replied' : 'draft') : 'failed';
 
+        // Collect images from knowledge that matched (visual guide)
+        $allImages = [];
+        foreach ($knowledge as $k) {
+            if (!empty($k['images']) && is_array($k['images'])) {
+                $allImages = array_merge($allImages, $k['images']);
+            }
+        }
+        $allImages = array_values(array_unique(array_filter($allImages)));
+        $mainImage = $allImages[0] ?? null;
+        $imagesJson = !empty($allImages) ? json_encode($allImages, JSON_UNESCAPED_UNICODE) : null;
+
         // log
         try {
             $pdo->prepare("INSERT INTO ai_logs (ticket_id, stage, provider, model, status, category, confidence,
-                            is_sensitive, needs_human, answer, latency_ms, error, accepted, created_at)
-                           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,0, CURRENT_TIMESTAMP)")
+                            is_sensitive, needs_human, answer, image_url, images_json, latency_ms, error, accepted, created_at)
+                           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,0, CURRENT_TIMESTAMP)")
                 ->execute([
                     $ticketId, $canAuto ? 'auto' : 'draft', $llm['provider'], $llm['model'], $status,
                     $parsed['category'], $parsed['confidence'], $parsed['is_sensitive'] ? 1 : 0,
-                    $parsed['needs_human'] ? 1 : 0, $parsed['answer'], $llm['latency_ms'], $llm['error'],
+                    $parsed['needs_human'] ? 1 : 0, $parsed['answer'], $mainImage, $imagesJson, $llm['latency_ms'], $llm['error'],
                 ]);
-        } catch (Throwable $e) {}
+        } catch (Throwable $e) {
+            // Fallback without images columns for old schema
+            try {
+                $pdo->prepare("INSERT INTO ai_logs (ticket_id, stage, provider, model, status, category, confidence,
+                                is_sensitive, needs_human, answer, latency_ms, error, accepted, created_at)
+                               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,0, CURRENT_TIMESTAMP)")
+                    ->execute([
+                        $ticketId, $canAuto ? 'auto' : 'draft', $llm['provider'], $llm['model'], $status,
+                        $parsed['category'], $parsed['confidence'], $parsed['is_sensitive'] ? 1 : 0,
+                        $parsed['needs_human'] ? 1 : 0, $parsed['answer'], $llm['latency_ms'], $llm['error'],
+                    ]);
+            } catch (Throwable $e2) {}
+        }
 
         if ($canAuto) {
             $footer = "\n\n— 🤖 این پاسخ توسط دستیار هوش مصنوعی Connectix ارائه شده است. اگر مشکل حل نشد، پیام جدید بفرستید تا پشتیبان انسانی بررسی کند.";
-            $pdo->prepare("INSERT INTO ticket_messages (ticket_id, sender_id, message, is_ai, created_at) VALUES (?, 0, ?, 1, CURRENT_TIMESTAMP)")
-                ->execute([$ticketId, $parsed['answer'] . $footer]);
+            try {
+                $pdo->prepare("INSERT INTO ticket_messages (ticket_id, sender_id, message, is_ai, attachment_url, attachments_json, created_at) VALUES (?, 0, ?, 1, ?, ?, CURRENT_TIMESTAMP)")
+                    ->execute([$ticketId, $parsed['answer'] . $footer, $mainImage, $imagesJson]);
+            } catch (Throwable $e) {
+                $pdo->prepare("INSERT INTO ticket_messages (ticket_id, sender_id, message, is_ai, created_at) VALUES (?, 0, ?, 1, CURRENT_TIMESTAMP)")
+                    ->execute([$ticketId, $parsed['answer'] . $footer]);
+            }
             $pdo->prepare("UPDATE tickets SET status='answered', updated_at=CURRENT_TIMESTAMP WHERE id=?")->execute([$ticketId]);
 
             $whoName = $ticket['brand_name'] ?: $ticket['username'];
