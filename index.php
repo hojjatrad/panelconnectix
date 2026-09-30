@@ -340,6 +340,7 @@ $router->post('resellers/store', [ResellerController::class, 'store']);
 $router->post('resellers/adjust', [ResellerController::class, 'adjustBalance']);
 $router->post('resellers/set-credit-limit', [ResellerController::class, 'setCreditLimit']);
 $router->post('resellers/update-discount', [ResellerController::class, 'updateDiscount']);
+$router->post('resellers/update-custom-perms', [ResellerController::class, 'updateCustomPlanPermissions']);
 $router->post('resellers/reset-password', [ResellerController::class, 'resetPassword']);
 $router->post('resellers/delete', [ResellerController::class, 'delete']);
 $router->get('resellers/clients', [ResellerController::class, 'clients']);

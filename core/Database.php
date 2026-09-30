@@ -333,7 +333,12 @@ class Database {
                 'telegram_chat_id' => 'VARCHAR(64) NULL',
                 'magic_login_token' => 'VARCHAR(64) NULL',
                 'magic_login_expires' => 'DATETIME NULL',
-                'panel_password_display' => 'VARCHAR(128) NULL'
+                'panel_password_display' => 'VARCHAR(128) NULL',
+                'allow_custom_plans' => 'TINYINT(1) DEFAULT 1',
+                'allow_price_edit' => 'TINYINT(1) DEFAULT 1',
+                'allowed_servers' => 'TEXT NULL',
+                'max_custom_plans' => 'INT DEFAULT 10',
+                'custom_plan_approval_required' => 'TINYINT(1) DEFAULT 0'
             ];
             foreach ($userCols as $c => $d) {
                 self::safeAddColumn($pdo, 'users', $c, $d);

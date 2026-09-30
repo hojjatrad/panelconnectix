@@ -49,6 +49,7 @@ $pendingCount = $pendingAppsCount ?? 0;
                     <th class="p-3.5 font-semibold">سقف بدهی مجاز</th>
                     <th class="p-3.5 font-semibold">وضعیت تراز</th>
                     <th class="p-3.5 font-semibold">تخفیف</th>
+                    <th class="p-3.5 font-semibold">پلن اختصاصی</th>
                     <th class="p-3.5 font-semibold">مشتریان</th>
                     <th class="p-3.5 font-semibold">وضعیت</th>
                     <th class="p-3.5 font-semibold text-center">عملیات</th>
@@ -112,6 +113,22 @@ $pendingCount = $pendingAppsCount ?? 0;
                                 <span><?= $tier['discount'] ?>%</span>
                                 <i class="fa-solid fa-pen text-[9px] text-purple-400 group-hover:scale-125 transition-transform"></i>
                             </button>
+                        </td>
+                        <td class="p-3.5 whitespace-nowrap">
+                            <?php
+                                $allowCustom = (int)($r['allow_custom_plans'] ?? 1);
+                                $allowPrice = (int)($r['allow_price_edit'] ?? 1);
+                                $customCount = (int)($r['custom_plans_count'] ?? 0);
+                                $maxCustom = (int)($r['max_custom_plans'] ?? 10);
+                            ?>
+                            <button onclick="openCustomPermsModal(<?= $r['id'] ?>, '<?= htmlspecialchars($r['username']) ?>', <?= $allowCustom ?>, <?= $allowPrice ?>, <?= $maxCustom ?>, <?= (int)($r['custom_plan_approval_required'] ?? 0) ?>, '<?= htmlspecialchars($r['allowed_servers'] ?? '', ENT_QUOTES) ?>')" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg <?= $allowCustom ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-slate-700/50 hover:bg-slate-700 text-slate-400 border border-slate-600' ?> font-bold transition text-xs" title="مدیریت دسترسی پلن اختصاصی - <?= $customCount ?>/<?= $maxCustom ?> ساخته شده">
+                                <i class="fa-solid fa-star text-[10px] <?= $allowCustom ? 'text-amber-400' : 'text-slate-500' ?>"></i>
+                                <span><?= $allowCustom ? 'فعال' : 'غیرفعال' ?> (<?= $customCount ?>/<?= $maxCustom ?>)</span>
+                                <i class="fa-solid fa-pen text-[9px] opacity-60"></i>
+                            </button>
+                            <?php if ($allowPrice): ?>
+                                <span class="inline-flex ml-1 px-1.5 py-0.5 rounded text-[9px] bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">قیمت✓</span>
+                            <?php endif; ?>
                         </td>
                         <td class="p-3.5 whitespace-nowrap">
                             <a href="<?= Helpers::url('resellers/clients?id=' . $r['id']) ?>" class="text-cyan-400 hover:underline font-medium flex items-center gap-1">
@@ -439,7 +456,76 @@ function closeDeleteResellerModal() {
     document.getElementById('deleteResellerModal').classList.remove('flex');
     document.getElementById('deleteResellerModal').classList.add('hidden');
 }
+
+function openCustomPermsModal(id, username, allowCustom, allowPrice, maxCustom, approvalRequired, allowedServersJson) {
+    document.getElementById('customPermsUserId').value = id;
+    document.getElementById('customPermsUsername').innerText = username;
+    document.getElementById('customPermsAllowCustom').checked = (allowCustom == 1);
+    document.getElementById('customPermsAllowPrice').checked = (allowPrice == 1);
+    document.getElementById('customPermsMax').value = maxCustom || 10;
+    document.getElementById('customPermsApproval').checked = (approvalRequired == 1);
+    // allowed servers
+    let allowed = [];
+    try { allowed = JSON.parse(allowedServersJson || '[]'); } catch(e){ allowed = []; }
+    document.querySelectorAll('.customPermsServerCheck').forEach(cb => {
+        cb.checked = allowed.length === 0 ? false : allowed.includes(parseInt(cb.value));
+    });
+    document.getElementById('customPermsModal').classList.remove('hidden');
+    document.getElementById('customPermsModal').classList.add('flex');
+}
+function closeCustomPermsModal() {
+    document.getElementById('customPermsModal').classList.remove('flex');
+    document.getElementById('customPermsModal').classList.add('hidden');
+}
 </script>
+
+<!-- Modal: Custom Plan Permissions (Full Control Panel) -->
+<div id="customPermsModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+    <div class="bg-slate-900 border border-emerald-500/30 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative text-xs">
+        <button onclick="closeCustomPermsModal()" class="absolute top-4 left-4 text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+        <h3 class="text-base font-bold text-white mb-2 flex items-center gap-2"><i class="fa-solid fa-star text-amber-400"></i> کنترل پلن اختصاصی نماینده</h3>
+        <p class="text-slate-400 mb-4">نماینده: <span id="customPermsUsername" class="font-bold text-emerald-400 font-mono"></span></p>
+        <form action="<?= Helpers::url('resellers/update-custom-perms') ?>" method="POST" class="space-y-4">
+            <?= Helpers::csrfField() ?>
+            <input type="hidden" name="user_id" id="customPermsUserId">
+            <div class="grid grid-cols-2 gap-3">
+                <label class="flex items-center gap-2 p-3 bg-slate-800/60 rounded-xl border border-slate-700 cursor-pointer">
+                    <input type="checkbox" name="allow_custom_plans" id="customPermsAllowCustom" value="1" class="rounded">
+                    <div><span class="block text-white font-bold">اجازه ساخت پلن اختصاصی</span><span class="text-[10px] text-slate-400">نماینده می‌تواند محصول خودش را بسازد</span></div>
+                </label>
+                <label class="flex items-center gap-2 p-3 bg-slate-800/60 rounded-xl border border-slate-700 cursor-pointer">
+                    <input type="checkbox" name="allow_price_edit" id="customPermsAllowPrice" value="1" class="rounded">
+                    <div><span class="block text-white font-bold">اجازه ویرایش قیمت پایه</span><span class="text-[10px] text-slate-400">قیمت فروش پلن‌های اصلی را تغییر دهد</span></div>
+                </label>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div><label class="block text-slate-300 mb-1">حداکثر تعداد پلن اختصاصی</label><input type="number" name="max_custom_plans" id="customPermsMax" min="0" max="100" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white text-center font-mono"></div>
+                <label class="flex items-center gap-2 p-3 bg-slate-800/60 rounded-xl border border-slate-700 cursor-pointer mt-5">
+                    <input type="checkbox" name="custom_plan_approval_required" id="customPermsApproval" value="1" class="rounded">
+                    <span class="text-white font-bold">نیاز به تایید ادمین</span>
+                </label>
+            </div>
+            <div>
+                <label class="block text-slate-300 mb-2 font-semibold">سرورهای مجاز برای ساخت پلن اختصاصی (خالی = همه سرورها)</label>
+                <div class="bg-slate-800/40 border border-slate-700 rounded-xl p-3 max-h-32 overflow-y-auto space-y-1.5">
+                    <?php
+                    try {
+                        $allServers = Database::getConnection()->query("SELECT id, name, driver FROM server_nodes WHERE is_active = 1 OR driver='connectix_seller' ORDER BY name ASC")->fetchAll();
+                    } catch(Throwable $e){ $allServers = []; }
+                    foreach ($allServers as $sv):
+                    ?>
+                        <label class="flex items-center gap-2 cursor-pointer hover:bg-slate-700/40 p-1 rounded">
+                            <input type="checkbox" name="allowed_servers[]" value="<?= $sv['id'] ?>" class="customPermsServerCheck rounded">
+                            <span class="text-slate-200"><?= htmlspecialchars($sv['name']) ?></span><span class="text-[10px] text-slate-500">(<?= $sv['driver'] ?>)</span>
+                        </label>
+                    <?php endforeach; ?>
+                </div>
+                <span class="text-[10px] text-slate-500">اگر هیچکدام را انتخاب نکنید، نماینده می‌تواند از همه سرورها استفاده کند. اگر فقط VIP را انتخاب کنید، فقط از VIP می‌تواند پلن بسازد.</span>
+            </div>
+            <button type="submit" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl">ذخیره دسترسی‌های پلن</button>
+        </form>
+    </div>
+</div>
 
 <!-- Modal: Delete Reseller -->
 <div id="deleteResellerModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">

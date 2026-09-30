@@ -169,7 +169,11 @@ class ResellerPortalController {
         // Ensure extended columns exist
         try { Database::ensureExtendedTablesExist($pdo); } catch (Throwable $e) {}
 
-        // Get reseller info for tiered discount rate
+        // Get reseller info and permissions (full control panel)
+        $stmtUser = $pdo->prepare("SELECT *, COALESCE(allow_custom_plans,1) as allow_custom_plans, COALESCE(allow_price_edit,1) as allow_price_edit, COALESCE(max_custom_plans,10) as max_custom_plans, allowed_servers FROM users WHERE id = ?");
+        $stmtUser->execute([$userId]);
+        $resellerPerms = $stmtUser->fetch() ?: ['allow_custom_plans'=>1,'allow_price_edit'=>1,'max_custom_plans'=>10,'allowed_servers'=>null];
+
         $tier = Provisioner::getResellerTier($userId);
         $discount = (int)$tier['discount'];
 
@@ -197,9 +201,20 @@ class ResellerPortalController {
             $customPlans = [];
         }
 
-        // Get servers for custom plan creation (allow all active)
+        // Get servers for custom plan creation - respect allowed_servers restriction
         try {
-            $servers = $pdo->query("SELECT id, name, driver FROM server_nodes WHERE is_active = 1 OR driver = 'connectix_seller' ORDER BY name ASC")->fetchAll();
+            $allServers = $pdo->query("SELECT id, name, driver FROM server_nodes WHERE is_active = 1 OR driver = 'connectix_seller' ORDER BY name ASC")->fetchAll();
+            $allowed = null;
+            if (!empty($resellerPerms['allowed_servers'])) {
+                try { $allowed = json_decode($resellerPerms['allowed_servers'], true); } catch (Throwable $e) { $allowed = null; }
+                if (is_array($allowed) && !empty($allowed)) {
+                    $servers = array_values(array_filter($allServers, fn($s) => in_array((int)$s['id'], array_map('intval',$allowed))));
+                } else {
+                    $servers = $allServers;
+                }
+            } else {
+                $servers = $allServers;
+            }
         } catch (Throwable $e) {
             $servers = [];
         }
@@ -215,7 +230,7 @@ class ResellerPortalController {
     }
 
     /**
-     * Save Reseller Plan Pricing
+     * Save Reseller Plan Pricing - respects allow_price_edit
      */
     public function savePlans(): void {
         $userId = self::checkResellerAccess();
@@ -223,10 +238,18 @@ class ResellerPortalController {
             Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
             Helpers::redirect('reseller/plans');
         }
+        $pdo = Database::getConnection();
+        try {
+            $perm = $pdo->prepare("SELECT COALESCE(allow_price_edit,1) as allow_price_edit FROM users WHERE id = ?");
+            $perm->execute([$userId]);
+            $allowPriceEdit = (int)($perm->fetchColumn() ?? 1);
+            if ($allowPriceEdit !== 1) {
+                Helpers::flash('error', '⛔ شما اجازه ویرایش قیمت پلن‌های پایه را ندارید. این دسترسی توسط مدیریت غیرفعال شده است.');
+                Helpers::redirect('reseller/plans');
+            }
+        } catch (Throwable $e) {}
 
         $planData = $_POST['plans'] ?? [];
-        $pdo = Database::getConnection();
-
         $pdo->beginTransaction();
         try {
             foreach ($planData as $planId => $data) {
@@ -236,8 +259,7 @@ class ResellerPortalController {
                 $price = (int)str_replace(',', '', $data['retail_price'] ?? 0);
                 $isActive = !empty($data['is_active']) ? 1 : 0;
 
-                // Check existing record
-                $check = $pdo->prepare("SELECT id FROM reseller_plans WHERE reseller_id = ? AND plan_id = ?");
+                $check = $pdo->prepare("SELECT id FROM reseller_plans WHERE reseller_id = ? AND plan_id = ? AND is_custom = 0");
                 $check->execute([$userId, $planId]);
                 $existingId = $check->fetchColumn();
 
@@ -245,7 +267,7 @@ class ResellerPortalController {
                     $stmt = $pdo->prepare("UPDATE reseller_plans SET custom_title = ?, custom_category = ?, retail_price = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
                     $stmt->execute([$title, $category, $price, $isActive, $existingId]);
                 } else {
-                    $stmt = $pdo->prepare("INSERT INTO reseller_plans (reseller_id, plan_id, custom_title, custom_category, retail_price, is_active, updated_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)");
+                    $stmt = $pdo->prepare("INSERT INTO reseller_plans (reseller_id, plan_id, custom_title, custom_category, retail_price, is_active, is_custom, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP)");
                     $stmt->execute([$userId, $planId, $title, $category, $price, $isActive]);
                 }
             }
@@ -255,7 +277,6 @@ class ResellerPortalController {
             $pdo->rollBack();
             Helpers::flash('error', 'خطا در ذخیره: ' . $e->getMessage());
         }
-
         Helpers::redirect('reseller/plans');
     }
 
@@ -271,6 +292,30 @@ class ResellerPortalController {
         $pdo = Database::getConnection();
         try { Database::ensureExtendedTablesExist($pdo); } catch (Throwable $e) {}
 
+        // Check permissions - full control panel
+        try {
+            $permStmt = $pdo->prepare("SELECT COALESCE(allow_custom_plans,1) as allow_custom_plans, COALESCE(max_custom_plans,10) as max_custom_plans, allowed_servers FROM users WHERE id = ?");
+            $permStmt->execute([$userId]);
+            $perms = $permStmt->fetch() ?: ['allow_custom_plans'=>1,'max_custom_plans'=>10,'allowed_servers'=>null];
+            if ((int)($perms['allow_custom_plans'] ?? 1) !== 1) {
+                Helpers::flash('error', '⛔ ساخت پلن اختصاصی برای شما توسط مدیریت غیرفعال شده است. فقط می‌توانید قیمت پلن‌های پایه را ویرایش کنید.');
+                Helpers::redirect('reseller/plans');
+            }
+            $countCustom = (int)$pdo->query("SELECT COUNT(*) FROM reseller_plans WHERE reseller_id = $userId AND is_custom = 1")->fetchColumn();
+            $maxAllowed = (int)($perms['max_custom_plans'] ?? 10);
+            if ($countCustom >= $maxAllowed) {
+                Helpers::flash('error', "⛔ سقف مجاز ساخت پلن اختصاصی شما {$maxAllowed} عدد است. شما {$countCustom} عدد ساخته‌اید. برای افزایش سقف با مدیریت تماس بگیرید.");
+                Helpers::redirect('reseller/plans');
+            }
+            // Check allowed servers
+            $allowedServers = null;
+            if (!empty($perms['allowed_servers'])) {
+                $allowedServers = json_decode($perms['allowed_servers'], true);
+            }
+        } catch (Throwable $e) {
+            $allowedServers = null;
+        }
+
         $title = trim($_POST['custom_title'] ?? '');
         $category = trim($_POST['custom_category'] ?? 'اقتصادی');
         $traffic = (float)($_POST['traffic_gb'] ?? 0);
@@ -284,6 +329,14 @@ class ResellerPortalController {
         if ($title === '' || $retailPrice <= 0 || $traffic <= 0) {
             Helpers::flash('error', 'عنوان، حجم و قیمت فروش الزامی هستند.');
             Helpers::redirect('reseller/plans');
+        }
+
+        // Enforce allowed servers restriction
+        if (is_array($allowedServers) && !empty($allowedServers) && $serverId !== null) {
+            if (!in_array($serverId, array_map('intval', $allowedServers))) {
+                Helpers::flash('error', '⛔ سرور انتخاب شده برای شما مجاز نیست. سرورهای مجاز توسط مدیریت تعیین شده‌اند.');
+                Helpers::redirect('reseller/plans');
+            }
         }
 
         try {

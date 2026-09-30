@@ -1,5 +1,10 @@
 <?php
 require __DIR__ . '/../layout/header.php';
+$perms = $resellerPerms ?? ['allow_custom_plans'=>1,'allow_price_edit'=>1,'max_custom_plans'=>10,'allowed_servers'=>null];
+$allowCustom = (int)($perms['allow_custom_plans'] ?? 1) === 1;
+$allowPrice = (int)($perms['allow_price_edit'] ?? 1) === 1;
+$maxCustom = (int)($perms['max_custom_plans'] ?? 10);
+$customCount = count($customPlans ?? []);
 ?>
 <div class="space-y-6">
     <!-- Header Card -->
@@ -9,12 +14,29 @@ require __DIR__ . '/../layout/header.php';
                 <h2 class="text-xl font-black text-white flex items-center gap-3">
                     <span class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center"><i class="fa-solid fa-store text-white"></i></span>
                     <span>فروشگاه من — مدیریت پلن‌های اختصاصی</span>
-                    <span class="px-2.5 py-1 bg-emerald-600/20 text-emerald-300 border border-emerald-700/40 rounded-full text-[10px]">HYBRID v5.6.2</span>
+                    <span class="px-2.5 py-1 bg-emerald-600/20 text-emerald-300 border border-emerald-700/40 rounded-full text-[10px]">FULL CONTROL v5.6.3</span>
                 </h2>
                 <p class="text-xs text-slate-400 mt-2 leading-relaxed">
-                    درصد تخفیف همکاری شما: <b class="text-violet-400 font-bold text-sm"><?= $discount ?>٪</b> — 
-                    شما می‌توانید هم پلن‌های اصلی را با قیمت دلخواه بفروشید و هم <b class="text-emerald-300">پلن کاملاً اختصاصی خودتان</b> را با حجم، روز، سقف اتصال ۴ نفره و قیمت خودتان بسازید. همه در ربات تلگرام شما نمایش داده می‌شوند.
+                    تخفیف شما: <b class="text-violet-400 font-bold text-sm"><?= $discount ?>٪</b> — 
+                    <?php if ($allowCustom && $allowPrice): ?>
+                        هم پلن‌های اصلی را با قیمت دلخواه بفروشید و هم <b class="text-emerald-300">پلن اختصاصی خودتان</b> را بسازید (سقف <?= $maxCustom ?> عدد، <?= $customCount ?> ساخته شده).
+                    <?php elseif ($allowCustom): ?>
+                        <b class="text-amber-300">فقط ساخت پلن اختصاصی فعال است</b> — قیمت پلن‌های پایه توسط مدیریت قفل شده.
+                    <?php elseif ($allowPrice): ?>
+                        <b class="text-cyan-300">فقط ویرایش قیمت پلن‌های پایه فعال است</b> — ساخت پلن اختصاصی توسط مدیریت غیرفعال شده.
+                    <?php else: ?>
+                        <b class="text-rose-300">⛔ هر دو دسترسی توسط مدیریت غیرفعال شده</b> — برای فعال‌سازی با مدیریت تماس بگیرید.
+                    <?php endif; ?>
+                    <?php if (!empty($servers) && count($servers) < count($allServers ?? $servers)): ?>
+                        <br><span class="text-[11px] text-amber-300"><i class="fa-solid fa-server ml-1"></i> سرورهای مجاز شما محدود شده: <?= implode('، ', array_map(fn($s)=>$s['name'], $servers)) ?></span>
+                    <?php endif; ?>
                 </p>
+                <?php if (!$allowCustom): ?>
+                    <div class="mt-2 p-2.5 bg-rose-950/30 border border-rose-800/40 rounded-xl text-[11px] text-rose-300"><i class="fa-solid fa-lock ml-1"></i> ساخت پلن اختصاصی توسط ادمین غیرفعال شده. فقط قیمت‌گذاری پایه (اگر فعال باشد) قابل استفاده است.</div>
+                <?php endif; ?>
+                <?php if (!$allowPrice): ?>
+                    <div class="mt-2 p-2.5 bg-amber-950/30 border border-amber-800/40 rounded-xl text-[11px] text-amber-300"><i class="fa-solid fa-lock ml-1"></i> ویرایش قیمت پلن‌های پایه توسط ادمین غیرفعال شده.</div>
+                <?php endif; ?>
             </div>
             <div class="flex items-center gap-2">
                 <div class="bg-slate-800/60 border border-slate-700 rounded-xl px-4 py-2.5 text-center">
@@ -23,11 +45,15 @@ require __DIR__ . '/../layout/header.php';
                 </div>
                 <div class="bg-emerald-950/30 border border-emerald-800/40 rounded-xl px-4 py-2.5 text-center">
                     <div class="text-[10px] text-emerald-400">اختصاصی من</div>
-                    <div class="text-lg font-black text-emerald-300"><?= $stats['custom_count'] ?? 0 ?> <span class="text-[10px] font-normal">فعال <?= $stats['active_custom'] ?? 0 ?></span></div>
+                    <div class="text-lg font-black text-emerald-300"><?= $stats['custom_count'] ?? 0 ?> <span class="text-[10px] font-normal">/ <?= $maxCustom ?> — فعال <?= $stats['active_custom'] ?? 0 ?></span></div>
                 </div>
-                <button onclick="openCreateCustomModal()" class="px-5 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold rounded-xl text-xs shadow-lg shadow-emerald-900/30 flex items-center gap-2">
-                    <i class="fa-solid fa-plus"></i><span>ساخت پلن اختصاصی جدید</span>
-                </button>
+                <?php if ($allowCustom): ?>
+                    <button onclick="openCreateCustomModal()" class="px-5 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold rounded-xl text-xs shadow-lg shadow-emerald-900/30 flex items-center gap-2 <?= $customCount >= $maxCustom ? 'opacity-50 cursor-not-allowed' : '' ?>" <?= $customCount >= $maxCustom ? 'disabled' : '' ?>>
+                        <i class="fa-solid fa-plus"></i><span>ساخت پلن اختصاصی</span>
+                    </button>
+                <?php else: ?>
+                    <span class="px-4 py-3 bg-slate-800 border border-slate-700 text-slate-400 rounded-xl text-xs"><i class="fa-solid fa-lock ml-1"></i> ساخت غیرفعال</span>
+                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -88,17 +114,17 @@ require __DIR__ . '/../layout/header.php';
                                         </span>
                                     </td>
                                     <td class="p-3.5">
-                                        <input type="text" name="plans[<?= $p['id'] ?>][custom_category]" value="<?= htmlspecialchars($displayCategory) ?>" placeholder="اقتصادی / VIP" class="bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 w-28 focus:border-indigo-500 focus:outline-none">
+                                        <input type="text" name="plans[<?= $p['id'] ?>][custom_category]" value="<?= htmlspecialchars($displayCategory) ?>" placeholder="اقتصادی / VIP" class="bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 w-28 focus:border-indigo-500 focus:outline-none <?= $allowPrice ? '' : 'opacity-50' ?>" <?= $allowPrice ? '' : 'readonly' ?>>
                                     </td>
                                     <td class="p-3.5">
-                                        <input type="text" name="plans[<?= $p['id'] ?>][custom_title]" value="<?= htmlspecialchars($displayTitle) ?>" class="bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white w-44 focus:border-indigo-500 focus:outline-none">
+                                        <input type="text" name="plans[<?= $p['id'] ?>][custom_title]" value="<?= htmlspecialchars($displayTitle) ?>" class="bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white w-44 focus:border-indigo-500 focus:outline-none <?= $allowPrice ? '' : 'opacity-50' ?>" <?= $allowPrice ? '' : 'readonly' ?>>
                                     </td>
                                     <td class="p-3.5">
                                         <span class="font-mono font-bold text-slate-300"><?= number_format($wholesaleCost) ?></span><span class="text-[10px] text-slate-400"> ت</span>
                                     </td>
                                     <td class="p-3.5">
                                         <div class="flex items-center gap-1">
-                                            <input type="number" step="1000" name="plans[<?= $p['id'] ?>][retail_price]" value="<?= $retailPrice ?>" oninput="calcProfit(this, <?= $wholesaleCost ?>, 'profit_<?= $p['id'] ?>')" class="bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs font-mono font-bold text-emerald-400 w-28 focus:border-indigo-500 focus:outline-none text-left" dir="ltr">
+                                            <input type="number" step="1000" name="plans[<?= $p['id'] ?>][retail_price]" value="<?= $retailPrice ?>" oninput="calcProfit(this, <?= $wholesaleCost ?>, 'profit_<?= $p['id'] ?>')" class="bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs font-mono font-bold text-emerald-400 w-28 focus:border-indigo-500 focus:outline-none text-left <?= $allowPrice ? '' : 'opacity-50' ?>" dir="ltr" <?= $allowPrice ? '' : 'readonly' ?>>
                                             <span class="text-[10px] text-slate-400">ت</span>
                                         </div>
                                     </td>
@@ -111,8 +137,14 @@ require __DIR__ . '/../layout/header.php';
                     </table>
                 </div>
                 <div class="p-4 bg-slate-800/40 border-t border-slate-800 flex items-center justify-between">
-                    <span class="text-xs text-slate-400"><i class="fa-solid fa-circle-info text-cyan-400 ml-1"></i> تغییرات بلافاصله در ربات تلگرام شما اعمال می‌شود.</span>
-                    <button type="submit" class="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold rounded-xl text-xs shadow-md flex items-center gap-2"><i class="fa-solid fa-check"></i><span>ذخیره قیمت‌های پایه</span></button>
+                    <span class="text-xs text-slate-400">
+                        <?php if ($allowPrice): ?>
+                            <i class="fa-solid fa-circle-info text-cyan-400 ml-1"></i> تغییرات بلافاصله در ربات تلگرام شما اعمال می‌شود.
+                        <?php else: ?>
+                            <i class="fa-solid fa-lock text-rose-400 ml-1"></i> ویرایش قیمت توسط مدیریت غیرفعال شده.
+                        <?php endif; ?>
+                    </span>
+                    <button type="submit" class="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold rounded-xl text-xs shadow-md flex items-center gap-2 <?= $allowPrice ? '' : 'opacity-50 cursor-not-allowed' ?>" <?= $allowPrice ? '' : 'disabled' ?>><i class="fa-solid fa-check"></i><span>ذخیره قیمت‌های پایه</span></button>
                 </div>
             </div>
         </form>

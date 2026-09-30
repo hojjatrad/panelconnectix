@@ -27,7 +27,13 @@ class ResellerController {
                                         u.discount_percent, u.status, u.telegram_bot_username, u.panel_password_display,
                                         COALESCE(u.credit_limit, 0) as credit_limit,
                                         COALESCE(u.brand_name, b.brand_name, 'بدون برند') as brand_name,
-                                        (SELECT COUNT(*) FROM clients WHERE reseller_id = u.id) as client_count
+                                        COALESCE(u.allow_custom_plans, 1) as allow_custom_plans,
+                                        COALESCE(u.allow_price_edit, 1) as allow_price_edit,
+                                        u.allowed_servers,
+                                        COALESCE(u.max_custom_plans, 10) as max_custom_plans,
+                                        COALESCE(u.custom_plan_approval_required, 0) as custom_plan_approval_required,
+                                        (SELECT COUNT(*) FROM clients WHERE reseller_id = u.id) as client_count,
+                                        (SELECT COUNT(*) FROM reseller_plans WHERE reseller_id = u.id AND is_custom = 1) as custom_plans_count
                                  FROM users u
                                  LEFT JOIN branding_metadata b ON b.user_id = u.id
                                  WHERE u.role = 'reseller'
@@ -42,7 +48,13 @@ class ResellerController {
                                             0 as credit_limit,
                                             '' as telegram_bot_username,
                                             'بدون برند' as brand_name,
-                                            (SELECT COUNT(*) FROM clients WHERE reseller_id = u.id) as client_count
+                                            1 as allow_custom_plans,
+                                            1 as allow_price_edit,
+                                            NULL as allowed_servers,
+                                            10 as max_custom_plans,
+                                            0 as custom_plan_approval_required,
+                                            (SELECT COUNT(*) FROM clients WHERE reseller_id = u.id) as client_count,
+                                            0 as custom_plans_count
                                      FROM users u
                                      WHERE u.role = 'reseller'
                                      ORDER BY u.id DESC");
@@ -142,6 +154,33 @@ class ResellerController {
             Helpers::flash('error', 'خطا در ثبت: ' . $e->getMessage());
         }
 
+        Helpers::redirect('resellers');
+    }
+
+    public function updateCustomPlanPermissions(): void {
+        Auth::requireAdmin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
+            Helpers::redirect('resellers');
+        }
+        $userId = (int)($_POST['user_id'] ?? 0);
+        $allowCustom = !empty($_POST['allow_custom_plans']) ? 1 : 0;
+        $allowPriceEdit = !empty($_POST['allow_price_edit']) ? 1 : 0;
+        $maxCustom = max(0, min(100, (int)($_POST['max_custom_plans'] ?? 10)));
+        $approvalRequired = !empty($_POST['custom_plan_approval_required']) ? 1 : 0;
+        $allowedServers = $_POST['allowed_servers'] ?? [];
+        if (!is_array($allowedServers)) $allowedServers = [];
+        $allowedServersJson = !empty($allowedServers) ? json_encode(array_map('intval', $allowedServers)) : null;
+
+        $pdo = Database::getConnection();
+        try { Database::ensureExtendedTablesExist($pdo); } catch (Throwable $e) {}
+
+        try {
+            $pdo->prepare("UPDATE users SET allow_custom_plans = ?, allow_price_edit = ?, max_custom_plans = ?, custom_plan_approval_required = ?, allowed_servers = ? WHERE id = ? AND role = 'reseller'")->execute([$allowCustom, $allowPriceEdit, $maxCustom, $approvalRequired, $allowedServersJson, $userId]);
+            Helpers::flash('success', "دسترسی پلن نماینده #{$userId} به‌روزرسانی شد");
+        } catch (Throwable $e) {
+            Helpers::flash('error', 'خطا: ' . $e->getMessage());
+        }
         Helpers::redirect('resellers');
     }
 
