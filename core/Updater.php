@@ -555,6 +555,9 @@ class Updater {
                 dirname($panelRoot) . '/index.php', // public_html/index.php if panel is public_html/contax
                 $panelRoot . '/../index.php',
                 '/home/vpbotnir/public_html/index.php',
+                '/home/vpbotni1/public_html/index.php', // actual live user found from logs
+                '/home/vpbotnir/public_html/contax/../index.php',
+                '/home/vpbotni1/public_html/contax/../index.php',
                 realpath($panelRoot . '/..') ? realpath($panelRoot . '/..') . '/index.php' : null,
             ];
             $candidates = array_filter(array_unique($candidates));
