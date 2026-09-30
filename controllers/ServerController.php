@@ -477,6 +477,11 @@ class ServerController {
     }
 
     public static function detectDriverType(string $apiUrl, string $username, string $password, string $token = '', string $name = ''): string {
+        $lowUrl = strtolower($apiUrl);
+        if (str_contains($lowUrl, 'api.connectix.vip') || str_contains($lowUrl, 'seller-api.connectix.vip') || str_contains($lowUrl, 'seller.connectix.vip')) {
+            return 'connectix_seller';
+        }
+
         $nameLower = mb_strtolower($name, 'UTF-8');
         if (str_contains($nameLower, 'پاسارگاد') || str_contains($nameLower, 'pasargad') || str_contains($nameLower, 'pasarguard')) {
             return 'pasargad';
@@ -487,6 +492,20 @@ class ServerController {
         }
 
         // Probe live endpoints
+        // Probe live endpoints - Connectix Seller first (its URL is api.connectix.vip)
+        try {
+            $cx = DriverFactory::create([
+                'driver' => 'connectix_seller',
+                'api_url' => $apiUrl,
+                'api_username' => $username,
+                'api_password' => $password,
+                'api_token' => $token
+            ]);
+            if ($cx->authenticate()) {
+                return 'connectix_seller';
+            }
+        } catch (Throwable $e) {}
+
         try {
             $psg = DriverFactory::create([
                 'driver' => 'pasargad',

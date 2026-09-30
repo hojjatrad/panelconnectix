@@ -4,6 +4,7 @@ require_once __DIR__ . '/MarzbanDriver.php';
 require_once __DIR__ . '/PasargadDriver.php';
 require_once __DIR__ . '/XUiDriver.php';
 require_once __DIR__ . '/MockDriver.php';
+require_once __DIR__ . '/ConnectixSellerDriver.php';
 
 class DriverFactory {
     public static function create(array $server): PanelDriverInterface {
@@ -40,8 +41,18 @@ class DriverFactory {
             case '3xui':
             case 'xui':
                 return new XUiDriver($url, $user, $pass, $token, $subDomain);
+            case 'connectix':
+            case 'connectix_seller':
+            case 'seller':
+            case 'seller_api':
+                return new ConnectixSellerDriver($url, $user, $pass, $token, $subDomain);
             case 'mock':
             default:
+                // Auto-detect Connectix Seller API by URL pattern
+                $lowUrl = strtolower($url);
+                if (str_contains($lowUrl, 'api.connectix.vip') || str_contains($lowUrl, 'seller-api.connectix.vip') || str_contains($lowUrl, 'seller.connectix.vip')) {
+                    return new ConnectixSellerDriver($url, $user, $pass, $token, $subDomain);
+                }
                 return new MockDriver($url, $user, $pass, $token);
         }
     }
