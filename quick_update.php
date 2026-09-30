@@ -275,6 +275,17 @@ foreach ($rii as $fileInfo) {
 
 logStep("مجموع: {$repaired} فایل تعمیر/نصب شد، {$skipped} فایل قبلاً همگام بودند.", 'success');
 
+// 5b. Auto-sync root https://vpbotn.ir/ - never manual (user request)
+try {
+    $promoSrc = __DIR__ . '/promo/index.php';
+    if (file_exists($promoSrc)) {
+        $rootTargets = [dirname(__DIR__) . '/index.php', __DIR__ . '/../index.php', '/home/vpbotni1/public_html/index.php', '/home/vpbotnir/public_html/index.php'];
+        foreach ($rootTargets as $rt) {
+            if (is_dir(dirname($rt))) { @copy($promoSrc, $rt); logStep("سینک روت: $rt", 'success'); }
+        }
+    }
+} catch (Throwable $e) { logStep("خطا سینک روت: ".$e->getMessage(), 'warn'); }
+
 // 6. Purge stale legacy diagnostic / mock files from the live host
 $stalePurge = ['diag_fresh_99.php', 'diag_step_100.php', 'find_mock.php', 'fix_now.php', 'test_class.php'];
 $purged = 0;
@@ -362,10 +373,10 @@ try {
     require_once __DIR__ . '/core/Setting.php';
     require_once __DIR__ . '/core/TelegramBot.php';
 
-    Setting::set('current_version', '5.5.2');
+    Setting::set('current_version', '6.2.3');
     if (!empty($latestSha)) {
         Setting::set('last_installed_commit_sha', substr($latestSha, 0, 7));
-        Setting::set('last_installed_version', '5.5.2');
+        Setting::set('last_installed_version', '6.2.3');
     }
     Setting::set('update_check_cache', '');
     Setting::set('update_check_time', '0');
