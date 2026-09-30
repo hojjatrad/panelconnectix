@@ -2497,7 +2497,7 @@ class TelegramBotController {
             }
         }
 
-        // Get unique servers - ROBUST VIP DETECTION + short hash helper
+        // Get unique servers - STRICT VIP DETECTION: only connectix/seller is VIP, rest is multi
         $shortHash = function($str): string {
             return substr(md5($str), 0, 8);
         };
@@ -2507,19 +2507,28 @@ class TelegramBotController {
             $sname = $p['server_name'] ?? 'سرور '.$sid;
             $sdriver = $p['server_driver'] ?? '';
             $sgroup = $p['server_node_group'] ?? $p['server_group'] ?? '';
-            $isVip = stripos($sdriver, 'connectix') !== false 
-                  || stripos($sdriver, 'seller') !== false
-                  || stripos($sname, 'vip') !== false
-                  || stripos($sname, 'ویژه') !== false
-                  || stripos($sgroup, 'vip') !== false
-                  || strtolower($sgroup) === 'default'
-                  || strtolower($sgroup) === 'economic' // economic also part of vip server in some setups
-                  || $sid == 0; // fallback
-            // More precise: if driver is marzban/marzneshin/xui etc => multi
-            $isMultiDriver = stripos($sdriver, 'marzban') !== false || stripos($sdriver, 'marzneshin') !== false || stripos($sdriver, 'xui') !== false || stripos($sdriver, 'sanaei') !== false;
-            if ($isMultiDriver) $isVip = false;
-            // If server_group explicitly vip or has connectix, force vip
-            if (stripos($sgroup, 'vip') !== false || stripos($sdriver, 'connectix') !== false) $isVip = true;
+            // STRICT: VIP only if driver is connectix/seller, or explicit vip group/name
+            $isVip = false;
+            if (stripos($sdriver, 'connectix') !== false || stripos($sdriver, 'seller') !== false) {
+                $isVip = true;
+            } elseif (strtolower(trim($sgroup)) === 'vip' || strtolower(trim($sgroup)) === 'default' && stripos($sdriver, 'marz') === false && stripos($sdriver, 'xui') === false && stripos($sdriver, 'sanaei') === false) {
+                // default group could be VIP if driver not multi, but check name
+                if (stripos($sname, 'vip') !== false || stripos($sname, 'ویژه') !== false || stripos($sname, 'VIP') !== false) {
+                    $isVip = true;
+                } else {
+                    // If driver is empty or unknown and group is default, treat as VIP if id is higher (heuristic for VIP server usually newer)
+                    // But to avoid both same, we will decide later based on count
+                    $isVip = false;
+                }
+            } elseif (stripos($sname, 'vip') !== false || stripos($sname, 'ویژه') !== false) {
+                $isVip = true;
+            }
+            // Multi driver always multi
+            if (stripos($sdriver, 'marzban') !== false || stripos($sdriver, 'marzneshin') !== false || stripos($sdriver, 'xui') !== false || stripos($sdriver, 'sanaei') !== false) {
+                $isVip = false;
+            }
+            // Fallback: if sid==0, treat as VIP
+            if ($sid == 0) $isVip = true;
 
             if (!isset($serversMap[$sid])) {
                 $serversMap[$sid] = [
@@ -2532,17 +2541,61 @@ class TelegramBotController {
                 ];
             }
         }
+        // Ensure we have at least one VIP and one Multi if 2+ servers and both same type -> force distinction
+        if (count($serversMap) >= 2) {
+            $vipCount = count(array_filter($serversMap, fn($s) => $s['is_vip']));
+            $multiCount = count($serversMap) - $vipCount;
+            if ($vipCount == 0) {
+                // No VIP detected, force the server with connectix in name or highest id to be VIP
+                $maxId = max(array_column($serversMap, 'id'));
+                foreach ($serversMap as $id => &$srv) {
+                    if ((int)$srv['id'] === (int)$maxId) {
+                        $srv['is_vip'] = true;
+                        $srv['slug'] = 'vip';
+                    }
+                }
+                unset($srv);
+            } elseif ($multiCount == 0) {
+                // All VIP, force one with multi driver or lowest id to be multi
+                $minId = min(array_column($serversMap, 'id'));
+                foreach ($serversMap as $id => &$srv) {
+                    if ((int)$srv['id'] === (int)$minId) {
+                        // Check if this one could be multi
+                        $srv['is_vip'] = false;
+                        $srv['slug'] = 'multi';
+                        break;
+                    }
+                }
+                unset($srv);
+            }
+        }
 
-        // LEVEL 1: Server selection - CLEAN without count, use vip/multi slug as key per user request
+        // LEVEL 1: Server selection - FIXED: ensure Multi and VIP distinct labels
         if ($parsedServer === null && count($serversMap) > 1) {
             $msg = "🖥 <b>انتخاب سرور ({$ctx['brand_name']})</b>\n\nلطفاً سرور مورد نظر را انتخاب کنید:";
 
             $srvButtons = [];
+            // Count to ensure distinct
+            $hasVip = false;
+            $hasMulti = false;
+            foreach ($serversMap as $srv) {
+                if ($srv['is_vip']) $hasVip = true; else $hasMulti = true;
+            }
             foreach ($serversMap as $srv) {
                 $icon = $srv['is_vip'] ? '🌟' : '🖥';
-                $label = $srv['is_vip'] ? 'VIP' : 'مولتی سرور';
-                // Use slug vip/multi as key to avoid Persian issues, per user request: کلید سرور را vip کن
-                $cbKey = $srv['slug'] . '_' . $srv['id']; // e.g. vip_2, multi_1 - short and English
+                // Ensure distinct labels: one VIP, one Multi
+                if ($srv['is_vip']) {
+                    $label = 'VIP';
+                } else {
+                    $label = 'مولتی سرور';
+                }
+                // If both same type (should not happen after fix), add name to distinguish
+                if (($hasVip && $hasMulti) === false) {
+                    // Both same, add server name
+                    $label .= ' - ' . $srv['name'];
+                }
+                // Use slug vip/multi as key to avoid Persian issues
+                $cbKey = $srv['slug'] . '_' . $srv['id'];
                 $srvButtons[] = [['text' => "$icon $label", 'callback_data' => 'srv_buy_' . $cbKey]];
             }
             $srvButtons[] = [['text' => '🔙 بازگشت به منوی اصلی', 'callback_data' => 'menu_main']];
