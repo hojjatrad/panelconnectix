@@ -4,7 +4,7 @@ require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Setting.php';
 
 class Updater {
-    public const CURRENT_VERSION = '6.1.0';
+    public const CURRENT_VERSION = '6.1.1';
 
     public static function getCurrentVersion(): string {
         $dbVer = Setting::get('current_version', '');
@@ -388,6 +388,10 @@ class Updater {
 
         self::copyDirectory($sourceDir, $panelRoot, $skipped);
 
+        // AUTO-SYNC root domain landing (https://vpbotn.ir/) - requested by user: always update with panel updates
+        // Copies promo/index.php -> public_html/index.php so root domain never stays outdated
+        self::syncRootLanding($panelRoot);
+
         // Run migrations if needed
         self::runPostUpdateMigrations();
 
@@ -525,6 +529,91 @@ class Updater {
         return $fileCount > 0;
     }
 
+    /**
+     * AUTO-SYNC: Ensure https://vpbotn.ir/ (root public_html/index.php) is always updated
+     * whenever panel updates. User requested: "میخوام همه اینا همراه با بروز رسانی انجام بشه که دستی کاری انجام نشه"
+     * 
+     * Copies promo/index.php (source of truth for landing) to parent directory index.php (public_html)
+     * with backup and safety checks.
+     */
+    public static function syncRootLanding(string $panelRoot): void {
+        try {
+            $panelRoot = rtrim($panelRoot, '/');
+            $sourceLanding = $panelRoot . '/promo/index.php';
+            if (!is_file($sourceLanding)) {
+                $sourceLanding = $panelRoot . '/root-landing/index.php';
+            }
+            if (!is_file($sourceLanding)) return;
+
+            $sourceContent = @file_get_contents($sourceLanding);
+            if ($sourceContent === false || strlen($sourceContent) < 500) return;
+            // Safety: must be our landing
+            if (strpos($sourceContent, 'mainAdminpanel') === false) return;
+
+            // Possible root targets for https://vpbotn.ir/
+            $candidates = [
+                dirname($panelRoot) . '/index.php', // public_html/index.php if panel is public_html/contax
+                $panelRoot . '/../index.php',
+                '/home/vpbotnir/public_html/index.php',
+                realpath($panelRoot . '/..') ? realpath($panelRoot . '/..') . '/index.php' : null,
+            ];
+            $candidates = array_filter(array_unique($candidates));
+
+            foreach ($candidates as $target) {
+                if (!$target) continue;
+                $targetDir = dirname($target);
+                if (!is_dir($targetDir)) continue;
+                // Avoid overwriting if target is inside panel itself (should be parent)
+                if (realpath($targetDir) === realpath($panelRoot)) continue;
+
+                // Backup old root index if exists and is not same as source
+                if (is_file($target)) {
+                    $oldContent = @file_get_contents($target);
+                    if ($oldContent !== false && $oldContent !== $sourceContent) {
+                        // Only backup if old file looks like our previous landing or generic index
+                        $backupName = $targetDir . '/index_backup_' . date('Ymd_His') . '.php';
+                        @copy($target, $backupName);
+                    } else if ($oldContent === $sourceContent) {
+                        // Already up-to-date, skip
+                        continue;
+                    }
+                }
+
+                // Copy new landing to root
+                $copied = @copy($sourceLanding, $target);
+                if (!$copied) {
+                    // Fallback: file_put_contents
+                    $copied = @file_put_contents($target, $sourceContent) !== false;
+                }
+                if ($copied) {
+                    @chmod($target, 0644);
+                    Helpers::logActivity('system_update', "لندینگ روت https://vpbotn.ir/ خودکار بروزرسانی شد از promo/index.php -> $target", 'system');
+                }
+            }
+
+            // Also ensure root-landing/index.php is synced from promo (source of truth)
+            $rootLandingFile = $panelRoot . '/root-landing/index.php';
+            $promoFile = $panelRoot . '/promo/index.php';
+            if (is_file($promoFile) && is_dir(dirname($rootLandingFile))) {
+                @copy($promoFile, $rootLandingFile);
+            }
+            // Ensure index_for_root_domain.php also synced
+            $indexForRoot = $panelRoot . '/index_for_root_domain.php';
+            if (is_file($promoFile)) {
+                @copy($promoFile, $indexForRoot);
+            }
+
+            // Also sync to landing-vpbotn if exists (dev workspace)
+            $landingVp = $panelRoot . '/../landing-vpbotn/index.php';
+            if (is_dir(dirname($landingVp))) {
+                @copy($sourceLanding, $landingVp);
+            }
+
+        } catch (Throwable $e) {
+            // Never break update if root sync fails
+        }
+    }
+
     public static function copyDirectory(string $src, string $dst, array $skipped = []): void {
         $dir = @opendir($src);
         if (!$dir) return;
@@ -581,6 +670,11 @@ class Updater {
             // Auto-fix Connectix Seller driver after any update
             self::ensureConnectixDriverFixed($pdo);
             self::ensureCustomerNamesFixed($pdo);
+            // Ensure root landing always synced (user request: auto update without manual work)
+            $panelRoot = realpath(__DIR__ . '/..');
+            if ($panelRoot) {
+                self::syncRootLanding($panelRoot);
+            }
         } catch (Throwable $e) {}
     }
 
