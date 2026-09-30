@@ -1,8 +1,44 @@
 <?php
 require __DIR__ . '/../layout/header.php';
 
-// Prepare Categories Filter List
+// Prepare Categories Filter List - NESTED SUPPORT
 $allCategories = $allCategories ?? [];
+// Build map for parent lookup and level
+$catById = [];
+$byParent = [];
+foreach ($allCategories as $c) {
+    $catById[$c['id']] = $c;
+    $pid = $c['parent_id'] ?? 0;
+    $pid = $pid ? (int)$pid : 0;
+    $byParent[$pid][] = $c;
+}
+// Sort by level then sort_order for nested display
+usort($allCategories, function($a, $b) {
+    $la = $a['level'] ?? $a['calc_level'] ?? 0;
+    $lb = $b['level'] ?? $b['calc_level'] ?? 0;
+    if ($la !== $lb) return $la <=> $lb;
+    return ($a['sort_order'] ?? 0) <=> ($b['sort_order'] ?? 0);
+});
+
+// Helper to render nested options recursively
+if (!function_exists('renderPlanCategoryOptions')) {
+    function renderPlanCategoryOptions($byParent, $parentId = 0, $level = 0) {
+        $html = '';
+        $cats = $byParent[$parentId] ?? [];
+        // Sort by sort_order
+        usort($cats, fn($a,$b) => ($a['sort_order'] ?? 0) <=> ($b['sort_order'] ?? 0));
+        foreach ($cats as $cat) {
+            $indent = str_repeat('— ', $level);
+            $botLabel = $cat['bot_label'] ?? $cat['name'];
+            $html .= '<option value="'.$cat['id'].'" data-name="'.htmlspecialchars($cat['name']).'" data-slug="'.htmlspecialchars($cat['slug']).'" data-level="'.$level.'">'.$indent.htmlspecialchars($botLabel).' ('.htmlspecialchars($cat['slug']).')</option>';
+            if (!empty($byParent[$cat['id']])) {
+                $html .= renderPlanCategoryOptions($byParent, $cat['id'], $level+1);
+            }
+        }
+        return $html;
+    }
+}
+
 $filterCategories = [];
 foreach ($allCategories as $cat) {
     $cnt = count(array_filter($plans, function($p) use ($cat) {
@@ -11,6 +47,17 @@ foreach ($allCategories as $cat) {
         if (!empty($p['server_group']) && $p['server_group'] === $cat['slug']) return true;
         return false;
     }));
+    // Calculate level for indent
+    $lvl = $cat['level'] ?? 0;
+    if (isset($cat['parent_id']) && $cat['parent_id']) {
+        $tmp = $cat['parent_id'];
+        $depth = 0;
+        while ($tmp && isset($catById[$tmp]) && $depth < 10) {
+            $lvl = max($lvl, $depth+1);
+            $tmp = $catById[$tmp]['parent_id'] ?? null;
+            $depth++;
+        }
+    }
     $filterCategories[] = [
         'id' => $cat['id'],
         'key' => 'cat_' . $cat['id'],
@@ -19,7 +66,11 @@ foreach ($allCategories as $cat) {
         'icon' => $cat['icon'] ?: 'fa-cubes',
         'badge_color' => $cat['badge_color'] ?: 'purple',
         'type' => $cat['type'] ?? 'both',
-        'count' => $cnt
+        'count' => $cnt,
+        'level' => $lvl,
+        'parent_id' => $cat['parent_id'] ?? null,
+        'bot_label' => $cat['bot_label'] ?? '',
+        'bot_icon' => $cat['bot_icon'] ?? '',
     ];
 }
 
@@ -77,9 +128,12 @@ foreach ($customPlanCats as $idx => $custCat) {
         <?php endif; ?>
     </div>
 
-    <!-- Category Filter Tabs Bar -->
-    <div class="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none text-xs">
-        <span class="text-slate-400 text-xs shrink-0 font-medium">دسته‌بندی‌ها:</span>
+    <!-- Category Filter Tabs Bar - FIXED: wrap instead of overflow -->
+    <div class="flex flex-wrap items-center gap-2 pb-3 text-xs bg-slate-900/40 border border-slate-800 rounded-2xl p-3">
+        <span class="text-slate-400 text-xs shrink-0 font-bold flex items-center gap-1.5">
+            <i class="fa-solid fa-filter text-purple-400"></i>
+            فیلتر دسته‌بندی:
+        </span>
         <button onclick="filterCategory('all', '', '', '')" id="pill-all" class="cat-pill shrink-0 px-3 py-1.5 rounded-xl font-bold bg-purple-600 text-white border border-purple-500 shadow-sm transition flex items-center gap-1.5">
             <i class="fa-solid fa-layer-group text-[11px]"></i>
             <span>همه پلن‌ها (<?= count($plans) ?>)</span>
@@ -95,12 +149,19 @@ foreach ($customPlanCats as $idx => $custCat) {
                 default => 'text-purple-400'
             };
         ?>
+            <?php
+                $lvl = $fc['level'] ?? 0;
+                $indent = $lvl > 0 ? str_repeat('—', $lvl) . ' ' : '';
+                $lvlClass = $lvl === 0 ? '' : ($lvl === 1 ? 'border-purple-500/30' : 'border-cyan-500/30');
+            ?>
             <button onclick="filterCategory('<?= $fc['key'] ?>', '<?= $fc['id'] ?>', '<?= htmlspecialchars($fc['slug']) ?>', '<?= htmlspecialchars(addslashes($fc['name'])) ?>')" 
                     id="pill-<?= $fc['key'] ?>" 
-                    class="cat-pill shrink-0 px-3 py-1.5 rounded-xl font-medium bg-slate-900 text-slate-300 border border-slate-800 hover:bg-slate-800 transition flex items-center gap-1.5">
+                    class="cat-pill shrink-0 px-3 py-1.5 rounded-xl font-medium bg-slate-900 text-slate-300 border border-slate-800 hover:bg-slate-800 transition flex items-center gap-1.5 <?= $lvlClass ?> <?= $lvl > 0 ? 'mr-2' : '' ?>"
+                    title="<?= $lvl > 0 ? 'زیرشاخه سطح '.$lvl : 'ریشه' ?> - <?= htmlspecialchars($fc['bot_label'] ?: $fc['name']) ?>">
                 <i class="fa-solid <?= htmlspecialchars($fc['icon']) ?> <?= $badgeDot ?> text-[11px]"></i>
-                <span><?= htmlspecialchars($fc['name']) ?></span>
+                <span><?= $indent . htmlspecialchars($fc['bot_label'] ?: $fc['name']) ?></span>
                 <span class="text-[10px] bg-slate-800/80 px-1.5 py-0.2 rounded-md font-mono text-slate-400"><?= $fc['count'] ?></span>
+                <?php if ($lvl > 0): ?><span class="text-[9px] bg-purple-500/20 text-purple-300 px-1 rounded">L<?= $lvl ?></span><?php endif; ?>
             </button>
         <?php endforeach; ?>
     </div>
@@ -275,28 +336,11 @@ foreach ($customPlanCats as $idx => $custCat) {
                         </a>
                     </div>
                     <select name="category_id" id="create_category_id" onchange="syncCategoryName(this, 'create_category_text')" required class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-medium">
-                        <option value="">-- انتخاب دسته‌بندی --</option>
-                        <?php if (!empty($planCategories)): ?>
-                            <optgroup label="دسته‌بندی‌های پلن و تعرفه">
-                                <?php foreach ($planCategories as $cat): ?>
-                                    <option value="<?= $cat['id'] ?>" data-name="<?= htmlspecialchars($cat['name']) ?>" data-slug="<?= htmlspecialchars($cat['slug']) ?>">
-                                        <?= htmlspecialchars($cat['name']) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </optgroup>
-                        <?php endif; ?>
-                        <?php 
-                        $otherCats = array_filter($allCategories, fn($c) => !in_array($c, $planCategories));
-                        if (!empty($otherCats)): 
+                        <option value="">-- انتخاب دسته‌بندی (تو در تو) --</option>
+                        <?php
+                        // Render nested categories with indent
+                        echo renderPlanCategoryOptions($byParent, 0, 0);
                         ?>
-                            <optgroup label="خوشه‌ها و سایر دسته‌ها">
-                                <?php foreach ($otherCats as $cat): ?>
-                                    <option value="<?= $cat['id'] ?>" data-name="<?= htmlspecialchars($cat['name']) ?>" data-slug="<?= htmlspecialchars($cat['slug']) ?>">
-                                        <?= htmlspecialchars($cat['name']) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </optgroup>
-                        <?php endif; ?>
                         <option value="0">سفارشی / نام دلخواه...</option>
                     </select>
                     <input type="text" name="category" id="create_category_text" value="" placeholder="عنوان دسته‌بندی" class="w-full mt-1.5 bg-slate-950/60 border border-slate-800 rounded-lg px-2.5 py-1 text-slate-300 text-[11px]">
@@ -452,28 +496,8 @@ foreach ($customPlanCats as $idx => $custCat) {
                         </a>
                     </div>
                     <select name="category_id" id="edit_category_id" onchange="syncCategoryName(this, 'edit_category_text')" required class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-medium">
-                        <option value="">-- انتخاب دسته‌بندی --</option>
-                        <?php if (!empty($planCategories)): ?>
-                            <optgroup label="دسته‌بندی‌های پلن و تعرفه">
-                                <?php foreach ($planCategories as $cat): ?>
-                                    <option value="<?= $cat['id'] ?>" data-name="<?= htmlspecialchars($cat['name']) ?>" data-slug="<?= htmlspecialchars($cat['slug']) ?>">
-                                        <?= htmlspecialchars($cat['name']) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </optgroup>
-                        <?php endif; ?>
-                        <?php 
-                        $otherCats = array_filter($allCategories, fn($c) => !in_array($c, $planCategories));
-                        if (!empty($otherCats)): 
-                        ?>
-                            <optgroup label="خوشه‌ها و سایر دسته‌ها">
-                                <?php foreach ($otherCats as $cat): ?>
-                                    <option value="<?= $cat['id'] ?>" data-name="<?= htmlspecialchars($cat['name']) ?>" data-slug="<?= htmlspecialchars($cat['slug']) ?>">
-                                        <?= htmlspecialchars($cat['name']) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </optgroup>
-                        <?php endif; ?>
+                        <option value="">-- انتخاب دسته‌بندی (تو در تو) --</option>
+                        <?php echo renderPlanCategoryOptions($byParent, 0, 0); ?>
                         <option value="0">سفارشی / نام دلخواه...</option>
                     </select>
                     <input type="text" name="category" id="edit_category_text" placeholder="عنوان دسته‌بندی" class="w-full mt-1.5 bg-slate-950/60 border border-slate-800 rounded-lg px-2.5 py-1 text-slate-300 text-[11px]">

@@ -416,6 +416,16 @@ class Database {
                 self::safeAddColumn($pdo, 'plans', $c, $d);
             }
 
+            $categoryCols = [
+                'parent_id' => 'INT NULL DEFAULT NULL',
+                'level' => 'INT DEFAULT 0',
+                'bot_label' => 'VARCHAR(128) NULL',
+                'bot_icon' => 'VARCHAR(32) NULL',
+            ];
+            foreach ($categoryCols as $c => $d) {
+                self::safeAddColumn($pdo, 'categories', $c, $d);
+            }
+
             $isMysql = ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql');
             if ($isMysql) {
                 try {

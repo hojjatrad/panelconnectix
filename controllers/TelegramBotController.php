@@ -2559,17 +2559,31 @@ class TelegramBotController {
             }
         }
 
-        // Get VIP types
+        // Get VIP types - normalized
+        $normalizeGroup = function($raw): string {
+            $raw = trim($raw ?? '');
+            if ($raw === '') return 'default';
+            $low = strtolower($raw);
+            if (in_array($low, ['economic', 'economy', 'eq'])) return 'Economic';
+            if (in_array($low, ['default', 'ویژه', 'vip', 'special', 'business_default'])) return 'default';
+            if (strpos($low, 'iran') !== false || $low === 'iran_access') return 'Iran Access';
+            if (strpos($low, 'business') !== false) return 'Business';
+            // Also check Persian
+            if (strpos($raw, 'اقتصادی') !== false) return 'Economic';
+            if (strpos($raw, 'ویژه') !== false) return 'default';
+            if (strpos($raw, 'ایران') !== false) return 'Iran Access';
+            return $raw;
+        };
         $vipTypes = [];
-        foreach ($serverFilteredPlans as $p) {
-            $gname = $p['vip_group_name'] ?? $p['server_group'] ?? '';
-            if (!empty($gname)) {
-                $norm = $gname;
-                if (in_array($gname, ['Economic', 'economic'])) $norm = 'Economic';
-                elseif (in_array($gname, ['default', 'ویژه', 'vip'])) $norm = 'default';
-                elseif (stripos($gname, 'Iran') !== false || $gname === 'iran_access') $norm = 'Iran Access';
-                $vipTypes[$norm] = $norm;
-            }
+        foreach ($serverFilteredPlans as $pl) {
+            $gname = $pl['vip_group_name'] ?? $pl['server_group'] ?? '';
+            $norm = $normalizeGroup($gname);
+            // Always include, even if empty -> default
+            $vipTypes[$norm] = $norm;
+        }
+        // Ensure at least default if empty
+        if (empty($vipTypes)) {
+            $vipTypes['default'] = 'default';
         }
 
         // LEVEL 2: For VIP, Type (Economic/ویژه) BEFORE month
@@ -2608,15 +2622,31 @@ class TelegramBotController {
             return;
         }
 
-        // Filter by type
+        // Filter by type - with normalized comparison
         $typeFilteredPlans = $serverFilteredPlans;
         $typeLabel = '';
         if ($parsedType !== null) {
             foreach ($vipTypes as $typeKey) {
-                if (md5($typeKey) === $parsedType || $typeKey === $parsedType) {
+                if (md5($typeKey) === $parsedType || $typeKey === $parsedType || md5(strtolower($typeKey)) === $parsedType) {
                     $typeLabel = $typeKey;
-                    $typeFilteredPlans = array_values(array_filter($serverFilteredPlans, fn($p) => ($p['vip_group_name'] ?? $p['server_group'] ?? '') === $typeKey));
+                    $typeFilteredPlans = array_values(array_filter($serverFilteredPlans, function($pp) use ($typeKey, $normalizeGroup) {
+                        $gn = $pp['vip_group_name'] ?? $pp['server_group'] ?? '';
+                        return $normalizeGroup($gn) === $typeKey;
+                    }));
                     break;
+                }
+            }
+            // Fallback: if still empty, try direct hash match on raw values
+            if (empty($typeFilteredPlans)) {
+                foreach ($serverFilteredPlans as $pp) {
+                    $gn = $pp['vip_group_name'] ?? $pp['server_group'] ?? '';
+                    if (md5($gn) === $parsedType || md5($normalizeGroup($gn)) === $parsedType) {
+                        $typeLabel = $normalizeGroup($gn);
+                        $typeFilteredPlans = array_values(array_filter($serverFilteredPlans, function($ppp) use ($typeLabel, $normalizeGroup) {
+                            return $normalizeGroup($ppp['vip_group_name'] ?? $ppp['server_group'] ?? '') === $typeLabel;
+                        }));
+                        break;
+                    }
                 }
             }
         }
