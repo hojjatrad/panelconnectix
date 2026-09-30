@@ -86,8 +86,35 @@ class PlanController {
                 }
             }
         }
-        if (empty($category)) {
+if (empty($category)) {
             $category = 'عمومی';
+        } else {
+            // Professional merge: normalize to canonical month (1 ماهه, etc.)
+            $persianDigits = ['۰','۱','۲','۳','۴','۵','۶','۷','۸','۹'];
+            $englishDigits = ['0','1','2','3','4','5','6','7','8','9'];
+            $normCat = str_replace($persianDigits, $englishDigits, $category);
+            $normCatLower = mb_strtolower(str_replace(' ', '', $normCat));
+            $canonicalMap = [
+                '۱ روزه' => ['1روزه','روزانه','1d','daily'],
+                '۳ روزه' => ['3روزه','3d'],
+                'هفتگی' => ['هفتگی','7روزه','1هفته','weekly','7d'],
+                '۱ ماهه' => ['1ماهه','یکماهه','30روزه','1m'],
+                '۲ ماهه' => ['2ماهه','دوماهه','60روزه','2m'],
+                '۳ ماهه' => ['3ماهه','سهماهه','90روزه','3m'],
+                '۶ ماهه' => ['6ماهه','ششماهه','180روزه','6m'],
+                '۱۲ ماهه' => ['12ماهه','یکساله','1ساله','سالانه','365روزه','12m','yearly'],
+            ];
+            foreach ($canonicalMap as $canon => $variants) {
+                $canonNorm = mb_strtolower(str_replace(' ', '', str_replace($persianDigits, $englishDigits, $canon)));
+                if ($normCatLower === $canonNorm) { $category = $canon; break; }
+                foreach ($variants as $v) {
+                    $vNorm = mb_strtolower(str_replace(' ', '', str_replace($persianDigits, $englishDigits, $v)));
+                    if ($normCatLower === $vNorm || strpos($normCatLower, $vNorm) !== false) {
+                        $category = $canon;
+                        break 2;
+                    }
+                }
+            }
         }
 
         $startOnFirstUse = isset($_POST['start_on_first_use']) ? 1 : 0;
@@ -195,8 +222,35 @@ class PlanController {
                 }
             }
         }
-        if (empty($category)) {
+if (empty($category)) {
             $category = 'عمومی';
+        } else {
+            // Professional merge: normalize to canonical month (1 ماهه, etc.)
+            $persianDigits = ['۰','۱','۲','۳','۴','۵','۶','۷','۸','۹'];
+            $englishDigits = ['0','1','2','3','4','5','6','7','8','9'];
+            $normCat = str_replace($persianDigits, $englishDigits, $category);
+            $normCatLower = mb_strtolower(str_replace(' ', '', $normCat));
+            $canonicalMap = [
+                '۱ روزه' => ['1روزه','روزانه','1d','daily'],
+                '۳ روزه' => ['3روزه','3d'],
+                'هفتگی' => ['هفتگی','7روزه','1هفته','weekly','7d'],
+                '۱ ماهه' => ['1ماهه','یکماهه','30روزه','1m'],
+                '۲ ماهه' => ['2ماهه','دوماهه','60روزه','2m'],
+                '۳ ماهه' => ['3ماهه','سهماهه','90روزه','3m'],
+                '۶ ماهه' => ['6ماهه','ششماهه','180روزه','6m'],
+                '۱۲ ماهه' => ['12ماهه','یکساله','1ساله','سالانه','365روزه','12m','yearly'],
+            ];
+            foreach ($canonicalMap as $canon => $variants) {
+                $canonNorm = mb_strtolower(str_replace(' ', '', str_replace($persianDigits, $englishDigits, $canon)));
+                if ($normCatLower === $canonNorm) { $category = $canon; break; }
+                foreach ($variants as $v) {
+                    $vNorm = mb_strtolower(str_replace(' ', '', str_replace($persianDigits, $englishDigits, $v)));
+                    if ($normCatLower === $vNorm || strpos($normCatLower, $vNorm) !== false) {
+                        $category = $canon;
+                        break 2;
+                    }
+                }
+            }
         }
 
         $startOnFirstUse = isset($_POST['start_on_first_use']) ? 1 : 0;

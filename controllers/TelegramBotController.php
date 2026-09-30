@@ -2730,7 +2730,36 @@ class TelegramBotController {
             }
         }
 
-        $categories = array_values(array_unique(array_map(fn($p) => $p['display_category'] ?: '۱ ماهه', $typeFilteredPlans)));
+        // PROFESSIONAL MERGE: Normalize month categories to canonical (1 ماهه, 2 ماهه, etc.) to merge duplicates from different servers
+        $normalizeMonth = function($raw): string {
+            $raw = trim($raw ?? '');
+            if ($raw === '') return '۱ ماهه';
+            // Convert Persian digits to English for matching
+            $persian = ['۰','۱','۲','۳','۴','۵','۶','۷','۸','۹'];
+            $english = ['0','1','2','3','4','5','6','7','8','9'];
+            $norm = str_replace($persian, $english, $raw);
+            $low = mb_strtolower($norm);
+            $low = str_replace(' ', '', $low);
+            // Map variants
+            if (in_array($low, ['1روزه','1روز','روزانه','یکروزه','یکروز','1d','daily','1روزه'])) return '۱ روزه';
+            if (in_array($low, ['3روزه','3روز','سهروزه','3d'])) return '۳ روزه';
+            if (in_array($low, ['هفتگی','هفتهای','7روزه','7روز','1هفته','یکهفته','7d','weekly','هفتروزه'])) return 'هفتگی';
+            if (strpos($low, '1ماه') !== false || strpos($low, 'یکماه') !== false || $low === '1ماهه' || $low === 'یکماهه' || $low === '30روزه' || $low === '1m' || $low === 'ماه1' || $low === '1ماه') return '۱ ماهه';
+            if (strpos($low, '2ماه') !== false || strpos($low, 'دوماه') !== false || $low === '2ماهه' || $low === '60روزه' || $low === '2m') return '۲ ماهه';
+            if (strpos($low, '3ماه') !== false || strpos($low, 'سهماه') !== false || $low === '3ماهه' || $low === '90روزه' || $low === '3m') return '۳ ماهه';
+            if (strpos($low, '6ماه') !== false || strpos($low, 'ششماه') !== false || $low === '6ماهه' || $low === '180روزه' || $low === '6m') return '۶ ماهه';
+            if (strpos($low, '12ماه') !== false || strpos($low, 'یکساله') !== false || strpos($low, '1ساله') !== false || strpos($low, 'سالانه') !== false || $low === '12ماهه' || $low === '365روزه' || $low === '12m' || $low === 'yearly') return '۱۲ ماهه';
+            // Fallback: check if contains number and ماه/روز
+            if (preg_match('/1.*ماه/', $low)) return '۱ ماهه';
+            if (preg_match('/2.*ماه/', $low)) return '۲ ماهه';
+            if (preg_match('/3.*ماه/', $low)) return '۳ ماهه';
+            if (preg_match('/6.*ماه/', $low)) return '۶ ماهه';
+            if (preg_match('/12.*ماه|سال/', $low)) return '۱۲ ماهه';
+            if (preg_match('/1.*روز/', $low)) return '۱ روزه';
+            // Return original if no match
+            return $raw;
+        };
+        $categories = array_values(array_unique(array_map(fn($p) => $normalizeMonth($p['display_category'] ?: '۱ ماهه'), $typeFilteredPlans)));
 
         // LEVEL 3: Month selection
         if ($parsedCatHash === null && count($categories) > 1) {
@@ -2794,22 +2823,28 @@ class TelegramBotController {
             return;
         }
 
-        // LEVEL 4: Final plans - volume + price only - SHORT HASH support
+        // LEVEL 4: Final plans - volume + price only - SHORT HASH + NORMALIZED MONTH support
         $finalPlans = $typeFilteredPlans;
         if ($parsedCatHash !== null) {
-            foreach ($categories as $c) {
-                $full = md5($c);
+            foreach ($categories as $catNorm) {
+                $full = md5($catNorm);
                 $short = substr($full, 0, 8);
-                if ($full === $parsedCatHash || $short === $parsedCatHash || $c === $parsedCatHash) {
-                    $finalPlans = array_values(array_filter($typeFilteredPlans, fn($p) => ($p['display_category'] ?: '۱ ماهه') === $c));
+                if ($full === $parsedCatHash || $short === $parsedCatHash || $catNorm === $parsedCatHash) {
+                    $finalPlans = array_values(array_filter($typeFilteredPlans, function($p) use ($catNorm, $normalizeMonth) {
+                        $display = $p['display_category'] ?: '۱ ماهه';
+                        return $normalizeMonth($display) === $catNorm;
+                    }));
+                    // Keep canonical name for title
+                    $c = $catNorm;
                     break;
                 }
             }
-            // Fallback: try short hash match directly on plans if still empty
+            // Fallback: try short hash match directly on plans if still empty (with normalization)
             if (empty($finalPlans)) {
-                $finalPlans = array_values(array_filter($typeFilteredPlans, function($p) use ($parsedCatHash) {
+                $finalPlans = array_values(array_filter($typeFilteredPlans, function($p) use ($parsedCatHash, $normalizeMonth) {
                     $cat = $p['display_category'] ?: '۱ ماهه';
-                    return md5($cat) === $parsedCatHash || substr(md5($cat),0,8) === $parsedCatHash || $cat === $parsedCatHash;
+                    $catNorm = $normalizeMonth($cat);
+                    return md5($cat) === $parsedCatHash || substr(md5($cat),0,8) === $parsedCatHash || md5($catNorm) === $parsedCatHash || substr(md5($catNorm),0,8) === $parsedCatHash || $cat === $parsedCatHash || $catNorm === $parsedCatHash;
                 }));
             }
         }

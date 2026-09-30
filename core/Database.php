@@ -493,19 +493,146 @@ class Database {
                         }
                     }
 
-                    // FIX: Correct 1-day VIP plans that were wrongly categorized as هفتگی, and ensure daily categories exist
+                    // PROFESSIONAL MERGE: Fix duplicate month categories and ensure canonical categories
                     try {
-                        // Ensure daily categories exist
+                        // Ensure daily and canonical categories exist
                         $dailyExists = (int)$pdo->query("SELECT COUNT(*) FROM categories WHERE slug IN ('period_1d', 'daily', '1d')")->fetchColumn();
                         if ($dailyExists === 0) {
                             $pdo->exec("INSERT INTO categories (name, slug, type, icon, badge_color, description, sort_order) VALUES ('پلن‌های ۱ روزه', 'period_1d', 'plans', 'fa-calendar-day', 'rose', 'پلن‌های تست یک روزه', 5)");
                             $pdo->exec("INSERT INTO categories (name, slug, type, icon, badge_color, description, sort_order) VALUES ('پلن‌های ۳ روزه', 'period_3d', 'plans', 'fa-calendar-days', 'amber', 'پلن‌های کوتاه‌مدت ۳ روزه', 6)");
                         }
-                        // Fix existing 1-day plans categorized as هفتگی
-                        $pdo->exec("UPDATE plans SET category = '۱ روزه' WHERE duration_days = 1 AND category = 'هفتگی'");
-                        $pdo->exec("UPDATE plans SET category = '۳ روزه' WHERE duration_days IN (2,3) AND category = 'هفتگی'");
-                        $pdo->exec("UPDATE plans SET category = '۱ روزه' WHERE duration_days = 1 AND category IN ('۱ ماهه', 'عمومی')");
-                    } catch (Throwable $e) {}
+
+                        // Define canonical mapping: canonical name => variants (including Persian/English digits, with/without space, different spellings)
+                        $canonicalMap = [
+                            '۱ روزه' => ['1 روزه', '۱روزه', '1روزه', 'روزانه', 'یک روزه', 'یکروزه', '1D', '1d', 'daily', 'روزه 1', '1 روز', 'یک روز'],
+                            '۳ روزه' => ['3 روزه', '۳روزه', '3روزه', 'سه روزه', 'سه‌روزه', '3D', '3d'],
+                            'هفتگی' => ['هفتگی', 'هفته‌ای', 'هفته ای', '7 روزه', '۷ روزه', '1 هفته', 'یک هفته', 'یک هفته‌ای', '7D', 'weekly'],
+                            '۱ ماهه' => ['1 ماهه', '۱ماهه', '1ماهه', 'یک ماهه', 'یکماهه', 'یک ماه', '30 روزه', '۳۰ روزه', '1M', '1m', 'یکماه', '1 ماه', 'یک ماهه', '30روزه', 'یکماهه'],
+                            '۲ ماهه' => ['2 ماهه', '۲ماهه', '2ماهه', 'دو ماهه', 'دوماهه', '60 روزه', '۶۰ روزه', '2M', '2m', '2 ماه'],
+                            '۳ ماهه' => ['3 ماهه', '۳ماهه', '3ماهه', 'سه ماهه', 'سه‌ماهه', '90 روزه', '۹۰ روزه', '3M', '3m', '3 ماه'],
+                            '۶ ماهه' => ['6 ماهه', '۶ماهه', '6ماهه', 'شش ماهه', 'شش‌ماهه', '180 روزه', '۱۸۰ روزه', '6M', '6m'],
+                            '۱۲ ماهه' => ['12 ماهه', '۱۲ماهه', '12ماهه', 'یک ساله', 'یکساله', '1 ساله', 'یکسال', 'سالانه', '365 روزه', '۳۶۵ روزه', '12M', 'yearly', 'یک ساله'],
+                        ];
+
+                        // Helper to normalize Persian digits to English for comparison
+                        $normalizeDigits = function($str) {
+                            $persian = ['۰','۱','۲','۳','۴','۵','۶','۷','۸','۹'];
+                            $english = ['0','1','2','3','4','5','6','7','8','9'];
+                            return str_replace($persian, $english, $str);
+                        };
+
+                        // Build lookup: variant normalized => canonical
+                        $variantToCanonical = [];
+                        foreach ($canonicalMap as $canonical => $variants) {
+                            $variantToCanonical[mb_strtolower(trim($canonical))] = $canonical;
+                            foreach ($variants as $v) {
+                                $variantToCanonical[mb_strtolower(trim($v))] = $canonical;
+                                $variantToCanonical[mb_strtolower(trim($normalizeDigits($v)))] = $canonical;
+                            }
+                        }
+
+                        // 1. Fix plans table: unify category string based on duration_days AND existing category name
+                        // First, fix by duration_days (most reliable)
+                        $durationToCanonical = [
+                            1 => '۱ روزه',
+                            2 => '۳ روزه',
+                            3 => '۳ روزه',
+                            7 => 'هفتگی',
+                            30 => '۱ ماهه',
+                            60 => '۲ ماهه',
+                            90 => '۳ ماهه',
+                            180 => '۶ ماهه',
+                            365 => '۱۲ ماهه',
+                            360 => '۱۲ ماهه',
+                        ];
+                        foreach ($durationToCanonical as $days => $canon) {
+                            $stmt = $pdo->prepare("UPDATE plans SET category = ? WHERE duration_days = ? AND category != ?");
+                            $stmt->execute([$canon, $days, $canon]);
+                        }
+                        // Also fix where duration is 0 or null but category is variant
+                        $allPlans = $pdo->query("SELECT id, category, duration_days FROM plans")->fetchAll(PDO::FETCH_ASSOC);
+                        foreach ($allPlans as $pl) {
+                            $cat = trim($pl['category'] ?? '');
+                            $catLower = mb_strtolower($cat);
+                            $catNormDigits = mb_strtolower($normalizeDigits($cat));
+                            $canonical = $variantToCanonical[$catLower] ?? $variantToCanonical[$catNormDigits] ?? null;
+                            if ($canonical && $canonical !== $cat) {
+                                $pdo->prepare("UPDATE plans SET category = ? WHERE id = ?")->execute([$canonical, $pl['id']]);
+                            }
+                        }
+
+                        // 2. Merge duplicate categories in categories table
+                        $allCats = $pdo->query("SELECT * FROM categories")->fetchAll(PDO::FETCH_ASSOC);
+                        $catGroups = []; // canonical => list of cat rows
+                        foreach ($allCats as $cat) {
+                            $name = trim($cat['name'] ?? '');
+                            $nameLower = mb_strtolower($name);
+                            $nameNorm = mb_strtolower($normalizeDigits($name));
+                            $canon = $variantToCanonical[$nameLower] ?? $variantToCanonical[$nameNorm] ?? null;
+                            // Also check slug
+                            if (!$canon) {
+                                $slug = mb_strtolower(trim($cat['slug'] ?? ''));
+                                // Map slug variants
+                                if (in_array($slug, ['period_1m', '1m', '1_m', 'one_month'])) $canon = '۱ ماهه';
+                                elseif (in_array($slug, ['period_2m', '2m'])) $canon = '۲ ماهه';
+                                elseif (in_array($slug, ['period_3m', '3m'])) $canon = '۳ ماهه';
+                                elseif (in_array($slug, ['period_6m', '6m', 'period_long'])) $canon = '۶ ماهه';
+                                elseif (in_array($slug, ['period_12m', '12m', 'yearly', '1y'])) $canon = '۱۲ ماهه';
+                                elseif (in_array($slug, ['period_1d', '1d', 'daily'])) $canon = '۱ روزه';
+                                elseif (in_array($slug, ['weekly', '7d', 'period_7d'])) $canon = 'هفتگی';
+                            }
+                            if ($canon) {
+                                $catGroups[$canon][] = $cat;
+                            }
+                        }
+
+                        // For each canonical group with duplicates, merge into primary
+                        foreach ($catGroups as $canonical => $group) {
+                            if (count($group) <= 1) continue;
+                            // Choose primary: prefer slug period_Xm, or lowest id with most plans
+                            usort($group, function($a,$b){
+                                $aScore = 0;
+                                $bScore = 0;
+                                if (strpos($a['slug'] ?? '', 'period_') === 0) $aScore += 10;
+                                if (strpos($b['slug'] ?? '', 'period_') === 0) $bScore += 10;
+                                // Prefer Persian canonical name exactly
+                                if (($a['name'] ?? '') === $a['name']) $aScore += 1;
+                                return $bScore <=> $aScore ?: ($a['id'] <=> $b['id']);
+                            });
+                            $primary = $group[0];
+                            $primaryId = $primary['id'];
+                            // Ensure primary has canonical name
+                            if ($primary['name'] !== $canonical) {
+                                $pdo->prepare("UPDATE categories SET name = ? WHERE id = ?")->execute([$canonical, $primaryId]);
+                            }
+                            // Merge others into primary
+                            for ($i=1; $i<count($group); $i++) {
+                                $dup = $group[$i];
+                                $dupId = $dup['id'];
+                                if ($dupId == $primaryId) continue;
+                                // Update plans category_id
+                                $pdo->prepare("UPDATE plans SET category_id = ? WHERE category_id = ?")->execute([$primaryId, $dupId]);
+                                // Update server_nodes category_id
+                                $pdo->prepare("UPDATE server_nodes SET category_id = ? WHERE category_id = ?")->execute([$primaryId, $dupId]);
+                                // Update child categories parent_id
+                                $pdo->prepare("UPDATE categories SET parent_id = ? WHERE parent_id = ?")->execute([$primaryId, $dupId]);
+                                // Delete duplicate
+                                $pdo->prepare("DELETE FROM categories WHERE id = ?")->execute([$dupId]);
+                            }
+                        }
+
+                        // 3. Ensure all plans with same duration have same category_id (canonical)
+                        foreach ($durationToCanonical as $days => $canon) {
+                            $catRow = $pdo->query("SELECT id FROM categories WHERE name = " . $pdo->quote($canon) . " LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+                            if ($catRow) {
+                                $catId = $catRow['id'];
+                                $pdo->prepare("UPDATE plans SET category_id = ? WHERE duration_days = ? AND (category_id IS NULL OR category_id != ?)")->execute([$catId, $days, $catId]);
+                            }
+                        }
+
+                    } catch (Throwable $e) {
+                        error_log("Category merge error: " . $e->getMessage());
+                    }
                 }
             } catch (Throwable $e) {}
 
