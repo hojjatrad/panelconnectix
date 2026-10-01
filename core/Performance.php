@@ -58,13 +58,11 @@ class Performance {
     }
 
     /**
-     * Warm up cache - preload frequently used data
+     * Warm up cache - preload frequently used data - uses fresh PDO to avoid 2014 unbuffered error
      */
     public static function warmupCache(): array {
         $result = ['success' => false, 'messages' => []];
         try {
-            $pdo = Database::getConnection();
-            
             if (!class_exists('Cache')) {
                 require_once __DIR__ . '/Cache.php';
             }
@@ -75,64 +73,47 @@ class Performance {
             Cache::clear();
             $result['messages'][] = '✓ Old cache cleared';
             
-            // Preload settings - use Database::getConnection to avoid constant issues
+            // Use fresh PDO for all cache warming to avoid unbuffered query conflicts with singleton
+            $dsn = "mysql:host=".DB_HOST.";port=".DB_PORT.";dbname=".DB_NAME.";charset=utf8mb4";
+            $freshPdo = new PDO($dsn, DB_USER, DB_PASS, [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
+            ]);
+            
+            // Preload settings
             try {
-                $pdo2 = Database::getConnection();
-                $stmt = $pdo2->query("SELECT setting_key, setting_value FROM system_settings");
+                $stmt = $freshPdo->query("SELECT setting_key, setting_value FROM system_settings");
                 $rows = $stmt->fetchAll();
                 $stmt->closeCursor();
                 $settings = [];
                 foreach ($rows as $row) {
                     $settings[$row['setting_key']] = $row['setting_value'];
                 }
-                if (class_exists('Cache')) {
-                    Cache::set('system_settings_all', $settings, 300);
-                }
-                $result['messages'][] = '✓ Settings cached (' . count($settings) . ' items) via main PDO';
+                Cache::set('system_settings_all', $settings, 300);
+                $result['messages'][] = '✓ Settings cached (' . count($settings) . ' items)';
             } catch (Throwable $e) {
                 $result['messages'][] = '⚠️ Settings cache failed: ' . $e->getMessage();
-                // Fallback to fresh PDO
-                try {
-                    $dsn = "mysql:host=".DB_HOST.";port=".DB_PORT.";dbname=".DB_NAME.";charset=utf8mb4";
-                    $tmpPdo = new PDO($dsn, DB_USER, DB_PASS, [
-                        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                        PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true
-                    ]);
-                    $stmt = $tmpPdo->query("SELECT setting_key, setting_value FROM system_settings");
-                    $rows = $stmt->fetchAll();
-                    $stmt->closeCursor();
-                    $settings = [];
-                    foreach ($rows as $row) {
-                        $settings[$row['setting_key']] = $row['setting_value'];
-                    }
-                    Cache::set('system_settings_all', $settings, 300);
-                    $result['messages'][] = '✓ Settings cached fallback (' . count($settings) . ' items)';
-                    $tmpPdo = null;
-                } catch (Throwable $e2) {
-                    $result['messages'][] = '⚠️ Settings fallback failed: ' . $e2->getMessage();
-                }
             }
             
-            // Preload plans, servers, categories - use main PDO with proper cursor handling
+            // Preload plans, servers, categories - all via fresh PDO
             try {
-                $pdo3 = Database::getConnection();
-                
-                $stmt = $pdo3->query("SELECT * FROM plans WHERE is_active = 1");
+                $stmt = $freshPdo->query("SELECT * FROM plans WHERE is_active = 1");
                 $plans = $stmt->fetchAll();
                 $stmt->closeCursor();
-                if (class_exists('Cache')) Cache::set('plans_active_v2', $plans, 600);
+                Cache::set('plans_active_v2', $plans, 600);
                 $result['messages'][] = '✓ Plans cached (' . count($plans) . ')';
                 
-                $stmt = $pdo3->query("SELECT * FROM server_nodes WHERE is_active = 1");
+                $stmt = $freshPdo->query("SELECT * FROM server_nodes WHERE is_active = 1");
                 $servers = $stmt->fetchAll();
                 $stmt->closeCursor();
-                if (class_exists('Cache')) Cache::set('servers_active_v2', $servers, 600);
+                Cache::set('servers_active_v2', $servers, 600);
                 $result['messages'][] = '✓ Servers cached (' . count($servers) . ')';
                 
-                $stmt = $pdo3->query("SELECT * FROM categories WHERE is_active = 1");
+                $stmt = $freshPdo->query("SELECT * FROM categories WHERE is_active = 1");
                 $cats = $stmt->fetchAll();
                 $stmt->closeCursor();
-                if (class_exists('Cache')) Cache::set('categories_active', $cats, 600);
+                Cache::set('categories_active', $cats, 600);
                 $result['messages'][] = '✓ Categories cached (' . count($cats) . ')';
                 
             } catch (Throwable $e) {
@@ -149,12 +130,23 @@ class Performance {
     }
 
     /**
-     * Get performance stats
+     * Get performance stats - uses fresh PDO to avoid 2014 unbuffered error
      */
     public static function getStats(): array {
         try {
-            $pdo = Database::getConnection();
-            $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+            // Use fresh PDO to avoid conflicts with singleton
+            if (DB_DRIVER === 'mysql') {
+                $dsn = "mysql:host=".DB_HOST.";port=".DB_PORT.";dbname=".DB_NAME.";charset=utf8mb4";
+                $pdo = new PDO($dsn, DB_USER, DB_PASS, [
+                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                    PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true,
+                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
+                ]);
+                $driver = 'mysql';
+            } else {
+                $pdo = Database::getConnection();
+                $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+            }
             
             $stats = [
                 'driver' => $driver,
