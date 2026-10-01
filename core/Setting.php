@@ -74,7 +74,9 @@ class Setting {
         
         try {
             $pdo = Database::getConnection();
-            $rows = $pdo->query("SELECT setting_key, setting_value FROM system_settings")->fetchAll();
+            $stmt = $pdo->query("SELECT setting_key, setting_value FROM system_settings");
+            $rows = $stmt->fetchAll();
+            $stmt->closeCursor();
             $result = [];
             foreach ($rows as $row) {
                 $result[$row['setting_key']] = $row['setting_value'];

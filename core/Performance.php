@@ -75,9 +75,20 @@ class Performance {
             Cache::clear();
             $result['messages'][] = '✓ Old cache cleared';
             
-            // Preload settings
-            $settings = Setting::getAll();
-            $result['messages'][] = '✓ Settings cached (' . count($settings) . ' items)';
+            // Preload settings - direct query to avoid nested cache issues
+            try {
+                $stmt = $pdo->query("SELECT setting_key, setting_value FROM system_settings");
+                $rows = $stmt->fetchAll();
+                $stmt->closeCursor();
+                $settings = [];
+                foreach ($rows as $row) {
+                    $settings[$row['setting_key']] = $row['setting_value'];
+                }
+                Cache::set('system_settings_all', $settings, 300);
+                $result['messages'][] = '✓ Settings cached (' . count($settings) . ' items)';
+            } catch (Throwable $e) {
+                $result['messages'][] = '⚠️ Settings cache failed: ' . $e->getMessage();
+            }
             
             // Preload plans - use buffered query
             try {
@@ -141,19 +152,23 @@ class Performance {
                 $stats['db_size'] = file_exists(SQLITE_PATH) ? filesize(SQLITE_PATH) : 0;
                 $stats['db_size_human'] = round($stats['db_size']/1024, 2) . ' KB';
                 
-                // Get pragma values
-                $stats['journal_mode'] = $pdo->query("PRAGMA journal_mode")->fetchColumn();
-                $stats['cache_size'] = $pdo->query("PRAGMA cache_size")->fetchColumn();
-                $stats['synchronous'] = $pdo->query("PRAGMA synchronous")->fetchColumn();
+                // Get pragma values with closeCursor
+                $stmt = $pdo->query("PRAGMA journal_mode"); $stats['journal_mode'] = $stmt->fetchColumn(); $stmt->closeCursor();
+                $stmt = $pdo->query("PRAGMA cache_size"); $stats['cache_size'] = $stmt->fetchColumn(); $stmt->closeCursor();
+                $stmt = $pdo->query("PRAGMA synchronous"); $stats['synchronous'] = $stmt->fetchColumn(); $stmt->closeCursor();
                 
                 // Count tables
-                $stats['clients_count'] = (int)$pdo->query("SELECT COUNT(*) FROM clients")->fetchColumn();
-                $stats['users_count'] = (int)$pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
-                $stats['plans_count'] = (int)$pdo->query("SELECT COUNT(*) FROM plans WHERE is_active=1")->fetchColumn();
-                $stats['servers_count'] = (int)$pdo->query("SELECT COUNT(*) FROM server_nodes WHERE is_active=1")->fetchColumn();
+                $stmt = $pdo->query("SELECT COUNT(*) FROM clients"); $stats['clients_count'] = (int)$stmt->fetchColumn(); $stmt->closeCursor();
+                $stmt = $pdo->query("SELECT COUNT(*) FROM users"); $stats['users_count'] = (int)$stmt->fetchColumn(); $stmt->closeCursor();
+                $stmt = $pdo->query("SELECT COUNT(*) FROM plans WHERE is_active=1"); $stats['plans_count'] = (int)$stmt->fetchColumn(); $stmt->closeCursor();
+                $stmt = $pdo->query("SELECT COUNT(*) FROM server_nodes WHERE is_active=1"); $stats['servers_count'] = (int)$stmt->fetchColumn(); $stmt->closeCursor();
             } else {
-                $stats['clients_count'] = (int)$pdo->query("SELECT COUNT(*) FROM clients")->fetchColumn();
-                $stats['users_count'] = (int)$pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
+                $stmt = $pdo->query("SELECT COUNT(*) FROM clients"); $stats['clients_count'] = (int)$stmt->fetchColumn(); $stmt->closeCursor();
+                $stmt = $pdo->query("SELECT COUNT(*) FROM users"); $stats['users_count'] = (int)$stmt->fetchColumn(); $stmt->closeCursor();
+                try {
+                    $stmt = $pdo->query("SELECT COUNT(*) FROM plans WHERE is_active=1"); $stats['plans_count'] = (int)$stmt->fetchColumn(); $stmt->closeCursor();
+                    $stmt = $pdo->query("SELECT COUNT(*) FROM server_nodes WHERE is_active=1"); $stats['servers_count'] = (int)$stmt->fetchColumn(); $stmt->closeCursor();
+                } catch (Throwable $e) {}
             }
             
             // Cache stats
