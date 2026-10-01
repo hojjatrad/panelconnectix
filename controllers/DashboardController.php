@@ -15,26 +15,43 @@ class DashboardController {
         $clientWhere = $isAdmin ? "1=1" : "reseller_id = " . intval($userId);
         $transWhere = $isAdmin ? "1=1" : "user_id = " . intval($userId);
 
-        // 1. Client Statistics
-        $totalClients = (int)$pdo->query("SELECT COUNT(*) FROM clients WHERE $clientWhere")->fetchColumn();
-        $activeClients = (int)$pdo->query("SELECT COUNT(*) FROM clients WHERE status = 'active' AND $clientWhere")->fetchColumn();
-        $expiredClients = (int)$pdo->query("SELECT COUNT(*) FROM clients WHERE status = 'expired' AND $clientWhere")->fetchColumn();
-        $neverConnected = (int)$pdo->query("SELECT COUNT(*) FROM clients WHERE status = 'never_connected' AND $clientWhere")->fetchColumn();
-        
+        // 1. Client Statistics - Optimized to single query (Phase 1)
         $tenMinutesAgo = date('Y-m-d H:i:s', strtotime('-10 minutes'));
-        $stmtOnline = $pdo->prepare("SELECT COUNT(*) FROM clients WHERE last_connected_at >= ? AND $clientWhere");
-        $stmtOnline->execute([$tenMinutesAgo]);
-        $onlineClients = (int)$stmtOnline->fetchColumn();
+        $statsRow = $pdo->query("
+            SELECT 
+                COUNT(*) as total,
+                SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active,
+                SUM(CASE WHEN status = 'expired' THEN 1 ELSE 0 END) as expired,
+                SUM(CASE WHEN status = 'never_connected' THEN 1 ELSE 0 END) as never,
+                SUM(CASE WHEN last_connected_at >= '$tenMinutesAgo' THEN 1 ELSE 0 END) as online
+            FROM clients WHERE $clientWhere
+        ")->fetch(PDO::FETCH_ASSOC);
         
+        $totalClients = (int)($statsRow['total'] ?? 0);
+        $activeClients = (int)($statsRow['active'] ?? 0);
+        $expiredClients = (int)($statsRow['expired'] ?? 0);
+        $neverConnected = (int)($statsRow['never'] ?? 0);
+        $onlineClients = (int)($statsRow['online'] ?? 0);
         $idleClients = max(0, $totalClients - ($onlineClients + $neverConnected + $expiredClients));
 
-        // 2. Plans & Revenue Statistics
-        $totalPlans = (int)$pdo->query("SELECT COUNT(*) FROM plans WHERE is_active = 1")->fetchColumn();
-        $freePlans = (int)$pdo->query("SELECT COUNT(*) FROM plans WHERE is_free = 1")->fetchColumn();
+        // 2. Plans & Revenue Statistics - Optimized to single queries
+        $planStats = $pdo->query("SELECT COUNT(*) as total, SUM(CASE WHEN is_free=1 THEN 1 ELSE 0 END) as free FROM plans WHERE is_active=1")->fetch(PDO::FETCH_ASSOC);
+        $totalPlans = (int)($planStats['total'] ?? 0);
+        $freePlans = (int)($planStats['free'] ?? 0);
         $premiumPlans = max(0, $totalPlans - $freePlans);
 
-        $totalTransactions = (int)$pdo->query("SELECT COUNT(*) FROM transactions WHERE $transWhere")->fetchColumn();
-        $totalSpent = (int)$pdo->query("SELECT ABS(SUM(amount)) FROM transactions WHERE amount < 0 AND $transWhere")->fetchColumn();
+        // Use cache for transactions count if possible
+        if (class_exists('Cache')) {
+            $totalTransactions = Cache::remember('dashboard_tx_count_' . $userId, 300, function() use ($pdo, $transWhere) {
+                return (int)$pdo->query("SELECT COUNT(*) FROM transactions WHERE $transWhere")->fetchColumn();
+            });
+            $totalSpent = Cache::remember('dashboard_spent_' . $userId, 300, function() use ($pdo, $transWhere) {
+                return (int)$pdo->query("SELECT ABS(SUM(amount)) FROM transactions WHERE amount < 0 AND $transWhere")->fetchColumn();
+            });
+        } else {
+            $totalTransactions = (int)$pdo->query("SELECT COUNT(*) FROM transactions WHERE $transWhere")->fetchColumn();
+            $totalSpent = (int)$pdo->query("SELECT ABS(SUM(amount)) FROM transactions WHERE amount < 0 AND $transWhere")->fetchColumn();
+        }
         $walletBalance = (int)$user['wallet_balance'];
 
         // 3. Active Nodes & Status

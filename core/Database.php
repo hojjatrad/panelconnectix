@@ -19,7 +19,14 @@ class Database {
                     self::$instance = new PDO('sqlite:' . SQLITE_PATH);
                     self::$instance->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
                     self::$instance->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+                    // Performance optimizations - Phase 1 & 2
                     self::$instance->exec('PRAGMA foreign_keys = ON;');
+                    self::$instance->exec('PRAGMA journal_mode=WAL;'); // Write-Ahead Logging - allows concurrent read/write
+                    self::$instance->exec('PRAGMA synchronous=NORMAL;'); // Faster, still safe with WAL
+                    self::$instance->exec('PRAGMA cache_size=-64000;'); // 64MB cache
+                    self::$instance->exec('PRAGMA temp_store=MEMORY;');
+                    self::$instance->exec('PRAGMA mmap_size=268435456;'); // 256MB mmap
+                    self::$instance->exec('PRAGMA busy_timeout=5000;'); // 5 sec busy timeout for concurrent access
                     
                     if ($isNew || filesize(SQLITE_PATH) === 0) {
                         self::initializeSqliteSchema(self::$instance);
@@ -844,6 +851,64 @@ class Database {
                     $pdo->exec("UPDATE users SET referral_code = '{$code}' WHERE id = {$u['id']}");
                 }
             } catch (Throwable $e) {}
+
+            // Performance: Create indexes for fast lookups (Phase 2)
+            try {
+                $indexes = [
+                    // clients table - most queried
+                    "CREATE INDEX IF NOT EXISTS idx_clients_username ON clients(username)",
+                    "CREATE INDEX IF NOT EXISTS idx_clients_sub_token ON clients(sub_token)",
+                    "CREATE INDEX IF NOT EXISTS idx_clients_reseller ON clients(reseller_id)",
+                    "CREATE INDEX IF NOT EXISTS idx_clients_server ON clients(server_id)",
+                    "CREATE INDEX IF NOT EXISTS idx_clients_plan ON clients(plan_id)",
+                    "CREATE INDEX IF NOT EXISTS idx_clients_status ON clients(status)",
+                    "CREATE INDEX IF NOT EXISTS idx_clients_expire ON clients(expire_at)",
+                    "CREATE INDEX IF NOT EXISTS idx_clients_uuid ON clients(uuid)",
+                    // users
+                    "CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)",
+                    "CREATE INDEX IF NOT EXISTS idx_users_status ON users(status)",
+                    "CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)",
+                    // transactions
+                    "CREATE INDEX IF NOT EXISTS idx_transactions_user ON transactions(user_id)",
+                    "CREATE INDEX IF NOT EXISTS idx_transactions_type ON transactions(type)",
+                    "CREATE INDEX IF NOT EXISTS idx_transactions_created ON transactions(created_at)",
+                    // bot_orders
+                    "CREATE INDEX IF NOT EXISTS idx_bot_orders_reseller ON bot_orders(reseller_id)",
+                    "CREATE INDEX IF NOT EXISTS idx_bot_orders_status ON bot_orders(payment_status)",
+                    "CREATE INDEX IF NOT EXISTS idx_bot_orders_tg ON bot_orders(user_tg_id)",
+                    // bot_sessions
+                    "CREATE INDEX IF NOT EXISTS idx_bot_sessions_tg ON bot_sessions(tg_id)",
+                    // plans
+                    "CREATE INDEX IF NOT EXISTS idx_plans_active ON plans(is_active)",
+                    "CREATE INDEX IF NOT EXISTS idx_plans_group ON plans(server_group)",
+                    // server_nodes
+                    "CREATE INDEX IF NOT EXISTS idx_servers_active ON server_nodes(is_active)",
+                    "CREATE INDEX IF NOT EXISTS idx_servers_group ON server_nodes(server_group)",
+                    // tickets
+                    "CREATE INDEX IF NOT EXISTS idx_tickets_user ON tickets(user_id)",
+                    "CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status)",
+                    // system_settings
+                    "CREATE INDEX IF NOT EXISTS idx_settings_key ON system_settings(setting_key)",
+                ];
+                foreach ($indexes as $sql) {
+                    try {
+                        $pdo->exec($sql);
+                    } catch (Throwable $e) {
+                        // MySQL syntax might differ for IF NOT EXISTS, try without
+                        try {
+                            $sql2 = str_replace('IF NOT EXISTS ', '', $sql);
+                            $pdo->exec($sql2);
+                        } catch (Throwable $e2) {}
+                    }
+                }
+                // For MySQL, also try to add composite indexes
+                if ($driver === 'mysql') {
+                    try { $pdo->exec("CREATE INDEX idx_clients_reseller_status ON clients(reseller_id, status)"); } catch (Throwable $e) {}
+                    try { $pdo->exec("CREATE INDEX idx_clients_expire_status ON clients(expire_at, status)"); } catch (Throwable $e) {}
+                }
+            } catch (Throwable $e) {
+                error_log("Index creation error: " . $e->getMessage());
+            }
 
         } catch (Throwable $e) {
             // Safe failover

@@ -11,9 +11,66 @@
     Header always set Referrer-Policy "strict-origin-when-cross-origin"
     Header always set X-XSS-Protection "1; mode=block"
     Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+    # Performance: Remove ETag for Cloudflare
+    Header unset ETag
+    FileETag None
 </IfModule>
 
 # Hide .php source leaks & block sensitive local files
-<FilesMatch "\.(sqlite|sqlite-journal|log)$">
+<FilesMatch "\.(sqlite|sqlite-journal|sqlite-wal|sqlite-shm|log)$">
     Require all denied
 </FilesMatch>
+
+# Performance Phase 1 & 2 - Gzip Compression
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css
+    AddOutputFilterByType DEFLATE application/xml application/xhtml+xml application/rss+xml
+    AddOutputFilterByType DEFLATE application/javascript application/x-javascript
+    AddOutputFilterByType DEFLATE application/json
+    AddOutputFilterByType DEFLATE application/vnd.ms-fontobject application/x-font-ttf font/opentype image/svg+xml image/x-icon
+    # Don't compress already compressed
+    SetEnvIfNoCase Request_URI \.(?:gif|jpe?g|png|webp|woff2?)$ no-gzip dont-vary
+</IfModule>
+
+# Performance - Expires & Cache Headers
+<IfModule mod_expires.c>
+    ExpiresActive On
+    # Assets - 1 year
+    ExpiresByType text/css "access plus 1 year"
+    ExpiresByType application/javascript "access plus 1 year"
+    ExpiresByType application/x-javascript "access plus 1 year"
+    ExpiresByType image/webp "access plus 1 year"
+    ExpiresByType image/svg+xml "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType image/jpg "access plus 1 year"
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/gif "access plus 1 year"
+    ExpiresByType image/x-icon "access plus 1 year"
+    ExpiresByType font/woff2 "access plus 1 year"
+    ExpiresByType font/woff "access plus 1 year"
+    ExpiresByType font/ttf "access plus 1 year"
+    ExpiresByType application/font-woff "access plus 1 year"
+    ExpiresByType application/font-woff2 "access plus 1 year"
+    # HTML - no cache (dynamic)
+    ExpiresByType text/html "access plus 0 seconds"
+    # API - no cache
+    ExpiresByType application/json "access plus 0 seconds"
+</IfModule>
+
+# Performance - Cache Control for static assets
+<IfModule mod_headers.c>
+    <FilesMatch "\.(css|js|webp|svg|png|jpg|jpeg|gif|ico|woff2?|ttf)$">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+    </FilesMatch>
+    <FilesMatch "\.(html|php)$">
+        Header set Cache-Control "private, no-cache, no-store, must-revalidate"
+    </FilesMatch>
+</IfModule>
+
+# Security - Prevent access to sensitive files
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+# Performance - Disable directory listing
+Options -Indexes

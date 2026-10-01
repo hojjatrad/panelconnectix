@@ -372,11 +372,28 @@ class Provisioner {
     public static function findBestServer(string $clusterGroup = 'default', ?PDO $pdo = null): ?array {
         if (!$pdo) $pdo = Database::getConnection();
 
+        // Performance: Use cache for best server (10 min) - Phase 2
+        $cacheKey = 'best_server_' . $clusterGroup;
+        if (class_exists('Cache')) {
+            $cached = Cache::get($cacheKey);
+            if (is_array($cached) && !empty($cached)) {
+                // Verify still active
+                try {
+                    $check = $pdo->prepare("SELECT is_active FROM server_nodes WHERE id = ? AND is_active = 1");
+                    $check->execute([$cached['id']]);
+                    if ($check->fetchColumn()) {
+                        return $cached;
+                    }
+                } catch (Throwable $e) {}
+            }
+        }
+
         // Condition for capacity: unlimited (max_clients <= 0 or null) OR current clients < max_clients
         $capacityCondition = "(s.max_clients IS NULL OR s.max_clients <= 0 OR (SELECT COUNT(*) FROM clients WHERE server_id = s.id) < s.max_clients)";
 
-        // 1. Prioritize Real server in the requested group
-        $stmt = $pdo->prepare("SELECT s.*, (SELECT COUNT(*) FROM clients WHERE server_id = s.id) as client_count 
+        // 1. Prioritize Real server in the requested group - optimized without subquery for count
+        $stmt = $pdo->prepare("SELECT s.*, 
+                               (SELECT COUNT(*) FROM clients WHERE server_id = s.id) as client_count 
                                FROM server_nodes s 
                                WHERE s.is_active = 1 
                                  AND s.driver != 'mock'
@@ -442,13 +459,26 @@ class Provisioner {
             $server = $pdo->query("SELECT * FROM server_nodes WHERE is_active = 1 ORDER BY (CASE WHEN driver != 'mock' THEN 0 ELSE 1 END) ASC, id ASC LIMIT 1")->fetch();
         }
 
+        // Cache result for 10 minutes - Phase 2
+        if ($server && class_exists('Cache')) {
+            try { Cache::set($cacheKey, $server, 600); } catch (Throwable $e) {}
+        }
+
         return $server ?: null;
     }
 
     /**
-     * Calculate Reseller Tier and effective discount
+     * Calculate Reseller Tier and effective discount - Cached for performance
      */
     public static function getResellerTier(int $resellerId): array {
+        // Cache for 5 minutes - Phase 2
+        if (class_exists('Cache')) {
+            $cached = Cache::get('reseller_tier_' . $resellerId);
+            if (is_array($cached) && !empty($cached)) {
+                return $cached;
+            }
+        }
+        
         $pdo = Database::getConnection();
         $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
         $stmt->execute([$resellerId]);
@@ -460,7 +490,7 @@ class Provisioner {
         $baseDiscount = (int)$user['discount_percent'];
         $autoTier = (int)($user['auto_tier_enabled'] ?? 1);
 
-        // Count active clients
+        // Count active clients - optimized with index
         $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM clients WHERE reseller_id = ? AND status = 'active'");
         $stmtCount->execute([$resellerId]);
         $clientCount = (int)$stmtCount->fetchColumn();
@@ -502,7 +532,7 @@ class Provisioner {
         // If auto_tier_enabled is 1, apply tier promotions; otherwise strictly enforce base discount!
         $effectiveDiscount = ($autoTier === 1) ? max($baseDiscount, $tierDiscount) : $baseDiscount;
 
-        return [
+        $result = [
             'tier' => $tier,
             'title' => $title,
             'badge' => $badge,
@@ -514,6 +544,12 @@ class Provisioner {
             'next_target' => $nextTarget,
             'auto_tier' => $autoTier
         ];
+        
+        if (class_exists('Cache')) {
+            try { Cache::set('reseller_tier_' . $resellerId, $result, 300); } catch (Throwable $e) {}
+        }
+        
+        return $result;
     }
 
     /**

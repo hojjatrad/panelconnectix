@@ -297,17 +297,17 @@ if (APP_DEBUG) {
     <?php if (file_exists($localTailwind)): ?>
     <script src="<?= $base ?>/assets/js/tailwind.js"></script>
     <?php else: ?>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/contax/assets/js/tailwind.js"></script>
     <?php endif; ?>
     <?php if (file_exists($localFA)): ?>
     <link rel="stylesheet" href="<?= $base ?>/assets/css/fontawesome.min.css">
     <?php else: ?>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/contax/assets/css/fontawesome.min.css">
     <?php endif; ?>
     <?php if (file_exists($localVazir)): ?>
     <link rel="stylesheet" href="<?= $base ?>/assets/css/vazirmatn.css">
     <?php else: ?>
-    <style>@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap');</style>
+    <style>@import url('/contax/assets/css/vazirmatn.css');</style>
     <?php endif; ?>
     <style>* { font-family: 'Vazirmatn', sans-serif; }</style>
 </head>

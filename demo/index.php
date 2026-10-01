@@ -33,8 +33,8 @@ $demoClients = [
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title><?= $pageTitle ?></title>
 <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet">
-<script src="https://cdn.tailwindcss.com"></script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<script src="/contax/assets/js/tailwind.js"></script>
+<link rel="stylesheet" href="/contax/assets/css/fontawesome.min.css">
 <style>*{font-family:Vazirmatn!important} .glass{backdrop-filter:blur(16px)}</style>
 </head>
 <body class="bg-[#05070A] text-white min-h-screen">

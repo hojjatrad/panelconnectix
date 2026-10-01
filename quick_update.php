@@ -27,9 +27,9 @@ header('Content-Type: text/html; charset=utf-8');
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>به‌روزرسانی آنی پنل از گیت‌هاب | Connectix</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/contax/assets/js/tailwind.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700;900&display=swap');
+        @import url('/contax/assets/css/vazirmatn.css');
         * { font-family: 'Vazirmatn', sans-serif; }
     </style>
 </head>
