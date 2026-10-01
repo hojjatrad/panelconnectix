@@ -79,20 +79,38 @@ class Performance {
             $settings = Setting::getAll();
             $result['messages'][] = '✓ Settings cached (' . count($settings) . ' items)';
             
-            // Preload plans
-            $plans = $pdo->query("SELECT * FROM plans WHERE is_active = 1")->fetchAll();
-            Cache::set('plans_active_v2', $plans, 600);
-            $result['messages'][] = '✓ Plans cached (' . count($plans) . ')';
+            // Preload plans - use buffered query
+            try {
+                $stmt = $pdo->query("SELECT * FROM plans WHERE is_active = 1");
+                $plans = $stmt->fetchAll();
+                $stmt->closeCursor();
+                Cache::set('plans_active_v2', $plans, 600);
+                $result['messages'][] = '✓ Plans cached (' . count($plans) . ')';
+            } catch (Throwable $e) {
+                $result['messages'][] = '⚠️ Plans cache failed: ' . $e->getMessage();
+            }
             
             // Preload servers
-            $servers = $pdo->query("SELECT * FROM server_nodes WHERE is_active = 1")->fetchAll();
-            Cache::set('servers_active_v2', $servers, 600);
-            $result['messages'][] = '✓ Servers cached (' . count($servers) . ')';
+            try {
+                $stmt = $pdo->query("SELECT * FROM server_nodes WHERE is_active = 1");
+                $servers = $stmt->fetchAll();
+                $stmt->closeCursor();
+                Cache::set('servers_active_v2', $servers, 600);
+                $result['messages'][] = '✓ Servers cached (' . count($servers) . ')';
+            } catch (Throwable $e) {
+                $result['messages'][] = '⚠️ Servers cache failed: ' . $e->getMessage();
+            }
             
             // Preload categories
-            $cats = $pdo->query("SELECT * FROM categories WHERE is_active = 1")->fetchAll();
-            Cache::set('categories_active', $cats, 600);
-            $result['messages'][] = '✓ Categories cached (' . count($cats) . ')';
+            try {
+                $stmt = $pdo->query("SELECT * FROM categories WHERE is_active = 1");
+                $cats = $stmt->fetchAll();
+                $stmt->closeCursor();
+                Cache::set('categories_active', $cats, 600);
+                $result['messages'][] = '✓ Categories cached (' . count($cats) . ')';
+            } catch (Throwable $e) {
+                $result['messages'][] = '⚠️ Categories cache failed: ' . $e->getMessage();
+            }
             
             $time = round((microtime(true) - $start)*1000, 2);
             $result['messages'][] = "⏱️ Total: {$time}ms";
