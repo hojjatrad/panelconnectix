@@ -75,9 +75,15 @@ class Performance {
             Cache::clear();
             $result['messages'][] = '✓ Old cache cleared';
             
-            // Preload settings - direct query to avoid nested cache issues
+            // Preload settings - use separate connection to avoid unbuffered issues
             try {
-                $stmt = $pdo->query("SELECT setting_key, setting_value FROM system_settings");
+                // Use a fresh PDO connection for cache warming to avoid unbuffered query conflicts
+                $dsn = "mysql:host=".DB_HOST.";port=".DB_PORT.";dbname=".DB_NAME.";charset=utf8mb4";
+                $tmpPdo = new PDO($dsn, DB_USER, DB_PASS, [
+                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                    PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true
+                ]);
+                $stmt = $tmpPdo->query("SELECT setting_key, setting_value FROM system_settings");
                 $rows = $stmt->fetchAll();
                 $stmt->closeCursor();
                 $settings = [];
@@ -86,41 +92,39 @@ class Performance {
                 }
                 Cache::set('system_settings_all', $settings, 300);
                 $result['messages'][] = '✓ Settings cached (' . count($settings) . ' items)';
+                $tmpPdo = null;
             } catch (Throwable $e) {
                 $result['messages'][] = '⚠️ Settings cache failed: ' . $e->getMessage();
             }
             
-            // Preload plans - use buffered query
+            // Preload plans - use fresh connection to avoid unbuffered conflicts
             try {
-                $stmt = $pdo->query("SELECT * FROM plans WHERE is_active = 1");
+                $dsn = "mysql:host=".DB_HOST.";port=".DB_PORT.";dbname=".DB_NAME.";charset=utf8mb4";
+                $tmpPdo = new PDO($dsn, DB_USER, DB_PASS, [
+                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                    PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true
+                ]);
+                $stmt = $tmpPdo->query("SELECT * FROM plans WHERE is_active = 1");
                 $plans = $stmt->fetchAll();
                 $stmt->closeCursor();
                 Cache::set('plans_active_v2', $plans, 600);
                 $result['messages'][] = '✓ Plans cached (' . count($plans) . ')';
-            } catch (Throwable $e) {
-                $result['messages'][] = '⚠️ Plans cache failed: ' . $e->getMessage();
-            }
-            
-            // Preload servers
-            try {
-                $stmt = $pdo->query("SELECT * FROM server_nodes WHERE is_active = 1");
+                
+                $stmt = $tmpPdo->query("SELECT * FROM server_nodes WHERE is_active = 1");
                 $servers = $stmt->fetchAll();
                 $stmt->closeCursor();
                 Cache::set('servers_active_v2', $servers, 600);
                 $result['messages'][] = '✓ Servers cached (' . count($servers) . ')';
-            } catch (Throwable $e) {
-                $result['messages'][] = '⚠️ Servers cache failed: ' . $e->getMessage();
-            }
-            
-            // Preload categories
-            try {
-                $stmt = $pdo->query("SELECT * FROM categories WHERE is_active = 1");
+                
+                $stmt = $tmpPdo->query("SELECT * FROM categories WHERE is_active = 1");
                 $cats = $stmt->fetchAll();
                 $stmt->closeCursor();
                 Cache::set('categories_active', $cats, 600);
                 $result['messages'][] = '✓ Categories cached (' . count($cats) . ')';
+                
+                $tmpPdo = null;
             } catch (Throwable $e) {
-                $result['messages'][] = '⚠️ Categories cache failed: ' . $e->getMessage();
+                $result['messages'][] = '⚠️ Cache warmup failed: ' . $e->getMessage();
             }
             
             $time = round((microtime(true) - $start)*1000, 2);
