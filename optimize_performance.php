@@ -15,6 +15,16 @@ if (($_GET['key'] ?? '') !== 'CONNECTIX2026' && ($_GET['key'] ?? '') !== 'CONNEC
     die('Unauthorized - key required');
 }
 
+// Invalidate OPcache for performance files to ensure latest code runs
+if (function_exists('opcache_invalidate')) {
+    @opcache_invalidate(__DIR__ . '/core/Performance.php', true);
+    @opcache_invalidate(__DIR__ . '/core/Database.php', true);
+    @opcache_invalidate(__DIR__ . '/core/Cache.php', true);
+}
+if (function_exists('opcache_reset')) {
+    @opcache_reset();
+}
+
 require_once __DIR__ . '/core/Database.php';
 require_once __DIR__ . '/core/Setting.php';
 require_once __DIR__ . '/core/Cache.php';
