@@ -11,12 +11,26 @@ class Auth {
 
     public static function login(string $username, string $password, ?string $twoFactorCode = null): array {
         self::init();
+        
+        // S1: Rate Limit check
+        require_once __DIR__ . '/RateLimiter.php';
+        $rateKey = RateLimiter::getClientKey('login_');
+        $rateCheck = RateLimiter::check($rateKey, 5, 300);
+        if (!$rateCheck['allowed']) {
+            require_once __DIR__ . '/SecurityLogger.php';
+            SecurityLogger::log('login_rate_limited', "Rate limited: $username - {$rateCheck['reason']}");
+            return ['success' => false, 'reason' => 'rate_limited', 'message' => $rateCheck['message']];
+        }
+        
         $pdo = Database::getConnection();
         $stmt = $pdo->prepare("SELECT * FROM users WHERE username = ? AND status = 'active' LIMIT 1");
         $stmt->execute([$username]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$user || !password_verify($password, $user['password_hash'])) {
+            RateLimiter::hit($rateKey);
+            require_once __DIR__ . '/SecurityLogger.php';
+            SecurityLogger::log('login_failed', "Invalid credentials for: $username");
             return ['success' => false, 'reason' => 'invalid_credentials'];
         }
 
@@ -27,13 +41,22 @@ class Auth {
                 return ['success' => false, 'reason' => 'requires_2fa', 'user_id' => $user['id']];
             }
             if (!TwoFactor::verifyCode($user['two_factor_secret'] ?? '', $twoFactorCode)) {
+                RateLimiter::hit($rateKey);
+                require_once __DIR__ . '/SecurityLogger.php';
+                SecurityLogger::log('login_failed', "Invalid 2FA for: $username");
                 return ['success' => false, 'reason' => 'invalid_2fa'];
             }
         }
 
+        // Success - clear rate limit
+        RateLimiter::clear($rateKey);
         $_SESSION['user_id'] = $user['id'];
         $_SESSION['username'] = $user['username'];
         $_SESSION['role'] = $user['role'];
+        
+        require_once __DIR__ . '/SecurityLogger.php';
+        SecurityLogger::log($user['role'] === 'admin' ? 'admin_login' : 'login_success', "User logged in: $username", $user['id']);
+        
         return ['success' => true, 'user' => $user];
     }
 

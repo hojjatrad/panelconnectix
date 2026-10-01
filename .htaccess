@@ -11,9 +11,33 @@
     Header always set Referrer-Policy "strict-origin-when-cross-origin"
     Header always set X-XSS-Protection "1; mode=block"
     Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+    # S6: HSTS - Force HTTPS for 1 year (include subdomains)
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" env=HTTPS
+    # S6: Enhanced CSP - allow self, inline styles/scripts for panel, fonts, images, connect to self and telegram
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.telegram.org https://telegram.org; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://api.telegram.org wss: https:; frame-src https://*.telegram.org https://telegram.org; object-src 'none'; base-uri 'self'; form-action 'self'"
     # Performance: Remove ETag for Cloudflare
     Header unset ETag
     FileETag None
+</IfModule>
+
+# S7: Protect sensitive directories - deny direct access to core, cache, data
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    # Block direct access to core files
+    RewriteRule ^core/.*\.php$ - [F,L]
+    RewriteRule ^cache/.* - [F,L]
+    RewriteRule ^data/.* - [F,L]
+    RewriteRule ^(config\.php|.*\.sqlite.*)$ - [F,L]
+</IfModule>
+
+# S7: Deny access to core, cache, data via FilesMatch
+<FilesMatch "^(config\.php|\.env|\.git)">
+    Require all denied
+</FilesMatch>
+<IfModule mod_authz_core.c>
+    <FilesMatch "^\.ht">
+        Require all denied
+    </FilesMatch>
 </IfModule>
 
 # Hide .php source leaks & block sensitive local files
