@@ -4,7 +4,7 @@ require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Setting.php';
 
 class Updater {
-    public const CURRENT_VERSION = '6.7.0'; // Phase 1+2 Performance Optimization
+    public const CURRENT_VERSION = '6.7.4'; // Phase 1+2 Performance Optimization - fix cache warmup
 
     public static function getCurrentVersion(): string {
         $dbVer = Setting::get('current_version', '');
