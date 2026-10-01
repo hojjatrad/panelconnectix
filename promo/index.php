@@ -34,8 +34,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reseller_request'])) 
 <html lang="fa" dir="rtl">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>پنل فروش محصول با اپ اختصاصی فارسی | سود 200% | Connectix - @mainAdminpanel</title>
-<meta name="description" content="پنل فروش محصول فارسی با اپ اندروید اختصاصی، ربات تلگرام فروش خودکار 24 ساعته، سود 200%، مدیریت سفارشات، ویدیو معرفی، دمو آنلاین demo/demo123. @mainAdminpanel">
+<title>خرید VPN پرسرعت | خرید فیلترشکن VLESS ضد فیلتر | پنل فروش VPN با سود 200% | Connectix</title>
+<meta name="description" content="خرید VPN پرسرعت VLESS، خرید فیلترشکن ضد فیلتر برای آیفون و اندروید، پنل فروش VPN با اپ اختصاصی فارسی، ربات تلگرام فروش خودکار، سود 200%، تحویل آنی. دمو: demo/demo123">
+<meta name="keywords" content="خرید vpn, خرید فیلترشکن, خرید vless, vpn ضد فیلتر, فیلترشکن پرسرعت, خرید اشتراک vpn, vpn آیفون, vpn اندروید, پنل فروش vpn, Connectix">
+<meta property="og:title" content="خرید VPN پرسرعت VLESS ضد فیلتر | Connectix">
+<meta property="og:description" content="خرید فیلترشکن پرسرعت VLESS با اپ اختصاصی، تحویل آنی، پشتیبانی 24 ساعته">
+<meta property="og:url" content="https://vpbotn.ir/">
+<meta property="og:type" content="website">
+<link rel="canonical" href="https://vpbotn.ir/">
 <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet">
 <script src="/contax/assets/js/tailwind.js"></script>
 <link rel="stylesheet" href="/contax/assets/css/fontawesome.min.css">

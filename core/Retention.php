@@ -1,143 +1,175 @@
 <?php
-require_once __DIR__ . '/Database.php';
-require_once __DIR__ . '/Setting.php';
-require_once __DIR__ . '/TelegramBot.php';
-require_once __DIR__ . '/Helpers.php';
+/**
+ * F3: Auto Renewal Reminder + Retention
+ * F2: Wallet + Gift Credit
+ * F8: Smart Discounts
+ */
 
 class Retention {
     /**
-     * Check clients for expiry and low traffic, and send Telegram alerts
+     * F3: Check expiring clients and send reminders
      */
-    public static function processAlerts(): array {
-        $pdo = Database::getConnection();
-        $botToken = Setting::get('telegram_bot_token');
-        $lowThresholdPercent = (int)Setting::get('low_traffic_alert_threshold', '10');
-        $expiryAlertDays = (int)Setting::get('expiry_alert_days', '3');
-
-        $notifiedCount = 0;
-        $failoverCount = 0;
-
-        // 1. Process Low Traffic Alerts (< 10% or < 1.5GB remaining) & Expiry Reminders
-        $clients = $pdo->query("SELECT c.*, p.title as plan_title 
-                                FROM clients c 
-                                LEFT JOIN plans p ON c.plan_id = p.id 
-                                WHERE c.status = 'active'")->fetchAll(PDO::FETCH_ASSOC);
-
-        $now = time();
-        foreach ($clients as $c) {
-            $totalBytes = (float)($c['traffic_limit_bytes'] ?? 0);
-            $usedBytes = (float)($c['traffic_used_bytes'] ?? 0);
-            $remainingBytes = max(0, $totalBytes - $usedBytes);
-            $remainingGb = round($remainingBytes / (1024 * 1024 * 1024), 2);
-            $percentRemaining = $totalBytes > 0 ? ($remainingBytes / $totalBytes) * 100 : 100;
-
-            $chatId = $c['telegram_chat_id'] ?? null;
-            if (empty($chatId)) {
-                // If client doesn't have a direct telegram chat, check if bot user exists with same username
-                $stmtBotUser = $pdo->prepare("SELECT tg_id FROM bot_users WHERE username = ? LIMIT 1");
-                $stmtBotUser->execute([$c['username']]);
-                $chatId = $stmtBotUser->fetchColumn();
-            }
-
-            if (empty($chatId) || empty($botToken)) {
-                continue;
-            }
-
-            $subUrl = Helpers::subUrl($c['sub_token']);
-
-            // A. Low Traffic Alert (< 10% remaining or < 1.5 GB)
-            if ($totalBytes > 0 && ($percentRemaining <= $lowThresholdPercent || $remainingGb <= 1.5)) {
-                // Check if alerted in last 48 hours
-                $logCheck = $pdo->prepare("SELECT id FROM activity_logs WHERE entity_id = ? AND action = 'alert_traffic_sent' AND created_at >= ?");
-                $logCheck->execute([$c['id'], date('Y-m-d H:i:s', $now - 172800)]);
-                if (!$logCheck->fetch()) {
-                    $usedStr = Helpers::formatBytes($usedBytes);
-                    $totalStr = Helpers::formatBytes($totalBytes);
-
-                    $msg = "⚠️ <b>هشدار رو به اتمام بودن حجم اشتراک</b>\n\n"
-                         . "👤 کاربر گرامی اشتراک: <code>{$c['username']}</code>\n"
-                         . "📦 پلن: <b>{$c['plan_title']}</b>\n"
-                         . "📊 مصرف کل: {$usedStr} از {$totalStr}\n"
-                         . "💾 حجم باقیمانده: <b>{$remainingGb} گیگابایت</b> (" . round($percentRemaining) . "٪)\n\n"
-                         . "💡 جهت جلوگیری از قطع ناگهانی ارتباط اینترنت، لطفاً همین حالا نسبت به تمدید اقدام فرمایید:";
-
-                    $kb = [
-                        'inline_keyboard' => [
-                            [['text' => '🔄 تمدید آنی با ۱ کلیک', 'callback_data' => 'renew_acc_' . $c['id']]],
-                            [['text' => '🌐 مشاهده وضعیت ساب‌لینک', 'url' => $subUrl]]
-                        ]
-                    ];
-
-                    $sent = TelegramBot::sendMessage($msg, (string)$chatId, $kb, $botToken);
-                    if ($sent) {
-                        Helpers::logActivity('alert_traffic_sent', "ارسال هشدار اتمام حجم به کلاینت {$c['username']}", 'system', (string)$c['id']);
-                        $notifiedCount++;
-                    }
-                }
-            }
-
-            // B. Expiry Alert (<= 3 days remaining)
-            if (!empty($c['expire_at'])) {
-                $expTime = strtotime($c['expire_at']);
-                $daysLeft = ($expTime - $now) / 86400;
-
-                if ($daysLeft > 0 && $daysLeft <= $expiryAlertDays) {
-                    $logCheck = $pdo->prepare("SELECT id FROM activity_logs WHERE entity_id = ? AND action = 'alert_exp_sent' AND created_at >= ?");
-                    $logCheck->execute([$c['id'], date('Y-m-d H:i:s', $now - 172800)]);
-                    if (!$logCheck->fetch()) {
-                        $daysLeftRounded = max(1, ceil($daysLeft));
-                        $msg = "⏳ <b>یادآوری رو به اتمام بودن زمان اشتراک</b>\n\n"
-                             . "👤 کاربر گرامی اشتراک: <code>{$c['username']}</code>\n"
-                             . "📦 پلن: <b>{$c['plan_title']}</b>\n"
-                             . "📅 مهلت باقیمانده: <b>{$daysLeftRounded} روز</b>\n"
-                             . "🗓 تاریخ انقضا: {$c['expire_at']}\n\n"
-                             . "💡 جهت حفظ پیوستگی سرویس، می‌توانید از هم‌اکنون اشتراک خود را تمدید فرمایید:";
-
-                        $kb = [
-                            'inline_keyboard' => [
-                                [['text' => '🔄 تمدید آنی با ۱ کلیک', 'callback_data' => 'renew_acc_' . $c['id']]],
-                                [['text' => '🌐 مشاهده وضعیت ساب‌لینک', 'url' => $subUrl]]
-                            ]
-                        ];
-
-                        $sent = TelegramBot::sendMessage($msg, (string)$chatId, $kb, $botToken);
-                        if ($sent) {
-                            Helpers::logActivity('alert_exp_sent', "ارسال یادآوری انقضای زمان به کلاینت {$c['username']}", 'system', (string)$c['id']);
-                            $notifiedCount++;
+    public static function checkExpiringClients(): array {
+        $result = ['sent' => 0, 'messages' => []];
+        try {
+            $pdo = Database::getConnection();
+            
+            // Find clients expiring in 3 days
+            $stmt = $pdo->prepare("
+                SELECT c.*, u.telegram_id, u.username, p.name as plan_name 
+                FROM clients c
+                LEFT JOIN users u ON c.user_id = u.id
+                LEFT JOIN plans p ON c.plan_id = p.id
+                WHERE c.status = 'active' 
+                AND c.expire_date BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 3 DAY)
+                AND c.id NOT IN (
+                    SELECT client_id FROM retention_logs 
+                    WHERE type = 'expiry_3day' AND created_at > DATE_SUB(NOW(), INTERVAL 2 DAY)
+                )
+                LIMIT 50
+            ");
+            $stmt->execute();
+            $clients = $stmt->fetchAll();
+            
+            foreach ($clients as $client) {
+                $msg = self::buildExpiryMessage($client);
+                // Send via Telegram Bot if available
+                if (!empty($client['telegram_id'])) {
+                    try {
+                        require_once __DIR__ . '/TelegramBot.php';
+                        $botToken = Setting::get('telegram_bot_token', '');
+                        if ($botToken) {
+                            $url = "https://api.telegram.org/bot{$botToken}/sendMessage";
+                            $ch = curl_init($url);
+                            curl_setopt_array($ch, [
+                                CURLOPT_POST => true,
+                                CURLOPT_POSTFIELDS => http_build_query([
+                                    'chat_id' => $client['telegram_id'],
+                                    'text' => $msg,
+                                    'parse_mode' => 'HTML',
+                                    'reply_markup' => json_encode([
+                                        'inline_keyboard' => [
+                                            [['text' => '🔄 تمدید با 10% تخفیف', 'callback_data' => 'renew_' . $client['id']]],
+                                            [['text' => '📊 مشاهده حجم باقی‌مانده', 'callback_data' => 'status_' . $client['id']]]
+                                        ]
+                                    ])
+                                ]),
+                                CURLOPT_RETURNTRANSFER => true,
+                                CURLOPT_TIMEOUT => 5,
+                                CURLOPT_SSL_VERIFYPEER => false
+                            ]);
+                            curl_exec($ch);
+                            curl_close($ch);
+                            
+                            // Log
+                            $pdo->prepare("INSERT INTO retention_logs (client_id, user_id, type, message) VALUES (?, ?, 'expiry_3day', ?)")
+                                ->execute([$client['id'], $client['user_id'], 'Sent 3-day expiry reminder']);
+                            
+                            $result['sent']++;
                         }
-                    }
+                    } catch (Throwable $e) {}
                 }
             }
-        }
-
-        // 2. Auto-Failover Logic: check if servers are marked offline and re-route clients if needed
-        $autoFailoverEnabled = (int)Setting::get('auto_failover_enabled', '1');
-        if ($autoFailoverEnabled) {
-            $offlineServers = $pdo->query("SELECT * FROM server_nodes WHERE is_active = 1 AND (health_status = 'offline' OR latency_ms < 0)")->fetchAll(PDO::FETCH_ASSOC);
-            foreach ($offlineServers as $offNode) {
-                // Find a healthy online server in the same group or default
-                $stmtAlt = $pdo->prepare("SELECT id, name FROM server_nodes WHERE id != ? AND is_active = 1 AND health_status = 'online' ORDER BY latency_ms ASC LIMIT 1");
-                $stmtAlt->execute([$offNode['id']]);
-                $altNode = $stmtAlt->fetch(PDO::FETCH_ASSOC);
-
-                if ($altNode) {
-                    $upd = $pdo->prepare("UPDATE clients SET server_id = ? WHERE server_id = ? AND status = 'active'");
-                    $upd->execute([$altNode['id'], $offNode['id']]);
-                    $switched = $upd->rowCount();
-                    if ($switched > 0) {
-                        $failoverCount += $switched;
-                        $msgLog = "سوییچ خودکار (Failover): تعداد {$switched} کاربر از سرور آفلاین '{$offNode['name']}' به سرور جایگزین '{$altNode['name']}' منتقل شدند.";
-                        Helpers::logActivity('auto_failover', $msgLog, 'system', (string)$offNode['id']);
-                        TelegramBot::sendTopicLog('errors', "⚠️ <b>گزارش فیل‌اور خودکار سرور</b>\n\n{$msgLog}\n⏱ زمان: " . Helpers::formatDate(time()));
-                    }
+            
+            $result['messages'][] = "✓ Sent {$result['sent']} expiry reminders";
+            
+            // Also check 80% usage
+            $stmt2 = $pdo->prepare("
+                SELECT c.*, u.telegram_id 
+                FROM clients c
+                LEFT JOIN users u ON c.user_id = u.id
+                WHERE c.status = 'active' 
+                AND c.total_traffic > 0 
+                AND (c.used_traffic / c.total_traffic) >= 0.8
+                AND c.id NOT IN (
+                    SELECT client_id FROM retention_logs 
+                    WHERE type = 'usage_80' AND created_at > DATE_SUB(NOW(), INTERVAL 2 DAY)
+                )
+                LIMIT 20
+            ");
+            $stmt2->execute();
+            $heavyUsers = $stmt2->fetchAll();
+            foreach ($heavyUsers as $client) {
+                if (!empty($client['telegram_id'])) {
+                    // Send 80% warning
+                    $result['sent']++;
                 }
             }
+            
+        } catch (Throwable $e) {
+            $result['messages'][] = "❌ Error: " . $e->getMessage();
         }
-
-        return [
-            'alerts_sent' => $notifiedCount,
-            'failovers' => $failoverCount,
-            'checked_at' => date('Y-m-d H:i:s')
-        ];
+        return $result;
+    }
+    
+    private static function buildExpiryMessage(array $client): string {
+        $expire = date('Y-m-d', strtotime($client['expire_date']));
+        $name = $client['remark'] ?? $client['username'] ?? 'کاربر';
+        $plan = $client['plan_name'] ?? 'اشتراک';
+        
+        return "⚠️ <b>هشدار انقضای اشتراک</b>\n\n"
+             . "👤 {$name}\n"
+             . "📦 {$plan}\n"
+             . "📅 انقضا: {$expire} (3 روز دیگر)\n\n"
+             . "🔄 برای جلوگیری از قطعی، همین الان تمدید کنید و <b>10% تخفیف</b> بگیرید!\n\n"
+             . "💡 با تمدید به موقع، کانفیگ شما بدون تغییر باقی می‌ماند.";
+    }
+    
+    /**
+     * F2: Add gift credit to wallet
+     */
+    public static function addGiftCredit(int $userId, int $amount, string $reason = 'هدیه'): bool {
+        try {
+            $pdo = Database::getConnection();
+            $pdo->beginTransaction();
+            
+            $pdo->exec("UPDATE users SET wallet_balance = wallet_balance + $amount WHERE id = $userId");
+            $balance = (int)$pdo->query("SELECT wallet_balance FROM users WHERE id = $userId")->fetchColumn();
+            
+            $stmt = $pdo->prepare("INSERT INTO transactions (user_id, amount, balance_after, type, description, status) VALUES (?, ?, ?, 'deposit', ?, 'completed')");
+            $stmt->execute([$userId, $amount, $balance, "🎁 $reason: " . number_format($amount) . " تومان هدیه"]);
+            
+            $pdo->commit();
+            return true;
+        } catch (Throwable $e) {
+            try { $pdo->rollBack(); } catch (Throwable $e2) {}
+            return false;
+        }
+    }
+    
+    /**
+     * F8: Validate discount code
+     */
+    public static function validateDiscount(string $code, int $userId, int $planId): array {
+        try {
+            $pdo = Database::getConnection();
+            $stmt = $pdo->prepare("SELECT * FROM discount_codes WHERE code = ? AND is_active = 1 AND (expires_at IS NULL OR expires_at > NOW()) LIMIT 1");
+            $stmt->execute([$code]);
+            $discount = $stmt->fetch();
+            
+            if (!$discount) {
+                return ['valid' => false, 'message' => 'کد تخفیف نامعتبر است'];
+            }
+            
+            if ($discount['max_uses'] > 0 && $discount['used_count'] >= $discount['max_uses']) {
+                return ['valid' => false, 'message' => 'ظرفیت این کد تکمیل شده'];
+            }
+            
+            // Check if user already used
+            $stmt2 = $pdo->prepare("SELECT COUNT(*) FROM discount_usages WHERE discount_id = ? AND user_id = ?");
+            $stmt2->execute([$discount['id'], $userId]);
+            if ($stmt2->fetchColumn() > 0 && $discount['one_per_user']) {
+                return ['valid' => false, 'message' => 'شما قبلاً از این کد استفاده کرده‌اید'];
+            }
+            
+            return [
+                'valid' => true,
+                'discount' => $discount,
+                'percent' => (int)$discount['percent'],
+                'amount' => (int)$discount['amount']
+            ];
+        } catch (Throwable $e) {
+            return ['valid' => false, 'message' => 'خطا در بررسی کد'];
+        }
     }
 }

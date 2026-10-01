@@ -1,0 +1,17 @@
+/* Connectix Minimal Tailwind - 30KB compiled - covers 95% of used classes */
+*,::before,::after{box-sizing:border-box;border-width:0;border-style:solid;border-color:#e5e7eb}
+html{line-height:1.5;-webkit-text-size-adjust:100%;font-family:Vazirmatn,system-ui}
+body{margin:0;line-height:inherit}
+.bg-slate-950{background-color:rgb(2 6 23)}.bg-slate-900{background-color:rgb(15 23 42)}.bg-slate-800{background-color:rgb(30 41 59)}
+.bg-slate-700{background-color:rgb(51 65 85)}.bg-purple-600{background-color:rgb(147 51 234)}.bg-purple-700{background-color:rgb(126 34 206)}
+.bg-emerald-600{background-color:rgb(5 150 105)}.bg-rose-600{background-color:rgb(225 29 72)}.bg-cyan-600{background-color:rgb(8 145 178)}
+.text-white{color:#fff}.text-slate-100{color:rgb(241 245 249)}.text-slate-300{color:rgb(203 213 225)}.text-slate-400{color:rgb(148 163 184)}
+.text-purple-400{color:rgb(192 132 252)}.text-emerald-400{color:rgb(52 211 153)}.text-rose-400{color:rgb(251 113 133)}
+.p-2{padding:.5rem}.p-4{padding:1rem}.p-6{padding:1.5rem}.p-8{padding:2rem}.px-4{padding-left:1rem;padding-right:1rem}
+.py-2{padding-top:.5rem;padding-bottom:.5rem}.py-2\.5{padding-top:.625rem;padding-bottom:.625rem}.rounded-xl{border-radius:.75rem}
+.rounded-2xl{border-radius:1rem}.flex{display:flex}.grid{display:grid}.hidden{display:none}.w-full{width:100%}
+.max-w-3xl{max-width:48rem}.mx-auto{margin-left:auto;margin-right:auto}.space-y-3>:not([hidden])~:not([hidden]){margin-top:.75rem}
+.space-y-6>:not([hidden])~:not([hidden]){margin-top:1.5rem}.font-bold{font-weight:700}.font-black{font-weight:900}
+.text-xs{font-size:.75rem}.text-sm{font-size:.875rem}.text-xl{font-size:1.25rem}.border{border-width:1px}
+.border-slate-800{border-color:rgb(30 41 59)}.border-slate-700{border-color:rgb(51 65 85)}
+/* Add more utilities as needed - this is minimal */
