@@ -1,7 +1,7 @@
 <?php
-// Connectix Ultra Premium Landing - v6.1 - Persian No 3D Word - Video + Demo View-Only
+// Connectix Ultra Premium Landing - v6.6 - Generic Product Sales Panel - No VPN/Filter Terms
 // https://vpbotn.ir/contax/promo/ | https://vpbotn.ir/
-// @mainAdminpanel
+// @mainAdminpanel - Generic Product Sales Panel Only
 $brand = 'Connectix';
 $tg = '@mainAdminpanel';
 $tg_url = 'https://t.me/mainAdminpanel';
@@ -22,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reseller_request'])) 
             if (file_exists($root.'/config.php')) {
                 require_once $root.'/config.php'; require_once $root.'/core/Database.php'; require_once $root.'/core/Setting.php'; require_once $root.'/core/TelegramBot.php';
                 $pdo = Database::getConnection(); $token = Setting::get('telegram_bot_token',''); $admin = Setting::get('telegram_admin_id',''); $logCh = Setting::get('bot_log_channel','') ?: Setting::get('telegram_log_channel_id','');
-                $text = "🔥 <b>درخواست جدید نمایندگی</b>\n\n👤 نام: $name\n📱 موبایل: $phone\n✈️ تلگرام: $tgid\n💼 کسب‌وکار: $biz\n📦 پلن: $plan\n💬 پیام: $msg\n\n🌐 https://vpbotn.ir/contax/promo/\n🕐 ".date('Y-m-d H:i:s');
+                $text = "🔥 <b>درخواست جدید پنل فروش</b>\n\n👤 نام: $name\n📱 موبایل: $phone\n✈️ تلگرام: $tgid\n💼 کسب‌وکار: $biz\n📦 پلن: $plan\n💬 پیام: $msg\n\n🌐 https://vpbotn.ir/contax/promo/\n🕐 ".date('Y-m-d H:i:s');
                 if ($admin) TelegramBot::sendMessage($text,$admin,null,$token); if ($logCh) TelegramBot::sendMessage($text,$logCh,null,$token);
             }
         } catch (Throwable $e) {}
@@ -34,8 +34,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reseller_request'])) 
 <html lang="fa" dir="rtl">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>پنل نمایندگی VPN با اپ اختصاصی فارسی | سود 200% | Connectix - @mainAdminpanel</title>
-<meta name="description" content="پنل نمایندگی VPN فارسی با اپ اندروید اختصاصی، ربات تلگرام فروش خودکار 24 ساعته، سود 200%، سرور VLESS Reality ضدفیلتر، ویدیو معرفی، دمو آنلاین demo/demo123. @mainAdminpanel">
+<title>پنل فروش محصول با اپ اختصاصی فارسی | سود 200% | Connectix - @mainAdminpanel</title>
+<meta name="description" content="پنل فروش محصول فارسی با اپ اندروید اختصاصی، ربات تلگرام فروش خودکار 24 ساعته، سود 200%، مدیریت سفارشات، ویدیو معرفی، دمو آنلاین demo/demo123. @mainAdminpanel">
 <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
@@ -79,7 +79,7 @@ body{background:#03050A;color:#fff;overflow-x:hidden}
 <div class="flex justify-between items-center h-[70px]">
 <div class="flex items-center gap-3">
 <div class="relative w-11 h-11 gradient-bg rounded-[14px] flex items-center justify-center font-black text-white shadow-[0_0_30px_rgba(124,58,237,.4)]">C</div>
-<div><div class="font-black text-[17px] leading-none flex items-center gap-2">Connectix <span class="text-[9px] bg-gradient-to-r from-violet-500 to-cyan-500 rounded-full px-2.5 py-1 font-black">فارسی v6.1</span></div><div class="text-[10px] text-white/40 mt-1 flex items-center gap-1.5"><span class="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span> آنلاین • فارسی • @mainAdminpanel</div></div>
+<div><div class="font-black text-[17px] leading-none flex items-center gap-2">Connectix <span class="text-[9px] bg-gradient-to-r from-violet-500 to-cyan-500 rounded-full px-2.5 py-1 font-black">فارسی v6.6</span></div><div class="text-[10px] text-white/40 mt-1 flex items-center gap-1.5"><span class="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span> آنلاین • فارسی • @mainAdminpanel</div></div>
 </div>
 <div class="hidden lg:flex items-center gap-1 bg-white/[0.03] border border-white/[0.05] rounded-full p-1">
 <a href="#features" class="px-4 py-2 rounded-full text-[12px] text-white/50 hover:text-white hover:bg-white/[0.06] transition">امکانات کامل</a>
@@ -102,24 +102,24 @@ body{background:#03050A;color:#fff;overflow-x:hidden}
 <div class="max-w-7xl mx-auto w-full grid lg:grid-cols-[1.15fr_0.85fr] gap-12 items-center">
 <div class="space-y-7">
 <div class="inline-flex items-center gap-2 bg-gradient-to-r from-violet-500/15 to-cyan-500/10 border border-violet-500/20 rounded-full pl-2 pr-5 py-2.5">
-<span class="bg-gradient-to-r from-violet-500 to-cyan-500 text-white text-[10px] font-black rounded-full px-3 py-1">جدید v6.1</span>
+<span class="bg-gradient-to-r from-violet-500 to-cyan-500 text-white text-[10px] font-black rounded-full px-3 py-1">جدید v6.6</span>
 <span class="text-[12px] text-violet-200">گرافیک سینمایی + ویدیو معرفی + دمو آنلاین فقط-دیدنی فارسی</span>
 </div>
 <h1 class="text-[40px] sm:text-[54px] lg:text-[58px] font-black leading-[0.95] tracking-tight">
-<span class="block">پنل نمایندگی VPN</span>
+<span class="block">پنل فروش محصول</span>
 <span class="block gradient-text">با اپ اختصاصی فارسی</span>
 <span class="block text-[26px] sm:text-[32px] text-white/85 mt-3">درآمد ماهانه 10 تا 25 میلیون</span>
 </h1>
 <p class="text-[14px] leading-7 text-white/60 max-w-[580px]">
-بدون حتی یک خط کدنویسی، با برند خودت کسب و کار VPN راه بنداز. <b class="text-white">اپ اندروید اختصاصی فارسی</b>، <b class="text-white">ربات تلگرام فروش خودکار 24 ساعته فارسی</b>، سود <b class="text-emerald-300">200% هر فروش</b>، سرور <b class="text-white">VLESS Reality ضدفیلتر</b>. <b class="text-violet-300">دمو: demo / demo123 - فقط دیدنی</b> - پشتیبانی فارسی: @mainAdminpanel
+بدون حتی یک خط کدنویسی، با برند خودت کسب و کار فروش محصول راه بنداز. <b class="text-white">اپ اندروید اختصاصی فارسی</b>، <b class="text-white">ربات تلگرام فروش خودکار 24 ساعته فارسی</b>، سود <b class="text-emerald-300">200% هر فروش</b>، مدیریت <b class="text-white">سفارشات و محصولات نامحدود</b>. <b class="text-violet-300">دمو: demo / demo123 - فقط دیدنی</b> - پشتیبانی فارسی: @mainAdminpanel
 </p>
 <div class="flex flex-wrap gap-3.5">
 <a href="#request" class="gradient-bg rounded-full px-8 py-4 font-black text-[14px] flex items-center gap-2.5 shadow-[0_0_50px_rgba(124,58,237,.5)]">🚀 ثبت درخواست - 30 دقیقه تحویل فارسی</a>
 <a href="#video" class="bg-white/[0.06] border border-white/[0.08] rounded-full px-7 py-4 font-bold text-[13px] flex items-center gap-2.5"><span class="w-8 h-8 bg-white rounded-full flex items-center justify-center"><i class="fa-solid fa-play text-black text-[12px] ml-0.5"></i></span> دیدن ویدیو معرفی</a>
 </div>
 <div class="grid grid-cols-3 gap-3 max-w-[440px] pt-3">
-<div class="bg-gradient-to-b from-white/[0.06] to-white/[0.02] border border-white/[0.08] rounded-[18px] p-4 text-center"><div class="text-[22px] font-black gradient-text">200+</div><div class="text-[10px] text-white/50">نماینده فعال</div></div>
-<div class="bg-gradient-to-b from-white/[0.06] to-white/[0.02] border border-white/[0.08] rounded-[18px] p-4 text-center"><div class="text-[22px] font-black">50K+</div><div class="text-[10px] text-white/50">کاربر راضی</div></div>
+<div class="bg-gradient-to-b from-white/[0.06] to-white/[0.02] border border-white/[0.08] rounded-[18px] p-4 text-center"><div class="text-[22px] font-black gradient-text">200+</div><div class="text-[10px] text-white/50">فروشنده فعال</div></div>
+<div class="bg-gradient-to-b from-white/[0.06] to-white/[0.02] border border-white/[0.08] rounded-[18px] p-4 text-center"><div class="text-[22px] font-black">50K+</div><div class="text-[10px] text-white/50">مشتری راضی</div></div>
 <div class="bg-gradient-to-b from-white/[0.06] to-white/[0.02] border border-white/[0.08] rounded-[18px] p-4 text-center"><div class="text-[22px] font-black text-emerald-400">فارسی</div><div class="text-[10px] text-white/50">100% فارسی</div></div>
 </div>
 </div>
@@ -152,7 +152,6 @@ body{background:#03050A;color:#fff;overflow-x:hidden}
 <img id="slideImage" src="<?= $base ?>ads/banner-fa-1.jpg" class="w-full h-full object-cover transition-all duration-700">
 <div class="absolute inset-0 bg-gradient-to-t from-[#0A0D18] via-transparent to-transparent"></div>
 <div class="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/20 group-hover:bg-black/10 transition">
-<!-- Animated pulse rings to show video exists -->
 <div class="relative">
 <div class="absolute inset-0 bg-white/20 rounded-full animate-ping" style="animation-duration: 2s"></div>
 <div class="absolute -inset-4 bg-gradient-to-br from-violet-600 to-cyan-400 rounded-full opacity-40 blur-2xl animate-pulse"></div>
@@ -160,12 +159,10 @@ body{background:#03050A;color:#fff;overflow-x:hidden}
 <button id="playBtn" class="relative w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-[0_0_80px_rgba(255,255,255,.7),0_12px_40px_rgba(0,0,0,.5)] hover:scale-110 hover:shadow-[0_0_100px_rgba(255,255,255,.9)] transition-all duration-300 group/btn cursor-pointer">
 <i class="fa-solid fa-play text-black text-[26px] ml-1 group-hover/btn:scale-110 transition-transform duration-300"></i>
 </button>
-<!-- Small play indicator dot -->
 <div class="absolute -top-1 -right-1 w-7 h-7 bg-red-500 rounded-full border-4 border-[#0A0D18] flex items-center justify-center shadow-lg">
 <div class="w-2 h-2 bg-white rounded-full animate-pulse"></div>
 </div>
 </div>
-<!-- Clear label that this is video -->
 <div class="flex flex-col items-center gap-2">
 <div class="bg-black/70 backdrop-blur-xl border border-white/15 rounded-full px-6 py-2.5 flex items-center gap-2.5 shadow-[0_8px_32px_rgba(0,0,0,.5)] hover:bg-black/80 transition">
 <div class="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(239,68,68,.5)]">
@@ -182,10 +179,9 @@ body{background:#03050A;color:#fff;overflow-x:hidden}
 </div>
 </div>
 <div class="absolute bottom-0 left-0 right-0 p-6">
-<h3 class="font-black text-[18px]">ویدیو معرفی پنل نمایندگی</h3>
+<h3 class="font-black text-[18px]">ویدیو معرفی پنل فروش</h3>
 <p class="text-[11px] text-white/50 mt-1">@mainAdminpanel</p>
 </div>
-<!-- Progress -->
 <div class="absolute bottom-0 left-0 right-0 h-1 bg-white/10"><div id="progressBar" class="h-full gradient-bg w-0 transition-all duration-300"></div></div>
 </div>
 <div class="p-5">
@@ -212,7 +208,7 @@ body{background:#03050A;color:#fff;overflow-x:hidden}
 <div class="bg-white/[0.03] border border-white/[0.06] rounded-[12px] px-4 py-3"><div class="text-[10px] text-white/40">نام کاربری</div><div class="font-mono font-bold text-[13px] mt-1 flex items-center gap-2"><i class="fa-solid fa-user text-violet-400 text-[11px]"></i> <?= $demo_user ?> <button onclick="copyText('<?= $demo_user ?>')" class="mr-auto text-[10px] bg-white/[0.06] rounded-full px-2 py-1">کپی</button></div></div>
 <div class="bg-white/[0.03] border border-white/[0.06] rounded-[12px] px-4 py-3"><div class="text-[10px] text-white/40">رمز عبور</div><div class="font-mono font-bold text-[13px] mt-1 flex items-center gap-2"><i class="fa-solid fa-lock text-emerald-400 text-[11px]"></i> <?= $demo_pass ?> <button onclick="copyText('<?= $demo_pass ?>')" class="mr-auto text-[10px] bg-white/[0.06] rounded-full px-2 py-1">کپی</button></div></div>
 </div>
-<div class="bg-amber-500/10 border border-amber-500/20 rounded-[12px] px-4 py-2.5 text-[11px] text-amber-300 flex gap-2"><i class="fa-solid fa-eye-slash mt-0.5"></i> این نسخه فقط برای نمایش است - امکان ساخت کلاینت، تغییر تنظیمات و حذف وجود ندارد. برای پنل واقعی درخواست دهید.</div>
+<div class="bg-amber-500/10 border border-amber-500/20 rounded-[12px] px-4 py-2.5 text-[11px] text-amber-300 flex gap-2"><i class="fa-solid fa-eye-slash mt-0.5"></i> این نسخه فقط برای نمایش است - امکان ساخت، تغییر تنظیمات و حذف وجود ندارد. برای پنل واقعی درخواست دهید.</div>
 </div>
 <div class="mt-4 grid grid-cols-3 gap-2 text-center text-[10px]">
 <div class="bg-white/[0.03] border border-white/[0.05] rounded-[12px] py-2.5"><b class="block text-[13px]">فقط دیدنی</b><span class="text-white/40">بدون دسترسی ساخت</span></div>
@@ -237,13 +233,13 @@ body{background:#03050A;color:#fff;overflow-x:hidden}
 <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
 <?php
 $feats = [
-['مدیریت مشتریان','fa-users','gradient-bg',['ساخت با نام فارسی','مصرف لحظه‌ای','تمدید 1 کلیک','تغییر حجم/سرور/سقف','حذف/مسدود/ریست','لینک ساب + QR فارسی']],
+['مدیریت مشتریان','fa-users','gradient-bg',['ساخت مشتری با نام فارسی','سفارشات لحظه‌ای','تمدید 1 کلیک','تغییر محصول/پلن','حذف/مسدود/ریست','لینک تحویل + QR فارسی']],
 ['مالی فارسی','fa-chart-pie','bg-emerald-500',['فاکتور ماهانه فارسی','سود خالص','نمودار درآمد','Excel فارسی','کیف پول هدیه‌دار','تراکنش‌ها فارسی']],
-['ربات تلگرام فارسی','fa-telegram','bg-sky-500',['یوزرنیم دلخواه','منوهای فارسی','فروش 24 ساعته فارسی','پرداخت کارت/تتر/تون','ارسال خودکار کانفیگ فارسی','تست رایگان فارسی']],
-['اپ اختصاصی فارسی','fa-mobile-screen','bg-amber-500',['برند شما - وایت‌لیبل فارسی','Universal+ARM64','اتصال 1 کلیک فارسی','حجم و روز باقی‌مانده فارسی','انتخاب سرور فارسی','آپدیت رایگان']],
-['پلن و سرور','fa-layer-group','bg-violet-500',['پلن اختصاصی ⭐ فارسی','حجم 5گیگ تا نامحدود','مدت 7 روز تا 1 ساله','سقف 1 تا نامحدود','اقتصادی/VIP/ایران‌اکسس','VLESS Reality ضدفیلتر']],
+['ربات تلگرام فارسی','fa-telegram','bg-sky-500',['یوزرنیم دلخواه','منوهای فارسی','فروش 24 ساعته فارسی','پرداخت کارت/تتر/تون','ارسال خودکار محصول فارسی','تست رایگان فارسی']],
+['اپ اختصاصی فارسی','fa-mobile-screen','bg-amber-500',['برند شما - وایت‌لیبل فارسی','Universal+ARM64','اتصال 1 کلیک فارسی','سفارشات و موجودی فارسی','انتخاب محصول فارسی','آپدیت رایگان']],
+['محصول و دسته‌بندی','fa-layer-group','bg-violet-500',['محصول اختصاصی ⭐ فارسی','دسته‌بندی تو در تو','مدت 1 روز تا 1 ساله','موجودی نامحدود','اقتصادی/VIP/ویژه','پنل فروش محصول']],
 ['هوش مصنوعی فارسی','fa-robot','bg-cyan-500',['پاسخ خودکار متن+عکس فارسی','راهنمای تصویری فارسی','پنل و تلگرام آلبوم','کاهش 80% تیکت فارسی','12 سند جامع فارسی','جستجوی هوشمند فارسی']],
-['درآمد تیمی فارسی','fa-people-group','bg-indigo-500',['ساب‌نماینده فارسی','پورسانت فارسی','انتقال اعتبار فارسی','لینک دعوت 10% فارسی','کد تخفیف فارسی']],
+['درآمد تیمی فارسی','fa-people-group','bg-indigo-500',['ساب‌فروشنده فارسی','پورسانت فارسی','انتقال اعتبار فارسی','لینک دعوت 10% فارسی','کد تخفیف فارسی']],
 ['امنیت فارسی','fa-shield-halved','bg-pink-500',['وایت‌لیبل 100% فارسی','دامنه اختصاصی فارسی','API فارسی','بک‌آپ روزانه فارسی','لاگ + 2FA فارسی']],
 ];
 foreach($feats as $f){
@@ -261,7 +257,7 @@ foreach($feats as $f){
 <div class="max-w-6xl mx-auto grid lg:grid-cols-5 gap-8">
 <div class="lg:col-span-2 space-y-5">
 <h2 class="text-[34px] font-black leading-[1.1]">فرم درخواست<br><span class="gradient-text">30 دقیقه بعد پنلت آماده‌ست</span></h2>
-<p class="text-white/60 text-[13px] leading-7">فرم فارسی - پشتیبانی: @mainAdminpanel - https://vpbotn.ir</p>
+<p class="text-white/60 text-[13px] leading-7">فرم فارسی - پشتیبانی: @mainAdminpanel - https://vpbotn.ir - پنل فروش محصول</p>
 <img src="<?= $base ?>ads/banner-fa-2.jpg" class="w-full rounded-[20px] border border-white/[0.06]">
 </div>
 <div class="lg:col-span-3"><div class="bg-gradient-to-b from-white/[0.06] to-white/[0.02] border border-white/[0.08] rounded-[28px] p-1"><div class="bg-[#0A0D18] rounded-[24px] p-6">
@@ -280,7 +276,7 @@ foreach($feats as $f){
 </div>
 </section>
 
-<footer class="border-t border-white/[0.06] py-8 px-4 text-center text-[11px] text-white/25">© 2025 Connectix v6.1 فارسی - https://vpbotn.ir - @mainAdminpanel - demo/demo123 فقط دیدنی</footer>
+<footer class="border-t border-white/[0.06] py-8 px-4 text-center text-[11px] text-white/25">© 2025 Connectix v6.6 فارسی - پنل فروش محصول - https://vpbotn.ir - @mainAdminpanel - demo/demo123 فقط دیدنی</footer>
 
 <script>
 // cursor
