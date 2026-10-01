@@ -1,17 +1,17 @@
 {
-  "version": "3.5.8",
-  "code": 38,
-  "changelog": "- **v3.5.8 بهینه شده برای ایران**: باندل CDN لوکال (بدون نیاز به cdn.tailwindcss.com و cdnjs)، رفع تایم‌اوت پنل (حذف Recursive کپی 2.8s و curl 30s)، رفع SSL self-signed، رفع صف تلگرام (pending queue)، بهبود اتصال اپ اندروید با سرور\n- **رفع ریشه‌ای خطای عدم نصب آپدیت**: ارتقای versionCode به 38 جهت جلوگیری از دانگرید",
-  "date": "2026-09-29",
+  "version": "3.6.0",
+  "code": 39,
+  "changelog": "- **v3.6.0 حل مشکل لاگین از ایران**: راه‌اندازی Cloudflare (ir.vpbotn.ir + cf.vpbotn.ir) با پروکسی نارنجی برای دور زدن فیلتر هلند\n- **Multi-Endpoint Failover**: اپ به صورت خودکار 4 آدرس را تست می‌کند (ir -> cf -> main -> api) و سریع‌ترین را ذخیره می‌کند\n- **بهبود پایداری**: افزایش لاگ تشخیصی، کاهش تایم‌اوت به 12 ثانیه برای فیل‌اور سریع، رفع مشکل اتصال یوزر/پسورد از داخل ایران",
+  "date": "2026-10-01",
   "apk": {
-    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.8/Connectix-Android-ARM64.apk",
-    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.8/Connectix-Android-Universal.apk",
-    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.8/Connectix-Android-ARM32.apk"
+    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v3.6.0/Connectix-Android-ARM64.apk",
+    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v3.6.0/Connectix-Android-Universal.apk",
+    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v3.6.0/Connectix-Android-ARM32.apk"
   },
   "windows": {
-    "version": "3.5.8",
+    "version": "3.6.0",
     "file": "Connectix-Windows-x64.zip",
-    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.8/Connectix-Windows-x64.zip",
+    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v3.6.0/Connectix-Windows-x64.zip",
     "min_os": "Windows 10 64-bit"
   }
 }

@@ -11,18 +11,25 @@ import '../models/client_model.dart';
 import '../models/server_model.dart';
 
 class ApiService {
-  static String baseUrl = "https://vpbotn.ir/contax";
+  // 3.6.0-IR-CLOUDFLARE-FIX: Multi-endpoint failover for Iran
+  // Priority: ir.vpbotn.ir (Iran-optimized via Cloudflare) -> cf -> main -> api
+  static List<String> baseUrls = [
+    "https://ir.vpbotn.ir/contax",      // Priority 1: Iran-optimized (Cloudflare proxied, fastest from Iran)
+    "https://cf.vpbotn.ir/contax",      // Priority 2: Cloudflare backup
+    "https://vpbotn.ir/contax",         // Priority 3: Direct main domain (now also Cloudflare proxied)
+    "https://api.vpbotn.ir/contax",     // Priority 4: API subdomain backup
+  ];
+  
+  static String baseUrl = "https://ir.vpbotn.ir/contax";
   static const MethodChannel _updaterChannel = MethodChannel('com.connectix.vpn/updater');
 
   // ---------------- Diagnostic Log Ring Buffer ----------------
-  // Kept in memory; attached to error reports so support sees exactly
-  // what happened (URLs, sizes, retry counts, errors) without screenshots.
   static final List<String> _logLines = <String>[];
 
   static void log(String msg) {
     try {
       _logLines.add('${DateTime.now().toIso8601String().substring(11, 19)} $msg');
-      if (_logLines.length > 60) {
+      if (_logLines.length > 80) {
         _logLines.removeAt(0);
       }
     } catch (_) {}
@@ -33,23 +40,52 @@ class ApiService {
   static final Connectivity _connectivity = Connectivity();
 
   // ----------------------------------------------------------
-
+  // 3.6.0: Smart init - loads last working URL first
   static Future<void> initBaseUrl() async {
-    // 3.3.9: the panel address is FIXED at build time. Any per-device saved
-    // value is ignored on purpose — the app must always talk to the official
-    // panel (the "set panel address" UI was removed in 3.3.9, so customers
-    // can never misconfigure the server). To change the panel address,
-    // release a new build with the new constant (see docs/RULES.md).
-    baseUrl = "https://vpbotn.ir/contax";
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('api_base_url', baseUrl); // keep legacy key in sync
+      final savedWorking = prefs.getString('api_base_url_working') ?? '';
+      final legacy = prefs.getString('api_base_url') ?? '';
+      
+      if (savedWorking.isNotEmpty && baseUrls.contains(savedWorking)) {
+        // Move working URL to front
+        baseUrl = savedWorking;
+        baseUrls = [savedWorking, ...baseUrls.where((u) => u != savedWorking)];
+        log('initBaseUrl: using saved working $savedWorking');
+      } else if (legacy.isNotEmpty && baseUrls.contains(legacy)) {
+        baseUrl = legacy;
+      } else {
+        baseUrl = baseUrls[0];
+      }
+      
+      await prefs.setString('api_base_url', baseUrl);
+      await prefs.setString('api_base_url_working', baseUrl);
+    } catch (_) {
+      baseUrl = baseUrls[0];
+    }
+  }
+
+  static List<String> getOrderedBaseUrls() {
+    // Returns baseUrls with current baseUrl first
+    if (baseUrls.isEmpty) return [baseUrl];
+    if (baseUrls.first == baseUrl) return baseUrls;
+    return [baseUrl, ...baseUrls.where((u) => u != baseUrl)];
+  }
+
+  static Future<void> _saveWorkingUrl(String workingUrl) async {
+    try {
+      baseUrl = workingUrl;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('api_base_url_working', workingUrl);
+      await prefs.setString('api_base_url', workingUrl);
+      // Reorder list to prioritize working URL next time
+      baseUrls = [workingUrl, ...baseUrls.where((u) => u != workingUrl)];
+      log('Saved working URL: $workingUrl');
     } catch (_) {}
   }
 
   /**
    * Persistent Session Verification (Auto-Login)
-   * Restores user state directly on app launch without prompting for login
    */
   static Future<Map<String, dynamic>?> checkSavedSession() async {
     try {
@@ -102,75 +138,91 @@ class ApiService {
     return [];
   }
 
+  // 3.6.0: Login with multi-endpoint failover
   static Future<Map<String, dynamic>> login(String username, String password) async {
-    try {
-      final url = Uri.parse("$baseUrl/api/v1/app/login");
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-        body: jsonEncode({'username': username, 'password': password}),
-      ).timeout(const Duration(seconds: 30));
+    final orderedUrls = getOrderedBaseUrls();
+    log('login start: trying ${orderedUrls.length} endpoints for user $username');
+    
+    for (int i = 0; i < orderedUrls.length; i++) {
+      final currentBase = orderedUrls[i];
+      try {
+        log('login try ${i+1}/${orderedUrls.length}: $currentBase');
+        final url = Uri.parse("$currentBase/api/v1/app/login");
+        final response = await http.post(
+          url,
+          headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+          body: jsonEncode({'username': username, 'password': password}),
+        ).timeout(const Duration(seconds: 12));
 
-      final data = jsonDecode(utf8.decode(response.bodyBytes));
-      if (data['success'] == true) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('is_logged_in', true);
-        await prefs.setString('auth_token', data['data']['auth_token'] ?? '');
-        await prefs.setString('saved_username', username);
-        await prefs.setString('saved_password', password);
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        if (data['success'] == true) {
+          await _saveWorkingUrl(currentBase);
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool('is_logged_in', true);
+          await prefs.setString('auth_token', data['data']['auth_token'] ?? '');
+          await prefs.setString('saved_username', username);
+          await prefs.setString('saved_password', password);
 
-        if (data['data']['client'] != null) {
-          await prefs.setString('cached_client', jsonEncode(data['data']['client']));
-          if (data['data']['client']['sub_url'] != null) {
-            await prefs.setString('sub_url', data['data']['client']['sub_url'].toString());
+          if (data['data']['client'] != null) {
+            await prefs.setString('cached_client', jsonEncode(data['data']['client']));
+            if (data['data']['client']['sub_url'] != null) {
+              await prefs.setString('sub_url', data['data']['client']['sub_url'].toString());
+            }
           }
-        }
-        if (data['data']['branding'] != null) {
-          await prefs.setString('cached_branding', jsonEncode(data['data']['branding']));
-        }
-
-        List<ServerModel> initialServers = [];
-        if (data['data']['servers'] != null && data['data']['servers'] is List) {
-          final List sList = data['data']['servers'];
-          final parsed = sList
-              .map((e) => ServerModel.fromJson(e))
-              .where((s) => !s.isInfoBanner && !s.configUri.contains('mock_pbk') && s.id != 'mci_reality_de')
-              .toList();
-          if (parsed.isNotEmpty) {
-            initialServers = parsed;
+          if (data['data']['branding'] != null) {
+            await prefs.setString('cached_branding', jsonEncode(data['data']['branding']));
           }
-        }
 
-        if (initialServers.isNotEmpty) {
-          await saveCachedServers(initialServers);
-        }
+          List<ServerModel> initialServers = [];
+          if (data['data']['servers'] != null && data['data']['servers'] is List) {
+            final List sList = data['data']['servers'];
+            final parsed = sList
+                .map((e) => ServerModel.fromJson(e))
+                .where((s) => !s.isInfoBanner && !s.configUri.contains('mock_pbk') && s.id != 'mci_reality_de')
+                .toList();
+            if (parsed.isNotEmpty) {
+              initialServers = parsed;
+            }
+          }
 
-        return {
-          'success': true,
-          'client': ClientModel.fromJson(data['data']['client']),
-          'branding': BrandingModel.fromJson(data['data']['branding']),
-          'servers': initialServers,
-        };
-      } else {
-        return {
-          'success': false,
-          'error': data['error'] ?? 'نام کاربری یا رمز عبور اشتباه است.',
-        };
+          if (initialServers.isNotEmpty) {
+            await saveCachedServers(initialServers);
+          }
+
+          log('login SUCCESS via $currentBase');
+          return {
+            'success': true,
+            'client': ClientModel.fromJson(data['data']['client']),
+            'branding': BrandingModel.fromJson(data['data']['branding']),
+            'servers': initialServers,
+          };
+        } else {
+          // Username/password wrong - no need to try other endpoints
+          log('login FAILED (auth) via $currentBase: ${data['error']}');
+          return {
+            'success': false,
+            'error': data['error'] ?? 'نام کاربری یا رمز عبور اشتباه است.',
+          };
+        }
+      } catch (e) {
+        log('login error via $currentBase: $e');
+        if (i == orderedUrls.length - 1) {
+          // Last endpoint failed
+          if (e is TimeoutException) {
+            return {'success': false, 'error': 'اتصال به سرور طول کشید. تمام سرورها تست شد. اینترنت خود را بررسی کنید.'};
+          }
+          return {'success': false, 'error': 'خطا در برقراری ارتباط با سرور: $e\nتمام ${orderedUrls.length} آدرس تست شد.'};
+        }
+        // Try next endpoint
+        await Future.delayed(Duration(milliseconds: 300));
+        continue;
       }
-    } catch (e) {
-      log('login error: $e');
-      if (e is TimeoutException) {
-        return {'success': false, 'error': 'اتصال به سرور طول کشید. اتصال اینترنت خود را بررسی کنید و دوباره تلاش کنید.'};
-      }
-      return {'success': false, 'error': 'خطا در برقراری ارتباط با سرور: $e'};
     }
+    return {'success': false, 'error': 'خطا در برقراری ارتباط با سرور'};
   }
 
   /**
-   * Universal Inbounds Delivery Engine
-   * 1. First tests panel app/configs endpoint
-   * 2. If response contains mock/fallback or fewer than 6 nodes, automatically falls back to sub_url
-   * 3. Parses all 14 active PasarGuard inbounds into clean ServerModel instances
+   * Universal Inbounds Delivery Engine with failover
    */
   static Future<List<ServerModel>> getServers() async {
     try {
@@ -179,46 +231,55 @@ class ApiService {
       final subUrl = prefs.getString('sub_url') ?? '';
 
       List<ServerModel> servers = [];
+      final orderedUrls = getOrderedBaseUrls();
 
-      // 1. Primary: Dedicated App Configs API
-      try {
-        final url = Uri.parse("$baseUrl/api/v1/app/configs?auth_token=${Uri.encodeComponent(token)}");
-        final response = await http.get(
-          url,
-          headers: {
-            'Authorization': 'Bearer $token',
-            'X-Auth-Token': token,
-            'Accept': 'application/json'
-          },
-        ).timeout(const Duration(seconds: 20));
-        log('configs API: base=$baseUrl HTTP ${response.statusCode}');
-        if (response.statusCode != 200) {
-          final snippet = response.body.length > 200 ? response.body.substring(0, 200) : response.body;
-          log('configs API non-200 body: $snippet');
-        }
-        final data = jsonDecode(utf8.decode(response.bodyBytes));
-        if (data['success'] == true && data['data'] != null && data['data']['servers'] != null) {
-          final List list = data['data']['servers'];
-          final parsed = list
-              .map((e) => ServerModel.fromJson(e))
-              .where((s) => !s.isInfoBanner && !s.configUri.contains('mock_pbk') && s.id != 'mci_reality_de')
-              .toList();
-          log('configs API: ${parsed.length} clean servers');
-          
-          if (parsed.isNotEmpty) {
-            servers = parsed;
-          } else {
-            log('configs list empty after filtering — falling back to sublink');
+      // 1. Primary: Try all baseUrls for configs API
+      for (int i = 0; i < orderedUrls.length; i++) {
+        final currentBase = orderedUrls[i];
+        try {
+          final url = Uri.parse("$currentBase/api/v1/app/configs?auth_token=${Uri.encodeComponent(token)}");
+          final response = await http.get(
+            url,
+            headers: {
+              'Authorization': 'Bearer $token',
+              'X-Auth-Token': token,
+              'Accept': 'application/json'
+            },
+          ).timeout(const Duration(seconds: 12));
+          log('configs API try ${i+1}: base=$currentBase HTTP ${response.statusCode}');
+          if (response.statusCode != 200) {
+            final snippet = response.body.length > 200 ? response.body.substring(0, 200) : response.body;
+            log('configs API non-200 body: $snippet');
+            continue;
           }
-        } else {
-          log('configs API: success=${data['success']} error=${data['error']}');
+          final data = jsonDecode(utf8.decode(response.bodyBytes));
+          if (data['success'] == true && data['data'] != null && data['data']['servers'] != null) {
+            final List list = data['data']['servers'];
+            final parsed = list
+                .map((e) => ServerModel.fromJson(e))
+                .where((s) => !s.isInfoBanner && !s.configUri.contains('mock_pbk') && s.id != 'mci_reality_de')
+                .toList();
+            log('configs API via $currentBase: ${parsed.length} clean servers');
+            
+            if (parsed.isNotEmpty) {
+              servers = parsed;
+              await _saveWorkingUrl(currentBase);
+              break; // Success, no need to try more
+            } else {
+              log('configs list empty after filtering — trying next');
+            }
+          } else {
+            log('configs API via $currentBase: success=${data['success']} error=${data['error']}');
+          }
+        } catch (e) {
+          log('API configs fetch error via $currentBase: $e');
+          if (i == orderedUrls.length - 1) {
+            debugPrint("API configs fetch error (all endpoints failed): $e");
+          }
         }
-      } catch (e) {
-        log('API configs fetch error: $e');
-        debugPrint("API configs fetch error: $e");
       }
 
-      // 2. Direct Node / Panel Sublink Auto-Resolver (Delivers all live PasarGuard inbounds)
+      // 2. Direct Node / Panel Sublink Auto-Resolver
       if (servers.isEmpty && subUrl.isNotEmpty) {
         try {
           log('sublink fallback: $subUrl');
@@ -261,7 +322,6 @@ class ApiService {
       if (servers.isNotEmpty) {
         await saveCachedServers(servers);
       } else {
-        // Fallback to locally cached servers so the user NEVER sees an empty server list
         servers = await getCachedServers();
       }
 
@@ -273,9 +333,6 @@ class ApiService {
     }
   }
 
-  /**
-   * Fast TCP Ping to server host:port directly (works offline/online, no VPN needed)
-   */
   static Future<int?> pingServerUri(String uriStr) async {
     try {
       String host = '';
@@ -304,14 +361,10 @@ class ApiService {
       socket.destroy();
       return sw.elapsedMilliseconds;
     } catch (_) {
-      return -1; // timed out or unreachable
+      return -1;
     }
   }
 
-  /**
-   * Ping multiple servers in parallel batches with progress callback.
-   * Supports custom pingFn (e.g. FlutterV2ray core delay) falling back to TCP socket ping.
-   */
   static Future<void> pingAllServers(
     List<ServerModel> servers, {
     Future<int?> Function(String uri)? pingFn,
@@ -343,97 +396,106 @@ class ApiService {
   }
 
   static Future<ClientModel?> getProfile() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('auth_token') ?? '';
+    final orderedUrls = getOrderedBaseUrls();
+    for (int i = 0; i < orderedUrls.length; i++) {
+      final currentBase = orderedUrls[i];
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('auth_token') ?? '';
 
-      final url = Uri.parse("$baseUrl/api/v1/app/profile?auth_token=${Uri.encodeComponent(token)}");
-      final response = await http.get(
-        url,
-        headers: {
-          'Authorization': 'Bearer $token',
-          'X-Auth-Token': token,
-          'Accept': 'application/json'
-        },
-      ).timeout(const Duration(seconds: 8));
+        final url = Uri.parse("$currentBase/api/v1/app/profile?auth_token=${Uri.encodeComponent(token)}");
+        final response = await http.get(
+          url,
+          headers: {
+            'Authorization': 'Bearer $token',
+            'X-Auth-Token': token,
+            'Accept': 'application/json'
+          },
+        ).timeout(const Duration(seconds: 8));
 
-      final data = jsonDecode(utf8.decode(response.bodyBytes));
-      if (data['success'] == true && data['data'] != null) {
-        // Cache refreshed profile
-        await prefs.setString('cached_client', jsonEncode(data['data']));
-        if (data['data']['sub_url'] != null) {
-          await prefs.setString('sub_url', data['data']['sub_url'].toString());
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        if (data['success'] == true && data['data'] != null) {
+          await _saveWorkingUrl(currentBase);
+          await prefs.setString('cached_client', jsonEncode(data['data']));
+          if (data['data']['sub_url'] != null) {
+            await prefs.setString('sub_url', data['data']['sub_url'].toString());
+          }
+          return ClientModel.fromJson(data['data']);
         }
-        return ClientModel.fromJson(data['data']);
+      } catch (_) {
+        if (i == orderedUrls.length - 1) return null;
       }
-      return null;
-    } catch (e) {
-      return null;
     }
+    return null;
   }
 
   static Future<List<Map<String, dynamic>>> getAnnouncements() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('auth_token') ?? '';
+    final orderedUrls = getOrderedBaseUrls();
+    for (final currentBase in orderedUrls) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('auth_token') ?? '';
 
-      final url = Uri.parse("$baseUrl/api/v1/app/announcements?auth_token=${Uri.encodeComponent(token)}");
-      final response = await http.get(
-        url,
-        headers: {
-          'Authorization': 'Bearer $token',
-          'X-Auth-Token': token,
-          'Accept': 'application/json'
-        },
-      ).timeout(const Duration(seconds: 8));
+        final url = Uri.parse("$currentBase/api/v1/app/announcements?auth_token=${Uri.encodeComponent(token)}");
+        final response = await http.get(
+          url,
+          headers: {
+            'Authorization': 'Bearer $token',
+            'X-Auth-Token': token,
+            'Accept': 'application/json'
+          },
+        ).timeout(const Duration(seconds: 8));
 
-      final data = jsonDecode(utf8.decode(response.bodyBytes));
-      if (data['success'] == true && data['data']['announcements'] != null) {
-        final List list = data['data']['announcements'];
-        return list.map((e) => Map<String, dynamic>.from(e)).toList();
-      }
-      return [];
-    } catch (e) {
-      return [];
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        if (data['success'] == true && data['data']['announcements'] != null) {
+          await _saveWorkingUrl(currentBase);
+          final List list = data['data']['announcements'];
+          return list.map((e) => Map<String, dynamic>.from(e)).toList();
+        }
+      } catch (_) {}
     }
+    return [];
   }
 
   static Future<Map<String, dynamic>?> checkAppUpdate() async {
-    // 1. Primary: Query Panel /api/v1/app/check-update
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('auth_token') ?? '';
+    // 1. Primary: Try all baseUrls for check-update
+    final orderedUrls = getOrderedBaseUrls();
+    for (final currentBase in orderedUrls) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('auth_token') ?? '';
 
-      // Platform-aware: Windows clients get the Windows package version/URL.
-      final url = Uri.parse("$baseUrl/api/v1/app/check-update?auth_token=${Uri.encodeComponent(token)}&platform=${Platform.isWindows ? 'windows' : 'android'}");
-      final response = await http.get(
-        url,
-        headers: {
-          'Authorization': 'Bearer $token',
-          'X-Auth-Token': token,
-          'Accept': 'application/json'
-        },
-      ).timeout(const Duration(seconds: 6));
+        final url = Uri.parse("$currentBase/api/v1/app/check-update?auth_token=${Uri.encodeComponent(token)}&platform=${Platform.isWindows ? 'windows' : 'android'}");
+        final response = await http.get(
+          url,
+          headers: {
+            'Authorization': 'Bearer $token',
+            'X-Auth-Token': token,
+            'Accept': 'application/json'
+          },
+        ).timeout(const Duration(seconds: 6));
 
-      final data = jsonDecode(utf8.decode(response.bodyBytes));
-      if (data['success'] == true && data['data'] != null) {
-        final map = Map<String, dynamic>.from(data['data']);
-        final latestVer = (map['latest_version'] ?? '').toString();
-        final serverUrl = (map['download_url'] ?? '').toString();
-        final dynamicGhArm64 = "https://github.com/hojjatrad/panelconnectix/releases/download/v$latestVer/Connectix-Android-ARM64.apk";
-        final dynamicGhUniversal = "https://github.com/hojjatrad/panelconnectix/releases/download/v$latestVer/Connectix-Android-Universal.apk";
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        if (data['success'] == true && data['data'] != null) {
+          await _saveWorkingUrl(currentBase);
+          final map = Map<String, dynamic>.from(data['data']);
+          final latestVer = (map['latest_version'] ?? '').toString();
+          final serverUrl = (map['download_url'] ?? '').toString();
+          final dynamicGhArm64 = "https://github.com/hojjatrad/panelconnectix/releases/download/v$latestVer/Connectix-Android-ARM64.apk";
+          final dynamicGhUniversal = "https://github.com/hojjatrad/panelconnectix/releases/download/v$latestVer/Connectix-Android-Universal.apk";
 
-        map['download_url'] = (serverUrl.isNotEmpty && serverUrl.startsWith('http'))
-            ? serverUrl
-            : dynamicGhArm64;
-        map['fallback_url'] = (map['universal_url'] != null && map['universal_url'].toString().startsWith('http'))
-            ? map['universal_url'].toString()
-            : dynamicGhUniversal;
-        return map;
-      }
-    } catch (_) {}
+          map['download_url'] = (serverUrl.isNotEmpty && serverUrl.startsWith('http'))
+              ? serverUrl
+              : dynamicGhArm64;
+          map['fallback_url'] = (map['universal_url'] != null && map['universal_url'].toString().startsWith('http'))
+              ? map['universal_url'].toString()
+              : dynamicGhUniversal;
+          return map;
+        }
+      } catch (_) {}
+    }
 
-    // 2. Direct Fallback: Query GitHub raw release manifest (available globally even when panel is blocked)
+    // 2. Direct Fallback: GitHub (always accessible from Iran)
     try {
       final ghResp = await http.get(
         Uri.parse("https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/app_release.json"),
@@ -462,18 +524,12 @@ class ApiService {
     return null;
   }
 
-  /**
-   * High-Speed In-App Download and Native Package Installation - ROBUST v3.5.7
-   * Fixes \"فایل ناقص\" by using dart:io HttpClient which correctly follows GitHub 302 redirects,
-   * validates APK ZIP header, retries fallback URL, and uses external files dir for better FileProvider compatibility.
-   */
   static Future<void> downloadAndInstallApk({
     required String downloadUrl,
     required Function(double progress, int receivedBytes, int totalBytes) onProgress,
     required Function(String error) onError,
     required Function() onSuccess,
   }) async {
-    // Helper to attempt one download
     Future<bool> attemptDownload(String url, {bool isFallback = false}) async {
       String? cacheDirPath;
       try {
@@ -491,7 +547,6 @@ class ApiService {
         try { await file.delete(); } catch (_) {}
       }
 
-      // Use dart:io HttpClient for proper redirect handling (GitHub -> S3)
       final httpClient = HttpClient();
       httpClient.connectionTimeout = const Duration(seconds: 20);
       httpClient.idleTimeout = const Duration(seconds: 20);
@@ -521,7 +576,6 @@ class ApiService {
           if (total > 0) {
             onProgress((received / total).clamp(0.0, 1.0), received, total);
           } else {
-            // Unknown total: show indeterminate progress based on received MB
             final fakeProgress = (received / (30 * 1024 * 1024)).clamp(0.0, 0.95);
             onProgress(fakeProgress, received, 0);
           }
@@ -532,27 +586,23 @@ class ApiService {
         final len = await file.length();
         log('download finished: len=$len total=$total');
 
-        // Robust integrity checks
         if (!await file.exists()) {
           throw Exception('فایل ایجاد نشد');
         }
         if (len < 1000000) {
-          throw Exception('فایل ناقص است (حجم ${len} بایت) - احتمالا لینک ریدایرکت نشده');
+          throw Exception('فایل ناقص است (حجم ${len} بایت)');
         }
-        // Check APK ZIP magic header 'PK'
         try {
           final raf = await file.open();
           final header = await raf.read(4);
           await raf.close();
           if (header.length < 2 || header[0] != 0x50 || header[1] != 0x4B) {
-            throw Exception('فایل دانلود شده APK معتبر نیست (هدر نامعتبر)');
+            throw Exception('فایل دانلود شده APK معتبر نیست');
           }
         } catch (e) {
           if (e.toString().contains('APK معتبر نیست')) rethrow;
-          // ignore header check errors
         }
 
-        // Success - trigger installer
         try {
           final installResult = await _updaterChannel.invokeMethod('installApk', {'filePath': file.path});
           log('installApk result: $installResult path=${file.path}');
@@ -564,7 +614,6 @@ class ApiService {
       } catch (e) {
         log('attemptDownload error for $url: $e');
         if (!isFallback) {
-          // Will be retried by caller with fallback URL
           return false;
         } else {
           onError('خطا در دانلود: $e');
@@ -576,7 +625,6 @@ class ApiService {
     }
 
     try {
-      // 1. Check install permission first
       try {
         final canInstall = await _updaterChannel.invokeMethod<bool>('canInstallPackages') ?? true;
         if (!canInstall) {
@@ -586,22 +634,16 @@ class ApiService {
         }
       } catch (_) {}
 
-      // 2. Try primary URL
       final primaryOk = await attemptDownload(downloadUrl, isFallback: false);
       if (primaryOk) return;
 
-      // 3. Auto-retry with fallback URL (Universal APK) if primary failed
       try {
-        final prefs = await SharedPreferences.getInstance();
-        final token = prefs.getString('auth_token') ?? '';
-        // Try to get fallback from panel if not already provided via caller
         String fallbackUrl = '';
         try {
           final updateData = await checkAppUpdate();
           fallbackUrl = (updateData?['fallback_url'] ?? '').toString();
         } catch (_) {}
         if (fallbackUrl.isEmpty || fallbackUrl == downloadUrl) {
-          // Derive universal from primary
           fallbackUrl = downloadUrl.replaceAll('ARM64', 'Universal').replaceAll('arm64-v8a', 'Universal');
         }
         if (fallbackUrl.isNotEmpty && fallbackUrl != downloadUrl) {
@@ -613,7 +655,6 @@ class ApiService {
         log('Fallback retry error: $e');
       }
 
-      // If both failed and we haven't yet called onError
       onError('فایل دانلود شده ناقص است. لطفا با اینترنت پایدارتر دوباره تلاش کنید یا از مرورگر دانلود کنید.');
     } catch (e) {
       log('downloadAndInstallApk top-level error: $e');
@@ -653,60 +694,56 @@ class ApiService {
     await prefs.remove('sub_url');
   }
 
-  /**
-   * Send a diagnostic error report (device log + context) to support.
-   * Creates a support ticket on the panel side; never throws.
-   */
   static Future<bool> sendFeedback({
     required String subject,
     required String message,
     String? version,
   }) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('auth_token') ?? '';
-      if (token.isEmpty) return false;
+    final orderedUrls = getOrderedBaseUrls();
+    for (final currentBase in orderedUrls) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('auth_token') ?? '';
+        if (token.isEmpty) return false;
 
-      final deviceInfo = Platform.operatingSystem.toUpperCase() + ' ' + Platform.version;
-      final body = <String, dynamic>{
-        'subject': subject,
-        'message': message,
-        'device_log': [
-          'نسخه: ${version ?? 'unknown'}',
-          'دستگاه: $deviceInfo',
-          'بازه زمانی: ${DateTime.now().toIso8601String()}',
-          '',
-          '--- لاگ آخرین فعالیت‌ها ---',
-          logDump,
-        ].join('\n'),
-      };
+        final deviceInfo = Platform.operatingSystem.toUpperCase() + ' ' + Platform.version;
+        final body = <String, dynamic>{
+          'subject': subject,
+          'message': message,
+          'device_log': [
+            'نسخه: ${version ?? 'unknown'}',
+            'دستگاه: $deviceInfo',
+            'بازه زمانی: ${DateTime.now().toIso8601String()}',
+            '',
+            '--- لاگ آخرین فعالیت‌ها ---',
+            logDump,
+          ].join('\n'),
+        };
 
-      final resp = await http.post(
-        Uri.parse('$baseUrl/api/v1/app/feedback'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 20));
+        final resp = await http.post(
+          Uri.parse('$currentBase/api/v1/app/feedback'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: jsonEncode(body),
+        ).timeout(const Duration(seconds: 20));
 
-      final data = jsonDecode(utf8.decode(resp.bodyBytes));
-      return data['success'] == true;
-    } catch (e) {
-      debugPrint('sendFeedback error: $e');
-      return false;
+        final data = jsonDecode(utf8.decode(resp.bodyBytes));
+        if (data['success'] == true) {
+          await _saveWorkingUrl(currentBase);
+          return true;
+        }
+      } catch (e) {
+        debugPrint('sendFeedback error via $currentBase: $e');
+      }
     }
+    return false;
   }
 
-  /**
-   * Returns true when the device is on Wi-Fi (used for the
-   * "download over Wi-Fi only" update option).
-   */
   static Future<bool> isOnWifi() async {
     try {
-      // connectivity_plus 5.x: checkConnectivity() returns a single
-      // ConnectivityResult (pinned to ^5.0.0).
       final conn = await _connectivity.checkConnectivity();
       return conn.toString() == 'ConnectivityResult.wifi';
     } catch (_) {
