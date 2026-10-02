@@ -55,6 +55,40 @@ $apkArm64 = "https://github.com/$repo/releases/download/v$version/Connectix-Andr
 $apkUniversal = "https://github.com/$repo/releases/download/v$version/Connectix-Android-Universal.apk";
 $ipa = "https://github.com/$repo/releases/download/v$version/Connectix-iOS-3.6.1.ipa";
 
+// Update app_release.json directly
+$json = <<<JSON
+{
+  "version": "3.6.1",
+  "code": 39,
+  "title": "Connectix VPN 3.6.1 - iOS Release",
+  "changelog": "🚀 نسخه 3.6.1 - انتشار iOS + فیکس اتصال",
+  "date": "2026-10-02",
+  "apk": {
+    "arm64": "https://github.com/$repo/releases/download/v$version/Connectix-Android-ARM64.apk",
+    "universal": "https://github.com/$repo/releases/download/v$version/Connectix-Android-Universal.apk",
+    "arm32": "https://github.com/$repo/releases/download/v$version/Connectix-Android-ARM32.apk"
+  },
+  "windows": {
+    "version": "3.6.1",
+    "file": "Connectix-Windows-x64.zip",
+    "url": "https://github.com/$repo/releases/download/v$version/Connectix-Windows-x64.zip",
+    "min_os": "Windows 10 64-bit"
+  },
+  "ios": {
+    "version": "3.6.1",
+    "file": "Connectix-iOS-3.6.1.ipa",
+    "ipa": "https://github.com/$repo/releases/download/v$version/Connectix-iOS-3.6.1.ipa",
+    "sibapp": "https://sibapp.com/applications/connectix-vpn",
+    "anardoni": "https://anardoni.com/applications/connectix-vpn",
+    "testflight": "https://testflight.apple.com/join/connectix",
+    "bundle_id": "com.connectix.vpn.ios",
+    "min_os": "iOS 12.0"
+  }
+}
+JSON;
+file_put_contents(__DIR__ . '/app_release.json', $json);
+echo "app_release.json updated\n";
+
 Setting::set('app_latest_version', $version);
 Setting::set('app_download_url', $apkArm64);
 Setting::set('app_universal_url', $apkUniversal);
