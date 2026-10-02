@@ -53,6 +53,15 @@ foreach ($files as $local => $urls) {
     foreach ((array)$urls as $u) {
         $data = fetchRaw($u);
         if ($data) {
+            // Validate that it's v4.5 with 4.0.1 for set_app_version files
+            if (str_contains($local, 'set_app_version') && !str_contains($data, 'v4.5')) {
+                echo "Fetched $local but not v4.5 (size ".strlen($data).") from ".parse_url($u, PHP_URL_HOST).", trying next...\n";
+                continue;
+            }
+            if (str_contains($local, 'set_app_version') && !str_contains($data, '4.0.1')) {
+                echo "Fetched $local but not 4.0.1 (size ".strlen($data).") from ".parse_url($u, PHP_URL_HOST).", trying next...\n";
+                continue;
+            }
             $path = __DIR__ . '/' . $local;
             if (!is_dir(dirname($path))) @mkdir(dirname($path), 0755, true);
             file_put_contents($path, $data);
