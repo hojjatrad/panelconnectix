@@ -32,7 +32,15 @@ $files = [
         'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/controllers/ApiControllerV2.php',
         'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/controllers/ApiControllerV2.php',
     ],
-    'emergency_ai_fix.php' => [
+    'check_db.php' => [
+            'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/check_db.php',
+            'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/check_db.php',
+        ],
+        'debug_app_version.php' => [
+            'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/debug_app_version.php',
+            'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/debug_app_version.php',
+        ],
+        'emergency_ai_fix.php' => [
         'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/emergency_ai_fix.php',
         'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/emergency_ai_fix.php',
     ],
