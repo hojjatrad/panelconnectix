@@ -873,7 +873,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   // In-App Auto-Update & In-Place Installer Flow
   void _checkAppUpdate() async {
     if (_hasAppUpdate && _updateInfo != null) {
-      final latestVer = (_updateInfo!['latest_version'] ?? '3.4.7').toString();
+      final latestVer = (_updateInfo!['latest_version'] ?? currentAppVersion).toString();
       final dlUrl = (_updateInfo!['download_url'] ?? '').toString();
       final fbUrl = (_updateInfo!['fallback_url'] ?? '').toString();
       _startInAppDownloadAndInstall(dlUrl, latestVer, fallbackUrl: fbUrl);
@@ -893,7 +893,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     Navigator.pop(context);
 
     if (updateData != null) {
-      final latestVer = (updateData['latest_version'] ?? '3.4.7').toString();
+      final latestVer = (updateData['latest_version'] ?? currentAppVersion).toString();
       final dlUrl = (updateData['download_url'] ?? '').toString();
       final fbUrl = (updateData['fallback_url'] ?? '').toString();
       final isNew = isNewerVersion(latestVer, currentAppVersion);
@@ -984,8 +984,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   void _showUpdateDialog(Map<String, dynamic> updateData, {bool isAutoPrompt = false}) {
-    final latestVer = (updateData['latest_version'] ?? '3.1.0').toString();
-    final changelog = (updateData['changelog'] ?? '• ماندگاری دائمی ورود به حساب\n• دریافت زنده ۱۴ اینباند فعال پاسارگاد\n• دانلود مستقیم و پرسرعت درون‌برنامه‌ای').toString();
+    final latestVer = (updateData['latest_version'] ?? currentAppVersion).toString();
+    final changelog = (updateData['changelog'] ?? '• بهبود پایداری و رفع باگ‌های گزارش شده').toString();
     final downloadUrl = (updateData['download_url'] ?? '').toString();
     final fallbackUrl = (updateData['fallback_url'] ?? '').toString();
 
@@ -2569,7 +2569,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       ),
                       ElevatedButton(
                         onPressed: () {
-                          final latestVer = (_updateInfo?['latest_version'] ?? '3.4.7').toString();
+                          final latestVer = (_updateInfo?['latest_version'] ?? currentAppVersion).toString();
                           final dlUrl = (_updateInfo?['download_url'] ?? '').toString();
                           final fbUrl = (_updateInfo?['fallback_url'] ?? '').toString();
                           _startInAppDownloadAndInstall(dlUrl, latestVer, fallbackUrl: fbUrl);
