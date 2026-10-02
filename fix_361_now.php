@@ -39,6 +39,14 @@ $files = [
         'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/set_app_version_400.php',
         'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/set_app_version_400.php',
     ],
+    'emergency_ai_fix.php' => [
+        'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/emergency_ai_fix.php',
+        'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/emergency_ai_fix.php',
+    ],
+    'update_self.php' => [
+        'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/update_self.php',
+        'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/update_self.php',
+    ],
 ];
 
 foreach ($files as $local => $urls) {
