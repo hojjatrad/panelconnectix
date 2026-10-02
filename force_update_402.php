@@ -80,5 +80,6 @@ try {
     }
 } catch (Throwable $e) { echo "emergency update error: ".$e->getMessage()."\n"; }
 
+try { require_once __DIR__ . '/core/Cache.php'; $cnt = Cache::clear(); echo "✅ Cache cleared $cnt files\n"; } catch (Throwable $e) { echo "cache clear error: ".$e->getMessage()."\n"; }
 if (function_exists('opcache_reset')) @opcache_reset();
 echo "DONE\n";
