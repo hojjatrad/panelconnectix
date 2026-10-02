@@ -49,6 +49,10 @@ try {
 
 try {
     $files = [
+        'debug_app_version.php' => [
+            'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/debug_app_version.php',
+            'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/debug_app_version.php',
+        ],
         'fix_361_now.php' => [
             'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/fix_361_now.php',
             'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/fix_361_now.php',
