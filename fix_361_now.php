@@ -1,6 +1,27 @@
 <?php
-// v4 ULTRA MINIMAL - no curl, no file fetching, just DB update to 4.0.0 - avoids any timeout
-echo "ULTRA FAST v4.0.0 DB update...\n";
+// v4.1 ULTRA MINIMAL + self-update set_app_version_361.php to 4.0.0
+echo "ULTRA FAST v4.0.0 DB update + self-update...\n";
+
+// First, update set_app_version_361.php and set_app_version_400.php from raw (to fix old 3.6.1 stuck)
+$files = [
+    'set_app_version_361.php' => 'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/set_app_version_361.php',
+    'set_app_version_400.php' => 'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/set_app_version_400.php',
+];
+foreach ($files as $local => $url) {
+    $ch = curl_init($url.'?t='.time().rand(1000,9999));
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    $data = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    if ($data && strlen($data) > 500 && $code === 200) {
+        file_put_contents(__DIR__ . '/' . $local, $data);
+        echo "Updated $local ".strlen($data)." bytes\n";
+    }
+}
+
 require_once __DIR__ . '/core/Database.php';
 require_once __DIR__ . '/core/Setting.php';
 $pdo = Database::getConnection();
