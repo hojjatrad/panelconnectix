@@ -65,14 +65,32 @@ class UpdateController {
     public function ajaxApply(): void {
         Auth::requireAdmin();
         header('Content-Type: application/json; charset=utf-8');
+        // v6.8.4: Increase time limit and handle disk quota errors gracefully
+        set_time_limit(300);
+        ini_set('max_execution_time', '300');
+        ini_set('memory_limit', '256M');
 
         $startTime = microtime(true);
-        $result = Updater::applyUpdate();
+        try {
+            $result = Updater::applyUpdate();
+        } catch (Throwable $e) {
+            $result = [
+                'success' => false,
+                'error' => 'خطای سیستمی: ' . $e->getMessage() . ' (فایل: ' . basename($e->getFile()) . ':' . $e->getLine() . ')',
+                'details' => $e->getTraceAsString()
+            ];
+            // Try emergency cleanup on failure
+            try {
+                Updater::emergencyDiskCleanup();
+            } catch (Throwable $e2) {}
+        }
         $duration = round(microtime(true) - $startTime, 2);
 
         $result['duration'] = $duration . ' ثانیه';
         $result['finished_at'] = date('H:i:s (Y/m/d)');
-        echo json_encode($result);
+        // Ensure free space info is included
+        $result['free_space_mb'] = round(disk_free_space(__DIR__ . '/..') / 1024 / 1024, 2);
+        echo json_encode($result, JSON_UNESCAPED_UNICODE);
         exit;
     }
 
