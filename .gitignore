@@ -18,3 +18,5 @@ data/*.sqlite
 *.log
 .github_token_secret
 .github_token
+.env.github
+.github_token_secure
