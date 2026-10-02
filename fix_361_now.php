@@ -4,6 +4,8 @@ echo "ULTRA FAST v4.0.0 DB + ApiControllerV2 fix...\n";
 
 // Update ApiControllerV2.php from raw to fix overwrite logic
 $files = [
+    'set_app_version_361.php' => 'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/set_app_version_361.php',
+    'set_app_version_400.php' => 'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/set_app_version_400.php',
     'controllers/ApiControllerV2.php' => 'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/controllers/ApiControllerV2.php',
     'core/AppReleasePublisher.php' => 'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/core/AppReleasePublisher.php',
     'core/AppApkMirror.php' => 'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/core/AppApkMirror.php',
