@@ -51,5 +51,34 @@ foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
     echo $row['setting_key'] . " => " . substr($row['setting_value']??'',0,200) . "\n";
 }
 
+// Also force-update emergency_ai_fix.php via GitHub API to prevent downgrade loop
+try {
+    $token = Setting::get('github_token', '');
+    if (!empty($token)) {
+        $apiUrl = "https://api.github.com/repos/$repo/contents/emergency_ai_fix.php?ref=main";
+        $ch = curl_init($apiUrl);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_TIMEOUT => 15,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_HTTPHEADER => ["Authorization: token $token", "User-Agent: Connectix-Force-Update", "Accept: application/vnd.github.v3+json"],
+        ]);
+        $res = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        if ($code === 200 && $res) {
+            $j = json_decode($res, true);
+            if (!empty($j['content'])) {
+                $content = base64_decode($j['content']);
+                if (strlen($content) > 5000 && str_contains($content, '4.0.2')) {
+                    file_put_contents(__DIR__ . '/emergency_ai_fix.php', $content);
+                    echo "✅ emergency_ai_fix.php force-updated via API (".strlen($content)." bytes)\n";
+                }
+            }
+        }
+    }
+} catch (Throwable $e) { echo "emergency update error: ".$e->getMessage()."\n"; }
+
 if (function_exists('opcache_reset')) @opcache_reset();
 echo "DONE\n";
