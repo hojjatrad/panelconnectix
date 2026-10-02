@@ -4,10 +4,15 @@ require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Setting.php';
 
 class Updater {
-    public const CURRENT_VERSION = '6.8.2'; // Phase 1+2 Performance Optimization - fix cache warmup
+    public const CURRENT_VERSION = '6.8.3'; // Fix version naming - never show commit-xxxx
 
     public static function getCurrentVersion(): string {
         $dbVer = Setting::get('current_version', '');
+        // Sanitize: if DB contains commit-xxxx, replace with proper version
+        if (!empty($dbVer) && str_starts_with($dbVer, 'commit-')) {
+            Setting::set('current_version', self::CURRENT_VERSION);
+            return self::CURRENT_VERSION;
+        }
         if (empty($dbVer) || version_compare(self::CURRENT_VERSION, $dbVer, '>')) {
             Setting::set('current_version', self::CURRENT_VERSION);
             return self::CURRENT_VERSION;
@@ -37,6 +42,27 @@ class Updater {
     }
 
     /**
+     * Sanitize version string - never return commit-xxxx as version
+     */
+    private static function sanitizeVersion(string $ver): string {
+        $ver = trim($ver);
+        if (str_starts_with($ver, 'commit-')) {
+            return self::CURRENT_VERSION;
+        }
+        // If version looks like commit hash (7-40 hex chars)
+        if (preg_match('/^[0-9a-f]{7,40}$/i', $ver)) {
+            return self::CURRENT_VERSION;
+        }
+        // Remove leading v
+        $ver = ltrim($ver, 'vV');
+        // If empty after sanitization, return current
+        if (empty($ver) || $ver === 'commit') {
+            return self::CURRENT_VERSION;
+        }
+        return $ver;
+    }
+
+    /**
      * Check GitHub for latest release or latest commit
      */
     public static function checkForUpdates(bool $forceRefresh = false): array {
@@ -50,7 +76,22 @@ class Updater {
 
         if (!$forceRefresh && !empty($cached) && (time() - $cacheTime < 180)) {
             $data = json_decode($cached, true);
-            if (is_array($data)) return $data;
+            if (is_array($data)) {
+                // IMPORTANT v6.8.3: If cached data contains commit-xxxx, invalidate it immediately
+                $lv = $data['latest_version'] ?? '';
+                $cv = $data['current_version'] ?? '';
+                if (str_starts_with((string)$lv, 'commit-') || str_starts_with((string)$cv, 'commit-')) {
+                    Setting::set('update_check_cache', '');
+                    Setting::set('update_check_time', '0');
+                } else {
+                    // Sanitize cached versions too
+                    $data['latest_version'] = self::sanitizeVersion((string)$lv);
+                    $data['current_version'] = self::sanitizeVersion((string)$cv);
+                    $data['latest_version_full'] = "Connectix v" . $data['latest_version'];
+                    $data['current_version_full'] = "Connectix v" . $data['current_version'];
+                    return $data;
+                }
+            }
         }
 
         $repo = self::getRepo();
@@ -59,8 +100,6 @@ class Updater {
         $currentVer = self::getCurrentVersion();
 
         // 1. Source 1: Check raw Updater.php on GitHub (Zero rate limit, works with 100% public repos)
-        // Unique bust per request: the host's egress network cache can otherwise
-        // serve a stale copy of this file and block legitimate updates.
         $bustRaw = 'cb=' . (string)time() . rand(1000, 9999);
         $rawUrls = [
             "https://raw.githubusercontent.com/{$repo}/{$branch}/core/Updater.php?{$bustRaw}",
@@ -83,14 +122,16 @@ class Updater {
             curl_close($chRaw);
 
             if ($rawHttp === 200 && preg_match("/CURRENT_VERSION\s*=\s*['\"]([^'\"]+)['\"]/", (string)$rawCode, $matches)) {
-                $remoteVer = trim($matches[1]);
+                $remoteVer = self::sanitizeVersion(trim($matches[1]));
                 if (version_compare($remoteVer, $currentVer, '>')) {
                     $result = [
                         'has_update' => true,
                         'current_version' => $currentVer,
+                        'current_version_full' => "Connectix v{$currentVer}",
                         'latest_version' => $remoteVer,
-                        'release_title' => "انتشار نسخه جدید {$remoteVer} در گیت‌هاب",
-                        'changelog' => "ارتقا به نگارش {$remoteVer}: افزودن تب‌های اختصاصی دسته‌بندی پلن‌ها، سیستم بازگردانی هوشمند دیتابیس و بهینه‌سازی‌های جامع هسته سامانه.",
+                        'latest_version_full' => "Connectix v{$remoteVer}",
+                        'release_title' => "انتشار نسخه جدید Connectix v{$remoteVer} در گیت‌هاب",
+                        'changelog' => "ارتقا به نگارش Connectix v{$remoteVer}: بهبود نمایش نسخه و رفع باگ commit-xxxx",
                         'download_url' => "https://github.com/{$repo}/archive/refs/heads/{$branch}.zip",
                         'published_at' => date('Y-m-d H:i:s'),
                         'checked_at' => date('Y-m-d H:i:s'),
@@ -114,19 +155,18 @@ class Updater {
         }
 
         if ($res && isset($res['tag_name'])) {
-            $latestTag = ltrim($res['tag_name'], 'vV');
+            $latestTag = self::sanitizeVersion(ltrim($res['tag_name'], 'vV'));
             $hasUpdate = version_compare($latestTag, $currentVer, '>');
 
-            // IMPORTANT: only short-circuit when the release is actually NEWER.
-            // App-release tags (e.g. v3.0.0) must NOT mask newer same-version
-            // commits on main — fall through to the commit SHA check below.
             if ($hasUpdate) {
                 $downloadUrl = $res['zipball_url'] ?? "https://github.com/{$repo}/archive/refs/tags/{$res['tag_name']}.zip";
                 $result = [
                     'has_update' => $hasUpdate,
                     'current_version' => $currentVer,
+                    'current_version_full' => "Connectix v{$currentVer}",
                     'latest_version' => $latestTag,
-                    'release_title' => $res['name'] ?? "Release v{$latestTag}",
+                    'latest_version_full' => "Connectix v{$latestTag}",
+                    'release_title' => $res['name'] ?? "Connectix v{$latestTag}",
                     'changelog' => $res['body'] ?? 'به‌روزرسانی‌های امنیتی و بهبود عملکرد پنل',
                     'download_url' => $downloadUrl,
                     'published_at' => $res['published_at'] ?? date('Y-m-d H:i:s'),
@@ -150,23 +190,13 @@ class Updater {
 
             $hasUpdate = empty($lastInstalledSha) || ($lastInstalledSha !== $shortSha);
 
-            // NEW v6.8.2: Always show proper Connectix version name, not commit hash
-            // User wants "Connectix vX" format, not "commit-xxxx"
-            $displayCurrent = $currentVer;
-            // If lastInstalledSha looks like a commit hash, still show version + short hash for debugging, but primary is version
-            if (!empty($lastInstalledSha) && strlen($lastInstalledSha) >= 7 && !str_starts_with($lastInstalledSha, 'vip_') && !str_starts_with($lastInstalledSha, 'auto_')) {
-                // It's a real git SHA, show version as primary
-                $displayCurrent = $currentVer;
-            } elseif (!empty($lastInstalledSha) && (str_starts_with($lastInstalledSha, 'vip_') || str_starts_with($lastInstalledSha, 'auto_'))) {
-                // It's our custom marker (vip_sync_...), show version
-                $displayCurrent = $currentVer;
-            }
-
+            // v6.8.3: NEVER return commit-xxxx as version - always return proper Connectix vX
+            // If has_update due to new commit but version same, still show version name, not commit hash
             $result = [
                 'has_update' => $hasUpdate,
-                'current_version' => $displayCurrent,
-                'current_version_full' => "Connectix v{$currentVer}" . (!empty($shortSha) ? " (commit-{$shortSha})" : ""),
-                'latest_version' => $hasUpdate ? $currentVer : $currentVer,
+                'current_version' => $currentVer,
+                'current_version_full' => "Connectix v{$currentVer}",
+                'latest_version' => $hasUpdate ? $currentVer : $currentVer, // Always version, never commit hash
                 'latest_version_full' => "Connectix v{$currentVer}",
                 'release_title' => $hasUpdate ? "نسخه جدید Connectix v{$currentVer} در دسترس است" : "Connectix v{$currentVer} - به‌روز",
                 'changelog' => $commitRes['commit']['message'] ?? 'آخرین تغییرات مستقیم مخزن گیت‌هاب',
@@ -288,7 +318,7 @@ class Updater {
         foreach ($rawUrls as $rawUrl) {
             $body = (string)self::httpGet($rawUrl);
             if (preg_match("/CURRENT_VERSION\s*=\s*['\"]([^'\"]+)['\"]/u", $body, $m)) {
-                $rawVer = trim($m[1]);
+                $rawVer = self::sanitizeVersion(trim($m[1]));
                 break;
             }
         }
@@ -333,19 +363,6 @@ class Updater {
 
     /**
      * Download ZIP and perform 1-Click Update.
-     *
-     * SAFETY GATE (incident 2026-09-25): never apply an update from a
-     * branch-alias zip URL ("refs/heads/main") — the host's transparent network
-     * cache can serve a stale zip for that URL for a long time, which once
-     * overwrote a healthy deployment. We only ever download a COMMIT-PINNED zip
-     * (unique URL, cannot be a stale pin) after the SHA was verified from
-     * independent sources, and we verify the package content against the
-     * expected version BEFORE touching any file on disk.
-     */
-    /**
-     * @param bool $notify When false the caller (webhook/cron) takes over the
-     *                     announcement via TelegramBot::announcePanelUpdate,
-     *                     so the same update never produces two bot messages.
      */
     public static function applyUpdate(bool $notify = true): array {
         $check = self::checkForUpdates(true);
@@ -355,15 +372,13 @@ class Updater {
         $shaInfo = self::resolveLatestSha();
         $sha = $shaInfo['sha'] ?? '';
         $expectedVer = (string)($shaInfo['remote_version'] ?? $check['latest_version'] ?? '');
+        $expectedVer = self::sanitizeVersion($expectedVer);
         $localVer = self::getCurrentVersion();
         $useBranchFallback = false;
 
         if (empty($sha)) {
-            // Fallback: try to get SHA from check result (commit-xxxx) or use branch zip directly
-            // This fixes "عدم امکان راستی‌آزمایی SHA" error when GitHub API is rate-limited or atom feed blocked
             if (!empty($check['latest_version']) && str_starts_with($check['latest_version'], 'commit-')) {
-                $sha = substr($check['latest_version'], 7); // short SHA
-                // Need full SHA - try to resolve via API again with no token or via githubRequest
+                $sha = substr($check['latest_version'], 7);
                 $commitUrl = "https://api.github.com/repos/{$repo}/commits/{$branch}";
                 $commitRes = self::githubRequest($commitUrl, self::getToken());
                 if (!empty($commitRes['sha'])) {
@@ -371,15 +386,10 @@ class Updater {
                 }
             }
             if (empty($sha) || strlen($sha) < 7) {
-                // Last resort: use branch zip (less safe but better than blocking update)
                 $useBranchFallback = true;
-                $sha = ''; // will use branch URL
+                $sha = '';
             }
         }
-
-        // Note: Authoritative package version verification is performed
-        // downstream in SAFETY GATE 2 directly on the extracted zip files
-        // to avoid false-positive downgrade blocks caused by stale CDN caches.
 
         if ($useBranchFallback) {
             $downloadUrl = "https://github.com/{$repo}/archive/refs/heads/{$branch}.zip";
@@ -395,7 +405,6 @@ class Updater {
         $zipFile = $tmpDir . '/update.zip';
         $token = self::getToken();
 
-        // Download zip (unique bust: codeload URLs can be cached by egress proxies)
         $zipUrl = $downloadUrl . '?cb=' . (string)time() . rand(1000, 9999);
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $zipUrl);
@@ -420,7 +429,6 @@ class Updater {
         curl_close($ch);
 
         if ($httpCode === 401 && !empty($token)) {
-            // Retry without token in case token expired or repo is public
             $ch = curl_init();
             curl_setopt($ch, CURLOPT_URL, $zipUrl);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -441,14 +449,12 @@ class Updater {
 
         file_put_contents($zipFile, $zipData);
 
-        // Extract ZIP using resilient multi-engine extraction (ZipArchive -> unzip CLI -> Pure PHP)
         $extractPath = $tmpDir . '/extracted';
         if (!self::extractZip($zipFile, $extractPath)) {
             self::deleteDirectory($tmpDir);
             return ['success' => false, 'error' => 'فایل فشرده دانلود شده قابل استخراج نیست.'];
         }
 
-        // Find root directory inside extracted zip (GitHub zips enclose files in a root directory)
         if (file_exists($extractPath . '/index.php')) {
             $sourceDir = $extractPath;
         } else {
@@ -456,13 +462,11 @@ class Updater {
             $sourceDir = (!empty($subDirs) && is_dir($subDirs[0])) ? $subDirs[0] : $extractPath;
         }
 
-        // SAFETY GATE 2: verify the extracted package matches the expected
-        // version before writing anything. A stale/corrupt zip is refused.
         $pkgUpdater = $sourceDir . '/core/Updater.php';
         $pkgVer = '';
         if (is_file($pkgUpdater)) {
             if (preg_match("/CURRENT_VERSION\s*=\s*['\"]([^'\"]+)['\"]/u", (string)file_get_contents($pkgUpdater), $m)) {
-                $pkgVer = trim($m[1]);
+                $pkgVer = self::sanitizeVersion(trim($m[1]));
             }
         }
         if ($expectedVer !== '' && $pkgVer !== '' && version_compare($pkgVer, $expectedVer, '<')) {
@@ -474,35 +478,29 @@ class Updater {
             return ['success' => false, 'error' => "پکیج دریافت‌شده ({$pkgVer}) قدیمی‌تر از نسخه نصب‌شده ({$localVer}) است — اعمال نشد."];
         }
 
-        // Copy files over panel root, skipping sensitive local configs and user data
         $panelRoot = realpath(__DIR__ . '/..');
         $skipped = ['config.php', 'data', 'assets/uploads'];
 
         self::copyDirectory($sourceDir, $panelRoot, $skipped);
 
-        // AUTO-SYNC root domain landing (https://{PANEL_DOMAIN}/ (root domain landing)) - requested by user: always update with panel updates
-        // Copies promo/index.php -> public_html/index.php so root domain never stays outdated
         self::syncRootLanding($panelRoot);
-
-        // Run migrations if needed
         self::runPostUpdateMigrations();
-
-        // Cleanup
         self::deleteDirectory($tmpDir);
-
-        // Run database auto-migrations
         self::ensureDatabaseSchema();
 
-        // Update installed version in database
         $installedVer = (!empty($pkgVer) && !str_starts_with($pkgVer, 'commit-')) ? $pkgVer : self::CURRENT_VERSION;
+        $installedVer = self::sanitizeVersion($installedVer);
         $installedSha = !empty($sha) ? substr($sha, 0, 7) : (substr($check['latest_version'] ?? '', 0, 7) ?: substr(md5((string)time()),0,7));
+        // Ensure SHA is clean hex, not commit-xxx
+        $installedSha = preg_replace('/[^0-9a-f]/i', '', $installedSha);
+        $installedSha = substr($installedSha, 0, 7);
+        
         Setting::set('current_version', $installedVer);
         Setting::set('last_installed_commit_sha', $installedSha);
         Setting::set('last_installed_version', $installedVer);
         Setting::set('update_check_cache', '');
         Setting::set('update_check_time', '0');
 
-        // Invalidate OPcache and clear stat cache so changes take effect in RAM immediately
         if (function_exists('opcache_reset')) {
             @opcache_reset();
         }
@@ -512,18 +510,14 @@ class Updater {
 
         Helpers::logActivity('system_update', "به‌روزرسانی موفق پنل به نگارش {$installedVer}", 'system');
 
-        // Send Notification to Telegram Supergroup Reports Topic
         try {
             require_once __DIR__ . '/TelegramBot.php';
             $msg = "🚀 <b>بروزرسانی موفق پنل با آخرین کدهای گیت‌هاب</b>\n\n"
                  . "📅 <b>تاریخ:</b> " . date('Y-m-d H:i:s') . "\n"
-                 . "🔖 <b>نگارش فعال:</b> <code>v{$installedVer}</code>\n"
+                 . "🔖 <b>نگارش فعال:</b> <code>Connectix v{$installedVer}</code>\n"
                  . "📦 <b>مخزن:</b> <code>" . self::getRepo() . " (" . self::getBranch() . ")</code>\n"
                  . "✅ تمامی فایل‌های هسته، کنترلرها و درایورها با موفقیت بروزرسانی شدند.";
             
-            // Send to Supergroup Reports Topic (general or notifications)
-            // — only when the caller did not take over announcing
-            // (webhook/cron send their own single message via announcePanelUpdate)
             if ($notify) {
                 $sent = TelegramBot::sendCategorizedReport('general', $msg);
                 if (!$sent) {
@@ -535,19 +529,15 @@ class Updater {
         return [
             'success' => true,
             'version' => $installedVer,
-            'message' => "پنل با موفقیت به نگارش {$installedVer} به‌روزرسانی شد!"
+            'message' => "پنل با موفقیت به نگارش Connectix v{$installedVer} به‌روزرسانی شد!"
         ];
     }
 
-    /**
-     * Resilient ZIP extractor supporting ZipArchive, unzip CLI, and pure PHP fallback
-     */
     public static function extractZip(string $zipFile, string $extractPath): bool {
         if (!is_dir($extractPath)) {
             @mkdir($extractPath, 0777, true);
         }
 
-        // Method 1: PHP native ZipArchive if extension loaded
         if (class_exists('ZipArchive')) {
             $zip = new ZipArchive();
             if ($zip->open($zipFile) === true) {
@@ -558,7 +548,6 @@ class Updater {
             }
         }
 
-        // Method 2: System unzip command
         if (function_exists('shell_exec')) {
             $cmd = 'unzip -q -o ' . escapeshellarg($zipFile) . ' -d ' . escapeshellarg($extractPath) . ' 2>&1';
             @shell_exec($cmd);
@@ -566,13 +555,9 @@ class Updater {
             if (!empty($files)) return true;
         }
 
-        // Method 3: Pure PHP unpacker using built-in gzinflate
         return self::purePhpUnzip($zipFile, $extractPath);
     }
 
-    /**
-     * Pure PHP ZIP file unpacker (Zero-dependency fallback)
-     */
     public static function purePhpUnzip(string $zipFile, string $extractPath): bool {
         $data = @file_get_contents($zipFile);
         if (!$data) return false;
@@ -621,13 +606,6 @@ class Updater {
         return $fileCount > 0;
     }
 
-    /**
-     * AUTO-SYNC: Ensure https://{PANEL_DOMAIN}/ (root domain landing) (root public_html/index.php) is always updated
-     * whenever panel updates. User requested: "میخوام همه اینا همراه با بروز رسانی انجام بشه که دستی کاری انجام نشه"
-     * 
-     * Copies promo/index.php (source of truth for landing) to parent directory index.php (public_html)
-     * with backup and safety checks.
-     */
     public static function syncRootLanding(string $panelRoot): void {
         try {
             $panelRoot = rtrim($panelRoot, '/');
@@ -639,14 +617,12 @@ class Updater {
 
             $sourceContent = @file_get_contents($sourceLanding);
             if ($sourceContent === false || strlen($sourceContent) < 500) return;
-            // Safety: must be our landing
             if (strpos($sourceContent, 'mainAdminpanel') === false) return;
 
-            // Possible root targets — domain independent, dynamic detection
             require_once __DIR__ . '/Helpers.php';
             $publicHtml = Helpers::getPublicHtmlPath();
             $candidates = [
-                dirname($panelRoot) . '/index.php', // public_html/index.php if panel is public_html/contax
+                dirname($panelRoot) . '/index.php',
                 $panelRoot . '/../index.php',
                 $publicHtml . '/index.php',
                 realpath($panelRoot . '/..') ? realpath($panelRoot . '/..') . '/index.php' : null,
@@ -658,26 +634,20 @@ class Updater {
                 if (!$target) continue;
                 $targetDir = dirname($target);
                 if (!is_dir($targetDir)) continue;
-                // Avoid overwriting if target is inside panel itself (should be parent)
                 if (realpath($targetDir) === realpath($panelRoot)) continue;
 
-                // Backup old root index if exists and is not same as source
                 if (is_file($target)) {
                     $oldContent = @file_get_contents($target);
                     if ($oldContent !== false && $oldContent !== $sourceContent) {
-                        // Only backup if old file looks like our previous landing or generic index
                         $backupName = $targetDir . '/index_backup_' . date('Ymd_His') . '.php';
                         @copy($target, $backupName);
                     } else if ($oldContent === $sourceContent) {
-                        // Already up-to-date, skip
                         continue;
                     }
                 }
 
-                // Copy new landing to root
                 $copied = @copy($sourceLanding, $target);
                 if (!$copied) {
-                    // Fallback: file_put_contents
                     $copied = @file_put_contents($target, $sourceContent) !== false;
                 }
                 if ($copied) {
@@ -686,26 +656,22 @@ class Updater {
                 }
             }
 
-            // Also ensure root-landing/index.php is synced from promo (source of truth)
             $rootLandingFile = $panelRoot . '/root-landing/index.php';
             $promoFile = $panelRoot . '/promo/index.php';
             if (is_file($promoFile) && is_dir(dirname($rootLandingFile))) {
                 @copy($promoFile, $rootLandingFile);
             }
-            // Ensure index_for_root_domain.php also synced
             $indexForRoot = $panelRoot . '/index_for_root_domain.php';
             if (is_file($promoFile)) {
                 @copy($promoFile, $indexForRoot);
             }
 
-            // Also sync to landing-vpbotn if exists (dev workspace)
             $landingVp = $panelRoot . '/../landing-vpbotn/index.php';
             if (is_dir(dirname($landingVp))) {
                 @copy($sourceLanding, $landingVp);
             }
 
         } catch (Throwable $e) {
-            // Never break update if root sync fails
         }
     }
 
@@ -762,10 +728,8 @@ class Updater {
         try {
             $pdo = Database::getConnection();
             Database::ensureExtendedTablesExist($pdo);
-            // Auto-fix Connectix Seller driver after any update
             self::ensureConnectixDriverFixed($pdo);
             self::ensureCustomerNamesFixed($pdo);
-            // Ensure root landing always synced (user request: auto update without manual work)
             $panelRoot = realpath(__DIR__ . '/..');
             if ($panelRoot) {
                 self::syncRootLanding($panelRoot);
@@ -776,7 +740,6 @@ class Updater {
     public static function ensureConnectixDriverFixed($pdo = null): void {
         try {
             if (!$pdo) $pdo = Database::getConnection();
-            // Fix servers with old seller-api URL or connectix.vip URL that have wrong driver
             $stmt = $pdo->query("SELECT id, driver, api_url, is_active FROM server_nodes WHERE api_url LIKE '%connectix.vip%'");
             $rows = $stmt->fetchAll();
             foreach ($rows as $r) {
@@ -797,11 +760,9 @@ class Updater {
     public static function ensureCustomerNamesFixed($pdo = null): void {
         try {
             if (!$pdo) $pdo = Database::getConnection();
-            // Always fix empty customer_name - no once-per-day limit for this critical UX
             $countEmpty = (int)$pdo->query("SELECT COUNT(*) FROM clients WHERE customer_name IS NULL OR customer_name = '' OR TRIM(customer_name) = ''")->fetchColumn();
             if ($countEmpty === 0) return;
 
-            // Try to build VIP map from Connectix Seller server
             $vipMap = [];
             try {
                 $vipServer = $pdo->query("SELECT * FROM server_nodes WHERE driver = 'connectix_seller' LIMIT 1")->fetch();
@@ -822,7 +783,6 @@ class Updater {
                 }
             } catch (Throwable $e) {}
 
-            // First: copy from VIP where username matches
             if (!empty($vipMap)) {
                 $stmt = $pdo->query("SELECT id, username FROM clients WHERE customer_name IS NULL OR customer_name = '' OR TRIM(customer_name) = '' LIMIT 500");
                 $rows = $stmt->fetchAll();
@@ -834,19 +794,11 @@ class Updater {
                 }
             }
 
-            // Second: for remaining empties, set customer_name = username as fallback - ALWAYS, not once per day
-            // This ensures professional display like VIP panel (avatar + name)
             $pdo->exec("UPDATE clients SET customer_name = username WHERE customer_name IS NULL OR customer_name = '' OR TRIM(customer_name) = ''");
             Setting::set('last_customer_name_autofix', (string)time());
         } catch (Throwable $e) {}
     }
 
-    /**
-     * Quality gate: find the CI workflow run for a given commit SHA.
-     * Returns the matching run array (with status/conclusion/html_url),
-     * ['not_found' => true] when no run exists for the workflow on this SHA,
-     * or null when the API itself could not be reached.
-     */
     public static function getActionsRunForSha(string $sha, string $workflowPath = '.github/workflows/panel-ci.yml'): ?array {
         if (strlen($sha) < 7 || !preg_match('/^[0-9a-f]{7,40}$/i', $sha)) {
             return null;
@@ -866,11 +818,6 @@ class Updater {
         return ['not_found' => true];
     }
 
-    /**
-     * Resolve the CI state for a SHA: 'green' | 'red' | 'pending' | 'unknown'.
-     * 'unknown' (no CI run found / API unreachable) keeps the legacy
-     * apply-now behavior so a missing workflow never bricks the pipeline.
-     */
     public static function ciStateForSha(string $sha): string {
         $run = self::getActionsRunForSha($sha);
         if ($run === null || !empty($run['not_found'])) {
@@ -891,8 +838,6 @@ class Updater {
     }
 
     public static function githubRequest(string $url, string $token = ''): ?array {
-        // Unique bust per call: transparent egress caches may otherwise serve
-        // stale GitHub API responses (seen: update blocked for minutes).
         $sep = (strpos($url, '?') === false) ? '?' : '&';
         $url = $url . $sep . 'cb=' . (string)time() . rand(1000, 9999);
 
@@ -919,7 +864,6 @@ class Updater {
         curl_close($ch);
 
         if ($code === 401 && !empty($token)) {
-            // Token expired or invalid, retry as clean public request
             return self::githubRequest($url, '');
         }
 

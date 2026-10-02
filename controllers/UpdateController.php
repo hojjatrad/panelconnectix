@@ -22,11 +22,23 @@ class UpdateController {
         Auth::requireAdmin();
         $updateInfo = Updater::checkForUpdates(true);
 
+        // v6.8.3: Sanitize - never show commit-xxxx
+        $sanitize = function($v) {
+            $v = trim((string)$v);
+            if (str_starts_with($v, 'commit-')) return Updater::CURRENT_VERSION;
+            if (preg_match('/^[0-9a-f]{7,40}$/i', $v)) return Updater::CURRENT_VERSION;
+            $v = ltrim($v, 'vV');
+            if (empty($v) || $v === 'commit') return Updater::CURRENT_VERSION;
+            return $v;
+        };
+
         if ($updateInfo['has_update']) {
-            $latestFull = $updateInfo['latest_version_full'] ?? ("Connectix v" . ($updateInfo['latest_version'] ?? Updater::getCurrentVersion()));
+            $lv = $sanitize($updateInfo['latest_version'] ?? Updater::CURRENT_VERSION);
+            $latestFull = "Connectix v{$lv}";
             Helpers::flash('info', "🎉 نسخه جدید {$latestFull} در گیت‌هاب در دسترس است! لطفاً جهت اعمال دکمه به‌روزرسانی را لمس کنید.");
         } else {
-            $currentFull = $updateInfo['current_version_full'] ?? ("Connectix v" . ($updateInfo['current_version'] ?? Updater::getCurrentVersion()));
+            $cv = $sanitize($updateInfo['current_version'] ?? Updater::CURRENT_VERSION);
+            $currentFull = "Connectix v{$cv}";
             Helpers::flash('success', "✅ {$currentFull} - پنل شما به‌روز است");
         }
 

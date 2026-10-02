@@ -463,7 +463,7 @@ if (!function_exists('isActiveRoute')) {
             </div>
         <?php endif; ?>
 
-        <!-- GitHub New Version Available Banner for Admin -->
+        <!-- GitHub New Version Available Banner for Admin - v6.8.3: Never show commit-xxxx -->
         <?php 
         if (Auth::isAdmin() && class_exists('Updater')) {
             $cachedUpdate = Setting::get('update_check_cache');
@@ -473,9 +473,27 @@ if (!function_exists('isActiveRoute')) {
                 $updateObj = Updater::checkForUpdates(false);
             } else {
                 $updateObj = json_decode($cachedUpdate, true);
+                // v6.8.3: If cached contains commit-xxxx, force refresh and sanitize
+                if (is_array($updateObj)) {
+                    $lv = $updateObj['latest_version'] ?? '';
+                    if (is_string($lv) && (str_starts_with($lv, 'commit-') || preg_match('/^[0-9a-f]{7,40}$/i', $lv))) {
+                        Setting::set('update_check_cache', '');
+                        Setting::set('update_check_time', '0');
+                        $updateObj = Updater::checkForUpdates(true);
+                    }
+                }
             }
 
             if (!empty($updateObj['has_update'])):
+                // Sanitize version for display - NEVER show commit-xxxx
+                $displayVer = $updateObj['latest_version'] ?? Updater::CURRENT_VERSION;
+                if (is_string($displayVer) && (str_starts_with($displayVer, 'commit-') || preg_match('/^[0-9a-f]{7,40}$/i', $displayVer))) {
+                    $displayVer = $updateObj['current_version'] ?? Updater::CURRENT_VERSION;
+                    $displayVer = ltrim($displayVer, 'vV');
+                    if (str_starts_with($displayVer, 'commit-')) $displayVer = Updater::CURRENT_VERSION;
+                }
+                $displayVer = ltrim((string)$displayVer, 'vV');
+                if (empty($displayVer) || $displayVer === 'commit') $displayVer = Updater::CURRENT_VERSION;
         ?>
             <div class="mx-6 mt-4 p-3.5 bg-gradient-to-r from-purple-900/80 via-indigo-900/80 to-slate-900/90 border border-purple-500/50 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xl text-xs">
                 <div class="flex items-center gap-3">
@@ -483,8 +501,8 @@ if (!function_exists('isActiveRoute')) {
                         <i class="fa-solid fa-cloud-arrow-down animate-bounce"></i>
                     </div>
                     <div>
-                        <h4 class="font-bold text-white">🎉 نگارش جدید Connectix v<?= htmlspecialchars($updateObj['latest_version']) ?> منتشر شد</h4>
-                        <p class="text-[11px] text-purple-200 mt-0.5"><?= htmlspecialchars($updateObj['release_title'] ?? '') ?></p>
+                        <h4 class="font-bold text-white">🎉 نگارش جدید Connectix v<?= htmlspecialchars($displayVer) ?> منتشر شد</h4>
+                        <p class="text-[11px] text-purple-200 mt-0.5"><?= htmlspecialchars($updateObj['release_title'] ?? "نسخه جدید Connectix v{$displayVer} در دسترس است") ?></p>
                     </div>
                 </div>
                 <div class="flex items-center gap-2 shrink-0">

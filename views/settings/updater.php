@@ -27,12 +27,29 @@ require __DIR__ . '/../layout/header.php';
     <!-- Status & 1-Click Update Card -->
     <div class="lg:col-span-2 space-y-6">
         <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-sm space-y-5">
+            <?php
+            // v6.8.3: Sanitize all versions for display - NEVER show commit-xxxx
+            $sanitize = function($v) {
+                $v = trim((string)$v);
+                if (str_starts_with($v, 'commit-')) return Updater::CURRENT_VERSION;
+                if (preg_match('/^[0-9a-f]{7,40}$/i', $v)) return Updater::CURRENT_VERSION;
+                $v = ltrim($v, 'vV');
+                if (empty($v) || $v === 'commit') return Updater::CURRENT_VERSION;
+                return $v;
+            };
+            $displayCurrent = $sanitize($currentVersion);
+            $displayLatest = $sanitize($updateInfo['latest_version'] ?? $displayCurrent);
+            $displayCurrentFull = "Connectix v{$displayCurrent}";
+            $displayLatestFull = "Connectix v{$displayLatest}";
+            ?>
             <div class="flex items-center justify-between border-b border-slate-800 pb-4">
                 <div>
                     <span class="text-xs text-slate-400 block mb-1">نگارش نصب‌شده بر روی هاست:</span>
-                    <span class="text-xl font-black text-white font-mono">Connectix v<?= $currentVersion ?></span>
-                    <?php if (!empty($updateInfo['short_sha'])): ?>
-                    <span class="text-[10px] text-slate-500 font-mono block mt-1">commit-<?= htmlspecialchars($updateInfo['short_sha']) ?></span>
+                    <span class="text-xl font-black text-white font-mono"><?= htmlspecialchars($displayCurrentFull) ?></span>
+                    <?php if (!empty($updateInfo['short_sha'])): 
+                        $shaClean = preg_replace('/[^0-9a-f]/i', '', $updateInfo['short_sha']);
+                    ?>
+                    <span class="text-[10px] text-slate-500 font-mono block mt-1"><?= htmlspecialchars($shaClean) ?></span>
                     <?php endif; ?>
                 </div>
                 <div class="text-left">
@@ -51,8 +68,8 @@ require __DIR__ . '/../layout/header.php';
                             <i class="fa-solid fa-cloud-arrow-down animate-bounce"></i>
                         </div>
                         <div>
-                            <h3 class="font-bold text-sm text-white">🎉 نگارش جدید در گیت‌هاب منتشر شد: <span class="font-mono text-purple-300">Connectix v<?= $updateInfo['latest_version'] ?></span></h3>
-                            <p class="text-xs text-purple-200/80 mt-1"><?= htmlspecialchars($updateInfo['release_title'] ?? '') ?></p>
+                            <h3 class="font-bold text-sm text-white">🎉 نگارش جدید در گیت‌هاب منتشر شد: <span class="font-mono text-purple-300"><?= htmlspecialchars($displayLatestFull) ?></span></h3>
+                            <p class="text-xs text-purple-200/80 mt-1"><?= htmlspecialchars($updateInfo['release_title'] ?? "نسخه جدید {$displayLatestFull} در دسترس است") ?></p>
                             <span class="text-[10px] text-purple-300 block font-mono mt-0.5">تاریخ انتشار: <?= $updateInfo['published_at'] ?></span>
                         </div>
                     </div>
@@ -67,7 +84,7 @@ require __DIR__ . '/../layout/header.php';
                     <div>
                         <button type="button" onclick="startLiveUpdate()" id="btnStartUpdate" class="w-full py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-xl text-xs transition-all shadow-lg shadow-purple-900/40 flex items-center justify-center gap-2 cursor-pointer">
                             <i class="fa-solid fa-rocket text-sm"></i>
-                            <span>شروع به‌روزرسانی آنی به نسخه Connectix v<?= $updateInfo['latest_version'] ?> (همراه با نوار پیشرفت زنده)</span>
+                            <span>شروع به‌روزرسانی آنی به نسخه <?= htmlspecialchars($displayLatestFull) ?> (همراه با نوار پیشرفت زنده)</span>
                         </button>
                     </div>
                 </div>
