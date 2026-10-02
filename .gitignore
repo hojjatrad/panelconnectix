@@ -16,3 +16,5 @@ Thumbs.db
 data/panel.sqlite
 data/*.sqlite
 *.log
+.github_token_secret
+.github_token

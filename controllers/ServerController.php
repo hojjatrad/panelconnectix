@@ -97,13 +97,56 @@ class ServerController {
 
                 $isVip = !empty($_POST['is_vip']) ? 1 : 0;
         $autoImport = !empty($_POST['auto_import_plans']) ? 1 : 0;
+        $priceMultiplier = isset($_POST['price_multiplier']) ? floatval($_POST['price_multiplier']) : 1.0;
+        $region = trim($_POST['region'] ?? '');
         if (!$isVip) {
             $lowerName = mb_strtolower($name, 'UTF-8');
-            if (str_contains($lowerName, 'ویژه') || str_contains($lowerName, 'vip') || $driver === 'connectix_seller') {
+            if (str_contains($lowerName, 'ویژه') || str_contains($lowerName, 'vip') || $driver === 'connectix_seller' || $driver === 'pasargad') {
                 $isVip = 1;
             }
         }
         Database::ensureExtendedTablesExist($pdo);
+
+        // NEW v6.8.0: Auto-detect server category from API groups
+        $autoDetected = null;
+        try {
+            require_once __DIR__ . '/../core/Provisioner.php';
+            require_once __DIR__ . '/../drivers/DriverFactory.php';
+            $tempServer = [
+                'name' => $name,
+                'driver' => $driver,
+                'api_url' => $apiUrl,
+                'api_username' => $username,
+                'api_password' => $password,
+                'api_token' => $token,
+                'sub_domain' => $subDomain
+            ];
+            $drv = DriverFactory::create($tempServer);
+            if ($drv->authenticate()) {
+                $groups = [];
+                if (method_exists($drv, 'getVipPlans')) {
+                    $vipData = $drv->getVipPlans();
+                    $groups = $vipData['groups'] ?? [];
+                } else {
+                    // For Pasargad, try to get groups via API if permitted
+                    try {
+                        $res = $drv->request('/api/groups');
+                        if (!empty($res['data']) && is_array($res['data'])) $groups = $res['data'];
+                    } catch (Throwable $e) {}
+                }
+                $autoDetected = Provisioner::autoDetectServerCategory($tempServer, $groups);
+                if (!empty($autoDetected['server_group']) && $serverGroup === 'default') {
+                    $serverGroup = $autoDetected['server_group'];
+                }
+                if (!empty($autoDetected['region']) && empty($region)) {
+                    $region = $autoDetected['region'];
+                }
+                if (!empty($autoDetected['is_vip'])) {
+                    $isVip = 1;
+                }
+            }
+        } catch (Throwable $e) {}
+
         // Smart category handling — find existing category instead of creating duplicate
         if (!$categoryId && !empty($serverGroup) && $serverGroup !== 'default') {
             try {
@@ -116,9 +159,10 @@ class ServerController {
             } catch (Throwable $e) {}
         }
 
-        $stmt = $pdo->prepare("INSERT INTO server_nodes (name, driver, api_url, api_username, api_password, api_token, server_group, category_id, sub_domain, max_clients, config_template, selected_inbounds, is_vip, auto_import_plans) 
-                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->execute([$name, $driver, $apiUrl, $username, $password, $token, $serverGroup, $categoryId, $subDomain, $maxClients, $configTemplate, $selectedInbounds, $isVip, $autoImport]);
+        $stmt = $pdo->prepare("INSERT INTO server_nodes (name, driver, api_url, api_username, api_password, api_token, server_group, category_id, sub_domain, max_clients, config_template, selected_inbounds, is_vip, auto_import_plans, price_multiplier, region, seller_code) 
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $sellerCode = $autoDetected['seller_code'] ?? null;
+        $stmt->execute([$name, $driver, $apiUrl, $username, $password, $token, $serverGroup, $categoryId, $subDomain, $maxClients, $configTemplate, $selectedInbounds, $isVip, $autoImport, $priceMultiplier, $region ?: ($autoDetected['region'] ?? null), $sellerCode]);
         $newServerId = (int)$pdo->lastInsertId();
 
         // Auto import plans if requested

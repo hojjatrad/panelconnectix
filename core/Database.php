@@ -440,6 +440,12 @@ class Database {
                 'auto_import_plans' => 'TINYINT(1) DEFAULT 0',
                 'last_sync_at' => 'DATETIME NULL',
                 'sync_enabled' => 'TINYINT(1) DEFAULT 1',
+                'price_multiplier' => 'DECIMAL(4,2) DEFAULT 1.00',
+                'region' => 'VARCHAR(32) NULL',
+                'seller_code' => 'VARCHAR(16) NULL',
+                'custom_prefix' => 'VARCHAR(8) NULL',
+                'priority' => 'INT DEFAULT 0',
+                'auto_detect_category' => 'TINYINT(1) DEFAULT 1',
             ];
             foreach ($serverCols as $c => $d) {
                 self::safeAddColumn($pdo, 'server_nodes', $c, $d);

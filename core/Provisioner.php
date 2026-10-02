@@ -368,6 +368,95 @@ class Provisioner {
     }
 
     /**
+     * NEW v6.8.0: Auto-detect server from category/type
+     * When user adds server, system auto-detects its category (economic/ویژه) from API groups and assigns
+     */
+    public static function autoDetectServerCategory(array $server, array $apiGroups = []): array {
+        $detected = [
+            'server_group' => 'default',
+            'is_vip' => 0,
+            'region' => null,
+            'seller_code' => null,
+        ];
+
+        $name = strtolower($server['name'] ?? '');
+        $url = strtolower($server['api_url'] ?? '');
+
+        // Detect VIP from name
+        if (str_contains($name, 'ویژه') || str_contains($name, 'vip') || str_contains($url, 'connectix.vip') || str_contains($url, 'speedur')) {
+            $detected['is_vip'] = 1;
+        }
+
+        // Detect group from API groups
+        if (!empty($apiGroups)) {
+            foreach ($apiGroups as $g) {
+                $gName = strtolower($g['name'] ?? '');
+                if (str_contains($gName, 'economic')) {
+                    $detected['server_group'] = 'economic';
+                    break;
+                } elseif (str_contains($gName, 'iran')) {
+                    $detected['server_group'] = 'iran_access';
+                    break;
+                } elseif ($gName === 'default') {
+                    $detected['server_group'] = 'default';
+                }
+            }
+        }
+
+        // Detect region from URL or name
+        if (str_contains($url, 'speedur') || str_contains($name, 'speedur')) {
+            $detected['region'] = 'TR';
+            $detected['seller_code'] = 'speedur';
+        } elseif (str_contains($url, 'irancdn') || str_contains($name, 'iran')) {
+            $detected['region'] = 'IR';
+        } elseif (str_contains($url, 'connectix') || str_contains($name, 'novin')) {
+            $detected['region'] = 'DE';
+            $detected['seller_code'] = '8cl';
+        }
+
+        return $detected;
+    }
+
+    /**
+     * NEW v6.8.0: Find best server by plan category (Type->Month) - for multi-server auto selection
+     */
+    public static function findBestServerByPlan(int $planId, ?PDO $pdo = null): ?array {
+        if (!$pdo) $pdo = Database::getConnection();
+        $stmt = $pdo->prepare("SELECT * FROM plans WHERE id = ?");
+        $stmt->execute([$planId]);
+        $plan = $stmt->fetch();
+        if (!$plan) return self::findBestServer('default', $pdo);
+
+        // If plan is bound to specific server, use it
+        if (!empty($plan['server_id'])) {
+            $stmt = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ? AND is_active = 1");
+            $stmt->execute([(int)$plan['server_id']]);
+            $srv = $stmt->fetch();
+            if ($srv && $srv['driver'] !== 'mock') return $srv;
+        }
+
+        // Find by server_group + category
+        $group = $plan['server_group'] ?? 'default';
+        $categoryId = $plan['category_id'] ?? null;
+
+        // Try to find server that has plans in same category
+        if ($categoryId) {
+            $stmt = $pdo->prepare("SELECT s.*, (SELECT COUNT(*) FROM clients WHERE server_id = s.id) as client_count 
+                                   FROM server_nodes s 
+                                   JOIN plans p ON p.server_id = s.id 
+                                   WHERE s.is_active = 1 AND s.driver != 'mock' 
+                                   AND p.category_id = ? AND (s.health_status != 'offline' OR s.health_status IS NULL)
+                                   ORDER BY client_count ASC, COALESCE(s.latency_ms, 999) ASC LIMIT 1");
+            $stmt->execute([$categoryId]);
+            $srv = $stmt->fetch();
+            if ($srv) return $srv;
+        }
+
+        // Fallback to group-based
+        return self::findBestServer($group, $pdo);
+    }
+
+    /**
      * Find best healthy server with automatic failover and lowest latency — v4.0 ultra fast (0.05s)
      */
     public static function findBestServer(string $clusterGroup = 'default', ?PDO $pdo = null): ?array {
