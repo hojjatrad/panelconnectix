@@ -23,9 +23,11 @@ class UpdateController {
         $updateInfo = Updater::checkForUpdates(true);
 
         if ($updateInfo['has_update']) {
-            Helpers::flash('info', "نسخه جدید {$updateInfo['latest_version']} در گیت‌هاب در دسترس است! لطفاً جهت اعمال دکمه به‌روزرسانی را لمس کنید.");
+            $latestFull = $updateInfo['latest_version_full'] ?? ("Connectix v" . ($updateInfo['latest_version'] ?? Updater::getCurrentVersion()));
+            Helpers::flash('info', "🎉 نسخه جدید {$latestFull} در گیت‌هاب در دسترس است! لطفاً جهت اعمال دکمه به‌روزرسانی را لمس کنید.");
         } else {
-            Helpers::flash('success', "پنل شما به‌روز است. نگارش فعال: " . ($updateInfo['current_version'] ?? Updater::getCurrentVersion()));
+            $currentFull = $updateInfo['current_version_full'] ?? ("Connectix v" . ($updateInfo['current_version'] ?? Updater::getCurrentVersion()));
+            Helpers::flash('success', "✅ {$currentFull} - پنل شما به‌روز است");
         }
 
         Helpers::redirect('updater');

@@ -483,7 +483,7 @@ if (!function_exists('isActiveRoute')) {
                         <i class="fa-solid fa-cloud-arrow-down animate-bounce"></i>
                     </div>
                     <div>
-                        <h4 class="font-bold text-white">🎉 نگارش جدید در گیت‌هاب منتشر شد (نسخه <?= htmlspecialchars($updateObj['latest_version']) ?>)</h4>
+                        <h4 class="font-bold text-white">🎉 نگارش جدید Connectix v<?= htmlspecialchars($updateObj['latest_version']) ?> منتشر شد</h4>
                         <p class="text-[11px] text-purple-200 mt-0.5"><?= htmlspecialchars($updateObj['release_title'] ?? '') ?></p>
                     </div>
                 </div>

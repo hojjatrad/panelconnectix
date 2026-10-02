@@ -4,7 +4,7 @@ require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Setting.php';
 
 class Updater {
-    public const CURRENT_VERSION = '6.8.1'; // Phase 1+2 Performance Optimization - fix cache warmup
+    public const CURRENT_VERSION = '6.8.2'; // Phase 1+2 Performance Optimization - fix cache warmup
 
     public static function getCurrentVersion(): string {
         $dbVer = Setting::get('current_version', '');
@@ -150,16 +150,31 @@ class Updater {
 
             $hasUpdate = empty($lastInstalledSha) || ($lastInstalledSha !== $shortSha);
 
+            // NEW v6.8.2: Always show proper Connectix version name, not commit hash
+            // User wants "Connectix vX" format, not "commit-xxxx"
+            $displayCurrent = $currentVer;
+            // If lastInstalledSha looks like a commit hash, still show version + short hash for debugging, but primary is version
+            if (!empty($lastInstalledSha) && strlen($lastInstalledSha) >= 7 && !str_starts_with($lastInstalledSha, 'vip_') && !str_starts_with($lastInstalledSha, 'auto_')) {
+                // It's a real git SHA, show version as primary
+                $displayCurrent = $currentVer;
+            } elseif (!empty($lastInstalledSha) && (str_starts_with($lastInstalledSha, 'vip_') || str_starts_with($lastInstalledSha, 'auto_'))) {
+                // It's our custom marker (vip_sync_...), show version
+                $displayCurrent = $currentVer;
+            }
+
             $result = [
                 'has_update' => $hasUpdate,
-                'current_version' => !empty($lastInstalledSha) ? "commit-{$lastInstalledSha}" : $currentVer,
-                'latest_version' => "commit-{$shortSha}",
-                'release_title' => "آخرین تغییرات شاخه {$branch}",
+                'current_version' => $displayCurrent,
+                'current_version_full' => "Connectix v{$currentVer}" . (!empty($shortSha) ? " (commit-{$shortSha})" : ""),
+                'latest_version' => $hasUpdate ? $currentVer : $currentVer,
+                'latest_version_full' => "Connectix v{$currentVer}",
+                'release_title' => $hasUpdate ? "نسخه جدید Connectix v{$currentVer} در دسترس است" : "Connectix v{$currentVer} - به‌روز",
                 'changelog' => $commitRes['commit']['message'] ?? 'آخرین تغییرات مستقیم مخزن گیت‌هاب',
                 'download_url' => "https://github.com/{$repo}/archive/refs/heads/{$branch}.zip",
                 'published_at' => $commitRes['commit']['committer']['date'] ?? date('Y-m-d H:i:s'),
                 'checked_at' => date('Y-m-d H:i:s'),
-                'type' => 'commit'
+                'type' => $hasUpdate ? 'commit' : 'current',
+                'short_sha' => $shortSha
             ];
 
             Setting::set('update_check_cache', json_encode($result));
@@ -170,9 +185,11 @@ class Updater {
         return [
             'has_update' => false,
             'current_version' => $currentVer,
+            'current_version_full' => "Connectix v{$currentVer}",
             'latest_version' => $currentVer,
-            'release_title' => "نگارش فعال v{$currentVer}",
-            'changelog' => 'سامانه هم‌اکنون از آخرین کدهای رسمی استفاده می‌کند.',
+            'latest_version_full' => "Connectix v{$currentVer}",
+            'release_title' => "Connectix v{$currentVer} - پنل شما به‌روز است",
+            'changelog' => 'سامانه هم‌اکنون از آخرین نسخه Connectix استفاده می‌کند.',
             'download_url' => "https://github.com/{$repo}/archive/refs/heads/{$branch}.zip",
             'published_at' => date('Y-m-d H:i:s'),
             'checked_at' => date('Y-m-d H:i:s'),
