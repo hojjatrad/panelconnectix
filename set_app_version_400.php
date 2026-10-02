@@ -38,8 +38,22 @@ $version = $manifest['version'] ?? '4.0.0';
 $code = $manifest['code'] ?? '40';
 $title = $manifest['title'] ?? 'Connectix VPN 4.0.0 - Speed & Domain Independence';
 $changelog = $manifest['changelog'] ?? 'نسخه 4.0.0 - سرعت فوق‌العاده + استقلال دامنه';
+// v4.0.0 APKs are being built by GitHub Actions (takes 10-20 min), fallback to v3.6.1 or panel mirrored files
 $apkArm64 = $manifest['apk']['arm64'] ?? "https://github.com/hojjatrad/panelconnectix/releases/download/v{$version}/Connectix-Android-ARM64.apk";
 $apkUniversal = $manifest['apk']['universal'] ?? "https://github.com/hojjatrad/panelconnectix/releases/download/v{$version}/Connectix-Android-Universal.apk";
+// If v4.0.0 APKs don't exist yet on GitHub, use v3.6.1 as temporary (still shows update dialog with new changelog)
+if (!@file_get_contents($apkArm64, false, stream_context_create(['http'=>['method'=>'HEAD','timeout'=>2]]))) {
+    // Fallback to panel's own mirrored APK (works inside Iran) or v3.6.1
+    $panelDomain = $_SERVER['HTTP_HOST'] ?? 'vpbotn.ir';
+    $proto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'https://';
+    $apkArm64 = $proto . $panelDomain . (defined('BASE_PATH') ? BASE_PATH : '') . '/Connectix-ARM64-v8a.apk';
+    $apkUniversal = $proto . $panelDomain . (defined('BASE_PATH') ? BASE_PATH : '') . '/Connectix-Universal.apk';
+    // If those don't exist, use v3.6.1 GitHub URLs (guaranteed to exist)
+    if (!file_exists(__DIR__ . '/Connectix-ARM64-v8a.apk')) {
+        $apkArm64 = "https://github.com/hojjatrad/panelconnectix/releases/download/v3.6.1/Connectix-Android-ARM64.apk";
+        $apkUniversal = "https://github.com/hojjatrad/panelconnectix/releases/download/v3.6.1/Connectix-Android-Universal.apk";
+    }
+}
 $winVer = $manifest['windows']['version'] ?? $version;
 $winUrl = $manifest['windows']['url'] ?? "https://github.com/hojjatrad/panelconnectix/releases/download/v{$version}/Connectix-Windows-x64.zip";
 $iosVer = $manifest['ios']['version'] ?? $version;
