@@ -1594,6 +1594,25 @@ class TelegramBotController {
             return;
         }
 
+        // B2: Smart Search - e.g. "50 گیگ یکماهه", "100 گیگ"
+        if (preg_match('/\d+\s*(گیگ|gb|ماه|روز)/i', $text) || strpos($text, 'گیگ') !== false || strpos($text, 'ماهه') !== false) {
+            try {
+                require_once __DIR__ . '/../core/BotSearch.php';
+                $plans = BotSearch::searchPlans($text);
+                if (!empty($plans)) {
+                    $msg = "🔍 <b>نتایج جستجو برای:</b> \"$text\"\n\n";
+                    $keyboard = [];
+                    foreach ($plans as $plan) {
+                        $msg .= "📦 {$plan['name']} - " . number_format($plan['price']) . " تومان ({$plan['volume_gb']}GB / {$plan['days']} روز)\n";
+                        $keyboard[] = [['text' => "🛒 {$plan['name']}", 'callback_data' => 'buy_plan_' . $plan['id']]];
+                    }
+                    $keyboard[] = [['text' => '⬅️ بازگشت', 'callback_data' => 'main_menu']];
+                    TelegramBot::sendMessage($msg, $chatId, ['inline_keyboard' => $keyboard]);
+                    return;
+                }
+            } catch (Throwable $e) {}
+        }
+
         // Web Panel Credentials Button / Commands
         if ($text === '🔐 ورود به پنل وب' || $text === '/panel' || $text === '/login' || $text === 'پنل' || $text === 'ورود به پنل') {
             self::showPanelCredentials($pdo, $chatId, $fromId);

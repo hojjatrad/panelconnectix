@@ -47,7 +47,38 @@ if (!function_exists('isActiveRoute')) {
     $localFA = __DIR__ . '/../../assets/css/fontawesome.min.css';
     $localVazir = __DIR__ . '/../../assets/css/vazirmatn.css';
     $localChart = __DIR__ . '/../../assets/js/chart.min.js';
+    $localCompiled = __DIR__ . '/../../assets/css/tailwind-compiled.css';
     ?>
+    <!-- O6: Preload dashboard stats via AJAX for 0.3s initial load -->
+    <script>
+    window.ConnectixStats = {
+        load: function() {
+            fetch('<?= Helpers::url('api/dashboard_stats') ?>'.replace('/contax/api/', '/contax/api/dashboard_stats.php?').replace('api/dashboard_stats', 'api/dashboard_stats.php'), {credentials: 'same-origin'})
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        // Update overview cards if they exist
+                        const els = {
+                            'today_sales': data.overview.today_sales,
+                            'today_revenue': data.overview.today_revenue,
+                            'active_clients': data.overview.active_clients,
+                            'expiring_soon': data.overview.expiring_soon
+                        };
+                        for (const [k,v] of Object.entries(els)) {
+                            const el = document.getElementById('stat-'+k);
+                            if (el) el.textContent = v;
+                        }
+                        console.log('Dashboard stats loaded in', data.overview ? 'fast' : 'slow', data.generated_at);
+                    }
+                })
+                .catch(e => console.log('Stats load failed', e));
+        }
+    };
+    // Auto load on dashboard
+    if (window.location.href.includes('dashboard')) {
+        document.addEventListener('DOMContentLoaded', () => setTimeout(window.ConnectixStats.load, 300));
+    }
+    </script>
     <?php if (file_exists($localTailwind)): ?>
     <script src="<?= $base ?>/assets/js/tailwind.js"></script>
     <?php else: ?>
