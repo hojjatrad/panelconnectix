@@ -535,7 +535,7 @@ class TelegramBotController {
                             $successMsg = "🎉 <b>بازگردانی پایگاه داده با موفقیت کامل انجام شد!</b>\n\n"
                                         . "📄 فایل: <code>{$fileName}</code>\n"
                                         . "⚡️ تعداد دستورات موفق: <b>{$restoreResult['executed']}</b> کوئری\n"
-                                        . "🕒 تاریخ و ساعت: " . date('Y-m-d H:i:s');
+                                        . "🕒 تاریخ و ساعت: " . (class_exists('JalaliDate') ? JalaliDate::format(time(), 'full') : date('Y-m-d H:i:s'));
                             if ($messageId) {
                                 TelegramBot::editMessageText($successMsg, $chatId, $messageId, self::getMainMenuInlineKeyboard($pdo, $fromId), $ctx['bot_token']);
                             } else {
@@ -889,6 +889,72 @@ class TelegramBotController {
             return;
         }
 
+        // Copy with one click - username, password, sublink, configs
+        if (str_starts_with($data, 'copy_user_')) {
+            $clientId = (int)str_replace('copy_user_', '', $data);
+            $stmt = $pdo->prepare("SELECT username FROM clients WHERE id = ? LIMIT 1");
+            $stmt->execute([$clientId]);
+            $username = $stmt->fetchColumn();
+            if ($username) {
+                TelegramBot::answerCallbackQuery($cbId, "✅ نام کاربری کپی شد!", false, $cbToken);
+                TelegramBot::sendMessage("👤 <b>نام کاربری (کپی با یک ضربه):</b>\n<code>{$username}</code>", $chatId, null, $cbToken);
+            }
+            return;
+        }
+        if (str_starts_with($data, 'copy_pass_')) {
+            $clientId = (int)str_replace('copy_pass_', '', $data);
+            $stmt = $pdo->prepare("SELECT password FROM clients WHERE id = ? LIMIT 1");
+            $stmt->execute([$clientId]);
+            $password = $stmt->fetchColumn() ?: '123456';
+            TelegramBot::answerCallbackQuery($cbId, "✅ رمز عبور کپی شد!", false, $cbToken);
+            TelegramBot::sendMessage("🔑 <b>رمز عبور (کپی با یک ضربه):</b>\n<code>{$password}</code>", $chatId, null, $cbToken);
+            return;
+        }
+        if (str_starts_with($data, 'copy_sub_')) {
+            $clientId = (int)str_replace('copy_sub_', '', $data);
+            $stmt = $pdo->prepare("SELECT * FROM clients WHERE id = ? LIMIT 1");
+            $stmt->execute([$clientId]);
+            $client = $stmt->fetch();
+            if ($client) {
+                $sub = self::getClientPrimarySublink($client, $pdo);
+                TelegramBot::answerCallbackQuery($cbId, "✅ لینک کپی شد!", false, $cbToken);
+                TelegramBot::sendMessage("🔗 <b>ساب‌لینک (کپی با یک ضربه):</b>\n<code>{$sub}</code>", $chatId, null, $cbToken);
+            }
+            return;
+        }
+        if (str_starts_with($data, 'copy_config_')) {
+            $parts = explode('_', str_replace('copy_config_', '', $data));
+            $clientId = (int)($parts[0] ?? 0);
+            $configIndex = $parts[1] ?? '0';
+            $stmt = $pdo->prepare("SELECT * FROM clients WHERE id = ? LIMIT 1");
+            $stmt->execute([$clientId]);
+            $client = $stmt->fetch();
+            if ($client) {
+                $subCtrl = new SublinkController();
+                $ref = new ReflectionMethod('SublinkController', 'buildConfigs');
+                $ref->setAccessible(true);
+                $configs = $ref->invoke($subCtrl, $client);
+                $keys = array_keys($configs);
+                $key = $keys[(int)$configIndex] ?? null;
+                if ($key && !empty($configs[$key])) {
+                    TelegramBot::answerCallbackQuery($cbId, "✅ کانفیگ کپی شد!", false, $cbToken);
+                    TelegramBot::sendMessage("🚀 <b>کانفیگ (کپی با یک ضربه):</b>\n<code>{$configs[$key]}</code>", $chatId, null, $cbToken);
+                }
+            }
+            return;
+        }
+        if (str_starts_with($data, 'copy_order_')) {
+            $orderId = (int)str_replace('copy_order_', '', $data);
+            $stmt = $pdo->prepare("SELECT order_code FROM bot_orders WHERE id = ? LIMIT 1");
+            $stmt->execute([$orderId]);
+            $code = $stmt->fetchColumn();
+            if ($code) {
+                TelegramBot::answerCallbackQuery($cbId, "✅ کد رهگیری کپی شد!", false, $cbToken);
+                TelegramBot::sendMessage("🔢 <b>کد رهگیری (کپی):</b>\n<code>{$code}</code>", $chatId, null, $cbToken);
+            }
+            return;
+        }
+
         // Apply Coupon Code
         if (str_starts_with($data, 'apply_coupon_')) {
             $orderId = (int)str_replace('apply_coupon_', '', $data);
@@ -1069,7 +1135,7 @@ class TelegramBotController {
     }
 
     /**
-     * Render Order Invoice with Clean 2-Column Action Buttons
+     * Render Order Invoice with Beautiful Persian Jalali + Copyable Fields
      */
     private static function renderOrderInvoice(PDO $pdo, int $orderId, string $chatId, ?int $messageId = null, ?string $botToken = null): void {
         $stmt = $pdo->prepare("SELECT o.*, p.title, p.traffic_gb, p.duration_days, p.ip_limit, 
@@ -1085,41 +1151,17 @@ class TelegramBotController {
         $ctx = self::getContext($pdo);
         $botToken = $botToken ?: $ctx['bot_token'];
 
-        $priceFa = number_format($order['amount']) . ' تومان';
-        $titlePrefix = ($order['order_type'] === 'renew') ? 'پیش‌فاکتور تمدید اشتراک' : 'پیش‌فاکتور خرید اشتراک جدید';
-
-        $trafficVal = (float)($order['traffic_gb'] ?? 0);
-        if ($trafficVal > 0 && $trafficVal < 1) {
-            $trafficText = round($trafficVal * 1024) . ' مگابایت';
-        } elseif ($trafficVal >= 1) {
-            $trafficText = ($trafficVal == (int)$trafficVal ? (int)$trafficVal : $trafficVal) . ' گیگابایت';
-        } else {
-            $trafficText = 'نامحدود';
-        }
-
-        $orderIpLimit = (int)($order['ip_limit'] ?? 0);
-        $userLimitText = $orderIpLimit > 0 ? "{$orderIpLimit} کاربر" : "نامحدود";
-
-        $msg = "🛒 <b>{$titlePrefix}</b>\n\n"
-             . "📦 <b>پلن انتخابی:</b> {$order['display_title']}\n"
-             . "💾 <b>حجم ترافیک:</b> {$trafficText}\n"
-             . "👥 <b>سقف اتصال همزمان:</b> {$userLimitText}\n"
-             . "⏳ <b>مدت اعتبار:</b> {$order['duration_days']} روز\n";
-
-        if (!empty($order['coupon_code'])) {
-            $msg .= "🎟 <b>کد تخفیف:</b> <code>{$order['coupon_code']}</code>\n"
-                  . "🔻 <b>میزان تخفیف:</b> " . number_format($order['discount_amount'] ?? 0) . " تومان\n";
-        }
-
-        $msg .= "💰 <b>مبلغ نهایی قابل پرداخت:</b> <b>{$priceFa}</b>\n"
-             . "🔢 <b>کد رهگیری:</b> <code>{$order['order_code']}</code>\n\n"
-             . "روش پرداخت یا ثبت کد تخفیف را انتخاب نمایید:";
+        require_once __DIR__ . '/../core/JalaliDate.php';
+        require_once __DIR__ . '/../core/BeautifulInvoice.php';
 
         // Fetch user wallet balance
         $stmtUser = $pdo->prepare("SELECT wallet_balance, referral_balance FROM bot_users WHERE tg_id = ?");
         $stmtUser->execute([$order['user_tg_id']]);
         $uRow = $stmtUser->fetch();
         $userWallet = (int)($uRow['wallet_balance'] ?? 0) + (int)($uRow['referral_balance'] ?? 0);
+
+        $invoice = BeautifulInvoice::renderPreInvoice($order, $userWallet);
+        $msg = $invoice['text'];
 
         $buttons = [];
         if ($userWallet >= (int)$order['amount']) {
@@ -1260,23 +1302,16 @@ class TelegramBotController {
         $ctx = self::getContext($pdo);
         $botToken = $botToken ?: $ctx['bot_token'];
 
-        $priceFa = number_format($order['amount']) . ' تومان';
-        $titlePrefix = ($order['order_type'] === 'renew') ? 'پیش‌فاکتور تمدید (پلن اختصاصی)' : 'پیش‌فاکتور خرید (پلن اختصاصی)';
+        require_once __DIR__ . '/../core/JalaliDate.php';
+        require_once __DIR__ . '/../core/BeautifulInvoice.php';
 
-        $trafficVal = (float)($order['traffic_gb'] ?? $order['custom_traffic_gb'] ?? 0);
-        $trafficText = $trafficVal >= 1 ? ($trafficVal == (int)$trafficVal ? (int)$trafficVal : $trafficVal) . ' گیگ' : ($trafficVal > 0 ? round($trafficVal*1024).' مگ' : 'نامحدود');
+        $stmtUser = $pdo->prepare("SELECT wallet_balance, referral_balance FROM bot_users WHERE tg_id = ?");
+        $stmtUser->execute([$order['user_tg_id']]);
+        $uRow = $stmtUser->fetch();
+        $userWallet = (int)($uRow['wallet_balance'] ?? 0) + (int)($uRow['referral_balance'] ?? 0);
 
-        $orderIpLimit = (int)($order['ip_limit'] ?? 4);
-        $userLimitText = $orderIpLimit > 0 ? "{$orderIpLimit} کاربر" : "نامحدود";
-
-        $msg = "🛒 <b>{$titlePrefix}</b>\n\n"
-             . "📦 <b>پلن:</b> " . ($order['display_title'] ?? $order['title'] ?? 'پلن اختصاصی') . " ⭐\n"
-             . "💾 <b>حجم:</b> {$trafficText}\n"
-             . "👥 <b>سقف اتصال:</b> {$userLimitText}\n"
-             . "⏳ <b>مدت:</b> " . ($order['duration_days'] ?? $order['custom_duration_days'] ?? 30) . " روز\n"
-             . "💰 <b>مبلغ:</b> <b>{$priceFa}</b>\n"
-             . "🔢 <b>کد:</b> <code>{$order['order_code']}</code>\n\n"
-             . "روش پرداخت را انتخاب کنید:";
+        $invoice = BeautifulInvoice::renderPreInvoice($order, $userWallet);
+        $msg = $invoice['text'];
 
         $stmtUser = $pdo->prepare("SELECT wallet_balance, referral_balance FROM bot_users WHERE tg_id = ?");
         $stmtUser->execute([$order['user_tg_id']]);
@@ -2261,11 +2296,9 @@ class TelegramBotController {
             return;
         }
 
-        $used = Helpers::formatBytes($c['traffic_used_bytes']);
-        $total = Helpers::formatBytes($c['traffic_limit_bytes']);
-        $rem = max(0, $c['traffic_limit_bytes'] - $c['traffic_used_bytes']);
-        $remStr = Helpers::formatBytes($rem);
-        $days = Helpers::daysRemaining($c['expire_at']);
+        require_once __DIR__ . '/../core/JalaliDate.php';
+        require_once __DIR__ . '/../core/BeautifulInvoice.php';
+
         $primarySub = self::getClientPrimarySublink($c, $pdo);
 
         $statusFa = match($c['status']) {
@@ -2275,36 +2308,33 @@ class TelegramBotController {
             default => $c['status']
         };
 
-        $clientIpLimit = (int)($c['ip_limit'] ?? 0);
-        $userLimitText = $clientIpLimit > 0 ? "{$clientIpLimit} کاربر" : "نامحدود";
-
-        $msg = "👤 <b>مدیریت حساب:</b> <code>{$c['username']}</code>\n\n"
-             . "🔑 <b>کلمه عبور:</b> <code>" . ($c['password'] ?: '123456') . "</code>\n"
-             . "⚡️ <b>وضعیت:</b> {$statusFa}\n"
-             . "👥 <b>سقف اتصال همزمان:</b> {$userLimitText}\n"
-             . "📊 <b>مصرف کل:</b> {$used} از {$total}\n"
-             . "💾 <b>حجم باقیمانده:</b> <b>{$remStr}</b>\n"
-             . "⏳ <b>اعتبار زمانی:</b> <b>{$days}</b>\n"
-             . "🌐 <b>سرور:</b> " . ($c['server_name'] ?? 'سرور ابری') . "\n\n"
-             . "🔗 <b>لینک مستقیم ساب‌لینک سرور:</b>\n<code>{$primarySub}</code>\n\n"
-             . "📱 <i>بارکد QR فوق آماده اسکن مستقیم است:</i>";
+        $msg = BeautifulInvoice::renderAccountDetail($c, $primarySub);
+        // Add status line
+        $msg = str_replace("┗━━━━━━━━━━━━━━━━━━━━━━┛\n\n", "┗━━━━━━━━━━━━━━━━━━━━━━┛\n⚡️ وضعیت: {$statusFa}\n\n", $msg);
 
         $kb = [
             'inline_keyboard' => [
                 [
-                    ['text' => '🚀 دانلود اپلیکیشن اختصاصی ما', 'callback_data' => 'apps_plat_our_app'],
-                    ['text' => '⚡ اتصال با V2rayNG', 'url' => $primarySub]
+                    ['text' => '📋 کپی نام کاربری', 'callback_data' => 'copy_user_' . $c['id']],
+                    ['text' => '📋 کپی رمز', 'callback_data' => 'copy_pass_' . $c['id']]
                 ],
                 [
-                    ['text' => '🚀 اتصال با Hiddify / Streisand', 'url' => $primarySub],
-                    ['text' => '🔄 تمدید این اشتراک', 'callback_data' => 'renew_acc_' . $c['id']]
+                    ['text' => '📋 کپی ساب‌لینک', 'callback_data' => 'copy_sub_' . $c['id']],
+                    ['text' => '📥 دریافت کانفیگ‌ها', 'callback_data' => 'configs_acc_' . $c['id']]
                 ],
                 [
-                    ['text' => '📥 دریافت کانفیگ‌ها', 'callback_data' => 'configs_acc_' . $c['id']],
-                    ['text' => '🚪 قطع اتصال از تلگرام', 'callback_data' => 'unbind_acc_' . $c['id']]
+                    ['text' => '🚀 اپ اختصاصی', 'callback_data' => 'apps_plat_our_app'],
+                    ['text' => '⚡ V2rayNG', 'url' => $primarySub]
                 ],
                 [
-                    ['text' => '👤 بازگشت به لیست حساب‌ها', 'callback_data' => 'menu_my_accounts'],
+                    ['text' => '🚀 Hiddify / Streisand', 'url' => $primarySub],
+                    ['text' => '🔄 تمدید', 'callback_data' => 'renew_acc_' . $c['id']]
+                ],
+                [
+                    ['text' => '🚪 قطع اتصال', 'callback_data' => 'unbind_acc_' . $c['id']],
+                    ['text' => '👤 لیست حساب‌ها', 'callback_data' => 'menu_my_accounts']
+                ],
+                [
                     ['text' => '🔙 منوی اصلی', 'callback_data' => 'menu_main']
                 ]
             ]
@@ -2338,31 +2368,18 @@ class TelegramBotController {
 
         $primarySub = self::getClientPrimarySublink($client, $pdo);
 
-        $msg = "📥 <b>کانفیگ‌های اختصاصی حساب {$client['username']}</b>\n\n"
-             . "🔗 <b>لینک مستقیم ساب‌لینک سرور:</b>\n<code>{$primarySub}</code>\n\n";
+        require_once __DIR__ . '/../core/JalaliDate.php';
+        require_once __DIR__ . '/../core/BeautifulInvoice.php';
 
-        if (!empty($configs['vless_reality'])) {
-            $msg .= "⚡️ <b>کانفیگ VLESS Reality:</b>\n<code>{$configs['vless_reality']}</code>\n\n";
-        }
-        if (!empty($configs['vless_ws'])) {
-            $msg .= "🛡 <b>کانفیگ WebSocket:</b>\n<code>{$configs['vless_ws']}</code>\n\n";
-        }
-        if (!empty($configs['trojan'])) {
-            $msg .= "🔒 <b>کانفیگ Trojan:</b>\n<code>{$configs['trojan']}</code>\n\n";
-        }
-        foreach ($configs as $k => $v) {
-            if (str_starts_with($k, 'node_link_') || str_starts_with($k, 'sub_link_')) {
-                $msg .= "🚀 <b>کانکشن مستقیم:</b>\n<code>{$v}</code>\n\n";
-            }
-        }
-        $msg .= "<i>جهت کپی کافیست روی هر متن ضربه بزنید یا بارکد فوق را اسکن فرمایید.</i>";
+        $msg = BeautifulInvoice::renderConfigs($client, $configs, $primarySub);
 
         $qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' . urlencode($primarySub);
 
         $kb = [
             'inline_keyboard' => [
-                [['text' => '⚡ اتصال با V2rayNG', 'url' => $primarySub]],
-                [['text' => '🚀 اتصال با Hiddify', 'url' => $primarySub]],
+                [['text' => '📋 کپی نام کاربری', 'callback_data' => 'copy_user_' . $client['id']], ['text' => '📋 کپی رمز', 'callback_data' => 'copy_pass_' . $client['id']]],
+                [['text' => '📋 کپی ساب‌لینک', 'callback_data' => 'copy_sub_' . $client['id']]],
+                [['text' => '⚡ اتصال با V2rayNG', 'url' => $primarySub], ['text' => '🚀 Hiddify', 'url' => $primarySub]],
                 [['text' => '🔙 بازگشت به جزئیات حساب', 'callback_data' => 'view_acc_' . $client['id']]]
             ]
         ];
@@ -3495,20 +3512,21 @@ class TelegramBotController {
             $primarySub = self::getClientPrimarySublink($client, $pdo);
             $qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=' . urlencode($primarySub);
 
-            $customerMsg = "🎉 <b>تمدید اشتراک شما با موفقیت تایید و اعمال گردید!</b>\n\n"
-                         . "👤 <b>نام کاربری:</b> <code>{$client['username']}</code>\n"
-                         . "🔑 <b>کلمه عبور:</b> <code>" . ($client['password'] ?: '123456') . "</code>\n"
-                         . "➕ <b>حجم افزوده شده:</b> {$order['traffic_gb']} گیگابایت\n"
-                         . "⏳ <b>تاریخ انقضای جدید:</b> {$renewResult['new_expire']}\n\n"
-                         . "🔗 <b>لینک مستقیم ساب‌لینک سرور:</b>\n<code>{$primarySub}</code>\n\n"
-                         . "📱 <i>بارکد QR فوق به‌روزرسانی شده و آماده اسکن است.</i>";
+            require_once __DIR__ . '/../core/JalaliDate.php';
+            require_once __DIR__ . '/../core/BeautifulInvoice.php';
+
+            $customerMsg = BeautifulInvoice::renderRenewInvoice($client, [
+                'traffic_gb' => $order['traffic_gb'],
+                'primary_sub' => $primarySub
+            ], $renewResult['new_expire']);
 
             TelegramBot::sendPhoto($qrUrl, $customerMsg, $order['user_tg_id'], [
                 'inline_keyboard' => [
-                    [['text' => '🚀 دانلود اپلیکیشن اختصاصی ما', 'callback_data' => 'apps_plat_our_app']],
-                    [['text' => '⚡ اتصال مستقیم با V2rayNG', 'url' => $primarySub]],
-                    [['text' => '🚀 اتصال با Streisand / Hiddify', 'url' => $primarySub]],
-                    [['text' => '📊 مشاهده وضعیت اشتراک', 'callback_data' => 'view_acc_' . $client['id']]],
+                    [['text' => '📋 کپی نام کاربری', 'callback_data' => 'copy_user_' . $client['id']], ['text' => '📋 کپی رمز', 'callback_data' => 'copy_pass_' . $client['id']]],
+                    [['text' => '📋 کپی ساب‌لینک', 'callback_data' => 'copy_sub_' . $client['id']]],
+                    [['text' => '🚀 اپ اختصاصی', 'callback_data' => 'apps_plat_our_app']],
+                    [['text' => '⚡ V2rayNG', 'url' => $primarySub], ['text' => '🚀 Hiddify', 'url' => $primarySub]],
+                    [['text' => '📊 وضعیت اشتراک', 'callback_data' => 'view_acc_' . $client['id']]],
                     [['text' => '🔙 منوی اصلی', 'callback_data' => 'menu_main']]
                 ]
             ], $botToken);
@@ -3556,41 +3574,32 @@ class TelegramBotController {
         $pdo->prepare("UPDATE bot_orders SET payment_status = 'paid', client_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
             ->execute([$prov['client_id'], $orderId]);
 
-        // Deliver to customer on Telegram as QR Photo + Full Caption
+        // Deliver to customer - Beautiful with Jalali + Copyable
+        require_once __DIR__ . '/../core/JalaliDate.php';
+        require_once __DIR__ . '/../core/BeautifulInvoice.php';
+
         $primarySub = !empty($prov['node_sublink']) ? $prov['node_sublink'] : $prov['sub_url'];
         $qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=' . urlencode($primarySub);
 
-        $clientIpLimit = (int)($prov['ip_limit'] ?? 0);
-        $userLimitText = $clientIpLimit > 0 ? "{$clientIpLimit} کاربر" : "نامحدود";
-
-        $customerMsg = "🎉 <b>سفارش شما تایید و اشتراک فعال گردید!</b>\n\n"
-                     . "👤 <b>نام کاربری:</b> <code>{$prov['username']}</code>\n"
-                     . "🔑 <b>کلمه عبور:</b> <code>{$prov['password']}</code>\n"
-                     . "👥 <b>سقف اتصال همزمان:</b> {$userLimitText}\n"
-                     . "📦 <b>حجم اشتراک:</b> {$prov['traffic_gb']} گیگابایت\n"
-                     . "⏳ <b>مهلت استفاده:</b> {$prov['expire_at']}\n"
-                     . "🌐 <b>سرور متصل:</b> {$prov['server_name']}\n\n"
-                     . "🔗 <b>لینک مستقیم ساب‌لینک سرور:</b>\n"
-                     . "<code>{$primarySub}</code>\n\n";
-
-        if (!empty($prov['vless_link'])) {
-            $customerMsg .= "🚀 <b>کانکشن مستقیم (کپی با یک لمس):</b>\n"
-                          . "<code>{$prov['vless_link']}</code>\n\n";
-        }
-
-        if (!empty($prov['node_sublink']) && $prov['node_sublink'] !== $prov['sub_url']) {
-            $customerMsg .= "🌐 <b>صفحه هوشمند وضعیت اشتراک:</b>\n"
-                          . "<code>{$prov['sub_url']}</code>\n\n";
-        }
-
-        $customerMsg .= "📱 <i>برای اتصال، لینک ساب‌لینک را در v2rayNG یا Streisand وارد فرمایید یا بارکد فوق را اسکن نمایید:</i>";
+        $customerMsg = BeautifulInvoice::renderSuccessInvoice([
+            'username' => $prov['username'],
+            'password' => $prov['password'],
+            'traffic_gb' => $prov['traffic_gb'],
+            'expire_at' => $prov['expire_at'],
+            'server_name' => $prov['server_name'],
+            'ip_limit' => $prov['ip_limit'] ?? 0,
+            'primary_sub' => $primarySub,
+            'sub_url' => $prov['sub_url'],
+            'vless_link' => $prov['vless_link'] ?? ''
+        ], $order);
 
         $customerKeyboard = [
             'inline_keyboard' => [
+                [['text' => '📋 کپی نام کاربری', 'callback_data' => 'copy_user_' . $prov['client_id']], ['text' => '📋 کپی رمز', 'callback_data' => 'copy_pass_' . $prov['client_id']]],
+                [['text' => '📋 کپی ساب‌لینک', 'callback_data' => 'copy_sub_' . $prov['client_id']]],
                 [['text' => '🚀 دانلود اپلیکیشن اختصاصی ما', 'callback_data' => 'apps_plat_our_app']],
-                [['text' => '⚡ اتصال مستقیم با V2rayNG', 'url' => $primarySub]],
-                [['text' => '🚀 اتصال با Streisand / Hiddify', 'url' => $primarySub]],
-                [['text' => '📊 صفحه وب وضعیت اشتراک', 'url' => $prov['sub_url']]],
+                [['text' => '⚡ اتصال با V2rayNG', 'url' => $primarySub], ['text' => '🚀 Hiddify / Streisand', 'url' => $primarySub]],
+                [['text' => '📊 صفحه وضعیت اشتراک', 'url' => $prov['sub_url']]],
                 [['text' => '🔙 منوی اصلی', 'callback_data' => 'menu_main']]
             ]
         ];

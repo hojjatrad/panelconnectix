@@ -197,8 +197,20 @@ class Helpers {
     }
 
     public static function formatDate(int|string $time): string {
+        require_once __DIR__ . '/JalaliDate.php';
         $timestamp = is_numeric($time) ? (int)$time : (strtotime((string)$time) ?: time());
-        return date('Y-m-d H:i:s', $timestamp);
+        // Return Jalali beautiful format
+        return JalaliDate::format($timestamp, 'full');
+    }
+
+    public static function formatJalali(int|string $time, string $format = 'beautiful'): string {
+        require_once __DIR__ . '/JalaliDate.php';
+        return JalaliDate::format($time, $format);
+    }
+
+    public static function formatPersianDate(int|string $time, string $format = 'beautiful'): string {
+        require_once __DIR__ . '/JalaliDate.php';
+        return JalaliDate::formatPersian($time, $format);
     }
 
     public static function generateUUID(): string {
@@ -213,21 +225,18 @@ class Helpers {
     }
 
     public static function timeAgo(?string $datetime): string {
-        if (!$datetime) return 'هرگز';
-        $time = strtotime($datetime);
-        $diff = time() - $time;
-        if ($diff < 60) return 'لحظاتی پیش';
-        if ($diff < 3600) return floor($diff / 60) . ' دقیقه پیش';
-        if ($diff < 86400) return floor($diff / 3600) . ' ساعت پیش';
-        return floor($diff / 86400) . ' روز پیش';
+        require_once __DIR__ . '/JalaliDate.php';
+        return JalaliDate::timeAgo($datetime);
     }
 
     public static function daysRemaining(?string $expireAt): string {
-        if (!$expireAt) return 'نامحدود';
+        require_once __DIR__ . '/JalaliDate.php';
+        if (!$expireAt) return '♾️ نامحدود';
         $diff = strtotime($expireAt) - time();
-        if ($diff <= 0) return 'منقضی شده';
+        if ($diff <= 0) return '❌ منقضی شده';
         $days = ceil($diff / 86400);
-        return $days . ' روز';
+        $faDays = JalaliDate::toPersianNumber($days);
+        return $faDays . ' روز';
     }
 
     public static function logActivity(string $action, string $description, ?string $entityType = null, $entityId = null, ?int $userId = null): void {
