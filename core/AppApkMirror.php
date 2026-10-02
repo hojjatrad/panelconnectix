@@ -52,10 +52,29 @@ class AppApkMirror {
         if ($release === null) {
             $repo  = Updater::getRepo();
             $token = Updater::getToken();
+            // v4.0 SPEED: Try latest release first, then v4.0.0, then fallback
             $release = Updater::githubRequest(
-                "https://api.github.com/repos/{$repo}/releases/tags/v3.0.0",
+                "https://api.github.com/repos/{$repo}/releases/latest",
                 $token
             );
+            if (!is_array($release) || empty($release['assets'])) {
+                $release = Updater::githubRequest(
+                    "https://api.github.com/repos/{$repo}/releases/tags/v4.0.0",
+                    $token
+                );
+            }
+            if (!is_array($release) || empty($release['assets'])) {
+                $release = Updater::githubRequest(
+                    "https://api.github.com/repos/{$repo}/releases/tags/v3.6.1",
+                    $token
+                );
+            }
+            if (!is_array($release) || empty($release['assets'])) {
+                $release = Updater::githubRequest(
+                    "https://api.github.com/repos/{$repo}/releases/tags/v3.0.0",
+                    $token
+                );
+            }
         }
 
         if (!is_array($release) || empty($release['assets'])) {
