@@ -1,41 +1,45 @@
 <?php
-// v4 - self updater for fix_361_now.php and fix_400_now.php — can self-update
-if (isset($_GET['self'])) {
-    $url = 'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/update_self.php?t='.time().rand(1000,9999);
-    $ch = curl_init($url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 20);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    $data = curl_exec($ch);
-    curl_close($ch);
-    if ($data && strlen($data) > 500) {
-        file_put_contents(__DIR__ . '/update_self.php', $data);
-        echo "Self-updated update_self.php ".strlen($data)." bytes\n";
-    }
-}
+// v4.1 - self updater with multi-URL fallback to bypass CDN cache
 $files = [
-    'fix_361_now.php' => 'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/fix_361_now.php',
-    'set_app_version_400.php' => 'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/set_app_version_400.php',
-    'fix_400_now.php' => 'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/fix_400_now.php',
-    'update_self.php' => 'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/update_self.php',
+    'fix_361_now.php' => [
+        'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/fix_361_now.php',
+        'https://github.com/hojjatrad/panelconnectix/raw/main/fix_361_now.php',
+        'https://codeload.github.com/hojjatrad/panelconnectix/zip/main',
+    ],
+    'set_app_version_400.php' => [
+        'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/set_app_version_400.php',
+    ],
 ];
 
-foreach ($files as $local => $url) {
-    $ch = curl_init($url.'?t='.time().rand(1000,9999));
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 20);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    $data = curl_exec($ch);
-    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    if ($data && strlen($data) > 500) {
-        file_put_contents(__DIR__ . '/' . $local, $data);
-        echo "Updated $local ".strlen($data)." bytes\n";
-    } else {
-        echo "Failed $local code $code\n";
+foreach ($files as $local => $urls) {
+    $success = false;
+    foreach ((array)$urls as $baseUrl) {
+        if (str_ends_with($baseUrl, '.zip')) continue; // skip zip for now
+        $url = $baseUrl . '?t=' . time() . rand(1000,9999) . '&cb=' . rand(100000,999999);
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Cache-Control: no-cache', 'Pragma: no-cache', 'User-Agent: Connectix-Updater-Bypass']);
+        $data = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        if ($data && strlen($data) > 500 && $code === 200) {
+            // Check if it's the ultra minimal version (contains ULTRA FAST)
+            if ($local === 'fix_361_now.php' && !str_contains($data, 'ULTRA')) {
+                echo "Fetched $local but not ULTRA version (size ".strlen($data)."), trying next URL...\n";
+                continue;
+            }
+            file_put_contents(__DIR__ . '/' . $local, $data);
+            echo "Updated $local ".strlen($data)." bytes from $baseUrl\n";
+            $success = true;
+            break;
+        } else {
+            echo "Failed $local from $baseUrl code $code\n";
+        }
     }
+    if (!$success) echo "All URLs failed for $local\n";
 }
 if (function_exists('opcache_reset')) @opcache_reset();
-echo "DONE - now run fix_361_now.php?nozip=1 or set_app_version_400.php?key=SECRET\n";
+echo "DONE - now run fix_361_now.php\n";
