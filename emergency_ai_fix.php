@@ -184,8 +184,20 @@ try {
     Setting::set('app_latest_version', $version);
     Setting::set('app_download_url', $apkArm64);
     Setting::set('app_universal_url', $apkUniversal);
-    Setting::set('app_update_title', "Connectix VPN 4.0.2 - Fix Connection Button");
-    Setting::set('app_update_changelog', "🚀 نسخه 4.0.1 - رفع باگ نصب\n\n✅ رفع مشکل دکمه نصب\n✅ نصب مجدد همین نسخه\n✅ رفع حلقه بی‌نهایت\n✅ سرعت پینگ 250 برابر\n✅ لود صفحه 40 برابر");
+    $title = $version === '4.0.2' ? "Connectix VPN 4.0.2 - Fix Connection Button" : "Connectix VPN $version - Fix";
+    $changelog = $version === '4.0.2' ? "🚀 نسخه 4.0.2 - رفع قطعی مشکل اتصال
+
+✅ رفع مشکل دکمه اتصال
+✅ علت: لیست 130 تایی bypass
+✅ فیکس: split tunneling پیش‌فرض غیرفعال، حداکثر 12 اپ
+✅ timeout 15 ثانیه + تلاش خودکار
+✅ رفع حلقه بی‌نهایت آپدیت" : "🚀 نسخه $version - رفع باگ نصب
+
+✅ رفع مشکل دکمه نصب
+✅ نصب مجدد همین نسخه
+✅ رفع حلقه بی‌نهایت";
+    Setting::set('app_update_title', $title);
+    Setting::set('app_update_changelog', $changelog);
     Setting::set('app_update_enabled', '1');
     Setting::set('app_update_source', 'admin');
     Setting::set('app_update_published_at', date('Y-m-d H:i:s'));
