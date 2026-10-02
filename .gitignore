@@ -12,3 +12,7 @@ Thumbs.db
 # Local secrets override (never commit real credentials)
 /config.secrets.php
 /scripts/mysql-credentials.json
+.rollback_backup_20261002/
+data/panel.sqlite
+data/*.sqlite
+*.log
