@@ -1,7 +1,6 @@
 <?php
 /**
- * Set App Version to 4.0.1 — Fix same-version reinstall loop v4.5
- * Checks v4.0.1 -> v4.0.0 -> v3.6.1
+ * Set App Version to 4.0.2 — Fix connection button deep fix v4.6
  */
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
@@ -38,10 +37,10 @@ try {
     ];
     foreach ($selfUrls as $u) {
         $data = fetchRaw($u);
-        if ($data && strlen($data) > 2000 && str_contains($data, 'v4.5')) {
+        if ($data && strlen($data) > 2000 && str_contains($data, 'v4.6')) {
             if (strlen($data) !== strlen(file_get_contents(__FILE__))) {
                 file_put_contents(__FILE__, $data);
-                echo "Self-updated to v4.5 from ".parse_url($u, PHP_URL_HOST)." - reload\n";
+                echo "Self-updated to v4.6 from ".parse_url($u, PHP_URL_HOST)." - reload\n";
             }
             break;
         }
@@ -57,10 +56,6 @@ try {
         'controllers/ApiControllerV2.php' => [
             'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/controllers/ApiControllerV2.php',
             'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/controllers/ApiControllerV2.php',
-        ],
-        'emergency_ai_fix.php' => [
-            'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/emergency_ai_fix.php',
-            'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/emergency_ai_fix.php',
         ],
     ];
     foreach ($files as $local => $urls) {
@@ -97,19 +92,23 @@ if (php_sapi_name() !== 'cli' && !$valid) {
 }
 
 $pdo = Database::getConnection();
-$version = '4.0.1';
+$version = '4.0.2';
 $repo = 'hojjatrad/panelconnectix';
-$title = "Connectix VPN 4.0.1 - Fix Install Button Same Version";
-$changelog = "🚀 نسخه 4.0.1 - رفع باگ نصب\n\n✅ رفع مشکل دکمه نصب که کاری انجام نمی‌داد\n✅ امکان نصب مجدد همین نسخه\n✅ رفع حلقه بی‌نهایت آپدیت\n✅ سرعت پینگ 250 برابر\n✅ لود صفحه 40 برابر";
+$title = "Connectix VPN 4.0.2 - Fix Connection Button";
+$changelog = "🚀 نسخه 4.0.2 - رفع قطعی مشکل اتصال\n\n✅ رفع مشکل دکمه اتصال که کار نمی‌کرد\n✅ علت: لیست 130 تایی bypass باعث TransactionTooLarge\n✅ فیکس: split tunneling پیش‌فرض غیرفعال، حداکثر 12 اپ\n✅ timeout 15 ثانیه + تلاش خودکار با سرور بعدی\n✅ دیالوگ خطای کامل با لاگ";
 
+$v402Arm64 = "https://github.com/$repo/releases/download/v4.0.2/Connectix-Android-ARM64.apk";
+$v402Universal = "https://github.com/$repo/releases/download/v4.0.2/Connectix-Android-Universal.apk";
 $v401Arm64 = "https://github.com/$repo/releases/download/v4.0.1/Connectix-Android-ARM64.apk";
-$v401Universal = "https://github.com/$repo/releases/download/v4.0.1/Connectix-Android-Universal.apk";
 $v400Arm64 = "https://github.com/$repo/releases/download/v4.0.0/Connectix-Android-ARM64.apk";
-$v400Universal = "https://github.com/$repo/releases/download/v4.0.0/Connectix-Android-Universal.apk";
 $v361Arm64 = "https://github.com/$repo/releases/download/v3.6.1/Connectix-Android-ARM64.apk";
+
+$v402Universal = "https://github.com/$repo/releases/download/v4.0.2/Connectix-Android-Universal.apk";
+$v401Universal = "https://github.com/$repo/releases/download/v4.0.1/Connectix-Android-Universal.apk";
+$v400Universal = "https://github.com/$repo/releases/download/v4.0.0/Connectix-Android-Universal.apk";
 $v361Universal = "https://github.com/$repo/releases/download/v3.6.1/Connectix-Android-Universal.apk";
 
-$v401Win = "https://github.com/$repo/releases/download/v4.0.1/Connectix-Windows-x64.zip";
+$v402Win = "https://github.com/$repo/releases/download/v4.0.2/Connectix-Windows-x64.zip";
 $v400Win = "https://github.com/$repo/releases/download/v4.0.0/Connectix-Windows-x64.zip";
 $v361Win = "https://github.com/$repo/releases/download/v3.6.1/Connectix-Windows-x64.zip";
 
@@ -117,21 +116,20 @@ $apkArm64 = $v361Arm64;
 $apkUniversal = $v361Universal;
 $winUrl = $v361Win;
 
-if (checkUrlExists($v401Arm64)) {
-    $apkArm64 = $v401Arm64;
-    $apkUniversal = $v401Universal;
-    $winUrl = $v401Win;
+if (checkUrlExists($v402Arm64)) {
+    $apkArm64 = $v402Arm64; $apkUniversal = $v402Universal; $winUrl = $v402Win;
+    echo "v4.0.2 APKs exist\n";
+} elseif (checkUrlExists($v401Arm64)) {
+    $apkArm64 = $v401Arm64; $apkUniversal = $v401Universal;
     echo "v4.0.1 APKs exist\n";
 } elseif (checkUrlExists($v400Arm64)) {
-    $apkArm64 = $v400Arm64;
-    $apkUniversal = $v400Universal;
-    $winUrl = $v400Win;
-    echo "v4.0.0 APKs exist (v4.0.1 not yet)\n";
+    $apkArm64 = $v400Arm64; $apkUniversal = $v400Universal; $winUrl = $v400Win;
+    echo "v4.0.0 APKs exist\n";
 } else {
     echo "v3.6.1 fallback\n";
 }
 
-echo "<h2>v4.5 Setting app version to $version (code 41)</h2><pre>";
+echo "<h2>v4.6 Setting app version to $version (code 42)</h2><pre>";
 
 Setting::set('app_latest_version', $version);
 Setting::set('app_download_url', $apkArm64);
@@ -141,7 +139,7 @@ Setting::set('app_update_changelog', $changelog);
 Setting::set('app_update_enabled', '1');
 Setting::set('app_update_source', 'admin');
 Setting::set('app_update_published_at', date('Y-m-d H:i:s'));
-Setting::set('app_update_auto_code', '41');
+Setting::set('app_update_auto_code', '42');
 Setting::set('app_latest_version_windows', $version);
 Setting::set('app_download_url_windows', $winUrl);
 Setting::set('app_latest_version_ios', $version);
@@ -152,7 +150,7 @@ try {
     $pdo->exec("DELETE FROM system_settings WHERE setting_key LIKE 'app_configs_cache_%'");
 } catch (Throwable $e) {}
 
-echo "✅ Settings updated v4.5:\n";
+echo "✅ Settings updated v4.6:\n";
 echo "app_latest_version = $version\n";
 echo "app_download_url = $apkArm64\n";
 echo "app_configs_cache cleared\n\n";

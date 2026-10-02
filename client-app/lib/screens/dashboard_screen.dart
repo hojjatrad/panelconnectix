@@ -52,7 +52,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Timer? _timer;
 
   // New Pro Features States
-  bool _splitTunnelingEnabled = true;
+  bool _splitTunnelingEnabled = false; // v4.1 FIX: Disabled by default to fix connection button doing nothing - was causing TransactionTooLarge on many devices
   bool _autoPauseForBankingEnabled = false;
   bool _pausedByBankingApp = false;
   String? _pausedForPackage;
@@ -71,7 +71,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Map<String, dynamic>? _updateInfo;
   bool _isCheckingUpdate = false;
 
-  static const String currentAppVersion = '4.0.1'; // A1: Fix connection button - improved bypass filter + 3 retries
+  static const String currentAppVersion = '4.0.2'; // A1: Fix connection button - improved bypass filter + 3 retries
 
   // "Download over Wi-Fi only" for update packages
   bool _updateWifiOnly = false;
@@ -305,7 +305,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     final prefs = await SharedPreferences.getInstance();
     if (mounted) {
       setState(() {
-        _splitTunnelingEnabled = prefs.getBool('split_tunneling_enabled') ?? true;
+        _splitTunnelingEnabled = prefs.getBool('split_tunneling_enabled') ?? false; // v4.1 default false
         _autoReconnectEnabled = prefs.getBool('auto_reconnect_enabled') ?? true;
         _autoPauseForBankingEnabled = prefs.getBool('auto_pause_for_banking_enabled') ?? false;
         _updateWifiOnly = prefs.getBool('update_wifi_only') ?? false;
@@ -1353,14 +1353,53 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   void _startTunnel({bool isReconnect = false}) async {
+    // v4.1 DEEP FIX: Connection button does nothing - root cause analysis and permanent fix
+    // Issues fixed:
+    // 1. _servers empty -> no server selected -> snackbar not visible -> user sees nothing
+    // 2. blockedApps list too large (130) causing TransactionTooLarge even after filter
+    // 3. startV2Ray hanging forever -> _isConnecting stuck true -> UI frozen
+    // 4. parseFromURL throwing for invalid URI -> caught but snackbar behind modal
+    // 5. No auto-retry with next server when current fails
+
+    if (_servers.isEmpty) {
+      ApiService.log('CRITICAL: _servers empty, forcing refresh from API');
+      setState(() => _isConnecting = true);
+      try {
+        final freshServers = await ApiService.getServers().timeout(const Duration(seconds: 12));
+        if (freshServers.isNotEmpty) {
+          setState(() => _servers = freshServers);
+          ApiService.log('Forced refresh got ${freshServers.length} servers');
+        }
+      } catch (e) {
+        ApiService.log('Forced refresh failed: $e');
+      }
+      if (_servers.isEmpty) {
+        setState(() => _isConnecting = false);
+        if (mounted) {
+          _showConnectionErrorDialog(
+            title: 'سروری یافت نشد',
+            message: 'لیست سرورها خالی است. اینترنت خود را بررسی کنید و دوباره تلاش کنید.',
+            logs: ApiService.logDump,
+          );
+        }
+        return;
+      }
+    }
+
     if (_selectedServer == null || _selectedServer!.configUri.isEmpty || _selectedServer!.isInfoBanner) {
       final clean = _servers.where((s) => !s.isInfoBanner && s.configUri.isNotEmpty).toList();
       if (clean.isNotEmpty) {
         _selectedServer = clean.first;
+        ApiService.log('Auto-selected first clean server: ${_selectedServer!.name}');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('لطفاً یک سرور دارای کانکشن معتبر انتخاب فرمایید.')),
-        );
+        setState(() => _isConnecting = false);
+        if (mounted) {
+          _showConnectionErrorDialog(
+            title: 'سرور معتبر نیست',
+            message: 'هیچ کانکشن معتبری یافت نشد. لطفا از تنظیمات، سرورها را بروزرسانی کنید.',
+            logs: ApiService.logDump,
+          );
+        }
         return;
       }
     }
@@ -1376,48 +1415,82 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     });
 
     try {
-      final hasPermission = await _flutterV2ray.requestPermission();
+      // Permission check with timeout
+      bool hasPermission = false;
+      try {
+        hasPermission = await _flutterV2ray.requestPermission().timeout(const Duration(seconds: 8));
+      } catch (e) {
+        ApiService.log('requestPermission timeout/error: $e');
+        hasPermission = false;
+      }
+
       if (!hasPermission) {
-        setState(() {
-          _isConnecting = false;
-        });
+        setState(() => _isConnecting = false);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('مجوز اتصال وی‌پی‌ان (VPN Permission) تایید نشد.')),
+          _showConnectionErrorDialog(
+            title: 'مجوز VPN تایید نشد',
+            message: 'برای اتصال، باید مجوز VPN را تایید کنید. اگر قبلا رد کرده‌اید، به تنظیمات گوشی > VPN بروید و مجوز را پاک کنید.',
+            logs: ApiService.logDump,
           );
         }
         return;
       }
 
-      // Windows Phase 2: full TUN mode needs admin on the FIRST run only
-      // (creates the Wintun TAP adapter); afterwards the adapter persists.
-      final tunMode =
-          Platform.isWindows && _winTunnelMode == 'tun';
-      if (tunMode && !await _flutterV2ray.isElevated()) {
-        setState(() {
-          _isConnecting = false;
-        });
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                  'حالت «VPN کامل» فقط در اولین اجرا به دسترسی ادمین نیاز دارد: روی آیکون برنامه راست‌کلیک کنید و «Run as administrator» را بزنید. در بارگذاری‌های بعدی دیگر لازم نیست.'),
-              duration: Duration(seconds: 9),
-            ),
-          );
+      final tunMode = Platform.isWindows && _winTunnelMode == 'tun';
+      if (tunMode) {
+        bool elevated = false;
+        try {
+          elevated = await _flutterV2ray.isElevated().timeout(const Duration(seconds: 3));
+        } catch (_) {}
+        if (!elevated) {
+          setState(() => _isConnecting = false);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('حالت VPN کامل فقط در اولین اجرا به ادمین نیاز دارد: راست‌کلیک > Run as administrator'),
+                duration: Duration(seconds: 9),
+              ),
+            );
+          }
+          return;
         }
-        return;
       }
 
-      final configUri = _selectedServer!.configUri;
-      final parser = FlutterV2ray.parseFromURL(configUri);
-      String finalConfig = parser.getFullConfiguration();
-
-      // Pass Split Tunneling blocked apps to exclude domestic/banking apps natively (without crashes)
-      // Layer 1: System-level disallowed apps (Android VpnService.Builder.addDisallowedApplication)
-      // v3.5.8 FIX: Filter to ONLY installed packages to avoid TransactionTooLarge & NameNotFoundException
+      // Build config with deep error handling
+      String finalConfig;
       List<String>? blockedAppsToPass;
-      String safeFinalConfig = finalConfig;
+      String originalConfig;
+
+      try {
+        final configUri = _selectedServer!.configUri;
+        ApiService.log('Parsing URI for server ${_selectedServer!.name}: ${configUri.substring(0, configUri.length > 50 ? 50 : configUri.length)}...');
+        final parser = FlutterV2ray.parseFromURL(configUri);
+        originalConfig = parser.getFullConfiguration();
+        finalConfig = originalConfig;
+        ApiService.log('Parsed config OK, length=${originalConfig.length}');
+      } catch (e, st) {
+        ApiService.log('parseFromURL FAILED for ${_selectedServer!.name}: $e\n$st');
+        setState(() => _isConnecting = false);
+        if (mounted) {
+          // Try next server automatically
+          final clean = _servers.where((s) => s.id != _selectedServer!.id && !s.isInfoBanner && s.configUri.isNotEmpty).toList();
+          if (clean.isNotEmpty && !isReconnect) {
+            ApiService.log('Auto-retry with next server: ${clean.first.name}');
+            setState(() => _selectedServer = clean.first);
+            _startTunnel(isReconnect: true);
+            return;
+          }
+          _showConnectionErrorDialog(
+            title: 'کانفیگ نامعتبر',
+            message: 'کانفیگ سرور ${_selectedServer!.name} نامعتبر است: $e',
+            logs: ApiService.logDump,
+          );
+        }
+        return;
+      }
+
+      // v4.1 FIX: Split tunneling disabled by default for stability, max 12 apps
+      // Previously 130 apps -> 30 after filter still too much for some devices
       if (Platform.isAndroid && _splitTunnelingEnabled) {
         try {
           final prefs = await SharedPreferences.getInstance();
@@ -1426,46 +1499,41 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               ? customBypass
               : defaultDomesticBypassApps;
 
-          // v3.5.8: Ask native layer to filter to installed apps only (real check via PackageManager)
+          // Filter to installed only
           try {
             const channel = MethodChannel('com.connectix.vpn/updater');
-            final filtered = await channel.invokeMethod<List<dynamic>>('getInstalledBypassApps', {'packages': candidateList});
+            final filtered = await channel.invokeMethod<List<dynamic>>('getInstalledBypassApps', {'packages': candidateList}).timeout(const Duration(seconds: 4));
             if (filtered != null && filtered.isNotEmpty) {
-              blockedAppsToPass = filtered.map((e) => e.toString()).toList();
-              ApiService.log('bypass filter: ${candidateList.length} -> ${blockedAppsToPass!.length} installed');
+              // v4.1: Max 12 apps to prevent TransactionTooLarge (was 30)
+              final limited = filtered.length > 12 ? filtered.sublist(0, 12) : filtered;
+              blockedAppsToPass = limited.map((e) => e.toString()).toList();
+              ApiService.log('bypass filter: ${candidateList.length} -> ${filtered.length} installed -> ${blockedAppsToPass!.length} limited to 12');
             } else {
-              // If filter returns empty (e.g. no banking apps installed), pass null to avoid empty list overhead
-              // But keep original candidate for safety if user has custom list that is all uninstalled? Use candidate truncated to 30
-              blockedAppsToPass = candidateList.length > 30 ? candidateList.sublist(0, 30) : candidateList;
-              ApiService.log('bypass filter empty, using truncated candidate ${blockedAppsToPass!.length}');
+              ApiService.log('bypass filter empty, disabling split tunneling for this connection');
+              blockedAppsToPass = null;
             }
           } catch (e) {
-            debugPrint('Bypass filter failed, using truncated list: $e');
-            ApiService.log('bypass filter error: $e');
-            // Fallback: truncate to 30 to avoid binder limit, still better than 130
-            blockedAppsToPass = candidateList.length > 30 ? candidateList.sublist(0, 30) : candidateList;
+            ApiService.log('bypass filter error: $e, disabling bypass for safety');
+            blockedAppsToPass = null;
           }
         } catch (e) {
-          debugPrint('Bypass apps check: $e');
-          blockedAppsToPass = null; // fail-safe: no bypass rather than crash
+          ApiService.log('Bypass apps outer error: $e');
+          blockedAppsToPass = null;
         }
 
-        // Layer 2: Inject SAFE direct routing rules (NO geosite/geoip - those need dat files and crash core on many devices)
-        // v3.5.8 FIX: Revert to v3.5.5 safe rules that were proven stable: only domain:ir + explicit Iranian domains, ip: geoip:private only
-        try {
-          final Map<String, dynamic> configMap = jsonDecode(finalConfig);
-          final routing = (configMap['routing'] as Map<String, dynamic>?) != null
-              ? Map<String, dynamic>.from(configMap['routing'] as Map)
-              : <String, dynamic>{};
-          final List<dynamic> rules = (routing['rules'] as List<dynamic>?) != null
-              ? List<dynamic>.from(routing['rules'] as List<dynamic>)
-              : <dynamic>[];
+        // Inject safe routing rules only if bypass is active
+        if (blockedAppsToPass != null && blockedAppsToPass!.isNotEmpty) {
+          try {
+            final Map<String, dynamic> configMap = jsonDecode(finalConfig);
+            final routing = (configMap['routing'] as Map<String, dynamic>?) != null
+                ? Map<String, dynamic>.from(configMap['routing'] as Map)
+                : <String, dynamic>{};
+            final List<dynamic> rules = (routing['rules'] as List<dynamic>?) != null
+                ? List<dynamic>.from(routing['rules'] as List<dynamic>)
+                : <dynamic>[];
 
-          // Rule 0: Iranian domains -> direct (100% safe, no dat files required)
-          rules.insert(0, {
-            'type': 'field',
-            'outboundTag': 'direct',
-            'domain': [
+            // Deduplicate domains
+            final domains = <String>{
               'domain:ir',
               'eitaa.com',
               'rubika.ir',
@@ -1478,115 +1546,212 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               'shaparak.ir',
               'myket.ir',
               'cafebazaar.ir',
-              'bazaar.ir',
               'bankmellat.ir',
               'bmi.ir',
-              'bankmelli.ir',
               'aparat.com',
               'filimo.com',
-              'aparat.com',
-              'myket.ir',
-            ],
-          });
-          // Rule 1: Private IPs -> direct (safe, no geoip:ir needed)
-          rules.insert(1, {
-            'type': 'field',
-            'outboundTag': 'direct',
-            'ip': [
-              'geoip:private',
-              '10.0.0.0/8',
-              '172.16.0.0/12',
-              '192.168.0.0/16',
-            ],
-          });
-          routing['rules'] = rules;
-          configMap['routing'] = routing;
-          final encoded = jsonEncode(configMap);
-          jsonDecode(encoded); // validate JSON
-          safeFinalConfig = encoded;
-          ApiService.log('routing safe rules injected, total rules=${rules.length}');
-        } catch (e) {
-          debugPrint('Inject direct routing rules failed, using original config: $e');
-          ApiService.log('routing inject failed: $e');
-          safeFinalConfig = finalConfig;
-        }
-      }
-      finalConfig = safeFinalConfig;
+            }.toList();
 
-      // v3.5.8: Robust start with fallback - if safe config fails, retry with original config and no bypass
+            rules.insert(0, {
+              'type': 'field',
+              'outboundTag': 'direct',
+              'domain': domains,
+            });
+            rules.insert(1, {
+              'type': 'field',
+              'outboundTag': 'direct',
+              'ip': [
+                'geoip:private',
+                '10.0.0.0/8',
+                '172.16.0.0/12',
+                '192.168.0.0/16',
+              ],
+            });
+            routing['rules'] = rules;
+            configMap['routing'] = routing;
+            final encoded = jsonEncode(configMap);
+            jsonDecode(encoded);
+            finalConfig = encoded;
+            ApiService.log('routing safe rules injected, total=${rules.length}');
+          } catch (e) {
+            ApiService.log('routing inject failed, using original: $e');
+            finalConfig = originalConfig;
+          }
+        }
+      } else {
+        ApiService.log('Split tunneling disabled, no bypass apps');
+        blockedAppsToPass = null;
+      }
+
+      // Robust start with timeout and auto-retry next server
       bool started = false;
       String lastError = '';
-      try {
-        await _flutterV2ray.startV2Ray(
-          remark: 'Connectix • ${_selectedServer!.name}',
-          config: finalConfig,
-          blockedApps: blockedAppsToPass,
-          proxyOnly: false,
-          tunMode: tunMode,
-          notificationDisconnectButtonName: 'قطع اتصال',
-        );
-        started = true;
-        ApiService.log('V2Ray started with safe config + ${blockedAppsToPass?.length ?? 0} bypass apps');
-      } catch (e) {
-        lastError = e.toString();
-        ApiService.log('V2Ray start with safe config failed: $e - retrying with original config');
+      final List<ServerModel> triedServers = [_selectedServer!];
+
+      Future<bool> tryStartWithConfig(String cfg, List<String>? bypass, String label) async {
         try {
-          // Retry 2: original config + filtered bypass
+          ApiService.log('Attempting V2Ray start: $label with ${bypass?.length ?? 0} bypass');
           await _flutterV2ray.startV2Ray(
             remark: 'Connectix • ${_selectedServer!.name}',
-            config: parser.getFullConfiguration(),
-            blockedApps: blockedAppsToPass,
+            config: cfg,
+            blockedApps: bypass,
             proxyOnly: false,
             tunMode: tunMode,
             notificationDisconnectButtonName: 'قطع اتصال',
-          );
-          started = true;
-          ApiService.log('V2Ray started with original config + bypass');
-        } catch (e2) {
-          ApiService.log('V2Ray retry 2 failed: $e2 - retrying with no bypass');
+          ).timeout(const Duration(seconds: 15));
+          ApiService.log('V2Ray started OK: $label');
+          return true;
+        } catch (e) {
+          ApiService.log('V2Ray start FAILED ($label): $e');
+          lastError = e.toString();
+          return false;
+        }
+      }
+
+      // Attempt 1: safe config + bypass (if any)
+      started = await tryStartWithConfig(finalConfig, blockedAppsToPass, 'safe+${blockedAppsToPass?.length ?? 0} bypass');
+
+      // Attempt 2: original config + bypass
+      if (!started) {
+        ApiService.log('Retry 2: original config + bypass');
+        started = await tryStartWithConfig(originalConfig, blockedAppsToPass, 'original+bypass');
+      }
+
+      // Attempt 3: original config + no bypass (guaranteed if server valid)
+      if (!started) {
+        ApiService.log('Retry 3: original config + no bypass');
+        started = await tryStartWithConfig(originalConfig, null, 'original+no bypass');
+      }
+
+      // Attempt 4: Try next server automatically (up to 2 more servers)
+      if (!started && !isReconnect) {
+        final clean = _servers.where((s) => !triedServers.any((t) => t.id == s.id) && !s.isInfoBanner && s.configUri.isNotEmpty).toList();
+        for (int i = 0; i < clean.length && i < 2 && !started; i++) {
+          final nextServer = clean[i];
+          ApiService.log('Auto-retry with next server ${i+1}: ${nextServer.name}');
+          setState(() => _selectedServer = nextServer);
+          triedServers.add(nextServer);
           try {
-            // Retry 3: original config + no bypass (guaranteed to work if server is valid)
-            await _flutterV2ray.startV2Ray(
-              remark: 'Connectix • ${_selectedServer!.name}',
-              config: parser.getFullConfiguration(),
-              blockedApps: null,
-              proxyOnly: false,
-              tunMode: tunMode,
-              notificationDisconnectButtonName: 'قطع اتصال',
-            );
-            started = true;
-            ApiService.log('V2Ray started with original config + no bypass (fallback)');
-          } catch (e3) {
-            lastError = '$e | $e2 | $e3';
-            ApiService.log('V2Ray all retries failed: $lastError');
-            rethrow;
+            final nextParser = FlutterV2ray.parseFromURL(nextServer.configUri);
+            final nextConfig = nextParser.getFullConfiguration();
+            started = await tryStartWithConfig(nextConfig, null, 'next server ${nextServer.name} no bypass');
+            if (started) {
+              ApiService.log('Connected via fallback server: ${nextServer.name}');
+              break;
+            }
+          } catch (e) {
+            ApiService.log('Next server parse/start failed: $e');
           }
         }
       }
 
       if (!started) {
-        throw Exception(lastError);
+        throw Exception('اتصال به ${_selectedServer!.name} و ${triedServers.length} سرور دیگر ناموفق بود. آخرین خطا: $lastError');
       }
 
       _connectedSeconds = 0;
       _timer?.cancel();
       _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
         if (mounted && _isConnected) {
-          setState(() {
-            _connectedSeconds++;
-          });
+          setState(() => _connectedSeconds++);
         }
       });
-    } catch (e) {
-      setState(() {
-        _isConnecting = false;
-      });
+    } catch (e, st) {
+      ApiService.log('Tunnel start top-level error: $e\n$st');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا در اتصال وی‌پی‌ان: $e')),
+        setState(() => _isConnecting = false);
+        _showConnectionErrorDialog(
+          title: 'خطا در اتصال',
+          message: e.toString(),
+          logs: ApiService.logDump,
         );
       }
     }
+  }
+
+  void _showConnectionErrorDialog({required String title, required String message, String logs = ''}) {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF0F172A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEF4444).withOpacity(0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.error_outline_rounded, color: Color(0xFFEF4444), size: 20),
+            ),
+            const SizedBox(width: 10),
+            Expanded(child: Text(title, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold))),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(message, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12, height: 1.5)),
+              if (logs.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E293B),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('لاگ فنی:', style: TextStyle(color: Color(0xFF64748B), fontSize: 10, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 4),
+                      Text(
+                        logs.length > 1000 ? logs.substring(logs.length - 1000) : logs,
+                        style: const TextStyle(color: Color(0xFF475569), fontSize: 9, fontFamily: 'monospace'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('باشه', style: TextStyle(color: Color(0xFF64748B))),
+          ),
+          OutlinedButton.icon(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _sendUpdateErrorReport('Connection error: $title - $message\nLogs:\n$logs');
+            },
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF818CF8),
+              side: const BorderSide(color: Color(0xFF4F46E5)),
+            ),
+            icon: const Icon(Icons.bug_report_rounded, size: 14),
+            label: const Text('ارسال گزارش', style: TextStyle(fontSize: 11)),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _startTunnel();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF10B981),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            icon: const Icon(Icons.refresh_rounded, size: 16),
+            label: const Text('تلاش مجدد', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _toggleConnection() async {
