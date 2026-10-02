@@ -29,6 +29,7 @@ $version = '4.0.0';
 $repo = 'hojjatrad/panelconnectix';
 $title = "Connectix VPN 4.0.0 - Speed & Domain Independence";
 $changelog = "🚀 نسخه 4.0.0 - سرعت فوق‌العاده + استقلال دامنه\n\n✅ سرعت پینگ 250 برابر سریع‌تر\n✅ لود صفحه سرورها 40 برابر\n✅ بروزرسانی اپ 50 برابر\n✅ اتصال هوشمند 100 برابر\n✅ استقلال کامل از دامنه";
+// Use v3.6.1 APKs (exist) until v4.0.0 APKs built by Actions (10-20 min)
 $apkArm64 = "https://github.com/$repo/releases/download/v3.6.1/Connectix-Android-ARM64.apk";
 $apkUniversal = "https://github.com/$repo/releases/download/v3.6.1/Connectix-Android-Universal.apk";
 $winUrl = "https://github.com/$repo/releases/download/v3.6.1/Connectix-Windows-x64.zip";
@@ -40,7 +41,7 @@ try {
     Setting::set('app_update_title', $title);
     Setting::set('app_update_changelog', $changelog);
     Setting::set('app_update_enabled', '1');
-    Setting::set('app_update_source', 'auto');
+    Setting::set('app_update_source', 'admin'); // admin to prevent auto-publisher overwriting with 404 URLs until APKs built
     Setting::set('app_update_published_at', date('Y-m-d H:i:s'));
     Setting::set('app_update_auto_code', '40');
     Setting::set('app_latest_version_windows', $version);
