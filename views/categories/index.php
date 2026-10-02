@@ -47,6 +47,20 @@ function renderCategoryOptions($cats, $byParent, $level = 0, $excludeId = null, 
                 <i class="fa-solid fa-diagram-project text-purple-400 ml-1"></i>
                 ساختار: سرور ویژه → اقتصادی/ویژه → ۱ماهه/۲ماهه → پلن‌ها
             </div>
+            <form action="<?= Helpers::url('categories/merge_duplicates') ?>" method="POST" class="inline">
+                <?= Helpers::csrfField() ?>
+                <button type="submit" onclick="return confirm('آیا از ادغام دسته‌بندی‌های تکراری (مثل 1 ماهه و یک ماهه) اطمینان دارید؟')" class="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs transition-all shadow-lg shadow-amber-900/30 flex items-center gap-2">
+                    <i class="fa-solid fa-code-merge"></i>
+                    <span>ادغام تکراری‌ها (هوشمند)</span>
+                </button>
+            </form>
+            <form action="<?= Helpers::url('categories/fix_all') ?>" method="POST" class="inline">
+                <?= Helpers::csrfField() ?>
+                <button type="submit" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition-all shadow-lg shadow-emerald-900/30 flex items-center gap-2">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    <span>اصلاح خودکار همه (Fix All)</span>
+                </button>
+            </form>
             <button onclick="openCreateCatModal()" class="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs transition-all shadow-lg shadow-purple-900/30 flex items-center gap-2">
                 <i class="fa-solid fa-plus"></i>
                 <span>افزودن دسته‌بندی جدید</span>

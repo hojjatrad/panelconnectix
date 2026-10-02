@@ -9,7 +9,7 @@ class XUiDriver implements PanelDriverInterface {
     private string $cookieFile;
     private ?string $token;
     private ?string $lastError = null;
-    private int $timeout = 10;
+    private int $timeout = 5;
 
     public function getLastError(): ?string {
         return $this->lastError;
@@ -77,6 +77,9 @@ class XUiDriver implements PanelDriverInterface {
     }
 
     public function authenticate(): bool {
+        $cacheKey = md5($this->baseUrl . ($this->username ?? ''));
+        $cacheFile = sys_get_temp_dir() . '/xui_prefix_' . $cacheKey . '.json';
+
         // If token is present, try probe with inbounds list
         if (!empty($this->token)) {
             $probe = $this->request('/panel/api/inbounds/list');

@@ -81,10 +81,10 @@ try {
 <head>
     <meta charset="UTF-8">
     <title>خام‌سازی کامل سامانه | Connectix</title>
-    <script src="/contax/assets/js/tailwind.js"></script>
-    <link rel="stylesheet" href="/contax/assets/css/fontawesome.min.css">
+    <?php $assetBase = str_replace("\\","/", dirname($_SERVER["SCRIPT_NAME"])); $assetBase = ($assetBase==="/"||$assetBase===".")?"":rtrim($assetBase,"/"); ?><script src="<?= $assetBase ?>/assets/js/tailwind.js"></script>
+    <link rel="stylesheet" href="<?= $assetBase ?>/assets/css/fontawesome.min.css">
     <style>
-        @import url('/contax/assets/css/vazirmatn.css');
+        @import url('<?= $assetBase ?>/assets/css/vazirmatn.css');
         * { font-family: 'Vazirmatn', sans-serif; }
     </style>
 </head>

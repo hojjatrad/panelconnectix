@@ -6,7 +6,7 @@ $servers = StatusPage::getServersStatus();
 header('Content-Type: text/html; charset=utf-8');
 ?>
 <!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="UTF-8"><title>وضعیت سرویس‌ها | Connectix</title>
-<script src="/contax/assets/js/tailwind.js"></script></head>
+<?php $assetBase = str_replace("\\","/", dirname($_SERVER["SCRIPT_NAME"])); $assetBase = ($assetBase==="/"||$assetBase===".")?"":rtrim($assetBase,"/"); ?><script src="<?= $assetBase ?>/assets/js/tailwind.js"></script></head>
 <body class="bg-slate-950 text-white min-h-screen p-6"><div class="max-w-3xl mx-auto space-y-4">
 <h1 class="text-xl font-black">📡 وضعیت سرویس‌ها</h1>
 <?php foreach($servers as $s): ?>

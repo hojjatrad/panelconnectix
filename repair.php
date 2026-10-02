@@ -966,10 +966,11 @@ foreach ($stepResults as $r) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ابزار ترمیم و عیب‌یابی خودکار پنل | Connectix Panel</title>
-    <script src="/contax/assets/js/tailwind.js"></script>
-    <link rel="stylesheet" href="/contax/assets/css/fontawesome.min.css">
+    <?php $rBase = str_replace('\\','/', dirname($_SERVER['SCRIPT_NAME'])); $rBase = ($rBase==='/'||$rBase==='.')?'':rtrim($rBase,'/'); ?>
+    <script src="<?= $rBase ?>/assets/js/tailwind.js"></script>
+    <link rel="stylesheet" href="<?= $rBase ?>/assets/css/fontawesome.min.css">
     <style>
-        @import url('/contax/assets/css/vazirmatn.css');
+        @import url('<?= $rBase ?>/assets/css/vazirmatn.css');
         * { font-family: 'Vazirmatn', sans-serif; }
     </style>
 </head>

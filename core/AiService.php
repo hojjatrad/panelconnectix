@@ -152,7 +152,9 @@ class AiService {
 
     public static function ensureSeedKnowledge(): void {
         $pdo = Database::getConnection();
-        $baseImg = 'https://vpbotn.ir/contax/assets/ai_guides/';
+        require_once __DIR__ . '/Helpers.php';
+        $baseImg = Helpers::fullAssetUrl('ai_guides/');
+        if (!str_ends_with($baseImg, '/')) $baseImg .= '/';
         $now = date('Y-m-d H:i:s');
         $seeds = [
             ['راهنمای جامع اتصال - همه پلتفرم‌ها', 'اتصال,وصل,کانفیگ,نصب,اندروید,آیفون,ویندوز,مک,VLESS,Reality,VMESS,Trojan,SS,Hiddify,V2rayNG,Streisand,FoXray,راهنما,آموزش,import,کلیپبورد', 'فنی',
@@ -449,8 +451,10 @@ class AiService {
     }
 
     private static function callOpenRouter(string $key, string $model, string $system, string $user, float $temp): array {
+        require_once __DIR__ . '/Helpers.php';
+        $panelRef = Helpers::panelDomain();
         $r = self::curlJson('https://openrouter.ai/api/v1/chat/completions',
-            ['Authorization: Bearer ' . $key, 'HTTP-Referer: https://vpbotn.ir', 'X-Title: Connectix Panel'],
+            ['Authorization: Bearer ' . $key, 'HTTP-Referer: ' . $panelRef, 'X-Title: Connectix Panel'],
             [
                 'model' => $model,
                 'temperature' => $temp,

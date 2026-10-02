@@ -210,16 +210,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $allPassed) {
             }
             $stmtBrand->execute([$adminId, $brandName]);
 
-            // Step 5: Write the new config.php automatically
+            // Step 5: Write the new config.php automatically — domain-independent (Task #11)
             $secretKey = bin2hex(random_bytes(24));
+            $webhookSecret = bin2hex(random_bytes(20));
+            // Dynamic APP_URL: use provided appUrl but also fallback to HTTP_HOST at runtime (config.php handles it)
             $configContent = "<?php
 /**
- * Auto-Generated Configuration by Easy Installer
+ * Auto-Generated Configuration by Easy Installer — domain-independent v2 (Task #11)
  * Date: " . date('Y-m-d H:i:s') . "
  */
 
 define('APP_NAME', " . var_export($brandName, true) . ");
 define('APP_ENV', 'production');
+
+// Dynamic base — will be overridden at runtime by Helpers::getPanelDomain() / HTTP_HOST
+// Keeping APP_URL for backwards compatibility, but helpers now prefer dynamic host
 define('APP_URL', " . var_export($appUrl, true) . ");
 
 // Database Configuration
@@ -249,8 +254,46 @@ if (APP_DEBUG) {
     ini_set('display_errors', 0);
     error_reporting(0);
 }
+
+// Load secrets override if exists (domain-independent store)
+if (file_exists(__DIR__ . '/config.secrets.php')) {
+    require_once __DIR__ . '/config.secrets.php';
+}
 ";
             file_put_contents($configFile, $configContent);
+
+            // Also create config.secrets.php for domain independence
+            $secretsFile = __DIR__ . '/config.secrets.php';
+            if (!file_exists($secretsFile)) {
+                $secretsContent = "<?php
+// Auto-generated secrets — domain-independent (Task #11)
+return [
+    'APP_URL' => " . var_export($appUrl, true) . ",
+    'APP_SECRET' => " . var_export($secretKey, true) . ",
+    'PANEL_DOMAIN' => " . var_export(parse_url($appUrl, PHP_URL_HOST) ?: ($host ?? 'localhost'), true) . ",
+    'GITHUB_WEBHOOK_SECRET' => " . var_export($webhookSecret, true) . ",
+    'TELEGRAM_BOT_TOKEN' => " . var_export($botToken, true) . ",
+    'TELEGRAM_ADMIN_CHAT_ID' => " . var_export($adminChatId, true) . ",
+];
+";
+                @file_put_contents($secretsFile, $secretsContent);
+            }
+
+            // Store panel_domain + webhook secret in settings table for runtime dynamic lookup
+            try {
+                $panelHost = parse_url($appUrl, PHP_URL_HOST) ?: $host;
+                $pdo->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES ('panel_domain', ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)")->execute([$panelHost]);
+                $pdo->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES ('github_webhook_secret', ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)")->execute([$webhookSecret]);
+                if ($pdo->query("SHOW TABLES LIKE 'system_settings'")->fetch() === false) {
+                    // SQLite fallback
+                }
+            } catch (Throwable $e) {
+                try {
+                    $panelHost = parse_url($appUrl, PHP_URL_HOST) ?: $host;
+                    $pdo->prepare("INSERT OR REPLACE INTO system_settings (setting_key, setting_value) VALUES ('panel_domain', ?)")->execute([$panelHost]);
+                    $pdo->prepare("INSERT OR REPLACE INTO system_settings (setting_key, setting_value) VALUES ('github_webhook_secret', ?)")->execute([$webhookSecret]);
+                } catch (Throwable $e2) {}
+            }
 
             // Step 6: Test Telegram Bot notification if token provided
             if (!empty($botToken) && !empty($adminChatId)) {
@@ -285,7 +328,8 @@ if (APP_DEBUG) {
     <title>نصب‌کننده آسان و خودکار پنل (Connectix Easy Installer)</title>
     <!-- v3.5.8 SAFE: Local assets for Iran with CDN fallback -->
     <?php
-    $base = '/contax';
+    // Domain-independent base path (Task #11) — never hardcode /contax
+    $base = '';
     if (isset($_SERVER['SCRIPT_NAME'])) {
         $sd = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME']));
         $base = ($sd === '/' || $sd === '.') ? '' : rtrim($sd, '/');
@@ -297,17 +341,17 @@ if (APP_DEBUG) {
     <?php if (file_exists($localTailwind)): ?>
     <script src="<?= $base ?>/assets/js/tailwind.js"></script>
     <?php else: ?>
-    <script src="/contax/assets/js/tailwind.js"></script>
+    <script src="<?= $base ?>/assets/js/tailwind.js"></script>
     <?php endif; ?>
     <?php if (file_exists($localFA)): ?>
     <link rel="stylesheet" href="<?= $base ?>/assets/css/fontawesome.min.css">
     <?php else: ?>
-    <link rel="stylesheet" href="/contax/assets/css/fontawesome.min.css">
+    <link rel="stylesheet" href="<?= $base ?>/assets/css/fontawesome.min.css">
     <?php endif; ?>
     <?php if (file_exists($localVazir)): ?>
     <link rel="stylesheet" href="<?= $base ?>/assets/css/vazirmatn.css">
     <?php else: ?>
-    <style>@import url('/contax/assets/css/vazirmatn.css');</style>
+    <style>@import url('<?= $base ?>/assets/css/vazirmatn.css');</style>
     <?php endif; ?>
     <style>* { font-family: 'Vazirmatn', sans-serif; }</style>
 </head>

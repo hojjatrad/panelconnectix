@@ -331,6 +331,9 @@ $router->get('servers/test-raw', [ServerController::class, 'testRawConnection'])
 $router->post('servers/fetch-inbounds-sample', [ServerController::class, 'fetchInboundsAndSample']);
 $router->get('servers/fetch-inbounds-sample', [ServerController::class, 'fetchInboundsAndSample']);
 $router->get('servers/ping', [ServerController::class, 'ping']);
+$router->get('servers/ping-all', [ServerController::class, 'pingAll']);
+$router->get('servers/stats', [ServerController::class, 'stats']);
+$router->post('servers/ping-all', [ServerController::class, 'pingAll']);
 
 // Live node client manager (all users on the node + links/credentials)
 $router->get('servers/{id}/node-users', [ServerController::class, 'nodeUsers']);
@@ -397,11 +400,25 @@ $router->get('settings/backup', [MetadataController::class, 'backup']);
 $router->get('settings/backup-telegram', [MetadataController::class, 'backupTelegram']);
 $router->post('settings/restore', [MetadataController::class, 'restore']);
 
-// Dynamic Clusters & Categories Management
+// Dynamic Clusters & Categories Management — domain independent + smart merge
 $router->get('categories', [CategoryController::class, 'index']);
 $router->post('categories/store', [CategoryController::class, 'store']);
 $router->post('categories/update', [CategoryController::class, 'update']);
 $router->post('categories/delete', [CategoryController::class, 'delete']);
+$router->post('categories/merge_duplicates', [CategoryController::class, 'mergeDuplicates']);
+$router->post('categories/fix_all', [CategoryController::class, 'fixAll']);
+$router->get('categories/merge_duplicates', [CategoryController::class, 'mergeDuplicates']);
+$router->get('categories/fix_all', [CategoryController::class, 'fixAll']);
+
+// VIP plans merge route (alternative)
+$router->post('vip_plans/merge_categories', [VipPlanController::class, 'mergeCategories']);
+$router->get('vip_plans/merge_categories', [VipPlanController::class, 'mergeCategories']);
+
+// Domain independence tools
+$router->get('migrate_host', function() { require __DIR__ . '/migrate_host.php'; });
+$router->post('migrate_host', function() { require __DIR__ . '/migrate_host.php'; });
+$router->get('test_host_independence', function() { require __DIR__ . '/test_host_independence.php'; });
+$router->post('test_host_independence', function() { require __DIR__ . '/test_host_independence.php'; });
 
 // Profile & Security & 2FA
 $router->get('profile', [ProfileController::class, 'show']);

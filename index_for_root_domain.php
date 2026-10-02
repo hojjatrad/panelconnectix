@@ -1,15 +1,19 @@
 <?php
 // Connectix Ultra Premium Landing - v6.6 - Generic Product Sales Panel - No VPN/Filter Terms
-// https://vpbotn.ir/contax/promo/ | https://vpbotn.ir/
+// <?= htmlspecialchars($domain) ?>/contax/promo/ | <?= htmlspecialchars($domain) ?>/
 // @mainAdminpanel - Generic Product Sales Panel Only
 $brand = 'Connectix';
 $tg = '@mainAdminpanel';
 $tg_url = 'https://t.me/mainAdminpanel';
-$panel_url = 'https://vpbotn.ir/contax/';
+$proto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https://' : 'http://');
+$host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+$basePath = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? ''));
+$basePath = ($basePath === '/' || $basePath === '.') ? '' : rtrim($basePath, '/');
+$panel_url = $proto . $host . $basePath . '/';
 $demo_user = 'demo';
 $demo_pass = 'demo123';
-$domain = 'https://vpbotn.ir';
-$base = $domain . '/contax/';
+$domain = $proto . $host;
+$base = $panel_url;
 $success = false; $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reseller_request'])) {
     $name = trim($_POST['name'] ?? ''); $phone = trim($_POST['phone'] ?? ''); $tgid = trim($_POST['telegram_id'] ?? '');
@@ -22,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reseller_request'])) 
             if (file_exists($root.'/config.php')) {
                 require_once $root.'/config.php'; require_once $root.'/core/Database.php'; require_once $root.'/core/Setting.php'; require_once $root.'/core/TelegramBot.php';
                 $pdo = Database::getConnection(); $token = Setting::get('telegram_bot_token',''); $admin = Setting::get('telegram_admin_id',''); $logCh = Setting::get('bot_log_channel','') ?: Setting::get('telegram_log_channel_id','');
-                $text = "🔥 <b>درخواست جدید پنل فروش</b>\n\n👤 نام: $name\n📱 موبایل: $phone\n✈️ تلگرام: $tgid\n💼 کسب‌وکار: $biz\n📦 پلن: $plan\n💬 پیام: $msg\n\n🌐 https://vpbotn.ir/contax/promo/\n🕐 ".date('Y-m-d H:i:s');
+                $text = "🔥 <b>درخواست جدید پنل فروش</b>\n\n👤 نام: $name\n📱 موبایل: $phone\n✈️ تلگرام: $tgid\n💼 کسب‌وکار: $biz\n📦 پلن: $plan\n💬 پیام: $msg\n\n🌐 {$panel_url}promo/\n🕐 ".date('Y-m-d H:i:s');
                 if ($admin) TelegramBot::sendMessage($text,$admin,null,$token); if ($logCh) TelegramBot::sendMessage($text,$logCh,null,$token);
             }
         } catch (Throwable $e) {}
@@ -37,8 +41,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reseller_request'])) 
 <title>پنل فروش محصول با اپ اختصاصی فارسی | سود 200% | Connectix - @mainAdminpanel</title>
 <meta name="description" content="پنل فروش محصول فارسی با اپ اندروید اختصاصی، ربات تلگرام فروش خودکار 24 ساعته، سود 200%، مدیریت سفارشات، ویدیو معرفی، دمو آنلاین demo/demo123. @mainAdminpanel">
 <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet">
-<script src="/contax/assets/js/tailwind.js"></script>
-<link rel="stylesheet" href="/contax/assets/css/fontawesome.min.css">
+<script src="<?= htmlspecialchars($basePath) ?>/assets/js/tailwind.js"></script>
+<link rel="stylesheet" href="<?= htmlspecialchars($basePath) ?>/assets/css/fontawesome.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <style>
 *{font-family:Vazirmatn,system-ui!important}
@@ -203,7 +207,7 @@ body{background:#03050A;color:#fff;overflow-x:hidden}
 <div class="w-12 h-12 bg-emerald-500/20 rounded-[14px] flex items-center justify-center"><i class="fa-solid fa-eye text-emerald-400"></i></div>
 </div>
 <div class="mt-6 bg-[#05070D] border border-white/[0.06] rounded-[18px] p-4 space-y-3">
-<div class="flex justify-between items-center bg-white/[0.03] rounded-[12px] px-4 py-3"><span class="text-[11px] text-white/40">آدرس دمو:</span><span class="text-[12px] font-mono text-cyan-300">https://vpbotn.ir/contax/demo/</span></div>
+<div class="flex justify-between items-center bg-white/[0.03] rounded-[12px] px-4 py-3"><span class="text-[11px] text-white/40">آدرس دمو:</span><span class="text-[12px] font-mono text-cyan-300"><?= htmlspecialchars($panel_url) ?>demo/</span></div>
 <div class="grid grid-cols-2 gap-3">
 <div class="bg-white/[0.03] border border-white/[0.06] rounded-[12px] px-4 py-3"><div class="text-[10px] text-white/40">نام کاربری</div><div class="font-mono font-bold text-[13px] mt-1 flex items-center gap-2"><i class="fa-solid fa-user text-violet-400 text-[11px]"></i> <?= $demo_user ?> <button onclick="copyText('<?= $demo_user ?>')" class="mr-auto text-[10px] bg-white/[0.06] rounded-full px-2 py-1">کپی</button></div></div>
 <div class="bg-white/[0.03] border border-white/[0.06] rounded-[12px] px-4 py-3"><div class="text-[10px] text-white/40">رمز عبور</div><div class="font-mono font-bold text-[13px] mt-1 flex items-center gap-2"><i class="fa-solid fa-lock text-emerald-400 text-[11px]"></i> <?= $demo_pass ?> <button onclick="copyText('<?= $demo_pass ?>')" class="mr-auto text-[10px] bg-white/[0.06] rounded-full px-2 py-1">کپی</button></div></div>
@@ -257,7 +261,7 @@ foreach($feats as $f){
 <div class="max-w-6xl mx-auto grid lg:grid-cols-5 gap-8">
 <div class="lg:col-span-2 space-y-5">
 <h2 class="text-[34px] font-black leading-[1.1]">فرم درخواست<br><span class="gradient-text">30 دقیقه بعد پنلت آماده‌ست</span></h2>
-<p class="text-white/60 text-[13px] leading-7">فرم فارسی - پشتیبانی: @mainAdminpanel - https://vpbotn.ir - پنل فروش محصول</p>
+<p class="text-white/60 text-[13px] leading-7">فرم فارسی - پشتیبانی: @mainAdminpanel - <?= htmlspecialchars($domain) ?> - پنل فروش محصول</p>
 <img src="<?= $base ?>ads/banner-fa-2.jpg" class="w-full rounded-[20px] border border-white/[0.06]">
 </div>
 <div class="lg:col-span-3"><div class="bg-gradient-to-b from-white/[0.06] to-white/[0.02] border border-white/[0.08] rounded-[28px] p-1"><div class="bg-[#0A0D18] rounded-[24px] p-6">
@@ -276,7 +280,7 @@ foreach($feats as $f){
 </div>
 </section>
 
-<footer class="border-t border-white/[0.06] py-8 px-4 text-center text-[11px] text-white/25">© 2025 Connectix v6.6 فارسی - پنل فروش محصول - https://vpbotn.ir - @mainAdminpanel - demo/demo123 فقط دیدنی</footer>
+<footer class="border-t border-white/[0.06] py-8 px-4 text-center text-[11px] text-white/25">© 2025 Connectix v6.6 فارسی - پنل فروش محصول - <?= htmlspecialchars($domain) ?> - @mainAdminpanel - demo/demo123 فقط دیدنی</footer>
 
 <script>
 // cursor

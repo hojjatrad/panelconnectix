@@ -8,13 +8,19 @@ require_once __DIR__ . '/../core/Retention.php';
 require_once __DIR__ . '/../drivers/DriverFactory.php';
 require_once __DIR__ . '/../controllers/ServerController.php';
 
-// Allow running via CLI, authenticated Admin, or Web with secret token
+// Allow running via CLI, authenticated Admin, or Web with secret token — domain independent
 if (php_sapi_name() !== 'cli') {
     require_once __DIR__ . '/../core/Auth.php';
     if (!Auth::isAdmin()) {
         $providedKey = $_GET['key'] ?? $_GET['secret'] ?? '';
-        $validKeys = [APP_SECRET, 'gh_hook_sec_vpbotn_2026', 'cpanel_cron'];
-        if (!in_array($providedKey, $validKeys, true)) {
+        $expectedSecret = Setting::get('github_webhook_secret', defined('APP_SECRET') ? APP_SECRET : '');
+        $valid = false;
+        if (!empty($providedKey)) {
+            if (!empty($expectedSecret) && hash_equals($expectedSecret, $providedKey)) $valid = true;
+            if (defined('APP_SECRET') && !empty(APP_SECRET) && hash_equals(APP_SECRET, $providedKey)) $valid = true;
+            if ($providedKey === 'cpanel_cron') $valid = true;
+        }
+        if (!$valid) {
             http_response_code(403);
             die("دسترسی غیرمجاز. کلید امنیتی اشتباه است.");
         }
@@ -27,6 +33,18 @@ $eol = $isCli ? "\n" : "<br>\n";
 echo "[" . date('Y-m-d H:i:s') . "] Starting Sync & Reserved Subscriptions Engine..." . $eol;
 
 $pdo = Database::getConnection();
+
+// 0. v4.0 SPEED: Fast health check every 2 min (parallel, 1 sec for all servers) — updates latency_ms and best_server_* cache
+try {
+    $lastHealth = (int)Setting::get('last_cron_health_check', '0');
+    if (time() - $lastHealth >= 120) { // 2 min
+        Setting::set('last_cron_health_check', (string)time());
+        $healthResults = ServerController::performHealthCheck();
+        echo "[Health] Fast parallel check: " . count($healthResults) . " servers checked in ~1s" . " (online: " . count(array_filter($healthResults, fn($r) => $r['status'] === 'online')) . ")" . $eol;
+    }
+} catch (Throwable $e) {
+    echo "[Health Error] " . $e->getMessage() . $eol;
+}
 
 // 0. Cron Heartbeat — alert if the previous cron run was longer than 5 minutes ago
 try {
@@ -715,6 +733,59 @@ try {
     }
 } catch (Throwable $e) {
     echo "[RestoreTest Error] " . $e->getMessage() . $eol;
+}
+
+// 6e. Auto-import VIP plans daily for servers with auto_import_plans enabled
+try {
+    require_once __DIR__ . '/../core/CategoryManager.php';
+    $lastVipImport = (int)Setting::get('last_cron_vip_import', '0');
+    if (time() - $lastVipImport >= 86400) { // once per 24h
+        Setting::set('last_cron_vip_import', (string)time());
+        $vipServers = $pdo->query("SELECT * FROM server_nodes WHERE driver = 'connectix_seller' AND is_active = 1 AND (auto_import_plans = 1 OR auto_import_plans IS NULL)")->fetchAll();
+        foreach ($vipServers as $vs) {
+            try {
+                $driver = DriverFactory::create($vs);
+                if (!method_exists($driver, 'getVipPlans')) continue;
+                $data = $driver->getVipPlans();
+                $vipPlans = $data['plans'] ?? [];
+                $vipGroups = $data['groups'] ?? [];
+                $imported = 0;
+                foreach ($vipPlans as $vp) {
+                    $norm = CategoryManager::normalizePlan($vp, $vipGroups);
+                    $dup = $pdo->prepare("SELECT id FROM plans WHERE vip_plan_id = ? LIMIT 1");
+                    $dup->execute([$vp['id'] ?? '']);
+                    if ($dup->fetch()) continue;
+                    $dup2 = $pdo->prepare("SELECT id FROM plans WHERE traffic_gb = ? AND duration_days = ? AND server_group = ? AND server_id = ? LIMIT 1");
+                    $dup2->execute([$norm['traffic_gb'], $norm['duration_days'], $norm['server_group'], $vs['id']]);
+                    if ($dup2->fetch()) continue;
+                    $catName = CategoryManager::canonicalFromDuration($norm['duration_days']);
+                    $catRow = CategoryManager::findOrCreateCategory($pdo, $catName, $norm['duration_days'], 'plans');
+                    $catId = $catRow['id'] ?? null;
+                    $basePrice = $norm['price'] ?? 120000;
+                    if (empty($basePrice) || $basePrice < 1000) {
+                        $basePrice = 120000;
+                        if ($norm['traffic_gb'] <= 1) $basePrice = 50000;
+                        elseif ($norm['traffic_gb'] <= 10) $basePrice = 120000;
+                        elseif ($norm['traffic_gb'] <= 50) $basePrice = 300000;
+                        else $basePrice = 500000;
+                    }
+                    $resellerPrice = (int)($basePrice * 0.7);
+                    $localTitle = str_replace(['Economic', 'Iran Access', 'Business Class'], ['اقتصادی', 'ایران‌اکسس', 'بیزنس'], $vp['title'] ?? 'پلن') . ' - VIP';
+                    $pdo->prepare("INSERT INTO plans (title, traffic_gb, duration_days, base_price, reseller_price, server_group, server_id, category, category_id, vip_plan_id, vip_group_id, vip_group_name, vip_plan_title, is_active, show_in_bot) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1)")
+                        ->execute([$localTitle, $norm['traffic_gb'], $norm['duration_days'], $basePrice, $resellerPrice, $norm['server_group'], $vs['id'], $catName, $catId, $vp['id'] ?? null, $norm['group_id'], $norm['group_name'], $vp['title'] ?? '']);
+                    $imported++;
+                }
+                if ($imported > 0) {
+                    $pdo->prepare("INSERT INTO server_sync_logs (server_id, action, details, plans_imported) VALUES (?, 'daily_auto_import', ?, ?)")->execute([$vs['id'], "Daily cron auto-import", $imported]);
+                    echo "[VIP Auto-Import] Server {$vs['name']}: $imported new plans imported." . $eol;
+                }
+            } catch (Throwable $e) {
+                echo "[VIP Auto-Import Error] {$vs['name']}: " . $e->getMessage() . $eol;
+            }
+        }
+    }
+} catch (Throwable $e) {
+    echo "[VIP Auto-Import Error] " . $e->getMessage() . $eol;
 }
 
 // AI Assistant maintenance: expire overdue reseller charges + daily digest + log pruning

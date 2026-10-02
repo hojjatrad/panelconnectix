@@ -27,9 +27,10 @@ header('Content-Type: text/html; charset=utf-8');
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>به‌روزرسانی آنی پنل از گیت‌هاب | Connectix</title>
-    <script src="/contax/assets/js/tailwind.js"></script>
+    <?php $qb = str_replace('\\','/', dirname($_SERVER['SCRIPT_NAME'])); $qb = ($qb==='/'||$qb=='.')?'':rtrim($qb,'/'); ?>
+    <script src="<?= $qb ?>/assets/js/tailwind.js"></script>
     <style>
-        @import url('/contax/assets/css/vazirmatn.css');
+        @import url('<?= $qb ?>/assets/css/vazirmatn.css');
         * { font-family: 'Vazirmatn', sans-serif; }
     </style>
 </head>
@@ -279,7 +280,9 @@ logStep("مجموع: {$repaired} فایل تعمیر/نصب شد، {$skipped} ف
 try {
     $promoSrc = __DIR__ . '/promo/index.php';
     if (file_exists($promoSrc)) {
-        $rootTargets = [dirname(__DIR__) . '/index.php', __DIR__ . '/../index.php', '/home/vpbotni1/public_html/index.php', '/home/vpbotnir/public_html/index.php'];
+        require_once __DIR__ . '/core/Helpers.php';
+        $publicHtml = Helpers::getPublicHtmlPath();
+        $rootTargets = [dirname(__DIR__) . '/index.php', __DIR__ . '/../index.php', $publicHtml . '/index.php'];
         foreach ($rootTargets as $rt) {
             if (is_dir(dirname($rt))) { @copy($promoSrc, $rt); logStep("سینک روت: $rt", 'success'); }
         }

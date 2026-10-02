@@ -11,7 +11,7 @@ class PasargadDriver implements PanelDriverInterface {
     private string $apiPrefix = '/api';
     private bool $isPasarGuard = true; // Modern PasarGuard (FastAPI) vs legacy Pasargad
     private ?string $lastError = null;
-    private int $timeout = 12;
+    private int $timeout = 5;
 
     public function __construct(string $baseUrl, ?string $username = null, ?string $password = null, ?string $token = null, ?string $subDomain = null) {
         $clean = rtrim(trim($baseUrl), '/');
@@ -57,8 +57,13 @@ class PasargadDriver implements PanelDriverInterface {
 
         // Target domain to rewrite to
         $targetDomain = !empty($this->subDomain) ? trim($this->subDomain) : '';
-        if (empty($targetDomain) || str_contains($targetDomain, 'montago-shop.ir')) {
+        if (empty($targetDomain)) {
             $targetDomain = $this->getEffectiveSubDomain();
+        } else {
+            require_once __DIR__ . '/../core/Helpers.php';
+            if (Helpers::isOldDomain($targetDomain)) {
+                $targetDomain = $this->getEffectiveSubDomain();
+            }
         }
 
         $scheme = str_starts_with($targetDomain, 'http://') ? 'http' : 'https';
@@ -107,7 +112,7 @@ class PasargadDriver implements PanelDriverInterface {
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 8);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
 
@@ -153,6 +158,15 @@ class PasargadDriver implements PanelDriverInterface {
     }
 
     public function authenticate(): bool {
+        // v4.0 SPEED: cached prefix
+        $cacheKey = md5($this->baseUrl . ($this->username ?? ''));
+        $cacheFile = sys_get_temp_dir() . '/pas_prefix_' . $cacheKey . '.json';
+        $cachedPrefix = null;
+        if (file_exists($cacheFile) && (time() - filemtime($cacheFile) < 600)) {
+            $c = @json_decode(@file_get_contents($cacheFile), true);
+            if (!empty($c['prefix'])) $cachedPrefix = $c['prefix'];
+        }
+
         // Strategy A: If token is already present, test with system status
         if (!empty($this->token)) {
             foreach (['/api/system', '/api/v1/system', '/api/status', '/api/inbounds'] as $testEndpoint) {
@@ -527,7 +541,7 @@ class PasargadDriver implements PanelDriverInterface {
                 if (empty($links) && !empty($subUrl) && !Helpers::isPanelSubUrl($subUrl)) {
                     $ch = curl_init($subUrl);
                     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                    curl_setopt($ch, CURLOPT_TIMEOUT, 6);
+                    curl_setopt($ch, CURLOPT_TIMEOUT, 3);
                     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
                     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
                     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
@@ -575,7 +589,7 @@ class PasargadDriver implements PanelDriverInterface {
                 if (empty($links) && !empty($subUrl) && !Helpers::isPanelSubUrl($subUrl)) {
                     $ch = curl_init($subUrl);
                     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                    curl_setopt($ch, CURLOPT_TIMEOUT, 6);
+                    curl_setopt($ch, CURLOPT_TIMEOUT, 3);
                     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
                     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
                     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);

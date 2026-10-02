@@ -350,8 +350,9 @@ class ClientController {
 
             // Insert Client
             $nodeSublink = !empty($driverResult['sublink']) ? $driverResult['sublink'] : null;
-            if ($nodeSublink && str_contains($nodeSublink, 'montago-shop.ir')) {
-                $nodeSublink = preg_replace('#https?://[^/]+#i', 'https://sub.speedur.org:2096', $nodeSublink);
+            if (!empty($nodeSublink)) {
+                // Domain independent replacement
+                $nodeSublink = Helpers::fixSublinkDomain($nodeSublink, $server['sub_domain'] ?? $client['sub_domain'] ?? null);
             }
             $stmtInsert = $pdo->prepare("INSERT INTO clients (reseller_id, server_id, plan_id, username, password, customer_name, uuid, sub_token, traffic_limit_bytes, traffic_used_bytes, expire_at, ip_limit, max_devices, start_on_first_use, duration_days, status, custom_note, node_sublink) 
                                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)");
@@ -430,8 +431,10 @@ class ClientController {
         $customNote = trim($_POST['custom_note'] ?? ($client['custom_note'] ?? ''));
         $ipLimit = isset($_POST['ip_limit']) && $_POST['ip_limit'] !== '' ? max(0, (int)$_POST['ip_limit']) : (int)($client['ip_limit'] ?? 0);
         $nodeSublink = !empty($_POST['node_sublink']) ? trim($_POST['node_sublink']) : ($client['node_sublink'] ?? null);
-        if ($nodeSublink && str_contains($nodeSublink, 'montago-shop.ir')) {
-            $nodeSublink = preg_replace('#https?://[^/]+#i', 'https://sub.speedur.org:2096', $nodeSublink);
+        if (!empty($nodeSublink)) {
+            // Domain independent replacement
+            $srvSub = $server['sub_domain'] ?? $client['sub_domain'] ?? null;
+            $nodeSublink = Helpers::fixSublinkDomain($nodeSublink, $srvSub);
         }
 
         // If server changed, handle node migration

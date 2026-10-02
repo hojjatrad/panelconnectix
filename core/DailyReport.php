@@ -1,7 +1,10 @@
 <?php
 /**
  * A4: Daily Report to Telegram - Automatic at 9 AM
+ * Updated: 2026-10-02 - Domain independent
  */
+
+require_once __DIR__ . '/Helpers.php';
 
 class DailyReport {
     public static function generate(): array {
@@ -54,6 +57,7 @@ class DailyReport {
         
         $yesterdayRevenueFormatted = number_format($stats['yesterday_revenue']);
         $monthRevenueFormatted = number_format($stats['month_revenue']);
+        $dashboardUrl = Helpers::fullUrl('dashboard');
         
         return "📊 <b>گزارش روزانه Connectix</b>\n"
              . "📅 تاریخ: " . date('Y-m-d H:i:s') . "\n"
@@ -73,7 +77,7 @@ class DailyReport {
              . "   • 3 روز آینده: {$stats['expiring_3days']}\n\n"
              . "🖥️ <b>سرورها:</b> {$stats['servers']} فعال\n"
              . "━━━━━━━━━━━━━━━━\n"
-             . "🔗 <a href=\"https://vpbotn.ir/contax/dashboard\">مشاهده داشبورد</a>";
+             . "🔗 <a href=\"{$dashboardUrl}\">مشاهده داشبورد</a>";
     }
     
     public static function send(): array {

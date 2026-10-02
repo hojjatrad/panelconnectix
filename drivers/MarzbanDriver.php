@@ -9,7 +9,7 @@ class MarzbanDriver implements PanelDriverInterface {
     private string $apiPrefix = '/api';
     private ?string $lastError = null;
     private ?string $subDomain = null;
-    private int $timeout = 12;
+    private int $timeout = 5;
 
     public function __construct(string $baseUrl, ?string $username, ?string $password, ?string $token = null, ?string $subDomain = null) {
         // Clean URL: remove trailing slashes, /dashboard, /admin, /api
@@ -62,7 +62,7 @@ class MarzbanDriver implements PanelDriverInterface {
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 8);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
 
@@ -108,12 +108,26 @@ class MarzbanDriver implements PanelDriverInterface {
     }
 
     public function authenticate(): bool {
-        // 1. Try testing existing token if present
+        // v4.0 SPEED: Try cached apiPrefix first (saves 1 request)
+        $cacheKey = md5($this->baseUrl . ($this->username ?? ''));
+        $cacheFile = sys_get_temp_dir() . '/mrz_prefix_' . $cacheKey . '.json';
+        $cachedPrefix = null;
+        if (file_exists($cacheFile) && (time() - filemtime($cacheFile) < 600)) {
+            $cached = @json_decode(@file_get_contents($cacheFile), true);
+            if (!empty($cached['prefix'])) $cachedPrefix = $cached['prefix'];
+        }
+
+        // 1. Try testing existing token if present — with cached prefix priority
         if (!empty($this->token)) {
-            foreach (['/api/system', '/api/v1/system'] as $testEndpoint) {
+            $endpoints = $cachedPrefix ? [$cachedPrefix . '/system'] : [];
+            $endpoints = array_merge($endpoints, ['/api/system', '/api/v1/system']);
+            $endpoints = array_unique($endpoints);
+            foreach ($endpoints as $testEndpoint) {
                 $res = $this->request($testEndpoint);
                 if ($res['success']) {
                     $this->apiPrefix = str_starts_with($testEndpoint, '/api/v1') ? '/api/v1' : '/api';
+                    // Cache it
+                    @file_put_contents($cacheFile, json_encode(['prefix' => $this->apiPrefix, 'ts' => time()]));
                     return true;
                 }
             }
@@ -142,6 +156,7 @@ class MarzbanDriver implements PanelDriverInterface {
                 $this->token = $res['data']['access_token'];
                 $this->apiPrefix = $prefix;
                 $this->lastError = null;
+                @file_put_contents($cacheFile, json_encode(['prefix' => $this->apiPrefix, 'ts' => time()]));
                 return true;
             }
 
@@ -168,10 +183,10 @@ class MarzbanDriver implements PanelDriverInterface {
         // Target domain to rewrite to
         $targetDomain = !empty($this->subDomain) ? trim($this->subDomain) : '';
 
-        // If targetDomain is not set, but the server returned a known broken domain (like gga1.montago-shop.ir)
-        // or a domain that differs from api_url host, fallback to baseUrl
+        // Domain independent: if targetDomain empty and url host is old/broken, fallback to baseUrl
         if (empty($targetDomain)) {
-            if ($parts['host'] === 'gga1.montago-shop.ir' || str_contains($parts['host'], 'montago-shop.ir')) {
+            require_once __DIR__ . '/../core/Helpers.php';
+            if (Helpers::isOldDomain($parts['host'] ?? '')) {
                 $targetDomain = $this->baseUrl;
             } else {
                 return $url;
@@ -473,7 +488,7 @@ class MarzbanDriver implements PanelDriverInterface {
             if (empty($links) && !empty($subUrl) && !Helpers::isPanelSubUrl($subUrl)) {
                 $ch = curl_init($subUrl);
                 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($ch, CURLOPT_TIMEOUT, 6);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 3);
                 curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
                 curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
                 curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);

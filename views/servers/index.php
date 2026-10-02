@@ -321,6 +321,18 @@ require __DIR__ . '/../layout/header.php';
                         </div>
                     </div>
 
+                    <div class="grid grid-cols-2 gap-3 p-3 bg-slate-950/60 border border-slate-800 rounded-xl">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" name="is_vip" value="1" class="rounded border-slate-700 bg-slate-800 text-purple-600 focus:ring-purple-600">
+                            <span class="text-slate-300 font-semibold">🌟 سرور ویژه (VIP)</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" name="auto_import_plans" value="1" checked class="rounded border-slate-700 bg-slate-800 text-emerald-600 focus:ring-emerald-600">
+                            <span class="text-slate-300 font-semibold">📥 ایمپورت خودکار پلن‌ها</span>
+                        </label>
+                        <p class="col-span-2 text-[10px] text-slate-400 mt-1">سرور ویژه در ربات به صورت ⭐ ویژه نمایش داده می‌شود و دسته‌بندی اقتصادی/ویژه را پشتیبانی می‌کند. ایمپورت خودکار پلن‌های سرور را بلافاصله پس از افزودن، با دسته‌بندی هوشمند موجود همگام می‌کند.</p>
+                    </div>
+
                     <div>
                         <label class="block text-slate-300 mb-1 font-semibold flex items-center justify-between">
                             <span>الگوی کانفیگ اختصاصی سرور (VLESS Reality / Trojan)</span>
@@ -476,6 +488,17 @@ require __DIR__ . '/../layout/header.php';
                         </div>
                     </div>
 
+                    <div class="grid grid-cols-2 gap-3 p-3 bg-slate-950/60 border border-slate-800 rounded-xl">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" name="is_vip" id="edit_server_is_vip" value="1" class="rounded border-slate-700 bg-slate-800 text-purple-600 focus:ring-purple-600">
+                            <span class="text-slate-300 font-semibold">🌟 سرور ویژه (VIP)</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" name="auto_import_plans" id="edit_server_auto_import" value="1" class="rounded border-slate-700 bg-slate-800 text-emerald-600 focus:ring-emerald-600">
+                            <span class="text-slate-300 font-semibold">📥 ایمپورت خودکار</span>
+                        </label>
+                    </div>
+
                     <div>
                         <label class="block text-slate-300 mb-1 font-semibold flex items-center justify-between">
                             <span>الگوی کانفیگ اختصاصی سرور (VLESS Reality / Trojan)</span>
@@ -547,6 +570,12 @@ require __DIR__ . '/../layout/header.php';
         }
         document.getElementById('edit_server_sub_domain').value = s.sub_domain || '';
         document.getElementById('edit_server_max_clients').value = (s.max_clients !== null && s.max_clients !== undefined) ? s.max_clients : 0;
+        if (document.getElementById('edit_server_is_vip')) {
+            document.getElementById('edit_server_is_vip').checked = !!(s.is_vip && parseInt(s.is_vip) === 1);
+        }
+        if (document.getElementById('edit_server_auto_import')) {
+            document.getElementById('edit_server_auto_import').checked = !!(s.auto_import_plans && parseInt(s.auto_import_plans) === 1);
+        }
         if (document.getElementById('edit_server_config_template')) {
             document.getElementById('edit_server_config_template').value = s.config_template || '';
         }
@@ -559,47 +588,89 @@ require __DIR__ . '/../layout/header.php';
         document.getElementById('editServerModal').classList.add('hidden');
     }
 
-    function pingSingleServer(id) {
+    function updateServerBadge(id, data) {
         const badge = document.getElementById('ping-badge-' + id);
         const dot = document.getElementById('dot-' + id);
         const statusText = document.getElementById('status-text-' + id);
+        if (!badge) return;
+        if (data && data.status === 'online' && data.latency !== null) {
+            let color = 'text-emerald-400 border-emerald-500/30 bg-emerald-950/40';
+            if (data.latency > 150) color = 'text-amber-400 border-amber-500/30 bg-amber-950/40';
+            if (data.latency > 300) color = 'text-rose-400 border-rose-500/30 bg-rose-950/40';
+            badge.className = 'px-2 py-0.5 rounded text-[11px] font-mono font-bold border ' + color;
+            badge.innerHTML = '⚡ ' + data.latency + ' ms' + (data.cached ? ' <span class=\"opacity-50\">⚡</span>' : '');
+            if (dot) dot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse';
+            if (statusText) { statusText.innerText = 'برخط'; statusText.className = 'font-bold text-emerald-400'; }
+        } else if (data && data.status === 'degraded') {
+            badge.className = 'px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-amber-950/50 text-amber-400 border border-amber-800/40';
+            badge.innerHTML = '⚠ ' + (data.latency || '--') + ' ms';
+            if (dot) dot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400';
+            if (statusText) { statusText.innerText = 'کند'; statusText.className = 'font-bold text-amber-400'; }
+        } else {
+            badge.className = 'px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-rose-950/50 text-rose-400 border border-rose-800/40';
+            badge.innerHTML = '✖ قطع';
+            if (dot) dot.className = 'w-2.5 h-2.5 rounded-full bg-rose-500';
+            if (statusText) { statusText.innerText = 'آفلاین'; statusText.className = 'font-bold text-rose-400'; }
+        }
+    }
 
-        badge.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-[10px]"></i>';
-        badge.className = 'px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-slate-800 text-cyan-400 border border-slate-700';
-
+    function pingSingleServer(id) {
+        const badge = document.getElementById('ping-badge-' + id);
+        if (badge) {
+            badge.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-[10px]"></i>';
+            badge.className = 'px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-slate-800 text-cyan-400 border border-slate-700';
+        }
         fetch(buildUrl('<?= Helpers::url('servers/ping') ?>', {id: id}), {
             headers: {'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json'}
         })
             .then(r => r.json())
             .then(data => {
-                if (data.success && data.latency !== null) {
-                    let color = 'text-emerald-400 border-emerald-500/30 bg-emerald-950/40';
-                    if (data.latency > 150) color = 'text-amber-400 border-amber-500/30 bg-amber-950/40';
-                    if (data.latency > 300) color = 'text-rose-400 border-rose-500/30 bg-rose-950/40';
-
-                    badge.className = 'px-2 py-0.5 rounded text-[11px] font-mono font-bold border ' + color;
-                    badge.innerHTML = '⚡ ' + data.latency + ' ms';
-                    dot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse';
-                    statusText.innerText = 'برخط';
-                    statusText.className = 'font-bold text-emerald-400';
+                if (data.success) {
+                    updateServerBadge(id, data);
                 } else {
-                    badge.className = 'px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-rose-950/50 text-rose-400 border border-rose-800/40';
-                    badge.innerHTML = '✖ قطع';
-                    dot.className = 'w-2.5 h-2.5 rounded-full bg-rose-500';
-                    statusText.innerText = 'آفلاین';
-                    statusText.className = 'font-bold text-rose-400';
+                    updateServerBadge(id, {status: 'offline', latency: null});
                 }
             })
             .catch(() => {
-                badge.className = 'px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-rose-950/50 text-rose-400 border border-rose-800/40';
-                badge.innerHTML = 'خطا';
+                const b = document.getElementById('ping-badge-' + id);
+                if (b) { b.className = 'px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-rose-950/50 text-rose-400 border border-rose-800/40'; b.innerHTML = 'خطا'; }
             });
     }
 
     function pingAllServers() {
-        serverIds.forEach(id => {
-            pingSingleServer(id);
-        });
+        // v4.0 SPEED: One request for all servers — 1 sec total instead of N*2.5
+        // First try cached (instant 50ms), then fresh if needed
+        const badges = serverIds.map(id => document.getElementById('ping-badge-' + id)).filter(Boolean);
+        badges.forEach(b => { b.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-[10px]"></i>'; });
+
+        // Try new parallel endpoint first
+        fetch(buildUrl('<?= Helpers::url('servers/ping-all') ?>', {cache: 1}), {
+            headers: {'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json'}
+        })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success && data.servers) {
+                    data.servers.forEach(s => updateServerBadge(s.id, s));
+                    // If any were cached and old (>45s), refresh in background without blocking
+                    const hasOldCache = data.servers.some(s => s.cached && s.age > 45);
+                    if (hasOldCache) {
+                        setTimeout(() => {
+                            fetch(buildUrl('<?= Helpers::url('servers/ping-all') ?>', {cache: 0}), {
+                                headers: {'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json'}
+                            }).then(r => r.json()).then(d => {
+                                if (d.success && d.servers) d.servers.forEach(s => updateServerBadge(s.id, s));
+                            }).catch(()=>{});
+                        }, 800);
+                    }
+                } else {
+                    // Fallback to old per-server ping
+                    serverIds.forEach(id => pingSingleServer(id));
+                }
+            })
+            .catch(() => {
+                // Fallback
+                serverIds.forEach(id => pingSingleServer(id));
+            });
     }
 
     function testServerConnection(id, btn) {
@@ -753,7 +824,10 @@ require __DIR__ . '/../layout/header.php';
             const modal = document.getElementById(mode === 'new' ? 'newServerModal' : 'editServerModal');
             if (!modal) return;
             const subInput = modal.querySelector('input[name="sub_domain"]');
-            if (subInput && (!subInput.value || subInput.value.includes('montago-shop.ir'))) {
+            // Domain-independent old-domain check (Task #11) — auto-fix if empty or contains any legacy domain
+            const oldDomains = ['montago-shop.ir','vpbotn.ir','gga1.montago-shop.ir','node.connectix.space','sub.speedur.org'];
+            const isOld = !subInput.value || oldDomains.some(d => subInput.value.includes(d));
+            if (subInput && isOld) {
                 subInput.value = u.host;
             }
         } catch(e) {}

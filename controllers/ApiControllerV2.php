@@ -581,8 +581,9 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
                         if (!Helpers::isPanelSubUrl($subUrl)) {
                             $ch = curl_init($subUrl);
                             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                            curl_setopt($ch, CURLOPT_TIMEOUT, 6);
+                            curl_setopt($ch, CURLOPT_TIMEOUT, 3);
                             curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2);
                             curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
                             curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
                             curl_setopt($ch, CURLOPT_USERAGENT, 'v2rayNG/1.8.5');
@@ -628,8 +629,9 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
             if (!Helpers::isPanelSubUrl($nodeSub)) {
                 $ch = curl_init($nodeSub);
                 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($ch, CURLOPT_TIMEOUT, 6);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 3);
                 curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2);
                 curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
                 curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
                 curl_setopt($ch, CURLOPT_USERAGENT, 'v2rayNG/1.8.5');
@@ -747,12 +749,14 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
      * Returns Structured Connection Nodes + Raw Base64 Sublink
      */
     public function appConfigs(): void {
+        if (session_status() === PHP_SESSION_ACTIVE) { @session_write_close(); }
         $client = self::authenticateClientApp();
         $pdo = Database::getConnection();
 
-        // Short cache: the live node query can take several seconds on a cold
-        // call; the client's inbounds change rarely, so 90s keeps the Android
-        // app well inside its request timeout on slow mobile networks.
+        // v4.0 SPEED: Fast mode ?fast=1 returns cached instantly without remote fetch (0.1s)
+        $isFast = isset($_GET['fast']) && $_GET['fast'] == '1';
+        
+        // Short cache: 90s normal, 30s for fast mode check
         $cacheKey = 'app_configs_cache_' . (int)$client['id'];
         $cached = json_decode((string)Setting::get($cacheKey, ''), true);
         if (is_array($cached) && (int)($cached['at'] ?? 0) > time() - 90 && !empty($cached['servers'])) {
@@ -762,6 +766,22 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
                 'sub_url' => Helpers::subUrl($client['sub_token']),
                 'total_servers' => count($cached['servers']),
                 'cached' => true,
+                'fast' => $isFast
+            ]);
+            return;
+        }
+        
+        // Fast mode: if cache exists but slightly old (up to 5 min), return it immediately and refresh in background
+        if ($isFast && is_array($cached) && (int)($cached['at'] ?? 0) > time() - 300 && !empty($cached['servers'])) {
+            // Return stale cache instantly
+            self::jsonSuccess([
+                'servers' => $cached['servers'],
+                'raw_sublink_base64' => $cached['raw_sublink_base64'] ?? '',
+                'sub_url' => Helpers::subUrl($client['sub_token']),
+                'total_servers' => count($cached['servers']),
+                'cached' => true,
+                'stale' => true,
+                'fast' => true
             ]);
             return;
         }

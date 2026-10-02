@@ -11,7 +11,7 @@ $windowsUrl = $manifest['windows']['url'] ?? 'https://github.com/hojjatrad/panel
 $iosSibappUrl = $manifest['ios']['sibapp'] ?? 'https://sibapp.com/applications/connectix-vpn';
 $iosAnardoniUrl = $manifest['ios']['anardoni'] ?? 'https://anardoni.com/applications/connectix-vpn';
 $iosTestFlightUrl = $manifest['ios']['testflight'] ?? 'https://testflight.apple.com/join/connectix';
-$iosIpaUrl = $manifest['ios']['ipa'] ?? '/contax/assets/Connectix-iOS-3.6.1.ipa';
+$iosIpaUrl = $manifest['ios']['ipa'] ?? (method_exists('Helpers','fullAssetUrl') ? Helpers::fullAssetUrl('Connectix-iOS-3.6.1.ipa') : '/assets/Connectix-iOS-3.6.1.ipa');
 $brandName = htmlspecialchars($brandName ?? 'Connectix VPN');
 $logoUrl = $logoUrl ?? '';
 $guides = $guides ?? [];
@@ -40,7 +40,7 @@ foreach ($guides as $g) {
     <title><?= $brandName ?> | مرکز دانلود نرم‌افزارها و راهنمای اتصال</title>
     <!-- v3.5.8 SAFE: Local assets for Iran -->
     <?php
-    $base = defined('Helpers::class') && method_exists('Helpers','basePath') ? Helpers::basePath() : '/contax';
+    $base = method_exists('Helpers','basePath') ? Helpers::basePath() : '';
     $localTailwind = __DIR__ . '/../../assets/js/tailwind.js';
     $localFA = __DIR__ . '/../../assets/css/fontawesome.min.css';
     $localVazir = __DIR__ . '/../../assets/css/vazirmatn.css';

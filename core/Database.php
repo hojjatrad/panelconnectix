@@ -314,6 +314,36 @@ class Database {
                 traffic_limit_total BIGINT DEFAULT 0
             )");
 
+            // Category aliases for smart duplicate detection
+            $pdo->exec("CREATE TABLE IF NOT EXISTS category_aliases (
+                id $autoInc,
+                category_id INT NOT NULL,
+                alias VARCHAR(128) NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(alias)
+            )");
+
+            // Server sync logs
+            $pdo->exec("CREATE TABLE IF NOT EXISTS server_sync_logs (
+                id $autoInc,
+                server_id INT NOT NULL,
+                action VARCHAR(64) NOT NULL,
+                details TEXT NULL,
+                plans_imported INT DEFAULT 0,
+                plans_skipped INT DEFAULT 0,
+                categories_created INT DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )");
+
+            // Domain replacements setting table (optional, but we use system_settings)
+            // Ensure default settings for domain independence exist
+            try {
+                $existingSettings = $pdo->query("SELECT setting_key FROM system_settings WHERE setting_key IN ('panel_domain','sublink_custom_domain','old_domains','domain_replacements','github_webhook_secret')")->fetchAll(PDO::FETCH_COLUMN);
+                if (!in_array('old_domains', $existingSettings)) {
+                    $pdo->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES ('old_domains', ?)")->execute(['montago-shop.ir,gga1.montago-shop.ir,node.connectix.space,sub.speedur.org']);
+                }
+            } catch (Throwable $e) {}
+
             // 2. Safe Column Additions for Core Tables
             $userCols = [
                 'telegram_bot_token' => 'VARCHAR(255) NULL',
@@ -401,7 +431,11 @@ class Database {
                 'error_message' => 'TEXT NULL',
                 'category_id' => 'INT NULL DEFAULT NULL',
                 'config_template' => 'TEXT NULL',
-                'selected_inbounds' => 'TEXT NULL'
+                'selected_inbounds' => 'TEXT NULL',
+                'is_vip' => 'TINYINT(1) DEFAULT 0',
+                'auto_import_plans' => 'TINYINT(1) DEFAULT 0',
+                'last_sync_at' => 'DATETIME NULL',
+                'sync_enabled' => 'TINYINT(1) DEFAULT 1',
             ];
             foreach ($serverCols as $c => $d) {
                 self::safeAddColumn($pdo, 'server_nodes', $c, $d);

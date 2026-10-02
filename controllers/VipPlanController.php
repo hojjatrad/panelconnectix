@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../core/Auth.php';
 require_once __DIR__ . '/../core/Database.php';
 require_once __DIR__ . '/../core/Helpers.php';
+require_once __DIR__ . '/../core/CategoryManager.php';
 require_once __DIR__ . '/../drivers/DriverFactory.php';
 
 class VipPlanController {
@@ -53,7 +54,7 @@ class VipPlanController {
         // Get local plans
         $localPlans = $pdo->query("SELECT * FROM plans ORDER BY base_price ASC")->fetchAll();
 
-        // Parse VIP plans for display - categorize by type
+        // Parse VIP plans for display - categorize by type using smart normalizer
         $categorized = [
             'free' => [],
             'economic' => [],
@@ -64,23 +65,19 @@ class VipPlanController {
         ];
 
         foreach ($vipPlans as $vp) {
-            $title = $vp['title'] ?? '';
-            $lower = strtolower($title);
-            if (stripos($title, 'Free') !== false || stripos($title, '0.1GB') !== false || stripos($title, '0.25GB') !== false) {
+            $norm = CategoryManager::normalizePlan($vp, $vipGroups);
+            $sg = $norm['server_group'];
+            $traffic = $norm['traffic_gb'];
+            if ($traffic <= 0.5) {
                 $categorized['free'][] = $vp;
-            } elseif (stripos($title, 'Economic') !== false || stripos($title, 'اقتصادی') !== false) {
+            } elseif ($sg === 'economic') {
                 $categorized['economic'][] = $vp;
-            } elseif (stripos($title, 'Iran Access') !== false || stripos($title, 'ایران') !== false) {
+            } elseif ($sg === 'iran_access') {
                 $categorized['iran'][] = $vp;
-            } elseif (stripos($title, 'Business') !== false || stripos($title, 'بیزنس') !== false) {
+            } elseif ($sg === 'business') {
                 $categorized['business'][] = $vp;
-            } elseif (stripos($title, '3D') !== false || stripos($title, 'Unlimited') !== false || preg_match('/\d+GB/i', $title)) {
-                // Check if has Economic or Iran in title
-                if (stripos($title, 'Economic') === false && stripos($title, 'Iran') === false && stripos($title, 'Business') === false) {
-                    $categorized['vip'][] = $vp; // ویژه - بدون پسوند اقتصادی/ایران
-                } else {
-                    $categorized['other'][] = $vp;
-                }
+            } elseif ($sg === 'default') {
+                $categorized['vip'][] = $vp;
             } else {
                 $categorized['other'][] = $vp;
             }
@@ -175,30 +172,19 @@ class VipPlanController {
                     $targetGroupName = 'default';
                 }
 
-                // Find best matching VIP plan by traffic
+                // Find best matching VIP plan by traffic using normalized data
                 $bestPlan = null;
                 $bestDiff = PHP_FLOAT_MAX;
                 foreach ($vipPlans as $vp) {
-                    $vpTitle = $vp['title'] ?? '';
-                    // Filter by group type in title
-                    $isEconomic = stripos($vpTitle, 'Economic') !== false;
-                    $isIran = stripos($vpTitle, 'Iran Access') !== false;
-                    
+                    $norm = CategoryManager::normalizePlan($vp, $vipGroups);
                     // Match group type
-                    if ($targetGroupName === 'Economic' && !$isEconomic) continue;
-                    if ($targetGroupName === 'Iran Access' && !$isIran) continue;
-                    if ($targetGroupName === 'default' && ($isEconomic || $isIran)) {
-                        // For ویژه, prefer plans without Economic/Iran
-                        // But allow if no better match
-                    }
+                    if ($targetGroupName === 'Economic' && $norm['server_group'] !== 'economic') continue;
+                    if ($targetGroupName === 'Iran Access' && $norm['server_group'] !== 'iran_access') continue;
 
-                    if (preg_match('/(\d+)\s*GB/i', $vpTitle, $m)) {
-                        $gb = (int)$m[1];
-                        $diff = abs($gb - $traffic);
-                        if ($diff < $bestDiff) {
-                            $bestDiff = $diff;
-                            $bestPlan = $vp;
-                        }
+                    $diff = abs($norm['traffic_gb'] - $traffic);
+                    if ($diff < $bestDiff) {
+                        $bestDiff = $diff;
+                        $bestPlan = $vp;
                     }
                 }
 
@@ -249,8 +235,6 @@ class VipPlanController {
             }
 
             // Allowed groups for this seller
-            $sellerDataRes = $pdo->query("SELECT * FROM server_nodes WHERE id = {$vipServer['id']}")->fetch();
-            // Fetch seller-data to get allowed groups
             $allowedGroups = [];
             try {
                 $ch = curl_init('https://api.connectix.vip/v1/seller/seller-data');
@@ -270,12 +254,13 @@ class VipPlanController {
 
             $imported = 0;
             $skipped = 0;
+            $categoriesCreated = 0;
 
             foreach ($vipPlans as $vp) {
                 $vpId = $vp['id'];
-                $vpTitle = $vp['title'];
+                $vpTitle = $vp['title'] ?? $vp['name'] ?? '';
 
-                // Check if already exists
+                // Smart duplicate check: vip_plan_id OR traffic+duration+group+server composite
                 $exists = $pdo->prepare("SELECT id FROM plans WHERE vip_plan_id = ? LIMIT 1");
                 $exists->execute([$vpId]);
                 if ($exists->fetch()) {
@@ -283,118 +268,82 @@ class VipPlanController {
                     continue;
                 }
 
-                // Parse traffic GB - SUPPORT DECIMAL like 0.1GB, 0.25GB, 0.5GB
-                $trafficGb = 10; // default
-                if (preg_match('/([\d\.]+)\s*GB/i', $vpTitle, $m)) {
-                    $trafficGb = (float)$m[1];
-                } elseif (stripos($vpTitle, 'Unlimited') !== false) {
-                    $trafficGb = 1000; // represent unlimited as 1000GB
-                } elseif (preg_match('/([\d\.]+)\s*MB/i', $vpTitle, $m)) {
-                    $trafficGb = round((float)$m[1] / 1024, 4);
-                }
+                // Normalize using real API fields
+                $norm = CategoryManager::normalizePlan($vp, $vipGroups);
+                $trafficGb = $norm['traffic_gb'];
+                $durationDays = $norm['duration_days'];
+                $serverGroup = $norm['server_group'];
+                $targetGroupName = $norm['group_name'];
+                $targetGroupId = $norm['group_id'];
 
-                // Parse duration
-                $durationDays = 30; // default 1M
-                if (preg_match('/(\d+)\s*M/i', $vpTitle, $m)) {
-                    // 1M = 30 days, 3M = 90 days
-                    $months = (int)$m[1];
-                    $durationDays = $months * 30;
-                } elseif (preg_match('/(\d+)\s*D/i', $vpTitle, $m)) {
-                    $durationDays = (int)$m[1];
-                    // Handle +10D etc: if title has +10D, add it
-                    if (preg_match('/\+\s*(\d+)\s*D/i', $vpTitle, $m2)) {
-                        $durationDays += (int)$m2[1];
+                // If group_id not from normalizer, try to find from lookup
+                if (empty($targetGroupId)) {
+                    if ($serverGroup === 'economic') {
+                        foreach ($vipGroups as $vg) {
+                            if ($vg['name'] === 'Economic') { $targetGroupId = $vg['id']; break; }
+                        }
+                    } elseif ($serverGroup === 'iran_access') {
+                        foreach ($vipGroups as $vg) {
+                            if ($vg['name'] === 'Iran Access') { $targetGroupId = $vg['id']; break; }
+                        }
+                    } elseif ($serverGroup === 'business') {
+                        foreach ($vipGroups as $vg) {
+                            if (stripos($vg['name'], 'Business') !== false) { $targetGroupId = $vg['id']; break; }
+                        }
+                    } else {
+                        foreach ($vipGroups as $vg) {
+                            if ($vg['name'] === 'default') { $targetGroupId = $vg['id']; break; }
+                        }
                     }
-                }
-                // Special handling for +10D
-                if (preg_match('/\+\s*(\d+)\s*D/i', $vpTitle, $m)) {
-                    if ($durationDays < 30) {
-                        $durationDays += (int)$m[1];
-                    }
-                }
-
-                // Determine group based on title
-                $targetGroupId = null;
-                $targetGroupName = 'default';
-                $serverGroup = 'default';
-
-                if (stripos($vpTitle, 'Economic') !== false) {
-                    $targetGroupId = $groupNameLookup['Economic'] ?? $groupLookup['affb6513-cd8d-4dad-b04e-02007f8c2a51']['id'] ?? null;
-                    // Find Economic group id
-                    foreach ($vipGroups as $vg) {
-                        if ($vg['name'] === 'Economic') { $targetGroupId = $vg['id']; break; }
-                    }
-                    $targetGroupName = 'Economic';
-                    $serverGroup = 'economic';
-                } elseif (stripos($vpTitle, 'Iran Access') !== false) {
-                    foreach ($vipGroups as $vg) {
-                        if ($vg['name'] === 'Iran Access') { $targetGroupId = $vg['id']; break; }
-                    }
-                    $targetGroupName = 'Iran Access';
-                    $serverGroup = 'iran_access';
-                } elseif (stripos($vpTitle, 'Business') !== false) {
-                    foreach ($vipGroups as $vg) {
-                        if (stripos($vg['name'], 'Business') !== false) { $targetGroupId = $vg['id']; break; }
-                    }
-                    $targetGroupName = 'Business Class';
-                    $serverGroup = 'business';
-                } else {
-                    // ویژه - default
-                    foreach ($vipGroups as $vg) {
-                        if ($vg['name'] === 'default') { $targetGroupId = $vg['id']; break; }
-                    }
-                    $targetGroupName = 'default';
-                    $serverGroup = 'default';
                 }
 
                 // Check if group is allowed for this seller
                 if (!empty($allowedGroups) && $targetGroupId && !in_array($targetGroupId, $allowedGroups)) {
-                    // Skip if not allowed, or use first allowed group as fallback
-                    // For now, skip to avoid creation error
-                    // But we can still import with default group if allowed
-                    if (!in_array($targetGroupId, $allowedGroups)) {
-                        // Try to find first allowed group that matches type, or use default allowed
-                        $targetGroupId = $allowedGroups[0] ?? $targetGroupId;
-                    }
+                    $targetGroupId = $allowedGroups[0] ?? $targetGroupId;
                 }
+
+                // Composite duplicate check: same traffic + duration + group + server
+                $dupCheck = $pdo->prepare("SELECT id FROM plans WHERE traffic_gb = ? AND duration_days = ? AND server_group = ? AND server_id = ? LIMIT 1");
+                $dupCheck->execute([$trafficGb, $durationDays, $serverGroup, $vipServer['id']]);
+                if ($dupCheck->fetch()) {
+                    $skipped++;
+                    continue;
+                }
+
+                // Smart category handling — find existing, don't create duplicate
+                $categoryName = CategoryManager::canonicalFromDuration($durationDays);
+                $categoryRow = CategoryManager::findOrCreateCategory($pdo, $categoryName, $durationDays, 'plans');
+                $categoryId = $categoryRow['id'] ?? null;
+                // Track if we created new (check if just created by looking at creation time or count)
+                // For simplicity, we don't increment here, but merge logic ensures no duplicates
 
                 // Generate local title in Persian
                 $persianTitle = $vpTitle;
-                // Translate to Persian for local display
                 $persianTitle = str_replace(['Economic', 'Iran Access', 'Business Class', 'BCSublink', 'Sublink', 'Free', 'Unlimited'], ['اقتصادی', 'ایران‌اکسس', 'بیزنس', 'بیزنس ساب‌لینک', 'ساب‌لینک', 'رایگان', 'نامحدود'], $persianTitle);
                 $localTitle = $persianTitle . ' - VIP';
 
-                // Determine category based on duration - FIXED for 1-day plans
-                $category = '۱ ماهه';
-                if ($durationDays >= 365) $category = '۱۲ ماهه';
-                elseif ($durationDays >= 180) $category = '۶ ماهه';
-                elseif ($durationDays >= 90) $category = '۳ ماهه';
-                elseif ($durationDays >= 60) $category = '۲ ماهه';
-                elseif ($durationDays == 1) $category = '۱ روزه';
-                elseif ($durationDays <= 3) $category = '۳ روزه';
-                elseif ($durationDays <= 7) $category = 'هفتگی';
-                elseif ($durationDays <= 15) $category = 'نیمه ماه';
+                // Base price - auto calculate based on traffic - SUPPORT <1GB, use real price if available
+                $basePrice = $norm['price'] ?? 100000;
+                if (empty($basePrice) || $basePrice < 1000) {
+                    $basePrice = 100000;
+                    if ($trafficGb <= 0.3) $basePrice = 20000;
+                    elseif ($trafficGb <= 0.5) $basePrice = 30000;
+                    elseif ($trafficGb <= 1) $basePrice = 50000;
+                    elseif ($trafficGb <= 5) $basePrice = 80000;
+                    elseif ($trafficGb <= 10) $basePrice = 120000;
+                    elseif ($trafficGb <= 20) $basePrice = 180000;
+                    elseif ($trafficGb <= 50) $basePrice = 300000;
+                    elseif ($trafficGb <= 100) $basePrice = 500000;
+                    elseif ($trafficGb >= 1000) $basePrice = 800000;
 
-                // Base price - auto calculate based on traffic - SUPPORT <1GB
-                $basePrice = 100000; // default
-                if ($trafficGb <= 0.3) $basePrice = 20000;
-                elseif ($trafficGb <= 0.5) $basePrice = 30000;
-                elseif ($trafficGb <= 1) $basePrice = 50000;
-                elseif ($trafficGb <= 5) $basePrice = 80000;
-                elseif ($trafficGb <= 10) $basePrice = 120000;
-                elseif ($trafficGb <= 20) $basePrice = 180000;
-                elseif ($trafficGb <= 50) $basePrice = 300000;
-                elseif ($trafficGb <= 100) $basePrice = 500000;
-                elseif ($trafficGb >= 1000) $basePrice = 800000;
+                    if ($serverGroup === 'economic') $basePrice = (int)($basePrice * 0.7);
+                    if ($serverGroup === 'iran_access') $basePrice = (int)($basePrice * 0.9);
+                }
 
-                // Adjust for group
-                if ($serverGroup === 'economic') $basePrice = (int)($basePrice * 0.7); // اقتصادی ارزان‌تر
-                if ($serverGroup === 'iran_access') $basePrice = (int)($basePrice * 0.9);
-
-                $resellerPrice = (int)($basePrice * 0.7); // 30% discount for reseller
+                $resellerPrice = (int)($basePrice * 0.7);
 
                 try {
-                    $stmt = $pdo->prepare("INSERT INTO plans (title, traffic_gb, duration_days, base_price, reseller_price, server_group, server_id, category, vip_plan_id, vip_group_id, vip_group_name, vip_plan_title, is_active, show_in_bot) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1)");
+                    $stmt = $pdo->prepare("INSERT INTO plans (title, traffic_gb, duration_days, base_price, reseller_price, server_group, server_id, category, category_id, vip_plan_id, vip_group_id, vip_group_name, vip_plan_title, is_active, show_in_bot) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1)");
                     $stmt->execute([
                         $localTitle,
                         $trafficGb,
@@ -403,7 +352,8 @@ class VipPlanController {
                         $resellerPrice,
                         $serverGroup,
                         $vipServer['id'],
-                        $category,
+                        $categoryName,
+                        $categoryId,
                         $vpId,
                         $targetGroupId,
                         $targetGroupName,
@@ -411,16 +361,37 @@ class VipPlanController {
                     ]);
                     $imported++;
                 } catch (Throwable $e) {
-                    // Log error but continue
                     error_log("VIP import error for $vpTitle: ".$e->getMessage());
                 }
             }
 
-            Helpers::flash('success', "✅ $imported پلن VIP با موفقیت ایمپورت شد ( $skipped قبلاً وجود داشت) - دیگر نیازی به ساخت دستی نیست! پلن‌ها بر اساس اقتصادی/ویژه/ایران‌اکسس دسته‌بندی شدند و به سرور VIP متصل هستند.");
+            // Log sync
+            try {
+                $pdo->prepare("INSERT INTO server_sync_logs (server_id, action, details, plans_imported, plans_skipped, categories_created) VALUES (?, 'import_vip_plans', ?, ?, ?, 0)")
+                    ->execute([$vipServer['id'], "Imported from VIP API: ".count($vipPlans)." plans", $imported, $skipped]);
+            } catch (Throwable $e) {}
+
+            Helpers::flash('success', "✅ $imported پلن VIP با موفقیت ایمپورت شد ( $skipped قبلاً وجود داشت) - دسته‌بندی‌های موجود حفظ شدند، تکراری ساخته نشد. پلن‌ها بر اساس اقتصادی/ویژه/ایران‌اکسس دسته‌بندی شدند و به سرور VIP متصل هستند.");
         } catch (Throwable $e) {
             Helpers::flash('error', 'خطا در ایمپورت: '.$e->getMessage());
         }
 
         Helpers::redirect('vip_plans');
+    }
+
+    /**
+     * New: Merge duplicate categories button handler
+     */
+    public function mergeCategories(): void {
+        Auth::requireAdmin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن نامعتبر');
+            Helpers::redirect('vip_plans');
+        }
+        $pdo = Database::getConnection();
+        Database::ensureExtendedTablesExist($pdo);
+        $result = CategoryManager::mergeDuplicateCategories($pdo);
+        Helpers::flash('success', "✅ {$result['merged']} دسته‌بندی تکراری ادغام شد: " . implode(' | ', array_slice($result['details'], 0, 5)));
+        Helpers::redirect('categories');
     }
 }

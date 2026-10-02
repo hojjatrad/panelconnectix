@@ -7,7 +7,7 @@ class ConnectixSellerDriver implements PanelDriverInterface {
     private ?string $username;
     private ?string $password;
     private ?string $lastError = null;
-    private int $timeout = 15;
+    private int $timeout = 5;
 
     public function __construct(string $baseUrl, ?string $username = null, ?string $password = null, ?string $token = null, ?string $subDomain = null) {
         // Normalize baseUrl - Connectix seller API always lives at api.connectix.vip
@@ -47,7 +47,7 @@ class ConnectixSellerDriver implements PanelDriverInterface {
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 8);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);

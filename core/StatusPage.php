@@ -1,6 +1,6 @@
 <?php
 /**
- * F10: Status Page - status.vpbotn.ir
+ * F10: Status Page - status.{PANEL_DOMAIN}
  * I1: Uptime Monitoring
  */
 

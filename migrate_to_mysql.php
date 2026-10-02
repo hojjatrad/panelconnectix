@@ -36,8 +36,8 @@ require_once __DIR__ . '/core/Performance.php';
 
 header('Content-Type: text/html; charset=utf-8');
 echo "<!DOCTYPE html><html lang='fa' dir='rtl'><head><meta charset='UTF-8'><title>مهاجرت به MySQL</title>";
-echo "<script src='/contax/assets/js/tailwind.js'></script>";
-echo "<link rel='stylesheet' href='/contax/assets/css/fontawesome.min.css'>";
+echo "<script src='<?= $assetBase ?>/assets/js/tailwind.js'></script>";
+echo "<link rel='stylesheet' href='<?= $assetBase ?>/assets/css/fontawesome.min.css'>";
 echo "<style>*{font-family:'Vazirmatn',sans-serif}</style></head>";
 echo "<body class='bg-slate-950 text-slate-100 min-h-screen p-6'><div class='max-w-3xl mx-auto space-y-6'>";
 

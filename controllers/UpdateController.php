@@ -75,7 +75,7 @@ class UpdateController {
         $autoApply = !empty($_POST['auto_apply_github_updates']) ? '1' : '0';
 
         // Remove https://github.com/ if user pasted full URL
-        $repo = preg_replace('#^https?://github\.com/#i', '', $repo);
+        $repo = preg_replace('#^https?://github\\.com/#i', '', $repo);
         $repo = rtrim($repo, '/.git');
 
         Setting::set('github_repo', $repo);
@@ -127,22 +127,34 @@ class UpdateController {
         header('Content-Type: application/json; charset=utf-8');
         $rawPayload = file_get_contents('php://input');
         $querySecret = $_GET['secret'] ?? '';
-        $expected = Setting::get('github_webhook_secret', defined('APP_SECRET') ? APP_SECRET : 'gh_hook_sec_vpbotn_2026');
+        // Domain independent: use Setting or APP_SECRET, no hardcoded vpbotn fallback
+        $expected = Setting::get('github_webhook_secret', defined('APP_SECRET') ? APP_SECRET : '');
 
         $isAuthorized = false;
 
         // Check 1: Query param ?secret=
-        if (!empty($querySecret) && (hash_equals($expected, $querySecret) || $querySecret === 'gh_hook_sec_vpbotn_2026')) {
+        if (!empty($querySecret) && !empty($expected) && hash_equals($expected, $querySecret)) {
+            $isAuthorized = true;
+        }
+        // Also allow APP_SECRET directly
+        if (!$isAuthorized && !empty($querySecret) && defined('APP_SECRET') && !empty(APP_SECRET) && hash_equals(APP_SECRET, $querySecret)) {
             $isAuthorized = true;
         }
 
         // Check 2: GitHub Native Header X-Hub-Signature-256
         $hubSignature = $_SERVER['HTTP_X_HUB_SIGNATURE_256'] ?? '';
         if (!$isAuthorized && !empty($hubSignature) && str_starts_with($hubSignature, 'sha256=')) {
-            $expectedSig1 = 'sha256=' . hash_hmac('sha256', $rawPayload, $expected);
-            $expectedSig2 = 'sha256=' . hash_hmac('sha256', $rawPayload, 'gh_hook_sec_vpbotn_2026');
-            if (hash_equals($expectedSig1, $hubSignature) || hash_equals($expectedSig2, $hubSignature)) {
-                $isAuthorized = true;
+            if (!empty($expected)) {
+                $expectedSig1 = 'sha256=' . hash_hmac('sha256', $rawPayload, $expected);
+                if (hash_equals($expectedSig1, $hubSignature)) {
+                    $isAuthorized = true;
+                }
+            }
+            if (!$isAuthorized && defined('APP_SECRET') && !empty(APP_SECRET)) {
+                $expectedSigApp = 'sha256=' . hash_hmac('sha256', $rawPayload, APP_SECRET);
+                if (hash_equals($expectedSigApp, $hubSignature)) {
+                    $isAuthorized = true;
+                }
             }
         }
 
@@ -167,10 +179,6 @@ class UpdateController {
         }
 
         // Short-circuit: nothing newer than what is installed → stay silent
-        // (prevents duplicate bot messages on retried/duplicate webhook events)
-        // forceRefresh=true: webhook events must always consult GitHub fresh —
-        // the 180s panel cache could otherwise hold a stale "no update" result
-        // written seconds before the push landed.
         $info = Updater::checkForUpdates(true);
         if (empty($info['has_update'])) {
             echo json_encode([
@@ -182,11 +190,7 @@ class UpdateController {
             exit;
         }
 
-        // ---- CI Quality Gate (Panel CI workflow) ----
-        // A pushed commit is only installed once its CI run is green.
-        // While CI is still running the SHA is parked in 'pending_ci_sha'
-        // and the panel cron (every minute) applies it as soon as it turns
-        // green; a red CI blocks the update and alerts the supergroup.
+        // ---- CI Quality Gate ----
         try {
             require_once __DIR__ . '/../core/TelegramBot.php';
             $ciState = Updater::ciStateForSha($pushedSha);
@@ -212,12 +216,10 @@ class UpdateController {
                 echo json_encode(['success' => true, 'status' => 'waiting_ci', 'sha' => $pushedSha, 'message' => 'CI در حال اجراست؛ اعمال خودکار پس از سبز شدن.']);
                 exit;
             }
-            // 'green' or 'unknown' → proceed to apply now
             if (Setting::get('pending_ci_sha', '') === $pushedSha) {
                 Setting::set('pending_ci_sha', '');
             }
         } catch (Throwable $e) {
-            // Gate failure must never block updates: fall through to apply
             error_log('CI gate error: ' . $e->getMessage());
         }
 
@@ -229,8 +231,6 @@ class UpdateController {
                      . "تغییرات جدید مستقیماً از مخزن گیت‌هاب دریافت و روی پنل هاست مستقر گردید.\n"
                      . "🏷 نسخه: <code>" . htmlspecialchars($res['version'] ?? '', ENT_QUOTES) . "</code>\n"
                      . "📅 زمان: " . date('Y-m-d H:i:s');
-                // ONE message per applied update, routed to the supergroup
-                // reports topic, de-duplicated by commit sha (no bot spam)
                 TelegramBot::announcePanelUpdate($pushedSha, $msg);
             } catch (Throwable $e) {}
         }

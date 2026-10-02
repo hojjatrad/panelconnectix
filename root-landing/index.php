@@ -37,8 +37,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reseller_request'])) 
 <title>پنل فروش محصول با اپ اختصاصی فارسی | سود 200% | Connectix - @mainAdminpanel</title>
 <meta name="description" content="پنل فروش محصول فارسی با اپ اندروید اختصاصی، ربات تلگرام فروش خودکار 24 ساعته، سود 200%، مدیریت سفارشات، ویدیو معرفی، دمو آنلاین demo/demo123. @mainAdminpanel">
 <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet">
-<script src="/contax/assets/js/tailwind.js"></script>
-<link rel="stylesheet" href="/contax/assets/css/fontawesome.min.css">
+<script src="<?= $base ?? $assetBase ?? "" ?>/assets/js/tailwind.js"></script>
+<link rel="stylesheet" href="<?= $base ?? $assetBase ?? "" ?>/assets/css/fontawesome.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <style>
 *{font-family:Vazirmatn,system-ui!important}

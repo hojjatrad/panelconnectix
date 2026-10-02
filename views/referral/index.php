@@ -5,7 +5,7 @@ require_once __DIR__ . '/../../core/Referral.php';
 
 $userId = Auth::id();
 $stats = Referral::getStats($userId);
-$referralLink = (Setting::get('site_url', 'https://vpbotn.ir') . '/?ref=' . $stats['referral_code']);
+$panelDomain = Helpers::getPanelDomain(); $siteUrl = 'https://' . $panelDomain; $referralLink = (Setting::get('site_url', $siteUrl) . '/?ref=' . $stats['referral_code']);
 ?>
 
 <div class="max-w-4xl mx-auto space-y-6">

@@ -1,6 +1,6 @@
 <?php
 // O8: Optimized Cron - Single file for all tasks, run every 5 minutes
-// Usage: Add to cPanel cron: php /home/vpbotni1/public_html/contax/cron/optimized_cron.php >> /dev/null 2>&1
+// Usage: Add to cPanel cron: php {PANEL_DIR}/cron/optimized_cron.php >> /dev/null 2>&1
 
 define('CONNECTIX_CRON', true);
 require_once __DIR__ . '/../core/Database.php';

@@ -104,7 +104,7 @@ function initials($name,$user){
 <?php else: foreach($clients as $c):
 $pct = $c['traffic_limit_bytes']>0 ? round(($c['traffic_used_bytes']/$c['traffic_limit_bytes'])*100,1) : 0;
 $subUrlRaw = !empty($c['node_sublink']) ? $c['node_sublink'] : Helpers::subUrl($c['sub_token']);
-$subUrl = str_contains($subUrlRaw, 'montago-shop.ir') ? preg_replace('#https?://[^/]+#i', 'https://sub.speedur.org:2096', $subUrlRaw) : $subUrlRaw;
+$subUrl = Helpers::fixSublinkDomain($subUrlRaw);
 $daysRemText = Helpers::daysRemaining($c['expire_at']);
 $isExpired = str_contains($daysRemText, 'منقضی') || $c['status']==='expired';
 $ini = initials($c['customer_name'] ?? '', $c['username']);

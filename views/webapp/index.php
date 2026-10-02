@@ -6,7 +6,7 @@
     <title><?= htmlspecialchars($brandName) ?> - Mini App</title>
     <!-- v3.5.8 SAFE: Local assets for Iran -->
     <?php
-    $base = method_exists('Helpers','basePath') ? Helpers::basePath() : '/contax';
+    $base = method_exists('Helpers','basePath') ? Helpers::basePath() : '';
     $localTailwind = __DIR__ . '/../../assets/js/tailwind.js';
     $localFA = __DIR__ . '/../../assets/css/fontawesome.min.css';
     $localVazir = __DIR__ . '/../../assets/css/vazirmatn.css';

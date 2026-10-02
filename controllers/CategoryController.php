@@ -77,12 +77,22 @@ class CategoryController {
         }
 
         $pdo = Database::getConnection();
+        Database::ensureExtendedTablesExist($pdo);
+        require_once __DIR__ . '/../core/CategoryManager.php';
         
+        // Smart: normalize name to canonical to avoid duplicate
+        $canonical = CategoryManager::normalizeCategoryName($name);
+        $name = $canonical;
+        $slug = CategoryManager::slugify($canonical);
+
         // Check uniqueness of slug
         $stmtCheck = $pdo->prepare("SELECT id FROM categories WHERE slug = ?");
         $stmtCheck->execute([$slug]);
-        if ($stmtCheck->fetch()) {
-            $slug .= '_' . time();
+        $existing = $stmtCheck->fetch();
+        if ($existing) {
+            // Return existing instead of creating duplicate
+            Helpers::flash('info', "دسته‌بندی «{$name}» قبلاً وجود دارد (ادغام شد).");
+            Helpers::redirect('categories');
         }
 
         // Calculate level
@@ -99,8 +109,11 @@ class CategoryController {
         $stmt = $pdo->prepare("INSERT INTO categories (name, slug, type, icon, badge_color, description, sort_order, parent_id, level, bot_label, bot_icon, is_active) 
                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)");
         $stmt->execute([$name, $slug, $type, $icon, $badgeColor, $description, $sortOrder, $parentId, $level, $botLabel ?: null, $botIcon ?: null]);
+        $newId = (int)$pdo->lastInsertId();
+        // Add aliases
+        try { CategoryManager::addAliases($pdo, $newId, $name); } catch (Throwable $e) {}
 
-        Helpers::logActivity('category_create', "ایجاد دسته‌بندی جدید {$name} ({$slug})", 'category', (string)$pdo->lastInsertId());
+        Helpers::logActivity('category_create', "ایجاد دسته‌بندی جدید {$name} ({$slug})", 'category', (string)$newId);
         Helpers::flash('success', "دسته‌بندی «{$name}» با موفقیت افزوده شد.");
         Helpers::redirect('categories');
     }
@@ -229,6 +242,58 @@ class CategoryController {
 
         Helpers::logActivity('category_delete', "حذف دسته‌بندی شناسه {$id} و انتقال موارد وابسته به پیش‌فرض", 'category', (string)$id);
         Helpers::flash('info', 'دسته‌بندی حذف شد و سرورها و پلن‌های وابسته به دسته پیش‌فرض منتقل شدند.');
+        Helpers::redirect('categories');
+    }
+
+    public function mergeDuplicates(): void {
+        Auth::requireAdmin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
+            Helpers::redirect('categories');
+        }
+
+        $pdo = Database::getConnection();
+        Database::ensureExtendedTablesExist($pdo);
+        require_once __DIR__ . '/../core/CategoryManager.php';
+
+        $result = CategoryManager::mergeDuplicateCategories($pdo);
+
+        Helpers::logActivity('category_merge', "ادغام {$result['merged']} دسته‌بندی تکراری", 'category');
+        Helpers::flash('success', "✅ {$result['merged']} دسته‌بندی تکراری ادغام شد. " . implode(' | ', array_slice($result['details'], 0, 3)));
+        Helpers::redirect('categories');
+    }
+
+    public function fixAll(): void {
+        Auth::requireAdmin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن نامعتبر');
+            Helpers::redirect('categories');
+        }
+
+        $pdo = Database::getConnection();
+        Database::ensureExtendedTablesExist($pdo);
+        require_once __DIR__ . '/../core/CategoryManager.php';
+
+        // 1. Merge duplicates
+        $mergeResult = CategoryManager::mergeDuplicateCategories($pdo);
+
+        // 2. Fix plans category_id based on duration
+        $fixedPlans = 0;
+        try {
+            $plans = $pdo->query("SELECT id, category, duration_days FROM plans")->fetchAll();
+            foreach ($plans as $pl) {
+                $catName = CategoryManager::canonicalFromDuration((int)$pl['duration_days']);
+                $catRow = CategoryManager::findOrCreateCategory($pdo, $catName, (int)$pl['duration_days'], 'plans');
+                if ($catRow && (empty($pl['category']) || $pl['category'] !== $catName)) {
+                    $pdo->prepare("UPDATE plans SET category = ?, category_id = ? WHERE id = ?")->execute([$catName, $catRow['id'], $pl['id']]);
+                    $fixedPlans++;
+                } elseif ($catRow) {
+                    $pdo->prepare("UPDATE plans SET category_id = ? WHERE id = ? AND (category_id IS NULL OR category_id = 0)")->execute([$catRow['id'], $pl['id']]);
+                }
+            }
+        } catch (Throwable $e) {}
+
+        Helpers::flash('success', "✅ ادغام: {$mergeResult['merged']} دسته تکراری، {$fixedPlans} پلن اصلاح شد.");
         Helpers::redirect('categories');
     }
 }

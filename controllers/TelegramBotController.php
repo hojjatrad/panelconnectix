@@ -68,13 +68,14 @@ class TelegramBotController {
         $pdo = $pdo ?: Database::getConnection();
         $subUrlLocal = Helpers::subUrl($client['sub_token'] ?? '');
 
-        // 1. If client already has a valid remote node_sublink (not pointing to our own sub proxy)
+        // 1. If client already has a valid remote node_sublink (not pointing to our own sub proxy) — domain-independent (Task #11)
         if (!empty($client['node_sublink']) && 
             $client['node_sublink'] !== $subUrlLocal && 
             !Helpers::isPanelSubUrl($client['node_sublink'])) {
             $link = $client['node_sublink'];
-            if (str_contains($link, 'montago-shop.ir')) {
-                $link = preg_replace('#https?://[^/]+#i', 'https://sub.speedur.org:2096', $link);
+            $fixed = Helpers::fixSublinkDomain($link);
+            if ($fixed !== $link) {
+                $link = $fixed;
                 $pdo->prepare("UPDATE clients SET node_sublink = ? WHERE id = ?")->execute([$link, $client['id']]);
             }
             return $link;
@@ -180,6 +181,7 @@ class TelegramBotController {
     }
 
     public static function getPlansForReseller(PDO $pdo, int $resellerId, bool $includeFree = false): array {
+        Database::ensureExtendedTablesExist($pdo);
         $sql = "SELECT p.*, 
                        COALESCE(rp.custom_title, p.title) as display_title,
                        COALESCE(rp.custom_category, p.category, '۱ ماهه') as display_category,
@@ -190,11 +192,16 @@ class TelegramBotController {
                        s.name as server_name,
                        s.driver as server_driver,
                        s.server_group as server_node_group,
+                       s.is_vip as server_is_vip,
                        p.server_group as server_group,
-                       p.vip_group_name as vip_group_name
+                       p.vip_group_name as vip_group_name,
+                       p.category_id as category_id,
+                       c.name as category_real_name,
+                       c.slug as category_slug
                 FROM plans p
                 LEFT JOIN reseller_plans rp ON p.id = rp.plan_id AND rp.reseller_id = ? AND rp.is_custom = 0
                 LEFT JOIN server_nodes s ON p.server_id = s.id
+                LEFT JOIN categories c ON p.category_id = c.id
                 WHERE p.is_active = 1 AND COALESCE(rp.is_active, 1) = 1 AND COALESCE(p.show_in_bot, 1) = 1";
         if (!$includeFree) {
             $sql .= " AND p.is_free = 0";
@@ -231,7 +238,11 @@ class TelegramBotController {
                 s.name as server_name,
                 s.driver as server_driver,
                 s.server_group as server_node_group,
-                1 as show_in_bot
+                s.is_vip as server_is_vip,
+                1 as show_in_bot,
+                NULL as category_id,
+                rp.custom_category as category_real_name,
+                '' as category_slug
                 FROM reseller_plans rp
                 LEFT JOIN server_nodes s ON rp.server_id = s.id
                 WHERE rp.reseller_id = ? AND rp.is_custom = 1 AND rp.is_active = 1
@@ -2563,50 +2574,76 @@ class TelegramBotController {
             }
         }
 
-        // Get unique servers - STRICT VIP DETECTION: only connectix/seller is VIP, rest is multi
+        // Get unique servers - DOMAIN INDEPENDENT + is_vip column support (no hardcoded detection)
         $shortHash = function($str): string {
             return substr(md5($str), 0, 8);
         };
         $serversMap = [];
-        foreach ($allPlans as $p) {
-            $sid = $p['server_id'] ?? 0;
-            $sname = $p['server_name'] ?? 'سرور '.$sid;
-            $sdriver = $p['server_driver'] ?? '';
-            $sgroup = $p['server_node_group'] ?? $p['server_group'] ?? '';
-            // STRICT: VIP only if driver is connectix/seller, or explicit vip group/name
-            $isVip = false;
-            if (stripos($sdriver, 'connectix') !== false || stripos($sdriver, 'seller') !== false) {
-                $isVip = true;
-            } elseif (strtolower(trim($sgroup)) === 'vip' || strtolower(trim($sgroup)) === 'default' && stripos($sdriver, 'marz') === false && stripos($sdriver, 'xui') === false && stripos($sdriver, 'sanaei') === false) {
-                // default group could be VIP if driver not multi, but check name
-                if (stripos($sname, 'vip') !== false || stripos($sname, 'ویژه') !== false || stripos($sname, 'VIP') !== false) {
-                    $isVip = true;
-                } else {
-                    // If driver is empty or unknown and group is default, treat as VIP if id is higher (heuristic for VIP server usually newer)
-                    // But to avoid both same, we will decide later based on count
-                    $isVip = false;
-                }
-            } elseif (stripos($sname, 'vip') !== false || stripos($sname, 'ویژه') !== false) {
-                $isVip = true;
-            }
-            // Multi driver always multi
-            if (stripos($sdriver, 'marzban') !== false || stripos($sdriver, 'marzneshin') !== false || stripos($sdriver, 'xui') !== false || stripos($sdriver, 'sanaei') !== false) {
+        // Primary source: server_nodes table with is_vip column (most reliable, admin-controlled)
+        try {
+            Database::ensureExtendedTablesExist($pdo);
+            $allServers = $pdo->query("SELECT id, name, driver, server_group, is_vip FROM server_nodes WHERE is_active = 1 ORDER BY id ASC")->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($allServers as $srv) {
                 $isVip = false;
-            }
-            // Fallback: if sid==0, treat as VIP
-            if ($sid == 0) $isVip = true;
-
-            if (!isset($serversMap[$sid])) {
-                $serversMap[$sid] = [
-                    'id' => $sid,
-                    'name' => $sname,
-                    'driver' => $sdriver,
-                    'group' => $sgroup,
+                if (isset($srv['is_vip']) && $srv['is_vip'] !== null) {
+                    $isVip = (bool)$srv['is_vip'];
+                } else {
+                    // Fallback to driver/name detection if column not set
+                    $drv = strtolower($srv['driver'] ?? '');
+                    $nm = mb_strtolower($srv['name'] ?? '', 'UTF-8');
+                    if (str_contains($drv, 'connectix') || str_contains($drv, 'seller')) $isVip = true;
+                    elseif (str_contains($nm, 'vip') || str_contains($nm, 'ویژه')) $isVip = true;
+                }
+                $serversMap[$srv['id']] = [
+                    'id' => $srv['id'],
+                    'name' => $srv['name'],
+                    'driver' => $srv['driver'] ?? '',
+                    'group' => $srv['server_group'] ?? 'default',
                     'is_vip' => $isVip,
                     'slug' => $isVip ? 'vip' : 'multi',
                 ];
             }
+        } catch (Throwable $e) {
+            // Fallback if table query fails
         }
+        // Ensure servers from plans are also included (in case server_nodes empty or plan has server_id 0)
+        foreach ($allPlans as $p) {
+            $sid = $p['server_id'] ?? 0;
+            if (isset($serversMap[$sid])) {
+                // Update is_vip from plan's server_is_vip if available and more accurate
+                if (isset($p['server_is_vip']) && $p['server_is_vip'] !== null) {
+                    $serversMap[$sid]['is_vip'] = (bool)$p['server_is_vip'];
+                    $serversMap[$sid]['slug'] = $serversMap[$sid]['is_vip'] ? 'vip' : 'multi';
+                }
+                continue;
+            }
+            $sname = $p['server_name'] ?? 'سرور '.$sid;
+            $sdriver = $p['server_driver'] ?? '';
+            $sgroup = $p['server_node_group'] ?? $p['server_group'] ?? '';
+            $isVip = false;
+            if (isset($p['server_is_vip']) && $p['server_is_vip'] !== null) {
+                $isVip = (bool)$p['server_is_vip'];
+            } else {
+                if (stripos($sdriver, 'connectix') !== false || stripos($sdriver, 'seller') !== false) {
+                    $isVip = true;
+                } elseif (stripos($sname, 'vip') !== false || stripos($sname, 'ویژه') !== false) {
+                    $isVip = true;
+                }
+                if (stripos($sdriver, 'marzban') !== false || stripos($sdriver, 'marzneshin') !== false || stripos($sdriver, 'xui') !== false || stripos($sdriver, 'sanaei') !== false) {
+                    $isVip = false;
+                }
+                if ($sid == 0) $isVip = true;
+            }
+            $serversMap[$sid] = [
+                'id' => $sid,
+                'name' => $sname,
+                'driver' => $sdriver,
+                'group' => $sgroup,
+                'is_vip' => $isVip,
+                'slug' => $isVip ? 'vip' : 'multi',
+            ];
+        }
+        // Ensure we have at least one VIP and one Multi if 2+ servers and both same type -> force distinction
         // Ensure we have at least one VIP and one Multi if 2+ servers and both same type -> force distinction
         if (count($serversMap) >= 2) {
             $vipCount = count(array_filter($serversMap, fn($s) => $s['is_vip']));

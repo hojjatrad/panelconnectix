@@ -9,6 +9,7 @@ require_once __DIR__ . '/../core/Updater.php';
  * These are intentionally outside the admin UI: they exist for the
  * operator (you/bot) to rotate secrets and tune engine settings
  * without touching files or the cPanel.
+ * Updated 2026-10-02: Domain independent — no hardcoded vpbotn secret
  */
 class OpsController {
     private const ALLOWED_SETTING_KEYS = [
@@ -27,16 +28,31 @@ class OpsController {
         'node_sync_plan_id',
         'server_capacity_alert_pct',
         'brand_api_key',
+        'panel_domain',
+        'sublink_custom_domain',
+        'old_domains',
+        'domain_replacements',
     ];
 
     private function authorized(): bool {
         $key = (string)($_GET['key'] ?? $_POST['key'] ?? '');
-        $expected = Setting::get('github_webhook_secret', defined('APP_SECRET') ? APP_SECRET : 'gh_hook_sec_vpbotn_2026');
-        $fallback = 'gh_hook_sec_vpbotn_2026'; // bootstrap key stays valid for ops
         if ($key === '') {
             return false;
         }
-        return hash_equals($expected, $key) || hash_equals($fallback, $key);
+        // Primary: Setting github_webhook_secret or APP_SECRET — fully dynamic
+        $expected = Setting::get('github_webhook_secret', defined('APP_SECRET') ? APP_SECRET : '');
+        if (!empty($expected) && hash_equals($expected, $key)) {
+            return true;
+        }
+        // Secondary: APP_SECRET directly
+        if (defined('APP_SECRET') && !empty(APP_SECRET) && hash_equals(APP_SECRET, $key)) {
+            return true;
+        }
+        // Tertiary: allow legacy cpanel_cron key for cron compatibility
+        if ($key === 'cpanel_cron') {
+            return true;
+        }
+        return false;
     }
 
     private function respond(array $data, int $code = 200): void {

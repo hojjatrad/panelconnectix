@@ -88,6 +88,7 @@ class BeautifulInvoice
         $expireJalali = JalaliDate::expireDate($expireAt);
         $nowJalali = JalaliDate::invoiceDate(time());
         $trafficText = $trafficGb ? JalaliDate::toPersianNumber($trafficGb) . ' گیگ' : 'نامحدود';
+        $iosGuide = Helpers::fullUrl('ios-guide');
 
         $msg = "┏━━━━━━━━━━━━━━━━━━━━━━┓\n";
         $msg .= "┃ 🎉 اشتراک فعال شد! ┃\n";
@@ -121,7 +122,7 @@ class BeautifulInvoice
 
         $msg .= "📱 <b>راهنمای اتصال:</b>\n";
         $msg .= "   • اندروید: v2rayNG - لینک را وارد کنید\n";
-        $msg .= "   • آیفون: <a href=\"https://vpbotn.ir/contax/ios-guide\">راهنمای تصویری iOS</a>\n";
+        $msg .= "   • آیفون: <a href=\"{$iosGuide}\">راهنمای تصویری iOS</a>\n";
         $msg .= "   • یا QR کد بالا را اسکن کنید\n\n";
 
         $msg .= "💡 <i>برای کپی، روی هر کد ضربه بزنید</i>\n";
@@ -214,6 +215,7 @@ class BeautifulInvoice
     {
         $username = $client['username'] ?? '';
         $nowJalali = JalaliDate::invoiceDate(time());
+        $iosGuide = Helpers::fullUrl('ios-guide');
 
         $msg = "┏━━━━━━━━━━━━━━━━━━━━━━┓\n";
         $msg .= "┃ 📥 کانفیگ‌های اختصاصی ┃\n";
@@ -243,7 +245,7 @@ class BeautifulInvoice
         }
 
         $msg .= "📱 <b>راهنما:</b> روی هر کانفیگ ضربه بزنید تا کپی شود\n";
-        $msg .= "🔍 آیفون: <a href=\"https://vpbotn.ir/contax/ios-guide\">آموزش تصویری iOS</a>";
+        $msg .= "🔍 آیفون: <a href=\"{$iosGuide}\">آموزش تصویری iOS</a>";
 
         return $msg;
     }

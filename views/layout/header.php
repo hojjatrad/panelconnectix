@@ -53,7 +53,7 @@ if (!function_exists('isActiveRoute')) {
     <script>
     window.ConnectixStats = {
         load: function() {
-            fetch('<?= Helpers::url('api/dashboard_stats') ?>'.replace('/contax/api/', '/contax/api/dashboard_stats.php?').replace('api/dashboard_stats', 'api/dashboard_stats.php'), {credentials: 'same-origin'})
+            fetch('<?= Helpers::url('api/dashboard_stats') ?>'.replace('/api/', '/api/dashboard_stats.php?').replace('api/dashboard_stats', 'api/dashboard_stats.php'), {credentials: 'same-origin'})
                 .then(r => r.json())
                 .then(data => {
                     if (data.success) {

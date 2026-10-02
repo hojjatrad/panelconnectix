@@ -463,7 +463,7 @@ class Updater {
 
         self::copyDirectory($sourceDir, $panelRoot, $skipped);
 
-        // AUTO-SYNC root domain landing (https://vpbotn.ir/) - requested by user: always update with panel updates
+        // AUTO-SYNC root domain landing (https://{PANEL_DOMAIN}/ (root domain landing)) - requested by user: always update with panel updates
         // Copies promo/index.php -> public_html/index.php so root domain never stays outdated
         self::syncRootLanding($panelRoot);
 
@@ -605,7 +605,7 @@ class Updater {
     }
 
     /**
-     * AUTO-SYNC: Ensure https://vpbotn.ir/ (root public_html/index.php) is always updated
+     * AUTO-SYNC: Ensure https://{PANEL_DOMAIN}/ (root domain landing) (root public_html/index.php) is always updated
      * whenever panel updates. User requested: "میخوام همه اینا همراه با بروز رسانی انجام بشه که دستی کاری انجام نشه"
      * 
      * Copies promo/index.php (source of truth for landing) to parent directory index.php (public_html)
@@ -625,15 +625,15 @@ class Updater {
             // Safety: must be our landing
             if (strpos($sourceContent, 'mainAdminpanel') === false) return;
 
-            // Possible root targets for https://vpbotn.ir/
+            // Possible root targets — domain independent, dynamic detection
+            require_once __DIR__ . '/Helpers.php';
+            $publicHtml = Helpers::getPublicHtmlPath();
             $candidates = [
                 dirname($panelRoot) . '/index.php', // public_html/index.php if panel is public_html/contax
                 $panelRoot . '/../index.php',
-                '/home/vpbotnir/public_html/index.php',
-                '/home/vpbotni1/public_html/index.php', // actual live user found from logs
-                '/home/vpbotnir/public_html/contax/../index.php',
-                '/home/vpbotni1/public_html/contax/../index.php',
+                $publicHtml . '/index.php',
                 realpath($panelRoot . '/..') ? realpath($panelRoot . '/..') . '/index.php' : null,
+                $publicHtml . '/contax/../index.php',
             ];
             $candidates = array_filter(array_unique($candidates));
 
@@ -665,7 +665,7 @@ class Updater {
                 }
                 if ($copied) {
                     @chmod($target, 0644);
-                    Helpers::logActivity('system_update', "لندینگ روت https://vpbotn.ir/ خودکار بروزرسانی شد از promo/index.php -> $target", 'system');
+                    Helpers::logActivity('system_update', "لندینگ روت خودکار بروزرسانی شد از promo/index.php -> $target", 'system');
                 }
             }
 

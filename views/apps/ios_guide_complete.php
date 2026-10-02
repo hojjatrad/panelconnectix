@@ -2,7 +2,7 @@
 $brandName = htmlspecialchars($brandName ?? 'Connectix VPN');
 $logoUrl = $logoUrl ?? '';
 $appVersion = $manifest['version'] ?? '3.6.1';
-$base = defined('Helpers::class') && method_exists('Helpers','basePath') ? Helpers::basePath() : '/contax';
+$base = method_exists('Helpers','basePath') ? Helpers::basePath() : '';
 $githubRaw = 'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main';
 ?>
 <!DOCTYPE html>
@@ -418,7 +418,7 @@ document.getElementById('guideVideo')?.addEventListener('play', () => {
 const githubRaw = '<?= $githubRaw ?>';
 document.querySelectorAll('img').forEach(img => {
   img.addEventListener('error', function() {
-    if (this.src.includes('/contax/assets/images/ios-guide/')) {
+    if (this.src.includes('/assets/images/ios-guide/') || this.src.includes('assets/images/ios-guide/')) {
       const file = this.src.split('/ios-guide/').pop();
       this.src = githubRaw + '/assets/images/ios-guide/' + file;
     }
@@ -427,7 +427,7 @@ document.querySelectorAll('img').forEach(img => {
 document.querySelectorAll('audio, video').forEach(media => {
   media.addEventListener('error', function() {
     const src = this.querySelector('source')?.src || this.src;
-    if (src && src.includes('/contax/assets/')) {
+    if (src && (src.includes('/assets/') || src.includes('assets/'))) {
       const file = src.includes('ios-guide/') ? src.split('/assets/').pop() : src.split('/assets/').pop();
       const newSrc = githubRaw + '/assets/' + file.split('?')[0];
       if (this.querySelector('source')) this.querySelector('source').src = newSrc;

@@ -10,7 +10,7 @@ $posts = [
 ?>
 <!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="UTF-8"><title><?= $title ?></title>
 <meta name="description" content="آموزش VPN، معرفی بهترین فیلترشکن‌ها، ترفندهای ضد فیلتر">
-<script src="/contax/assets/js/tailwind.js"></script></head>
+<?php $assetBase = str_replace("\\","/", dirname($_SERVER["SCRIPT_NAME"])); $assetBase = ($assetBase==="/"||$assetBase===".")?"":rtrim($assetBase,"/"); ?><script src="<?= $assetBase ?>/assets/js/tailwind.js"></script></head>
 <body class="bg-slate-950 text-white p-6"><div class="max-w-4xl mx-auto">
 <h1 class="text-2xl font-black mb-6">📚 بلاگ Connectix</h1>
 <div class="grid gap-4">

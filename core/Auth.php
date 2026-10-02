@@ -171,7 +171,8 @@ class Auth {
                 echo json_encode(['success' => false, 'error' => '👁️ نسخه دمو فقط برای نمایش است - امکان ' . $action . ' وجود ندارد. برای پنل واقعی به @mainAdminpanel پیام دهید.'], JSON_UNESCAPED_UNICODE);
                 exit;
             }
-            Helpers::flash('error', '👁️ نسخه دمو فقط برای نمایش است - امکان ' . $action . ' وجود ندارد. برای پنل واقعی به @mainAdminpanel پیام دهید. (سایت: https://vpbotn.ir)');
+            $siteUrl = Helpers::panelDomain();
+            Helpers::flash('error', '👁️ نسخه دمو فقط برای نمایش است - امکان ' . $action . ' وجود ندارد. برای پنل واقعی به @mainAdminpanel پیام دهید. (سایت: ' . $siteUrl . ')');
             $referer = $_SERVER['HTTP_REFERER'] ?? '';
             if ($referer !== '') {
                 header('Location: ' . $referer);

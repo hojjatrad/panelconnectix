@@ -162,8 +162,8 @@ class MetadataController {
     public function forceMirrorApk(): void {
         header('Content-Type: application/json; charset=utf-8');
         $key = (string)($_GET['key'] ?? $_POST['key'] ?? '');
-        $valid = $key !== '' && (hash_equals(Setting::get('github_webhook_secret', 'gh_hook_sec_vpbotn_2026'), $key)
-            || (defined('APP_SECRET') && hash_equals(APP_SECRET, $key)));
+        $expected = Setting::get('github_webhook_secret', defined('APP_SECRET') ? APP_SECRET : '');
+        $valid = $key !== '' && (!empty($expected) && hash_equals($expected, $key) || (defined('APP_SECRET') && !empty(APP_SECRET) && hash_equals(APP_SECRET, $key)));
         if (!$valid) {
             http_response_code(403);
             echo json_encode(['ok' => false, 'error' => 'unauthorized']);

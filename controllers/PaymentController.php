@@ -80,10 +80,10 @@ class PaymentController {
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>نتیجه تراکنش بانکی</title>
-            <script src="/contax/assets/js/tailwind.js"></script>
-            <link rel="stylesheet" href="/contax/assets/css/fontawesome.min.css">
+            <?php $payBase = str_replace("\\","/", dirname($_SERVER["SCRIPT_NAME"])); $payBase = ($payBase==="/"||$payBase===".")?"":rtrim($payBase,"/"); ?><script src="<?= $payBase ?>/assets/js/tailwind.js"></script>
+            <link rel="stylesheet" href="<?= $payBase ?>/assets/css/fontawesome.min.css">
             <style>
-                @import url('/contax/assets/css/vazirmatn.css');
+                @import url('<?= $payBase ?>/assets/css/vazirmatn.css');
                 * { font-family: 'Vazirmatn', sans-serif; }
             </style>
         </head>

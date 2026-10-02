@@ -73,7 +73,7 @@
     <ol class="text-sm text-slate-300 space-y-2 list-decimal pr-5 leading-relaxed">
       <li>AltStore را از <a href="https://altstore.io" class="text-indigo-400 underline">altstore.io</a> روی کامپیوتر نصب کنید</li>
       <li>آیفون را به کامپیوتر وصل کنید و AltStore را روی آیفون نصب کنید</li>
-      <li>فایل IPA را دانلود کنید: <a href="/contax/assets/Connectix-iOS-3.6.1.ipa" class="text-indigo-400 underline">دانلود IPA</a></li>
+      <li>فایل IPA را دانلود کنید: <a href="<?= method_exists('Helpers','fullAssetUrl') ? Helpers::fullAssetUrl('Connectix-iOS-3.6.1.ipa') : '/assets/Connectix-iOS-3.6.1.ipa' ?>" class="text-indigo-400 underline">دانلود IPA</a></li>
       <li>در آیفون: AltStore → My Apps → + → فایل IPA را انتخاب کنید</li>
       <li>با Apple ID خود ساین کنید (رایگان - هر 7 روز باید تمدید شود)</li>
     </ol>

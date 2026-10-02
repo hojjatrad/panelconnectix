@@ -1,7 +1,7 @@
 <?php
 /**
  * EMERGENCY AI FIX - Creates missing ai_* tables
- * https://vpbotn.ir/contax/emergency_ai_fix.php?key=CONNECTIX2026
+ * https://{YOUR-DOMAIN}/{PANEL_PATH}/emergency_ai_fix.php?key=CONNECTIX2026
  * This file fixes Error 500 SQLSTATE[42S02] ai_subscriptions doesn't exist
  */
 header('Content-Type: text/html; charset=utf-8');

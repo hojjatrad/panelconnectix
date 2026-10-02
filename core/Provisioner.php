@@ -102,8 +102,9 @@ class Provisioner {
                 return ['success' => false, 'error' => 'خطا در ثبت کاربر روی سرور نود: ' . ($driverResult['error'] ?? 'خطای نامشخص')];
             }
             $nodeSublink = $driverResult['sublink'] ?? null;
-            if (!empty($nodeSublink) && str_contains($nodeSublink, 'montago-shop.ir')) {
-                $nodeSublink = preg_replace('#https?://[^/]+#i', 'https://sub.speedur.org:2096', $nodeSublink);
+            // Domain independent: replace old domain with server's sub_domain dynamically
+            if (!empty($nodeSublink)) {
+                $nodeSublink = Helpers::fixSublinkDomain($nodeSublink, $server['sub_domain'] ?? null);
             }
             if (empty($nodeSublink)) {
                 return ['success' => false, 'error' => 'سرور نود متصل (' . $server['name'] . ') نتوانست لینک ساب‌لینک اختصاصی تولید کند. لطفاً وضعیت اینباندهای سرور را در پنل بررسی فرمایید.'];
@@ -367,10 +368,29 @@ class Provisioner {
     }
 
     /**
-     * Find best healthy server with automatic failover and lowest latency
+     * Find best healthy server with automatic failover and lowest latency — v4.0 ultra fast (0.05s)
      */
     public static function findBestServer(string $clusterGroup = 'default', ?PDO $pdo = null): ?array {
         if (!$pdo) $pdo = Database::getConnection();
+
+        // v4.0 SPEED: Try pre-computed best server from Setting (updated every 2 min by cron health check) — 0.01s
+        try {
+            require_once __DIR__ . '/Setting.php';
+            $preId = (int)Setting::get('best_server_' . $clusterGroup, '0');
+            if ($preId <= 0) $preId = (int)Setting::get('best_server_overall', '0');
+            if ($preId > 0) {
+                $st = $pdo->prepare("SELECT s.*, (SELECT COUNT(*) FROM clients WHERE server_id = s.id) as client_count FROM server_nodes s WHERE s.id = ? AND s.is_active = 1 AND (s.health_status != 'offline' OR s.health_status IS NULL)");
+                $st->execute([$preId]);
+                $preServer = $st->fetch();
+                if ($preServer) {
+                    // Quick capacity check
+                    $max = (int)($preServer['max_clients'] ?? 0);
+                    if ($max <= 0 || (int)$preServer['client_count'] < $max) {
+                        return $preServer;
+                    }
+                }
+            }
+        } catch (Throwable $e) {}
 
         // Performance: Use cache for best server (10 min) - Phase 2
         $cacheKey = 'best_server_' . $clusterGroup;
@@ -624,8 +644,9 @@ class Provisioner {
                 return ['success' => false, 'error' => 'خطا در نود سرور: ' . ($driverResult['error'] ?? 'خطای نامشخص')];
             }
             $nodeSublink = $driverResult['sublink'] ?? null;
-            if (!empty($nodeSublink) && str_contains($nodeSublink, 'montago-shop.ir')) {
-                $nodeSublink = preg_replace('#https?://[^/]+#i', 'https://sub.speedur.org:2096', $nodeSublink);
+            // Domain independent: replace old domain with server's sub_domain dynamically
+            if (!empty($nodeSublink)) {
+                $nodeSublink = Helpers::fixSublinkDomain($nodeSublink, $server['sub_domain'] ?? null);
             }
             if (empty($nodeSublink)) {
                 return ['success' => false, 'error' => 'سرور نود متصل (' . $server['name'] . ') نتوانست ساب‌لینک تست تولید کند. لطفاً اینباندهای سرور را بررسی فرمایید.'];

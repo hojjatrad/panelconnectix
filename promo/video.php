@@ -9,8 +9,8 @@ $tg_url = 'https://t.me/mainAdminpanel';
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ویدیو معرفی پنل فروش محصول فارسی - Connectix</title>
 <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet">
-<script src="/contax/assets/js/tailwind.js"></script>
-<link rel="stylesheet" href="/contax/assets/css/fontawesome.min.css">
+<script src="<?= $base ?? $assetBase ?? "" ?>/assets/js/tailwind.js"></script>
+<link rel="stylesheet" href="<?= $base ?? $assetBase ?? "" ?>/assets/css/fontawesome.min.css">
 <style>*{font-family:Vazirmatn!important} body{background:#05070A;color:#fff}</style>
 </head>
 <body class="antialiased">

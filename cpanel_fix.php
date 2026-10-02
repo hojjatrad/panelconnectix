@@ -2,8 +2,8 @@
 /**
  * Connectix Panel - Emergency One-Click Remote Host Fixer (v2.7.2)
  * Language: Persian (Farsi) - RTL
- * Upload this single file to your panel directory: /home/vpbotni1/public_html/contax/cpanel_fix.php
- * And open in browser: https://YOUR-DOMAIN/contax/cpanel_fix.php
+ * Upload this single file to your panel directory: {PANEL_DIR}/cpanel_fix.php
+ * And open in browser: https://{YOUR-DOMAIN}/{PANEL_PATH}/cpanel_fix.php
  */
 
 error_reporting(E_ALL);
@@ -221,9 +221,9 @@ if (function_exists('clearstatcache')) @clearstatcache(true);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ترمیم کامل و قطعی سیستم | Connectix Panel</title>
-    <script src="/contax/assets/js/tailwind.js"></script>
+    <?php $bp = str_replace("\\","/", dirname($_SERVER["SCRIPT_NAME"])); $bp = ($bp==="/"||$bp===".")?"":rtrim($bp,"/"); ?><script src="<?= $bp ?>/assets/js/tailwind.js"></script>
     <style>
-        @import url('/contax/assets/css/vazirmatn.css');
+        @import url('<?= $bp ?>/assets/css/vazirmatn.css');
         * { font-family: 'Vazirmatn', sans-serif; }
     </style>
 </head>

@@ -114,7 +114,7 @@ class SublinkControllerV2 {
         $localSubBase = Helpers::subUrl($client['sub_token']);
         $needsNodeResolve = empty($client['node_sublink']) || 
                             $client['node_sublink'] === $localSubBase || 
-                            str_contains($client['node_sublink'], 'montago-shop.ir') ||
+                            Helpers::isOldDomain($client['node_sublink']) ||
                             Helpers::isPanelSubUrl($client['node_sublink']);
 
         if ($needsNodeResolve) {
@@ -241,7 +241,10 @@ class SublinkControllerV2 {
                                 foreach ($createRes['links'] as $i => $l) {
                                     $out['node_link_' . ($i + 1)] = $l;
                                 }
-                                if (!empty($out)) return $out;
+                                if (!empty($out)) {
+                            @file_put_contents($cacheFile, json_encode(['configs' => $out, 'ts' => time()]));
+                            return $out;
+                        }
                             }
                         }
                     }
@@ -252,7 +255,10 @@ class SublinkControllerV2 {
                         foreach ($liveUser['links'] as $i => $l) {
                             $out['node_link_' . ($i + 1)] = $l;
                         }
-                        if (!empty($out)) return $out;
+                        if (!empty($out)) {
+                            @file_put_contents($cacheFile, json_encode(['configs' => $out, 'ts' => time()]));
+                            return $out;
+                        }
                     }
 
                     // If links empty but subscription_url is present, fetch and parse configs
@@ -261,8 +267,9 @@ class SublinkControllerV2 {
                         if (!Helpers::isPanelSubUrl($subUrl)) {
                             $ch = curl_init($subUrl);
                             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                            curl_setopt($ch, CURLOPT_TIMEOUT, 6);
+                            curl_setopt($ch, CURLOPT_TIMEOUT, 3);
                             curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2);
                             curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
                             curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
                             curl_setopt($ch, CURLOPT_USERAGENT, 'v2rayNG/1.8.5');
@@ -277,7 +284,10 @@ class SublinkControllerV2 {
                                         $out['sub_link_' . ($i + 1)] = $l;
                                     }
                                 }
-                                if (!empty($out)) return $out;
+                                if (!empty($out)) {
+                            @file_put_contents($cacheFile, json_encode(['configs' => $out, 'ts' => time()]));
+                            return $out;
+                        }
                             }
                         }
                     }
@@ -285,19 +295,36 @@ class SublinkControllerV2 {
             } catch (Throwable $e) {}
         }
 
-        // 4. Fallback: Query remote node_sublink if not self-referential
+        // 4. Fallback: Query remote node_sublink if not self-referential — domain-independent (Task #11)
         if (!empty($client['node_sublink'])) {
             $nodeSub = $client['node_sublink'];
-            if (str_contains($nodeSub, 'montago-shop.ir')) {
-                $nodeSub = preg_replace('#https?://[^/]+#i', 'https://sub.speedur.org:2096', $nodeSub);
+            // Use dynamic old-domain fixer (covers montago-shop.ir, vpbotn.ir, etc.)
+            $fixed = \Helpers::fixSublinkDomain($nodeSub);
+            if ($fixed !== $nodeSub) {
+                $nodeSub = $fixed;
                 $pdo->prepare("UPDATE clients SET node_sublink = ? WHERE id = ?")->execute([$nodeSub, $client['id']]);
             }
             if (!Helpers::isPanelSubUrl($nodeSub)) {
+                // v4.0 SPEED: Check cache first — if we fetched this sub in last 2 min, use cached
+                $cacheKey = 'sub_cache_' . md5($nodeSub);
+                $cacheFile = sys_get_temp_dir() . '/' . $cacheKey . '.json';
+                $useCachedSub = false;
+                if (file_exists($cacheFile) && (time() - filemtime($cacheFile) < 120)) {
+                    $cached = @json_decode(@file_get_contents($cacheFile), true);
+                    if (!empty($cached['configs'])) {
+                        return $cached['configs'];
+                    }
+                }
+                // Fast mode: skip remote fetch entirely
+                if (isset($_GET['fast']) && $_GET['fast'] == '1') {
+                    return [];
+                }
                 try {
                     $ch = curl_init($nodeSub);
                     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                    curl_setopt($ch, CURLOPT_TIMEOUT, 8);
+                    curl_setopt($ch, CURLOPT_TIMEOUT, 3);
                     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2);
                     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
                     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
                     curl_setopt($ch, CURLOPT_USERAGENT, 'v2rayNG/1.8.5');
@@ -312,7 +339,10 @@ class SublinkControllerV2 {
                                 $out['sub_link_' . ($i + 1)] = $l;
                             }
                         }
-                        if (!empty($out)) return $out;
+                        if (!empty($out)) {
+                            @file_put_contents($cacheFile, json_encode(['configs' => $out, 'ts' => time()]));
+                            return $out;
+                        }
                     }
                 } catch (Throwable $e) {}
             }
