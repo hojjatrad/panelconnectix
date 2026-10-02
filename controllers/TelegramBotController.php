@@ -915,6 +915,36 @@ class TelegramBotController {
         }
 
         // Menu triggers
+        // B1: New glass menu handlers
+        if ($data === 'main_menu' || $data === 'menu_main') {
+            self::sendMainMenu($pdo, $chatId, $fromId, $cb['from']['first_name'] ?? '', $messageId);
+            return;
+        }
+        if (in_array($data, ['buy', 'buy_monthly', 'buy_3month', 'buy_6month', 'buy_yearly', 'buy_vip'])) {
+            $filter = null;
+            if ($data === 'buy_monthly') $filter = ['days' => 30];
+            elseif ($data === 'buy_3month') $filter = ['days' => 90];
+            elseif ($data === 'buy_6month') $filter = ['days' => 180];
+            elseif ($data === 'buy_yearly') $filter = ['days' => 365];
+            self::showPlansMenu($pdo, $chatId, $messageId, null, $filter['days'] ?? null, null);
+            return;
+        }
+        if ($data === 'search_plan') {
+            self::setSession($pdo, $fromId, 'awaiting_search_query', []);
+            TelegramBot::sendMessage("🔍 <b>جستجوی پلن</b>\n\nلطفاً حجم و مدت زمان مورد نظر را بنویسید:\nمثال: <code>50 گیگ یکماهه</code> یا <code>100 گیگ سه ماهه</code>", $chatId, ['inline_keyboard' => [[['text' => '⬅️ بازگشت', 'callback_data' => 'main_menu']]]]);
+            return;
+        }
+        if (in_array($data, ['wallet', 'my_subs', 'renew', 'help', 'settings', 'referral', 'wheel', 'support'])) {
+            if ($data === 'wallet') { self::showWalletMenu($pdo, $chatId, $fromId, $messageId); return; }
+            if ($data === 'my_subs') { self::showMyAccounts($pdo, $chatId, $fromId, $messageId); return; }
+            if ($data === 'renew') { self::showRenewChoice($pdo, $chatId, $fromId, $messageId); return; }
+            if ($data === 'help') { self::showAppsDownload($pdo, $chatId, $messageId, null); return; }
+            if ($data === 'referral') { self::showReferralInfo($pdo, $chatId, $fromId, $messageId); return; }
+            if ($data === 'wheel') { self::handleLuckyWheel($pdo, $chatId, $fromId, $messageId); return; }
+            if ($data === 'support') { self::enterAiSupport($pdo, $chatId, $fromId, $messageId); return; }
+            if ($data === 'settings') { self::showPanelCredentials($pdo, $chatId, $fromId, $messageId); return; }
+        }
+
         if ($data === 'menu_buy') {
             self::showPlansMenu($pdo, $chatId, $messageId, null, null, null);
             return;
