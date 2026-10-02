@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/core/Database.php';
 require_once __DIR__ . '/core/Setting.php';
-Database::init();
+$pdo = Database::getConnection();
 
 $version = '3.6.1';
 $code = '39';
