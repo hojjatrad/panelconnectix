@@ -3,6 +3,7 @@ $brandName = htmlspecialchars($brandName ?? 'Connectix VPN');
 $logoUrl = $logoUrl ?? '';
 $appVersion = $manifest['version'] ?? '3.6.1';
 $base = defined('Helpers::class') && method_exists('Helpers','basePath') ? Helpers::basePath() : '/contax';
+$githubRaw = 'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main';
 ?>
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
@@ -397,7 +398,7 @@ if (video) {
   });
   // Check if mp4 exists
   fetch(video.querySelector('source')?.src, {method:'HEAD'}).then(r => {
-    if (r.ok) {
+    if (r.ok && r.headers.get('content-length') > 1000) {
       video.classList.remove('hidden');
       document.getElementById('slideshow')?.classList.add('hidden');
       document.getElementById('videoPlaceholder')?.classList.remove('hidden');
@@ -411,6 +412,29 @@ if (video) {
 
 document.getElementById('guideVideo')?.addEventListener('play', () => {
   document.getElementById('videoPlaceholder')?.style.setProperty('display','none');
+});
+
+// Fallback images to GitHub raw if local 404
+const githubRaw = '<?= $githubRaw ?>';
+document.querySelectorAll('img').forEach(img => {
+  img.addEventListener('error', function() {
+    if (this.src.includes('/contax/assets/images/ios-guide/')) {
+      const file = this.src.split('/ios-guide/').pop();
+      this.src = githubRaw + '/assets/images/ios-guide/' + file;
+    }
+  });
+});
+document.querySelectorAll('audio, video').forEach(media => {
+  media.addEventListener('error', function() {
+    const src = this.querySelector('source')?.src || this.src;
+    if (src && src.includes('/contax/assets/')) {
+      const file = src.includes('ios-guide/') ? src.split('/assets/').pop() : src.split('/assets/').pop();
+      const newSrc = githubRaw + '/assets/' + file.split('?')[0];
+      if (this.querySelector('source')) this.querySelector('source').src = newSrc;
+      else this.src = newSrc;
+      this.load();
+    }
+  });
 });
 </script>
 </body>
