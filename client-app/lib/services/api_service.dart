@@ -547,12 +547,10 @@ class ApiService {
         try { await file.delete(); } catch (_) {}
       }
 
-      // Try HttpClient first, then http package as fallback for better redirect handling
       int total = 0;
       int received = 0;
       bool downloadDone = false;
 
-      // Attempt 1: HttpClient (original method, good for large files with progress)
       try {
         final httpClient = HttpClient();
         httpClient.connectionTimeout = const Duration(seconds: 20);
@@ -595,11 +593,9 @@ class ApiService {
         }
       } catch (e) {
         log('HttpClient download failed for $url: $e — trying http package fallback');
-        // Clean partial file
         try { if (await file.exists()) await file.delete(); } catch (_) {}
       }
 
-      // Attempt 2: http package fallback (better redirect + TLS handling)
       if (!downloadDone) {
         try {
           final request = http.Request('GET', Uri.parse(url));
@@ -656,7 +652,6 @@ class ApiService {
         bool installOk = false;
         String installError = '';
         try {
-          // v4.0 FIX: allowSameVersion=true to support reinstalling same version
           final installResult = await _updaterChannel.invokeMethod('installApk', {
             'filePath': file.path,
             'allowSameVersion': true,
@@ -673,7 +668,6 @@ class ApiService {
           onSuccess();
           return true;
         } else {
-          // Install intent failed — try to at least show file exists, then fallback
           if (installError.isNotEmpty) {
             throw Exception('نصب خودکار ناموفق: $installError — لطفا از مرورگر دانلود کنید');
           } else {
