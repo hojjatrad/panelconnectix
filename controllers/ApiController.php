@@ -772,7 +772,7 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
         $universalUrl= trim(Setting::get('app_universal_url', ''));
 
         // FIX 2026-10-02: Prefer PANEL-HOST mirrored APKs over GitHub (Iran filtering fix)
-        $panelBase = Helpers::baseUrl();
+        $panelBase = rtrim(Helpers::fullUrl(''), '/');
         $mirroredArm64 = __DIR__ . '/../Connectix-ARM64-v8a.apk';
         $mirroredUniversal = __DIR__ . '/../Connectix-Universal.apk';
         $hasMirroredArm64 = is_file($mirroredArm64) && filesize($mirroredArm64) > 1024*1024;

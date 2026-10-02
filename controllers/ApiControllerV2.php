@@ -876,7 +876,7 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
         // FIX 2026-10-02: Prefer PANEL-HOST mirrored APKs over GitHub
         // GitHub is filtered in Iran for some ISPs (MCI etc) — causes "some phones update, some not"
         // Panel host https://vpbotn.ir/contax/Connectix-*.apk works for ALL Iranian operators
-        $panelBase = Helpers::baseUrl(); // e.g. https://vpbotn.ir/contax
+        $panelBase = rtrim(Helpers::fullUrl(''), '/'); // e.g. https://vpbotn.ir/contax
         $mirroredArm64 = __DIR__ . '/../Connectix-ARM64-v8a.apk';
         $mirroredUniversal = __DIR__ . '/../Connectix-Universal.apk';
         $hasMirroredArm64 = is_file($mirroredArm64) && filesize($mirroredArm64) > 1024*1024;

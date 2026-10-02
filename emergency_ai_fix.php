@@ -158,7 +158,7 @@ try {
     $v401Win = "https://github.com/$repo/releases/download/v4.0.1/Connectix-Windows-x64.zip";
     $v361Win = "https://github.com/$repo/releases/download/v3.6.1/Connectix-Windows-x64.zip";
 
-    $panelBase = Helpers::baseUrl();
+    $panelBase = rtrim(Helpers::fullUrl(''), '/');
     $localArm64 = __DIR__ . '/Connectix-ARM64-v8a.apk';
     $localUni = __DIR__ . '/Connectix-Universal.apk';
     $hasLocalArm64 = is_file($localArm64) && filesize($localArm64) > 1024*1024;
