@@ -1,6 +1,6 @@
 <?php
-// v4.4 ULTRA MINIMAL + checks v4.0.0 APK existence, fallback to v3.6.1
-echo "ULTRA FAST v4.0.0 DB + ApiControllerV2 fix (v4.4)...\n";
+// v4.5 ULTRA - 4.0.1 fix same-version reinstall, checks v4.0.1->v4.0.0->v3.6.1
+echo "ULTRA FAST v4.0.1 DB + ApiControllerV2 fix (v4.5)...\n";
 
 function fetchRaw($url) {
     $ch = curl_init($url.'?t='.time().rand(1000,9999));
@@ -57,26 +57,39 @@ foreach ($files as $local => $urls) {
 require_once __DIR__ . '/core/Database.php';
 require_once __DIR__ . '/core/Setting.php';
 $pdo = Database::getConnection();
-$version = '4.0.0';
+$version = '4.0.1';
 $repo = 'hojjatrad/panelconnectix';
-$title = "Connectix VPN 4.0.0 - Speed & Domain Independence";
-$changelog = "🚀 نسخه 4.0.0 - سرعت فوق‌العاده + استقلال دامنه\n\n✅ سرعت پینگ 250 برابر سریع‌تر\n✅ لود صفحه سرورها 40 برابر\n✅ بروزرسانی اپ 50 برابر\n✅ اتصال هوشمند 100 برابر\n✅ استقلال کامل از دامنه\n✅ رفع مشکل دکمه نصب خودکار";
+$title = "Connectix VPN 4.0.1 - Fix Install Button Same Version";
+$changelog = "🚀 نسخه 4.0.1 - رفع باگ نصب\n\n✅ رفع مشکل دکمه نصب که کاری انجام نمی‌داد\n✅ امکان نصب مجدد همین نسخه (reinstall)\n✅ بهبود PackageInstaller + ACTION_INSTALL_PACKAGE\n✅ رفع حلقه بی‌نهایت آپدیت (نصب می‌شد ولی نسخه قدیمی می‌ماند)\n✅ سرعت پینگ 250 برابر سریع‌تر\n✅ لود صفحه سرورها 40 برابر";
 
+$v401Arm64 = "https://github.com/$repo/releases/download/v4.0.1/Connectix-Android-ARM64.apk";
+$v401Universal = "https://github.com/$repo/releases/download/v4.0.1/Connectix-Android-Universal.apk";
 $v400Arm64 = "https://github.com/$repo/releases/download/v4.0.0/Connectix-Android-ARM64.apk";
 $v400Universal = "https://github.com/$repo/releases/download/v4.0.0/Connectix-Android-Universal.apk";
-$v400Win = "https://github.com/$repo/releases/download/v4.0.0/Connectix-Windows-x64.zip";
 $v361Arm64 = "https://github.com/$repo/releases/download/v3.6.1/Connectix-Android-ARM64.apk";
 $v361Universal = "https://github.com/$repo/releases/download/v3.6.1/Connectix-Android-Universal.apk";
+
+$v401Win = "https://github.com/$repo/releases/download/v4.0.1/Connectix-Windows-x64.zip";
+$v400Win = "https://github.com/$repo/releases/download/v4.0.0/Connectix-Windows-x64.zip";
 $v361Win = "https://github.com/$repo/releases/download/v3.6.1/Connectix-Windows-x64.zip";
 
-$apkArm64 = checkUrlExists($v400Arm64) ? $v400Arm64 : $v361Arm64;
-$apkUniversal = checkUrlExists($v400Universal) ? $v400Universal : $v361Universal;
-$winUrl = checkUrlExists($v400Win) ? $v400Win : $v361Win;
+// Check existence in order: 4.0.1 -> 4.0.0 -> 3.6.1
+$apkArm64 = $v361Arm64;
+$apkUniversal = $v361Universal;
+$winUrl = $v361Win;
 
-if ($apkArm64 === $v400Arm64) {
-    echo "Using v4.0.0 APKs (exist)\n";
+if (checkUrlExists($v401Arm64)) {
+    $apkArm64 = $v401Arm64;
+    $apkUniversal = $v401Universal;
+    $winUrl = $v401Win;
+    echo "Using v4.0.1 APKs (exist)\n";
+} elseif (checkUrlExists($v400Arm64)) {
+    $apkArm64 = $v400Arm64;
+    $apkUniversal = $v400Universal;
+    $winUrl = $v400Win;
+    echo "Using v4.0.0 APKs (exist, v4.0.1 not yet built)\n";
 } else {
-    echo "Using v3.6.1 fallback (v4.0.0 not yet built)\n";
+    echo "Using v3.6.1 fallback (v4.0.0/v4.0.1 not yet built)\n";
 }
 
 try {
@@ -88,7 +101,7 @@ try {
     Setting::set('app_update_enabled', '1');
     Setting::set('app_update_source', 'admin');
     Setting::set('app_update_published_at', date('Y-m-d H:i:s'));
-    Setting::set('app_update_auto_code', '40');
+    Setting::set('app_update_auto_code', '41');
     Setting::set('app_latest_version_windows', $version);
     Setting::set('app_download_url_windows', $winUrl);
     Setting::set('app_latest_version_ios', $version);
@@ -100,5 +113,5 @@ try {
 } catch (Throwable $e) {
     echo "Error: ".$e->getMessage()."\n";
 }
-echo "DONE v$version ULTRA v4.4\n";
+echo "DONE v$version ULTRA v4.5\n";
 if (function_exists('opcache_reset')) @opcache_reset();
