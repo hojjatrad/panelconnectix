@@ -124,3 +124,13 @@ try {
 }
 echo "DONE v$version ULTRA v4.6\n";
 if (function_exists('opcache_reset')) @opcache_reset();
+
+// DEBUG DUMP v4.6
+try {
+    echo "\n--- CURRENT SETTINGS DUMP ---\n";
+    $stmt = $pdo->query("SELECT setting_key, setting_value FROM system_settings WHERE setting_key LIKE 'app_%' ORDER BY setting_key");
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        echo $row['setting_key'] . " => " . substr($row['setting_value']??'',0,200) . "\n";
+    }
+} catch (Throwable $e) { echo "dump error: ".$e->getMessage(); }
+
