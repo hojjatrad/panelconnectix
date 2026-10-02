@@ -547,44 +547,94 @@ class ApiService {
         try { await file.delete(); } catch (_) {}
       }
 
-      final httpClient = HttpClient();
-      httpClient.connectionTimeout = const Duration(seconds: 20);
-      httpClient.idleTimeout = const Duration(seconds: 20);
-      httpClient.autoUncompress = false;
+      // Try HttpClient first, then http package as fallback for better redirect handling
+      int total = 0;
+      int received = 0;
+      bool downloadDone = false;
+
+      // Attempt 1: HttpClient (original method, good for large files with progress)
       try {
-        final uri = Uri.parse(url);
-        final request = await httpClient.getUrl(uri);
-        request.headers.set(HttpHeaders.userAgentHeader, 'Mozilla/5.0 (Linux; Android 10; Mobile) Connectix');
-        request.headers.set(HttpHeaders.acceptHeader, '*/*');
-        request.followRedirects = true;
-        request.maxRedirects = 5;
-        final response = await request.close().timeout(const Duration(minutes: 6));
+        final httpClient = HttpClient();
+        httpClient.connectionTimeout = const Duration(seconds: 20);
+        httpClient.idleTimeout = const Duration(seconds: 20);
+        httpClient.autoUncompress = false;
+        try {
+          final uri = Uri.parse(url);
+          final request = await httpClient.getUrl(uri);
+          request.headers.set(HttpHeaders.userAgentHeader, 'Mozilla/5.0 (Linux; Android 10; Mobile) Connectix');
+          request.headers.set(HttpHeaders.acceptHeader, '*/*');
+          request.followRedirects = true;
+          request.maxRedirects = 8;
+          final response = await request.close().timeout(const Duration(minutes: 6));
 
-        if (response.statusCode >= 400) {
-          log('download HTTP ${response.statusCode} for $url');
-          throw Exception('کد خطا: ${response.statusCode}');
-        }
-
-        final total = response.contentLength > 0 ? response.contentLength : 0;
-        log('download start: $url total=$total status=${response.statusCode}');
-
-        final sink = file.openWrite();
-        int received = 0;
-        await for (final chunk in response) {
-          sink.add(chunk);
-          received += chunk.length;
-          if (total > 0) {
-            onProgress((received / total).clamp(0.0, 1.0), received, total);
-          } else {
-            final fakeProgress = (received / (30 * 1024 * 1024)).clamp(0.0, 0.95);
-            onProgress(fakeProgress, received, 0);
+          if (response.statusCode >= 400) {
+            log('download HTTP ${response.statusCode} for $url (HttpClient)');
+            throw Exception('کد خطا: ${response.statusCode}');
           }
-        }
-        await sink.flush();
-        await sink.close();
 
-        final len = await file.length();
-        log('download finished: len=$len total=$total');
+          total = response.contentLength > 0 ? response.contentLength : 0;
+          log('download start HttpClient: $url total=$total status=${response.statusCode}');
+
+          final sink = file.openWrite();
+          received = 0;
+          await for (final chunk in response) {
+            sink.add(chunk);
+            received += chunk.length;
+            if (total > 0) {
+              onProgress((received / total).clamp(0.0, 1.0), received, total);
+            } else {
+              final fakeProgress = (received / (30 * 1024 * 1024)).clamp(0.0, 0.95);
+              onProgress(fakeProgress, received, 0);
+            }
+          }
+          await sink.flush();
+          await sink.close();
+          downloadDone = true;
+        } finally {
+          try { httpClient.close(force: true); } catch (_) {}
+        }
+      } catch (e) {
+        log('HttpClient download failed for $url: $e — trying http package fallback');
+        // Clean partial file
+        try { if (await file.exists()) await file.delete(); } catch (_) {}
+      }
+
+      // Attempt 2: http package fallback (better redirect + TLS handling)
+      if (!downloadDone) {
+        try {
+          final request = http.Request('GET', Uri.parse(url));
+          request.headers['User-Agent'] = 'Mozilla/5.0 (Linux; Android 10; Mobile) Connectix';
+          request.headers['Accept'] = '*/*';
+          final streamed = await request.send().timeout(const Duration(minutes: 6));
+          if (streamed.statusCode >= 400) {
+            log('download HTTP ${streamed.statusCode} for $url (http package)');
+            throw Exception('کد خطا: ${streamed.statusCode}');
+          }
+          total = streamed.contentLength ?? 0;
+          log('download start http pkg: $url total=$total status=${streamed.statusCode}');
+          final sink = file.openWrite();
+          received = 0;
+          await for (final chunk in streamed.stream) {
+            sink.add(chunk);
+            received += chunk.length;
+            if (total > 0) {
+              onProgress((received / total).clamp(0.0, 1.0), received, total);
+            } else {
+              final fakeProgress = (received / (30 * 1024 * 1024)).clamp(0.0, 0.95);
+              onProgress(fakeProgress, received, 0);
+            }
+          }
+          await sink.flush();
+          await sink.close();
+          downloadDone = true;
+        } catch (e) {
+          log('http package download also failed for $url: $e');
+          rethrow;
+        }
+      }
+
+      final len = await file.length();
+      log('download finished: len=$len total=$total');
 
         if (!await file.exists()) {
           throw Exception('فایل ایجاد نشد');
@@ -603,14 +653,29 @@ class ApiService {
           if (e.toString().contains('APK معتبر نیست')) rethrow;
         }
 
+        bool installOk = false;
+        String installError = '';
         try {
           final installResult = await _updaterChannel.invokeMethod('installApk', {'filePath': file.path});
           log('installApk result: $installResult path=${file.path}');
+          installOk = true;
         } catch (nativeErr) {
           log('Native install invoke failed: $nativeErr');
+          installError = nativeErr.toString();
+          installOk = false;
         }
-        onSuccess();
-        return true;
+
+        if (installOk) {
+          onSuccess();
+          return true;
+        } else {
+          // Install intent failed — try to at least show file exists, then fallback
+          if (installError.isNotEmpty) {
+            throw Exception('نصب خودکار ناموفق: $installError — لطفا از مرورگر دانلود کنید');
+          } else {
+            throw Exception('پنجره نصب باز نشد — لطفا دسترسی نصب را بررسی کنید');
+          }
+        }
       } catch (e) {
         log('attemptDownload error for $url: $e');
         if (!isFallback) {
@@ -619,8 +684,6 @@ class ApiService {
           onError('خطا در دانلود: $e');
           return false;
         }
-      } finally {
-        try { httpClient.close(force: true); } catch (_) {}
       }
     }
 

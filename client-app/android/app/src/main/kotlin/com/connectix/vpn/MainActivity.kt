@@ -201,58 +201,96 @@ class MainActivity: FlutterActivity() {
                 }
                 "installApk" -> {
                     val filePath = call.argument<String>("filePath")
-                    if (filePath != null) {
-                        val file = File(filePath)
-                        if (file.exists() && file.length() > 1000000) {
+                    if (filePath == null) {
+                        result.error("INVALID_ARGUMENT", "filePath is null", null)
+                        return@setMethodCallHandler
+                    }
+                    val file = File(filePath)
+                    if (!file.exists()) {
+                        result.error("FILE_NOT_FOUND", "File does not exist: $filePath", null)
+                        return@setMethodCallHandler
+                    }
+                    if (file.length() < 500000) {
+                        result.error("FILE_TOO_SMALL", "File too small (${file.length()} bytes), likely HTML error page: $filePath", null)
+                        return@setMethodCallHandler
+                    }
+                    try {
+                        // Ensure file is readable
+                        file.setReadable(true, false)
+
+                        val uri: Uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                             try {
-                                val uri: Uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                                    try {
-                                        FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file)
-                                    } catch (e: Exception) {
-                                        // Fallback: try external cache file provider
-                                        val fallbackFile = File(context.getExternalFilesDir(null), "Connectix-Update.apk")
-                                        if (fallbackFile.exists()) {
-                                            FileProvider.getUriForFile(context, context.packageName + ".fileprovider", fallbackFile)
+                                FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file)
+                            } catch (e: Exception) {
+                                // Try alternative locations for FileProvider
+                                try {
+                                    val extDir = context.getExternalFilesDir(null)
+                                    if (extDir != null) {
+                                        val altFile = File(extDir, file.name)
+                                        if (altFile.exists() && altFile != file) {
+                                            try {
+                                                FileProvider.getUriForFile(context, context.packageName + ".fileprovider", altFile)
+                                            } catch (_: Exception) {
+                                                throw e
+                                            }
                                         } else {
                                             throw e
                                         }
-                                    }
-                                } else {
-                                    Uri.fromFile(file)
-                                }
-                                val intent = Intent(Intent.ACTION_VIEW).apply {
-                                    setDataAndType(uri, "application/vnd.android.package-archive")
-                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or 
-                                            Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                                            Intent.FLAG_ACTIVITY_CLEAR_TOP
-                                }
-
-                                // Grant permission to all potential installer activities
-                                try {
-                                    val resInfoList = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                        packageManager.queryIntentActivities(intent, PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY.toLong()))
                                     } else {
-                                        @Suppress("DEPRECATION")
-                                        packageManager.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
+                                        throw e
                                     }
-                                    for (resolveInfo in resInfoList) {
-                                        try {
-                                            val pkgName = resolveInfo.activityInfo.packageName
-                                            context.grantUriPermission(pkgName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                        } catch (_: Exception) {}
-                                    }
-                                } catch (_: Exception) {}
-
-                                context.startActivity(intent)
-                                result.success(true)
-                            } catch (e: Exception) {
-                                result.error("INSTALL_ERROR", e.message + " path=" + filePath + " len=" + file.length(), null)
+                                } catch (e2: Exception) {
+                                    throw Exception("FileProvider failed: ${e.message} / fallback: ${e2.message}")
+                                }
                             }
                         } else {
-                            result.error("FILE_NOT_FOUND", "File does not exist or too small: $filePath len=${if (file.exists()) file.length() else 0}", null)
+                            Uri.fromFile(file)
                         }
-                    } else {
-                        result.error("INVALID_ARGUMENT", "filePath is null", null)
+
+                        val intent = Intent(Intent.ACTION_VIEW).apply {
+                            setDataAndType(uri, "application/vnd.android.package-archive")
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                            // Android 14+ needs this for package installer
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                            }
+                        }
+
+                        // Grant URI permission to all potential installer packages
+                        try {
+                            val resInfoList = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                packageManager.queryIntentActivities(intent, PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY.toLong()))
+                            } else {
+                                @Suppress("DEPRECATION")
+                                packageManager.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
+                            }
+                            if (resInfoList.isEmpty()) {
+                                // No activity found to handle APK install — try generic chooser
+                                val chooser = Intent.createChooser(intent, "نصب بروزرسانی")
+                                chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                context.startActivity(chooser)
+                                result.success(true)
+                                return@setMethodCallHandler
+                            }
+                            for (resolveInfo in resInfoList) {
+                                try {
+                                    val pkgName = resolveInfo.activityInfo.packageName
+                                    context.grantUriPermission(pkgName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                } catch (_: Exception) {}
+                            }
+                        } catch (e: Exception) {
+                            // Non-fatal, continue to startActivity
+                        }
+
+                        context.startActivity(intent)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        // Detailed error for Dart side to show
+                        val msg = "INSTALL_ERROR: ${e.message} path=$filePath len=${file.length()} canRequest=${if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) packageManager.canRequestPackageInstalls() else true}"
+                        result.error("INSTALL_ERROR", msg, null)
                     }
                 }
                 "getLastCrashReport" -> {

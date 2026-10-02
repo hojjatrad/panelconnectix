@@ -982,33 +982,64 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               ],
             ),
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('بعداً', style: TextStyle(color: Color(0xFF64748B))),
-          ),
-          ElevatedButton.icon(
-            onPressed: () async {
-              if (_updateWifiOnly) {
-                final onWifi = await ApiService.isOnWifi();
-                if (!onWifi) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
-                    content: Text('شما گزینه «فقط روی Wi-Fi» را فعال کرده‌اید. برای دانلود، به شبکه Wi-Fi متصل شوید (یا این گزینه را غیرفعال کنید).'),
-                  ));
-                  return;
+          // v4.0 FIX: Always offer browser download as fallback when auto-install fails
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                final uri = Uri.parse(downloadUrl.isNotEmpty ? downloadUrl : fallbackUrl);
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('لینک دانلود: $downloadUrl')),
+                  );
                 }
-              }
-              Navigator.pop(ctx);
-              _startInAppDownloadAndInstall(downloadUrl, latestVer, fallbackUrl: fallbackUrl);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF10B981),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              elevation: 4,
+              },
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF818CF8),
+                side: const BorderSide(color: Color(0xFF4F46E5)),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              icon: const Icon(Icons.open_in_browser, size: 16),
+              label: const Text('دانلود با مرورگر (اگر نصب خودکار کار نکرد)', style: TextStyle(fontSize: 11)),
             ),
-            icon: const Icon(Icons.install_mobile_rounded, size: 18),
-            label: const Text('نصب خودکار درون‌برنامه‌ای', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('بعداً', style: TextStyle(color: Color(0xFF64748B))),
+              ),
+              const Spacer(),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  if (_updateWifiOnly) {
+                    final onWifi = await ApiService.isOnWifi();
+                    if (!onWifi) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
+                        content: Text('شما گزینه «فقط روی Wi-Fi» را فعال کرده‌اید. برای دانلود، به شبکه Wi-Fi متصل شوید (یا این گزینه را غیرفعال کنید).'),
+                      ));
+                      return;
+                    }
+                  }
+                  Navigator.pop(ctx);
+                  _startInAppDownloadAndInstall(downloadUrl, latestVer, fallbackUrl: fallbackUrl);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF10B981),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  elevation: 4,
+                ),
+                icon: const Icon(Icons.install_mobile_rounded, size: 18),
+                label: const Text('نصب خودکار', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              ),
+            ],
           ),
         ],
       ),
@@ -1077,6 +1108,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     });
                   },
                   onError: (error) {
+                    ApiService.log('Download/install error: $error for $url');
                     // Auto-retry once via the GitHub release fallback
                     if (!usedFallback && fallbackUrl.isNotEmpty && fallbackUrl != url) {
                       usedFallback = true;
@@ -1090,7 +1122,21 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     } else {
                       setModalState(() {
                         isFailed = true;
-                        statusText = error;
+                        // v4.0 FIX: Show detailed error + auto browser fallback hint
+                        if (error.contains('نصب خودکار ناموفق') || error.contains('پنجره نصب')) {
+                          statusText = '$error\n\nدر حال باز کردن مرورگر برای دانلود دستی...';
+                          // Auto-open browser after 1.5s if auto-install fails
+                          Future.delayed(const Duration(milliseconds: 1500), () async {
+                            try {
+                              final uri = Uri.parse(url);
+                              if (await canLaunchUrl(uri)) {
+                                await launchUrl(uri, mode: LaunchMode.externalApplication);
+                              }
+                            } catch (_) {}
+                          });
+                        } else {
+                          statusText = error;
+                        }
                       });
                     }
                   },
