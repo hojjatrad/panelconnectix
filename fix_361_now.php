@@ -39,7 +39,11 @@ echo "Windows: $win\n";
 PHP;
 
 file_put_contents(__DIR__ . '/set_app_version_361.php', $fixed);
-echo "Fixed file written\n";
+@touch(__DIR__ . '/.deploy_stamp');
+foreach (glob(__DIR__ . '/.opcache_reset_done_*') as $f) { @unlink($f); }
+if (function_exists('opcache_reset')) { @opcache_reset(); }
+if (function_exists('clearstatcache')) { @clearstatcache(true); }
+echo "Fixed file written + opcache reset\n";
 
 // Now run it
 require_once __DIR__ . '/core/Database.php';
