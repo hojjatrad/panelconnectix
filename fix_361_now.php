@@ -110,7 +110,11 @@ echo "app_latest_version = $version\n";
 echo "download_url = $apkArm64\n";
 echo "universal_url = $apkUniversal\n";
 
-// Deploy images via zip (optional, fast fail)
+// Deploy images via zip (optional, skip if ?nozip=1 for speed)
+if (isset($_GET['nozip']) && $_GET['nozip'] == '1') {
+    echo "Skipping image zip deploy (nozip=1) for speed
+";
+} else {
 echo "Deploying images via zip (optional)...\n";
 $zipUrl = "https://github.com/hojjatrad/panelconnectix/archive/refs/heads/main.zip?t=".time();
 $ch = curl_init($zipUrl);
@@ -144,6 +148,7 @@ if ($zipData && strlen($zipData) > 10000) {
     @unlink($tmpZip);
     $del = function($d) use (&$del) { if (!is_dir($d)) return; foreach (array_diff(scandir($d),['.','..']) as $f) { $p="$d/$f"; is_dir($p)?$del($p):@unlink($p); } @rmdir($d); };
     $del($tmpExt);
+}
 }
 
 if (function_exists('opcache_reset')) @opcache_reset();
