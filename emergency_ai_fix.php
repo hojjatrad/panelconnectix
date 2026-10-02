@@ -217,6 +217,11 @@ try {
             'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/controllers/ApiControllerV2.php',
             'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/controllers/ApiControllerV2.php',
         ],
+        'force_update_402.php' => [
+            'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/force_update_402.php',
+            'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/force_update_402.php',
+            'https://github.com/hojjatrad/panelconnectix/raw/main/force_update_402.php',
+        ],
         'set_app_version_361.php' => [
             'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/set_app_version_361.php',
             'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/set_app_version_361.php',
