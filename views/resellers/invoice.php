@@ -1,19 +1,21 @@
 <?php
 $pageTitle = 'فاکتور و صورت‌حساب ماهانه نماینده';
 require __DIR__ . '/../layout/header.php';
+require_once __DIR__ . '/../../core/JalaliDate.php';
 
 $isAdmin = Auth::isAdmin();
 $curYear = (int)date('Y');
 $curMonth = (int)date('m');
 
-// Generate past 12 months for selector
+// Generate past 12 months for selector with Jalali labels
 $monthsList = [];
 for ($i = 0; $i < 12; $i++) {
     $ts = strtotime("-{$i} month", strtotime(date('Y-m-01')));
     $val = date('Y-m', $ts);
+    $jalaliLabel = JalaliDate::format($ts, 'date');
     $monthsList[] = [
         'val' => $val,
-        'label' => date('F Y', $ts) . ' (' . $val . ')'
+        'label' => $jalaliLabel . ' (' . $val . ')'
     ];
 }
 
@@ -138,7 +140,7 @@ $totalGbUsed = round($totalTrafficUsedBytes / (1024 * 1024 * 1024), 2);
             <div class="text-xs text-slate-400">شماره فاکتور:</div>
             <div class="text-base font-bold text-emerald-400 tracking-wider"><?= $invoiceNumber ?></div>
             <div class="text-[11px] text-slate-400 mt-1">دوره صورت‌حساب: <span class="text-white font-semibold"><?= $month ?></span></div>
-            <div class="text-[11px] text-slate-500">تاریخ صدور: <?= date('Y-m-d') ?></div>
+            <div class="text-[11px] text-slate-500">تاریخ صدور: <?= JalaliDate::format(time(), 'full') ?> (<?= JalaliDate::toPersianNumber(JalaliDate::format(time(), 'short')) ?>)</div>
         </div>
     </div>
 
@@ -340,12 +342,12 @@ $totalGbUsed = round($totalTrafficUsedBytes / (1024 * 1024 * 1024), 2);
                                         <span class="text-slate-500 font-normal">—</span>
                                     <?php endif; ?>
                                 </td>
-                                <td class="p-2.5 font-bold text-white"><?= htmlspecialchars($c['username']) ?></td>
+                                <td class="p-2.5 font-bold text-white"><code class="cursor-pointer hover:bg-slate-700 px-1.5 py-0.5 rounded" onclick="navigator.clipboard.writeText(this.textContent)" title="کلیک برای کپی"><?= htmlspecialchars($c['username']) ?></code></td>
                                 <td class="p-2.5 font-sans text-slate-300"><?= htmlspecialchars($c['plan_title'] ?? 'سفارشی') ?></td>
                                 <td class="p-2.5 font-sans text-slate-400"><?= htmlspecialchars($c['server_name'] ?? '—') ?></td>
                                 <td class="p-2.5 text-center text-slate-200"><?= $cLimitGb > 0 ? $cLimitGb . ' GB' : 'نامحدود' ?></td>
-                                <td class="p-2.5 text-center text-slate-400"><?= substr($c['created_at'], 0, 10) ?></td>
-                                <td class="p-2.5 text-center text-slate-400"><?= !empty($c['expire_at']) ? substr($c['expire_at'], 0, 10) : '∞' ?></td>
+                                <td class="p-2.5 text-center text-slate-400" title="<?= htmlspecialchars($c['created_at']) ?>"><?= JalaliDate::format($c['created_at'], 'short') ?></td>
+                                <td class="p-2.5 text-center text-slate-400" title="<?= htmlspecialchars($c['expire_at'] ?? '') ?>"><?= !empty($c['expire_at']) ? JalaliDate::format($c['expire_at'], 'short') : '∞' ?></td>
                                 <td class="p-2.5 text-center">
                                     <?php if ($c['status'] === 'active' && !$isExpired): ?>
                                         <span class="print-badge px-2 py-0.5 rounded-full text-[10px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">فعال</span>
