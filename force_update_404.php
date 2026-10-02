@@ -1,5 +1,5 @@
 <?php
-// FORCE UPDATE TO 4.0.4 - bypasses all cache checks, hardcodes v4.0.4 URLs + self-heals via GitHub API
+// FORCE UPDATE TO 4.0.4 - Final fix some-phones-update-fail
 header('Content-Type: text/plain; charset=utf-8');
 require __DIR__ . '/config.php';
 require __DIR__ . '/core/Database.php';
@@ -8,16 +8,14 @@ require __DIR__ . '/core/Setting.php';
 $key = $_GET['key'] ?? '';
 $expected = Setting::get('github_webhook_secret', '');
 if ($key !== $expected && $key !== 'gh_hook_sec_vpbotn_2026' && $key !== 'CONNECTIX2026' && $key !== (defined('APP_SECRET')?APP_SECRET:'')) {
-    if ($key !== 'cpanel_cron') {
-        die("Unauthorized - need ?key=SECRET");
-    }
+    if ($key !== 'cpanel_cron') die("Unauthorized");
 }
 
 $pdo = Database::getConnection();
 $version = '4.0.4';
 $repo = 'hojjatrad/panelconnectix';
-$title = "Connectix VPN 4.0.4 - Fix Some Phones Update Fail";
-$changelog = "🚀 نسخه 4.0.4 - رفع مشکل بروزرسانی در بعضی گوشی‌ها\n\n✅ علت اصلی: گیت‌هاب در بعضی اپراتورها (همراه اول/ایرانسل) فیلتر است\n✅ فیکس: دانلود از هاست پنل (vpbotn.ir) که برای همه اپراتورها کار می‌کند\n✅ فیکس AppApkMirror: حذف ?cb= و token header که باعث شکست دانلود از گیت‌هاب بود\n✅ اپ اندروید: تلاش 6+ URL (پنل اصلی، بکاپ، گیت‌هاب) برای دانلود\n✅ نصب‌کننده بهبود یافته: 3 مرحله‌ای (INSTALL_PACKAGE + VIEW + Chooser) برای همه برندها\n✅ رفع مشکل نصب روی شیائومی MIUI، سامسونگ OneUI، اندروید 14+\n✅ رفع قطعی مشکل اتصال و حلقه بی‌نهایت آپدیت از نسخه‌های قبل";
+$title = "Connectix VPN 4.0.4 - Final Fix Some Phones Update Fail";
+$changelog = "🚀 نسخه 4.0.4 - فیکس نهایی مشکل بروزرسانی در بعضی گوشی‌ها\n\n✅ علت اصلی: گیت‌هاب در بعضی اپراتورها (همراه اول/ایرانسل) فیلتر است\n✅ فیکس نهایی: دانلود از هاست پنل (vpbotn.ir) به عنوان پیش‌فرض در همه جا\n✅ فیکس dashboard_screen: defaultPrimary از گیت‌هاب به پنل هاست تغییر کرد\n✅ اپ اندروید: تلاش 6+ URL (پنل اصلی، بکاپ، گیت‌هاب) برای دانلود\n✅ نصب‌کننده بهبود یافته: 3 مرحله‌ای (INSTALL_PACKAGE + VIEW + Chooser)\n✅ رفع مشکل نصب روی شیائومی MIUI، سامسونگ OneUI، اندروید 14+\n✅ رفع قطعی مشکل اتصال و حلقه بی‌نهایت آپدیت";
 
 $proto = 'https';
 $host = $_SERVER['HTTP_HOST'] ?? 'vpbotn.ir';
@@ -29,14 +27,14 @@ $panelBase = $proto . '://' . $host . $basePath;
 $localArm64 = __DIR__ . '/Connectix-ARM64-v8a.apk';
 $localUni = __DIR__ . '/Connectix-Universal.apk';
 
-$apkArm64 = "https://github.com/$repo/releases/download/v4.0.4/Connectix-Android-ARM64.apk";
-$apkUniversal = "https://github.com/$repo/releases/download/v4.0.4/Connectix-Android-Universal.apk";
+$apkArm64 = $panelBase . '/Connectix-ARM64-v8a.apk';
+$apkUniversal = $panelBase . '/Connectix-Universal.apk';
 
-if (is_file($localArm64) && filesize($localArm64) > 1024*1024) {
-    $apkArm64 = $panelBase . '/Connectix-ARM64-v8a.apk';
+if (!is_file($localArm64) || filesize($localArm64) < 1024*1024) {
+    $apkArm64 = "https://github.com/$repo/releases/download/v4.0.4/Connectix-Android-ARM64.apk";
 }
-if (is_file($localUni) && filesize($localUni) > 1024*1024) {
-    $apkUniversal = $panelBase . '/Connectix-Universal.apk';
+if (!is_file($localUni) || filesize($localUni) < 1024*1024) {
+    $apkUniversal = "https://github.com/$repo/releases/download/v4.0.4/Connectix-Android-Universal.apk";
 }
 
 $winUrl = "https://github.com/$repo/releases/download/v4.0.4/Connectix-Windows-x64.zip";
@@ -45,6 +43,8 @@ echo "FORCE SETTING TO $version\n";
 echo "Panel base: $panelBase\n";
 echo "ARM64: $apkArm64\n";
 echo "Universal: $apkUniversal\n";
+echo "Local ARM64: " . (is_file($localArm64) ? round(filesize($localArm64)/1024/1024,1)." MB" : "NO") . "\n";
+echo "Local Universal: " . (is_file($localUni) ? round(filesize($localUni)/1024/1024,1)." MB" : "NO") . "\n";
 
 Setting::set('app_latest_version', $version);
 Setting::set('app_download_url', $apkArm64);
@@ -64,15 +64,9 @@ $pdo->exec("DELETE FROM system_settings WHERE setting_key LIKE 'app_configs_cach
 
 echo "✅ DB FORCED to $version\n";
 
-$stmt = $pdo->query("SELECT setting_key, setting_value FROM system_settings WHERE setting_key LIKE 'app_%' ORDER BY setting_key");
-foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-    echo $row['setting_key'] . " => " . substr($row['setting_value']??'',0,200) . "\n";
-}
-
-// Self-heal via GitHub API: update all critical files to v4.0.4 (bypass CDN cache)
+// Self-heal via GitHub API
 try {
     $token = Setting::get('github_token', '');
-    echo "token debug: ".(empty($token)?'empty':'exists '.substr($token,0,10))."\n";
     if (!empty($token)) {
         $filesToUpdate = [
             'emergency_ai_fix.php',
@@ -80,8 +74,6 @@ try {
             'controllers/ApiControllerV2.php',
             'controllers/ApiController.php',
             'clear_cache.php',
-            'force_update_403.php',
-            'force_update_403_via_api.php',
             'app_release.json',
         ];
         foreach ($filesToUpdate as $f) {
@@ -97,7 +89,6 @@ try {
             $res = curl_exec($ch);
             $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
-            echo "API $f code $code len ".strlen($res)."\n";
             if ($code === 200 && $res) {
                 $j = json_decode($res, true);
                 if (!empty($j['content'])) {
@@ -106,33 +97,30 @@ try {
                         $path = __DIR__ . '/' . $f;
                         if (!is_dir(dirname($path))) @mkdir(dirname($path), 0755, true);
                         file_put_contents($path, $content);
-                        echo "✅ $f force-updated via API (".strlen($content)." bytes)\n";
+                        echo "✅ $f updated (".strlen($content)." bytes)\n";
                     }
                 }
             }
         }
     }
-} catch (Throwable $e) { echo "API update error: ".$e->getMessage()."\n"; }
+} catch (Throwable $e) { echo "API error: ".$e->getMessage()."\n"; }
 
-// Try to mirror APKs after fixing AppApkMirror
+// Mirror APKs
 try {
     require_once __DIR__ . '/core/AppApkMirror.php';
-    echo "\n--- Mirroring APKs (after fix) ---\n";
+    echo "\n--- Mirroring APKs ---\n";
     $mirrorResult = AppApkMirror::mirror(null, true, $version, '44');
     echo json_encode($mirrorResult, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . "\n";
-    
     if (is_file($localArm64) && filesize($localArm64) > 1024*1024) {
         Setting::set('app_download_url', $panelBase . '/Connectix-ARM64-v8a.apk');
-        echo "✅ Updated to panel host: " . $panelBase . "/Connectix-ARM64-v8a.apk (".round(filesize($localArm64)/1024/1024,1)." MB)\n";
+        echo "✅ Final URL: panel host ARM64\n";
     }
     if (is_file($localUni) && filesize($localUni) > 1024*1024) {
         Setting::set('app_universal_url', $panelBase . '/Connectix-Universal.apk');
-        echo "✅ Updated to panel host: " . $panelBase . "/Connectix-Universal.apk (".round(filesize($localUni)/1024/1024,1)." MB)\n";
+        echo "✅ Final URL: panel host Universal\n";
     }
-} catch (Throwable $e) {
-    echo "Mirror error: " . $e->getMessage() . "\n";
-}
+} catch (Throwable $e) { echo "Mirror error: ".$e->getMessage()."\n"; }
 
-try { require_once __DIR__ . '/core/Cache.php'; $cnt = Cache::clear(); echo "✅ Cache cleared $cnt files\n"; } catch (Throwable $e) { echo "cache clear error: ".$e->getMessage()."\n"; }
+try { require_once __DIR__ . '/core/Cache.php'; $cnt = Cache::clear(); echo "✅ Cache cleared $cnt\n"; } catch (Throwable $e) {}
 if (function_exists('opcache_reset')) @opcache_reset();
 echo "DONE v4.0.4\n";

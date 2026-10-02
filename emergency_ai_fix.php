@@ -139,21 +139,21 @@ echo "</ul>";
 echo "<br>Checking tables now:<br>";
 
 
-// v4.7 FIX: Also update app version to 4.0.3 (Fix some-phones-update-fail - Iran filtering)
+// v4.7 FIX: Also update app version to 4.0.4 (Fix some-phones-update-fail - Iran filtering)
 try {
     require_once __DIR__ . '/core/Setting.php';
     require_once __DIR__ . '/core/Helpers.php';
-    $version = '4.0.3';
+    $version = '4.0.4';
     $repo = 'hojjatrad/panelconnectix';
-    $v403Arm64 = "https://github.com/$repo/releases/download/v4.0.3/Connectix-Android-ARM64.apk";
+    $v403Arm64 = "https://github.com/$repo/releases/download/v4.0.4/Connectix-Android-ARM64.apk";
     $v402Arm64 = "https://github.com/$repo/releases/download/v4.0.2/Connectix-Android-ARM64.apk";
     $v401Arm64 = "https://github.com/$repo/releases/download/v4.0.1/Connectix-Android-ARM64.apk";
     $v361Arm64 = "https://github.com/$repo/releases/download/v3.6.1/Connectix-Android-ARM64.apk";
-    $v403Universal = "https://github.com/$repo/releases/download/v4.0.3/Connectix-Android-Universal.apk";
+    $v403Universal = "https://github.com/$repo/releases/download/v4.0.4/Connectix-Android-Universal.apk";
     $v402Universal = "https://github.com/$repo/releases/download/v4.0.2/Connectix-Android-Universal.apk";
     $v401Universal = "https://github.com/$repo/releases/download/v4.0.1/Connectix-Android-Universal.apk";
     $v361Universal = "https://github.com/$repo/releases/download/v3.6.1/Connectix-Android-Universal.apk";
-    $v403Win = "https://github.com/$repo/releases/download/v4.0.3/Connectix-Windows-x64.zip";
+    $v403Win = "https://github.com/$repo/releases/download/v4.0.4/Connectix-Windows-x64.zip";
     $v402Win = "https://github.com/$repo/releases/download/v4.0.2/Connectix-Windows-x64.zip";
     $v401Win = "https://github.com/$repo/releases/download/v4.0.1/Connectix-Windows-x64.zip";
     $v361Win = "https://github.com/$repo/releases/download/v3.6.1/Connectix-Windows-x64.zip";
@@ -185,7 +185,7 @@ try {
         $winUrl = $v361Win;
         if ($check($v403Arm64)) {
             $apkArm64 = $v403Arm64; $apkUniversal = $v403Universal; $winUrl = $v403Win;
-            $version = '4.0.3';
+            $version = '4.0.4';
         } elseif ($check($v402Arm64)) {
             $apkArm64 = $v402Arm64; $apkUniversal = $v402Universal; $winUrl = $v402Win;
             $version = '4.0.2';
@@ -209,8 +209,8 @@ try {
 ✅ نصب‌کننده 3 مرحله‌ای برای همه برندها
 ✅ رفع مشکل شیائومی، سامسونگ، اندروید 14+
 ✅ رفع قطعی اتصال و حلقه آپدیت";
-    if ($version === '4.0.3') {
-        $changelog = "🚀 نسخه 4.0.3 - رفع مشکل بروزرسانی در بعضی گوشی‌ها
+    if ($version === '4.0.4') {
+        $changelog = "🚀 نسخه 4.0.4 - رفع مشکل بروزرسانی در بعضی گوشی‌ها
 
 ✅ علت اصلی: گیت‌هاب در بعضی اپراتورها (همراه اول/ایرانسل) فیلتر است
 ✅ فیکس: دانلود از هاست پنل (vpbotn.ir) که برای همه اپراتورها کار می‌کند
@@ -225,7 +225,7 @@ try {
     Setting::set('app_update_enabled', '1');
     Setting::set('app_update_source', 'admin');
     Setting::set('app_update_published_at', date('Y-m-d H:i:s'));
-    Setting::set('app_update_auto_code', '43');
+    Setting::set('app_update_auto_code', '44');
     Setting::set('app_latest_version_windows', $version);
     Setting::set('app_download_url_windows', $winUrl);
     Setting::set('app_latest_version_ios', $version);

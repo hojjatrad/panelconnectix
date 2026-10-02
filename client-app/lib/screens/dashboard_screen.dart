@@ -71,7 +71,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Map<String, dynamic>? _updateInfo;
   bool _isCheckingUpdate = false;
 
-  static const String currentAppVersion = '4.0.3'; // A2: Fix some-phones-update-fail - panel host mirror + robust multi-URL download + improved installer
+  static const String currentAppVersion = '4.0.4'; // A3: Final fix some-phones - panel host as default in dashboard + robust installer
 
   // "Download over Wi-Fi only" for update packages
   bool _updateWifiOnly = false;
@@ -1122,17 +1122,22 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     );
   }
 
-  // Real-time In-App Downloader Modal Sheet
+  // Real-time In-App Downloader Modal Sheet - FIX 4.0.3: Use panel host as primary (works for all Iranian operators, GitHub filtered for some)
   void _startInAppDownloadAndInstall(String downloadUrl, String version, {String fallbackUrl = ''}) {
+    // Panel host URLs work for ALL Iranian operators (unfiltered), GitHub filtered for some ISPs
+    final panelPrimary = "${ApiService.baseUrl}/Connectix-ARM64-v8a.apk";
+    final panelFallback = "${ApiService.baseUrl}/Connectix-Universal.apk";
     final defaultPrimary = "https://github.com/hojjatrad/panelconnectix/releases/download/v$version/Connectix-Android-ARM64.apk";
     final defaultFallback = "https://github.com/hojjatrad/panelconnectix/releases/download/v$version/Connectix-Android-Universal.apk";
 
     if (downloadUrl.isEmpty || !downloadUrl.startsWith('http')) {
-      downloadUrl = defaultPrimary;
+      downloadUrl = panelPrimary;
     }
     if (fallbackUrl.isEmpty || !fallbackUrl.startsWith('http')) {
-      fallbackUrl = defaultFallback;
+      fallbackUrl = panelFallback;
     }
+    // Keep GitHub as ultimate fallback if panel fails
+    // downloadAndInstallApk will try all URLs: panel primary, panel fallback, github primary, github fallback, all baseUrls
 
     // Windows (phase 1): the update is a ZIP package — open it in the
     // default browser (no in-process installer yet).
