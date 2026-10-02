@@ -139,18 +139,21 @@ echo "</ul>";
 echo "<br>Checking tables now:<br>";
 
 
-// v4.5 FIX: Also update app version to 4.0.1 (Fix same-version reinstall loop) + update ApiControllerV2 via jsDelivr
+// v4.6 FIX: Also update app version to 4.0.2 (Fix connection button + infinite loop) + update ApiControllerV2 via jsDelivr
 try {
     require_once __DIR__ . '/core/Setting.php';
-    $version = '4.0.1';
+    $version = '4.0.2';
     $repo = 'hojjatrad/panelconnectix';
-    // Check v4.0.1 -> v4.0.0 -> v3.6.1
+    // Check v4.0.2 -> v4.0.1 -> v4.0.0 -> v3.6.1
+    $v402Arm64 = "https://github.com/$repo/releases/download/v4.0.2/Connectix-Android-ARM64.apk";
     $v401Arm64 = "https://github.com/$repo/releases/download/v4.0.1/Connectix-Android-ARM64.apk";
     $v400Arm64 = "https://github.com/$repo/releases/download/v4.0.0/Connectix-Android-ARM64.apk";
     $v361Arm64 = "https://github.com/$repo/releases/download/v3.6.1/Connectix-Android-ARM64.apk";
+    $v402Universal = "https://github.com/$repo/releases/download/v4.0.2/Connectix-Android-Universal.apk";
     $v401Universal = "https://github.com/$repo/releases/download/v4.0.1/Connectix-Android-Universal.apk";
     $v400Universal = "https://github.com/$repo/releases/download/v4.0.0/Connectix-Android-Universal.apk";
     $v361Universal = "https://github.com/$repo/releases/download/v3.6.1/Connectix-Android-Universal.apk";
+    $v402Win = "https://github.com/$repo/releases/download/v4.0.2/Connectix-Windows-x64.zip";
     $v401Win = "https://github.com/$repo/releases/download/v4.0.1/Connectix-Windows-x64.zip";
     $v400Win = "https://github.com/$repo/releases/download/v4.0.0/Connectix-Windows-x64.zip";
     $v361Win = "https://github.com/$repo/releases/download/v3.6.1/Connectix-Windows-x64.zip";
@@ -169,20 +172,24 @@ try {
     $apkArm64 = $v361Arm64;
     $apkUniversal = $v361Universal;
     $winUrl = $v361Win;
-    if ($check($v401Arm64)) {
+    if ($check($v402Arm64)) {
+        $apkArm64 = $v402Arm64; $apkUniversal = $v402Universal; $winUrl = $v402Win;
+        $version = '4.0.2';
+    } elseif ($check($v401Arm64)) {
         $apkArm64 = $v401Arm64; $apkUniversal = $v401Universal; $winUrl = $v401Win;
+        $version = '4.0.1';
     } elseif ($check($v400Arm64)) {
         $apkArm64 = $v400Arm64; $apkUniversal = $v400Universal; $winUrl = $v400Win;
     }
     Setting::set('app_latest_version', $version);
     Setting::set('app_download_url', $apkArm64);
     Setting::set('app_universal_url', $apkUniversal);
-    Setting::set('app_update_title', "Connectix VPN 4.0.1 - Fix Install Button Same Version");
+    Setting::set('app_update_title', "Connectix VPN 4.0.2 - Fix Connection Button");
     Setting::set('app_update_changelog', "🚀 نسخه 4.0.1 - رفع باگ نصب\n\n✅ رفع مشکل دکمه نصب\n✅ نصب مجدد همین نسخه\n✅ رفع حلقه بی‌نهایت\n✅ سرعت پینگ 250 برابر\n✅ لود صفحه 40 برابر");
     Setting::set('app_update_enabled', '1');
     Setting::set('app_update_source', 'admin');
     Setting::set('app_update_published_at', date('Y-m-d H:i:s'));
-    Setting::set('app_update_auto_code', '41');
+    Setting::set('app_update_auto_code', '42');
     Setting::set('app_latest_version_windows', $version);
     Setting::set('app_download_url_windows', $winUrl);
     Setting::set('app_latest_version_ios', $version);
