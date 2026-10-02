@@ -547,90 +547,93 @@ class ApiService {
         try { await file.delete(); } catch (_) {}
       }
 
-      int total = 0;
-      int received = 0;
-      bool downloadDone = false;
-
       try {
-        final httpClient = HttpClient();
-        httpClient.connectionTimeout = const Duration(seconds: 20);
-        httpClient.idleTimeout = const Duration(seconds: 20);
-        httpClient.autoUncompress = false;
+        int total = 0;
+        int received = 0;
+        bool downloadDone = false;
+
+        // Attempt 1: HttpClient with progress
         try {
-          final uri = Uri.parse(url);
-          final request = await httpClient.getUrl(uri);
-          request.headers.set(HttpHeaders.userAgentHeader, 'Mozilla/5.0 (Linux; Android 10; Mobile) Connectix');
-          request.headers.set(HttpHeaders.acceptHeader, '*/*');
-          request.followRedirects = true;
-          request.maxRedirects = 8;
-          final response = await request.close().timeout(const Duration(minutes: 6));
+          final httpClient = HttpClient();
+          httpClient.connectionTimeout = const Duration(seconds: 20);
+          httpClient.idleTimeout = const Duration(seconds: 20);
+          httpClient.autoUncompress = false;
+          try {
+            final uri = Uri.parse(url);
+            final request = await httpClient.getUrl(uri);
+            request.headers.set(HttpHeaders.userAgentHeader, 'Mozilla/5.0 (Linux; Android 10; Mobile) Connectix');
+            request.headers.set(HttpHeaders.acceptHeader, '*/*');
+            request.followRedirects = true;
+            request.maxRedirects = 8;
+            final response = await request.close().timeout(const Duration(minutes: 6));
 
-          if (response.statusCode >= 400) {
-            log('download HTTP ${response.statusCode} for $url (HttpClient)');
-            throw Exception('کد خطا: ${response.statusCode}');
-          }
-
-          total = response.contentLength > 0 ? response.contentLength : 0;
-          log('download start HttpClient: $url total=$total status=${response.statusCode}');
-
-          final sink = file.openWrite();
-          received = 0;
-          await for (final chunk in response) {
-            sink.add(chunk);
-            received += chunk.length;
-            if (total > 0) {
-              onProgress((received / total).clamp(0.0, 1.0), received, total);
-            } else {
-              final fakeProgress = (received / (30 * 1024 * 1024)).clamp(0.0, 0.95);
-              onProgress(fakeProgress, received, 0);
+            if (response.statusCode >= 400) {
+              log('download HTTP ${response.statusCode} for $url (HttpClient)');
+              throw Exception('کد خطا: ${response.statusCode}');
             }
-          }
-          await sink.flush();
-          await sink.close();
-          downloadDone = true;
-        } finally {
-          try { httpClient.close(force: true); } catch (_) {}
-        }
-      } catch (e) {
-        log('HttpClient download failed for $url: $e — trying http package fallback');
-        try { if (await file.exists()) await file.delete(); } catch (_) {}
-      }
 
-      if (!downloadDone) {
-        try {
-          final request = http.Request('GET', Uri.parse(url));
-          request.headers['User-Agent'] = 'Mozilla/5.0 (Linux; Android 10; Mobile) Connectix';
-          request.headers['Accept'] = '*/*';
-          final streamed = await request.send().timeout(const Duration(minutes: 6));
-          if (streamed.statusCode >= 400) {
-            log('download HTTP ${streamed.statusCode} for $url (http package)');
-            throw Exception('کد خطا: ${streamed.statusCode}');
-          }
-          total = streamed.contentLength ?? 0;
-          log('download start http pkg: $url total=$total status=${streamed.statusCode}');
-          final sink = file.openWrite();
-          received = 0;
-          await for (final chunk in streamed.stream) {
-            sink.add(chunk);
-            received += chunk.length;
-            if (total > 0) {
-              onProgress((received / total).clamp(0.0, 1.0), received, total);
-            } else {
-              final fakeProgress = (received / (30 * 1024 * 1024)).clamp(0.0, 0.95);
-              onProgress(fakeProgress, received, 0);
+            total = response.contentLength > 0 ? response.contentLength : 0;
+            log('download start HttpClient: $url total=$total status=${response.statusCode}');
+
+            final sink = file.openWrite();
+            received = 0;
+            await for (final chunk in response) {
+              sink.add(chunk);
+              received += chunk.length;
+              if (total > 0) {
+                onProgress((received / total).clamp(0.0, 1.0), received, total);
+              } else {
+                final fakeProgress = (received / (30 * 1024 * 1024)).clamp(0.0, 0.95);
+                onProgress(fakeProgress, received, 0);
+              }
             }
+            await sink.flush();
+            await sink.close();
+            downloadDone = true;
+          } finally {
+            try { httpClient.close(force: true); } catch (_) {}
           }
-          await sink.flush();
-          await sink.close();
-          downloadDone = true;
         } catch (e) {
-          log('http package download also failed for $url: $e');
-          rethrow;
+          log('HttpClient download failed for $url: $e — trying http package fallback');
+          try { if (await file.exists()) await file.delete(); } catch (_) {}
         }
-      }
 
-      final len = await file.length();
-      log('download finished: len=$len total=$total');
+        // Attempt 2: http package fallback (better redirect handling)
+        if (!downloadDone) {
+          try {
+            final request = http.Request('GET', Uri.parse(url));
+            request.headers['User-Agent'] = 'Mozilla/5.0 (Linux; Android 10; Mobile) Connectix';
+            request.headers['Accept'] = '*/*';
+            final streamed = await request.send().timeout(const Duration(minutes: 6));
+            if (streamed.statusCode >= 400) {
+              log('download HTTP ${streamed.statusCode} for $url (http package)');
+              throw Exception('کد خطا: ${streamed.statusCode}');
+            }
+            total = streamed.contentLength ?? 0;
+            log('download start http pkg: $url total=$total status=${streamed.statusCode}');
+            final sink = file.openWrite();
+            received = 0;
+            await for (final chunk in streamed.stream) {
+              sink.add(chunk);
+              received += chunk.length;
+              if (total > 0) {
+                onProgress((received / total).clamp(0.0, 1.0), received, total);
+              } else {
+                final fakeProgress = (received / (30 * 1024 * 1024)).clamp(0.0, 0.95);
+                onProgress(fakeProgress, received, 0);
+              }
+            }
+            await sink.flush();
+            await sink.close();
+            downloadDone = true;
+          } catch (e) {
+            log('http package download also failed for $url: $e');
+            rethrow;
+          }
+        }
+
+        final len = await file.length();
+        log('download finished: len=$len total=$total');
 
         if (!await file.exists()) {
           throw Exception('فایل ایجاد نشد');
