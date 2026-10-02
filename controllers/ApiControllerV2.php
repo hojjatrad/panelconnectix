@@ -872,10 +872,12 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
         $repo = Updater::getRepo();
         $downloadUrl = trim(Setting::get('app_download_url', ''));
         $universalUrl= trim(Setting::get('app_universal_url', ''));
-        if ($downloadUrl === '' || !str_contains($downloadUrl, "v{$latest}")) {
+        // v4.0 FIX: Don't force v{latest} in URL — allow v3.6.1 fallback until v4.0.0 APKs built by Actions
+        // Old logic overwrote working v3.6.1 URLs with 404 v4.0.0 URLs, causing Android update not showing
+        if ($downloadUrl === '') {
             $downloadUrl = "https://github.com/{$repo}/releases/download/v{$latest}/Connectix-Android-ARM64.apk";
         }
-        if ($universalUrl === '' || !str_contains($universalUrl, "v{$latest}")) {
+        if ($universalUrl === '') {
             $universalUrl = "https://github.com/{$repo}/releases/download/v{$latest}/Connectix-Android-Universal.apk";
         }
         $title       = trim(Setting::get('app_update_title', '')) ?: "Connectix v{$latest}";
