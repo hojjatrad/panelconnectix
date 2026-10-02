@@ -477,6 +477,9 @@ $router->post('webapp/spin', [WebappController::class, 'spin']);
 // App Guides & Download Tutorials
 $router->get('apps', [AppGuideController::class, 'publicIndex']);
 $router->get('download', [AppGuideController::class, 'publicIndex']);
+$router->get('ios-guide', [AppGuideController::class, 'iosGuide']);
+$router->get('apps/ios', [AppGuideController::class, 'iosGuide']);
+$router->get('download/ios', [AppGuideController::class, 'iosGuide']);
 $router->get('settings/app-guides', [AppGuideController::class, 'index']);
 $router->post('settings/app-guides/store', [AppGuideController::class, 'store']);
 $router->post('settings/app-guides/update', [AppGuideController::class, 'update']);

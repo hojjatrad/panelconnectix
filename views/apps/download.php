@@ -102,10 +102,17 @@ foreach ($guides as $g) {
 
     <main class="max-w-5xl mx-auto px-4 py-8 md:py-12 space-y-12 relative z-10">
         <!-- Hero Section -->
-        <div class="text-center space-y-4 max-w-2xl mx-auto">
+        <div class="text-center space-y-4 max-w-3xl mx-auto">
             <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-300 text-xs font-bold">
                 <i class="fa-solid fa-sparkles text-amber-400"></i>
                 <span>نگارش جدید ۳.۶.۱ اپلیکیشن اختصاصی اندروید و iOS منتشر شد</span>
+            </div>
+            <div class="flex justify-center">
+              <a href="<?= $base ?>/ios-guide" class="group inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-black shadow-lg shadow-indigo-900/30 transition-all">
+                <i class="fa-solid fa-circle-play group-hover:scale-110 transition"></i>
+                <span>📱 راهنمای کامل نصب آیفون با ویدیو و تصویر - جدید!</span>
+                <i class="fa-solid fa-arrow-left text-[10px]"></i>
+              </a>
             </div>
             <h2 class="text-2xl md:text-4xl font-black text-white leading-tight">
                 دانلود نرم‌افزارهای اتصال و <span class="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400">راهنمای هوشمند</span>
@@ -255,7 +262,7 @@ foreach ($guides as $g) {
                                 <span>TestFlight</span>
                             </a>
                         </div>
-                        <p class="text-[10px] text-slate-400 text-center">یا فایل IPA مستقیم: <a href="<?= htmlspecialchars($iosIpaUrl) ?>" class="text-indigo-400 hover:underline">دانلود IPA</a> + آموزش AltStore</p>
+                        <p class="text-[10px] text-slate-400 text-center">یا فایل IPA مستقیم: <a href="<?= htmlspecialchars($iosIpaUrl) ?>" class="text-indigo-400 hover:underline">دانلود IPA</a> + <a href="<?= $base ?>/ios-guide" class="text-emerald-400 hover:underline font-bold"><i class="fa-solid fa-circle-play ml-1"></i>راهنمای تصویری و ویدیویی نصب آیفون</a></p>
                     </div>
                 </div>
 

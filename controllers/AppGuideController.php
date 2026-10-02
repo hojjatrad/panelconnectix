@@ -30,6 +30,19 @@ class AppGuideController {
         require __DIR__ . '/../views/apps/download.php';
     }
 
+    public function iosGuide(): void {
+        $pdo = Database::getConnection();
+        $manifestPath = dirname(__DIR__) . '/app_release.json';
+        $manifest = [];
+        if (is_file($manifestPath)) {
+            $manifest = @json_decode(file_get_contents($manifestPath), true) ?: [];
+        }
+        require_once __DIR__ . '/../core/Setting.php';
+        $brandName = Setting::get('brand_name', 'Connectix VPN');
+        $logoUrl = Setting::get('brand_logo_url', '');
+        require __DIR__ . '/../views/apps/ios_guide_complete.php';
+    }
+
     public function index(): void {
         Auth::requireAdmin();
         $pdo = Database::getConnection();
