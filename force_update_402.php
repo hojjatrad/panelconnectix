@@ -54,6 +54,7 @@ foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
 // Also force-update emergency_ai_fix.php via GitHub API to prevent downgrade loop
 try {
     $token = Setting::get('github_token', '');
+    echo "token debug: ".(empty($token)?'empty':'exists '.substr($token,0,10))."\n";
     if (!empty($token)) {
         $apiUrl = "https://api.github.com/repos/$repo/contents/emergency_ai_fix.php?ref=main";
         $ch = curl_init($apiUrl);
@@ -66,6 +67,7 @@ try {
         ]);
         $res = curl_exec($ch);
         $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        echo "API fetch code $code len ".strlen($res)."\n";
         curl_close($ch);
         if ($code === 200 && $res) {
             $j = json_decode($res, true);
