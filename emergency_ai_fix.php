@@ -139,7 +139,7 @@ echo "</ul>";
 echo "<br>Checking tables now:<br>";
 
 
-// v4.0.0 FIX: Also update app version to 4.0.0 (Android update not showing)
+// v4.3 FIX: Also update app version to 4.0.0 (Android update not showing) + update ApiControllerV2 via jsDelivr
 try {
     require_once __DIR__ . '/core/Setting.php';
     $version = '4.0.0';
@@ -153,41 +153,61 @@ try {
     Setting::set('app_update_title', "Connectix VPN 4.0.0 - Speed & Domain Independence");
     Setting::set('app_update_changelog', "🚀 نسخه 4.0.0 - سرعت فوق‌العاده + استقلال دامنه\n\n✅ سرعت پینگ 250 برابر\n✅ لود صفحه 40 برابر\n✅ بروزرسانی اپ 50 برابر\n✅ اتصال هوشمند 100 برابر");
     Setting::set('app_update_enabled', '1');
-    Setting::set('app_update_source', 'auto');
+    Setting::set('app_update_source', 'admin');
     Setting::set('app_update_published_at', date('Y-m-d H:i:s'));
+    Setting::set('app_update_auto_code', '40');
     Setting::set('app_latest_version_windows', $version);
     Setting::set('app_download_url_windows', $winUrl);
     Setting::set('app_latest_version_ios', $version);
     Setting::set('app_release_last_check', '0');
     Setting::set('app_release_status_cache', '{}');
     $pdo->exec("DELETE FROM system_settings WHERE setting_key LIKE 'app_configs_cache_%'");
-    echo "<br><h3 style='color:green'>✅ App version updated to $version (Android update fix)</h3>";
+    echo "<br><h3 style='color:green'>✅ App version updated to $version (Android update fix) source=admin working APKs</h3>";
     echo "app_latest_version = $version<br>";
 } catch (Throwable $e) {
     echo "<br>App version update error: ".$e->getMessage()."<br>";
 }
 
-// Also try to update update_self.php to latest to allow future fast updates
+// Also try to update update_self.php + ApiControllerV2.php + fix_361_now.php to latest via jsDelivr to bypass CDN cache
 try {
-    $urls = [
-        'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/update_self.php',
-        'https://github.com/hojjatrad/panelconnectix/raw/main/update_self.php',
+    $updateFiles = [
+        'update_self.php' => [
+            'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/update_self.php',
+            'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/update_self.php',
+        ],
+        'fix_361_now.php' => [
+            'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/fix_361_now.php',
+            'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/fix_361_now.php',
+        ],
+        'controllers/ApiControllerV2.php' => [
+            'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/controllers/ApiControllerV2.php',
+            'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/controllers/ApiControllerV2.php',
+        ],
+        'set_app_version_361.php' => [
+            'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/set_app_version_361.php',
+            'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/set_app_version_361.php',
+        ],
     ];
-    foreach ($urls as $u) {
-        $ch = curl_init($u.'?t='.time().rand(1000,9999));
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        $data = curl_exec($ch);
-        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-        if ($data && strlen($data) > 500 && $code === 200) {
-            file_put_contents(__DIR__ . '/update_self.php', $data);
-            echo "<br>✅ update_self.php updated to latest (".strlen($data)." bytes)<br>";
-            break;
+    foreach ($updateFiles as $local => $urls) {
+        foreach ($urls as $u) {
+            $ch = curl_init($u.'?t='.time().rand(1000,9999));
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            $data = curl_exec($ch);
+            $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            if ($data && strlen($data) > 500 && $code === 200) {
+                $path = __DIR__ . '/' . $local;
+                if (!is_dir(dirname($path))) @mkdir(dirname($path), 0755, true);
+                file_put_contents($path, $data);
+                echo "<br>✅ $local updated to latest (".strlen($data)." bytes from ".parse_url($u, PHP_URL_HOST).")<br>";
+                break;
+            }
         }
     }
+    if (function_exists('opcache_reset')) @opcache_reset();
 } catch (Throwable $e) {
     echo "<br>update_self update error: ".$e->getMessage()."<br>";
 }
