@@ -366,6 +366,187 @@ class CategoryManager {
         return ['merged' => $merged, 'details' => $details];
     }
 
+    // --- VIP Hierarchy Support: Type (Economic/ویژه) -> Duration ---
+    private const VIP_TYPE_MAP = [
+        'economic' => '💰 اقتصادی',
+        'default' => '⭐ ویژه',
+        'iran_access' => '🇮🇷 ایران‌اکسس',
+        'business' => '🏢 بیزنس',
+        'free' => '🎁 رایگان',
+    ];
+
+    private const VIP_TYPE_SLUGS = [
+        'economic' => 'vip_economic',
+        'default' => 'vip_special',
+        'iran_access' => 'vip_iran',
+        'business' => 'vip_business',
+        'free' => 'vip_free',
+    ];
+
+    public static function getVipTypeLabel(string $serverGroup): string {
+        return self::VIP_TYPE_MAP[$serverGroup] ?? self::VIP_TYPE_MAP['default'];
+    }
+
+    public static function getVipTypeSlug(string $serverGroup): string {
+        return self::VIP_TYPE_SLUGS[$serverGroup] ?? 'vip_' . $serverGroup;
+    }
+
+    /**
+     * Find or create hierarchical category for VIP: Type (parent) -> Duration (child)
+     * Returns child category row (duration) with parent_id set
+     */
+    public static function findOrCreateVipCategory(PDO $pdo, string $serverGroup, int $durationDays, string $type = 'plans'): array {
+        // 1. Ensure parent type category exists
+        $parentLabel = self::getVipTypeLabel($serverGroup);
+        $parentSlug = self::getVipTypeSlug($serverGroup);
+        
+        $stmt = $pdo->prepare("SELECT * FROM categories WHERE slug = ? LIMIT 1");
+        $stmt->execute([$parentSlug]);
+        $parentCat = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$parentCat) {
+            $stmt = $pdo->prepare("SELECT * FROM categories WHERE name = ? LIMIT 1");
+            $stmt->execute([$parentLabel]);
+            $parentCat = $stmt->fetch(PDO::FETCH_ASSOC);
+        }
+
+        if (!$parentCat) {
+            $icon = match($serverGroup) {
+                'economic' => 'fa-coins',
+                'iran_access' => 'fa-flag',
+                'business' => 'fa-briefcase',
+                'free' => 'fa-gift',
+                default => 'fa-star',
+            };
+            $color = match($serverGroup) {
+                'economic' => 'emerald',
+                'iran_access' => 'blue',
+                'business' => 'amber',
+                'free' => 'rose',
+                default => 'purple',
+            };
+            $sortOrder = match($serverGroup) {
+                'free' => 1,
+                'economic' => 2,
+                'default' => 3,
+                'iran_access' => 4,
+                'business' => 5,
+                default => 10,
+            };
+            try {
+                $stmt = $pdo->prepare("INSERT INTO categories (name, slug, type, icon, badge_color, description, sort_order, is_active, parent_id) VALUES (?, ?, ?, ?, ?, ?, ?, 1, NULL)");
+                $stmt->execute([$parentLabel, $parentSlug, $type, $icon, $color, "دسته‌بندی $parentLabel", $sortOrder]);
+                $parentId = (int)$pdo->lastInsertId();
+                $parentCat = $pdo->query("SELECT * FROM categories WHERE id = $parentId")->fetch(PDO::FETCH_ASSOC);
+            } catch (Throwable $e) {
+                // Try without parent_id column if not exists
+                try {
+                    $stmt = $pdo->prepare("INSERT INTO categories (name, slug, type, icon, badge_color, description, sort_order, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, 1)");
+                    $stmt->execute([$parentLabel, $parentSlug, $type, $icon, $color, "دسته‌بندی $parentLabel", $sortOrder]);
+                    $parentId = (int)$pdo->lastInsertId();
+                    $parentCat = $pdo->query("SELECT * FROM categories WHERE id = $parentId")->fetch(PDO::FETCH_ASSOC);
+                } catch (Throwable $e2) {
+                    // Fallback: search again
+                    $stmt = $pdo->prepare("SELECT * FROM categories WHERE slug = ? LIMIT 1");
+                    $stmt->execute([$parentSlug]);
+                    $parentCat = $stmt->fetch(PDO::FETCH_ASSOC);
+                }
+            }
+        }
+
+        $parentId = $parentCat['id'] ?? null;
+
+        // 2. Now create/find child duration category under parent
+        $durationCanonical = self::canonicalFromDuration($durationDays);
+        $childSlug = $parentSlug . '_' . self::slugify($durationCanonical);
+        // e.g., vip_economic_period_1m
+
+        $stmt = $pdo->prepare("SELECT * FROM categories WHERE slug = ? LIMIT 1");
+        $stmt->execute([$childSlug]);
+        $childCat = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($childCat) {
+            // Ensure parent_id is set
+            if ($parentId && empty($childCat['parent_id'])) {
+                try {
+                    $pdo->prepare("UPDATE categories SET parent_id = ? WHERE id = ?")->execute([$parentId, $childCat['id']]);
+                } catch (Throwable $e) {}
+            }
+            return $childCat;
+        }
+
+        // Search by name + parent_id
+        if ($parentId) {
+            try {
+                $stmt = $pdo->prepare("SELECT * FROM categories WHERE name = ? AND parent_id = ? LIMIT 1");
+                $stmt->execute([$durationCanonical, $parentId]);
+                $childCat = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($childCat) return $childCat;
+            } catch (Throwable $e) {}
+        }
+
+        // Create child
+        $icon = match($durationCanonical) {
+            '۱ روزه' => 'fa-calendar-day',
+            '۳ روزه' => 'fa-calendar-days',
+            'هفتگی' => 'fa-calendar-week',
+            'نیمه ماه' => 'fa-calendar',
+            '۱ ماهه' => 'fa-calendar-days',
+            '۲ ماهه' => 'fa-calendar-week',
+            '۳ ماهه' => 'fa-calendar-check',
+            '۶ ماهه' => 'fa-calendar-plus',
+            '۱۲ ماهه' => 'fa-calendar-range',
+            default => 'fa-tag',
+        };
+        $color = match($durationCanonical) {
+            '۱ روزه' => 'rose',
+            '۳ روزه' => 'amber',
+            'هفتگی' => 'blue',
+            'نیمه ماه' => 'cyan',
+            '۱ ماهه' => 'purple',
+            '۲ ماهه' => 'blue',
+            '۳ ماهه' => 'amber',
+            '۶ ماهه' => 'emerald',
+            '۱۲ ماهه' => 'violet',
+            default => 'purple',
+        };
+        $sortOrder = match($durationCanonical) {
+            '۱ روزه' => 5,
+            '۳ روزه' => 6,
+            'هفتگی' => 7,
+            'نیمه ماه' => 8,
+            '۱ ماهه' => 10,
+            '۲ ماهه' => 11,
+            '۳ ماهه' => 12,
+            '۶ ماهه' => 13,
+            '۱۲ ماهه' => 14,
+            default => 20,
+        };
+
+        try {
+            $stmt = $pdo->prepare("INSERT INTO categories (name, slug, type, icon, badge_color, description, sort_order, is_active, parent_id) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)");
+            $stmt->execute([$durationCanonical, $childSlug, $type, $icon, $color, "دسته‌بندی $parentLabel - $durationCanonical", $sortOrder, $parentId]);
+            $id = (int)$pdo->lastInsertId();
+            $cat = $pdo->query("SELECT * FROM categories WHERE id = $id")->fetch(PDO::FETCH_ASSOC);
+            self::addAliases($pdo, $id, $durationCanonical);
+            return $cat;
+        } catch (Throwable $e) {
+            // Column parent_id may not exist, try without
+            try {
+                $stmt = $pdo->prepare("INSERT INTO categories (name, slug, type, icon, badge_color, description, sort_order, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, 1)");
+                $stmt->execute([$durationCanonical, $childSlug, $type, $icon, $color, "دسته‌بندی $parentLabel - $durationCanonical", $sortOrder]);
+                $id = (int)$pdo->lastInsertId();
+                return $pdo->query("SELECT * FROM categories WHERE id = $id")->fetch(PDO::FETCH_ASSOC);
+            } catch (Throwable $e2) {
+                // Fallback: find existing
+                $stmt = $pdo->prepare("SELECT * FROM categories WHERE name = ? LIMIT 1");
+                $stmt->execute([$durationCanonical]);
+                $cat = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($cat) return $cat;
+                throw $e2;
+            }
+        }
+    }
+
     /**
      * Normalize plan data from API — uses real API fields, not regex on title
      */
@@ -405,6 +586,22 @@ class CategoryManager {
         if (empty($groupName) && isset($vipPlan['group_name'])) $groupName = $vipPlan['group_name'];
         if (empty($groupName) && isset($vipPlan['group'])) $groupName = $vipPlan['group'];
 
+        // Check enriched parsed fields from driver (v2)
+        if ($trafficGb === null && isset($vipPlan['_parsed_traffic_gb'])) {
+            $trafficGb = $vipPlan['_parsed_traffic_gb'];
+            if ($trafficGb === 0) $trafficGb = 1000;
+        }
+        if ($durationDays === null && isset($vipPlan['_parsed_duration_days'])) {
+            $durationDays = $vipPlan['_parsed_duration_days'];
+        }
+        if (empty($groupName) && isset($vipPlan['_parsed_server_group'])) {
+            $sg = $vipPlan['_parsed_server_group'];
+            if ($sg === 'economic') { $groupName = 'Economic'; }
+            elseif ($sg === 'iran_access') { $groupName = 'Iran Access'; }
+            elseif ($sg === 'business') { $groupName = 'Business Class'; }
+            else { $groupName = 'default'; }
+        }
+
         // Fallback to regex parsing if real fields not available
         if ($trafficGb === null) {
             if (preg_match('/([\d\.]+)\s*GB/i', $title, $m)) {
@@ -420,17 +617,14 @@ class CategoryManager {
 
         if ($durationDays === null) {
             $durationDays = 30;
-            // Try multiple patterns
             if (preg_match('/(\d+)\s*M/i', $title, $m)) {
                 $durationDays = (int)$m[1] * 30;
             }
             if (preg_match('/(\d+)\s*D/i', $title, $m)) {
                 $d = (int)$m[1];
-                // If title has +10D, add it
                 if (preg_match('/\+\s*(\d+)\s*D/i', $title, $m2)) {
                     $d += (int)$m2[1];
                 }
-                // If M already matched, D might be bonus
                 if ($durationDays !== 30 || !preg_match('/\d+\s*M/i', $title)) {
                     $durationDays = $d;
                 } else {

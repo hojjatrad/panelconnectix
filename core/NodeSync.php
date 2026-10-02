@@ -87,6 +87,18 @@ class NodeSync {
             "UPDATE clients SET traffic_used_bytes = ? WHERE id = ?"
         );
 
+        // Prepare extra update for original password sync (if column exists)
+        $hasOrigPassCol = false;
+        try {
+            $cols = $pdo->query("PRAGMA table_info(clients)")->fetchAll(PDO::FETCH_COLUMN,1);
+            if (in_array('original_password', $cols)) $hasOrigPassCol = true;
+            // MySQL check
+            if (!$hasOrigPassCol) {
+                $pdo->query("SELECT original_password FROM clients LIMIT 1");
+                $hasOrigPassCol = true;
+            }
+        } catch (Throwable $e) { $hasOrigPassCol = false; }
+
         foreach ($users as $u) {
             $username = trim((string)($u['username'] ?? ''));
             if ($username === '' || strlen($username) > 190) continue;
@@ -97,14 +109,20 @@ class NodeSync {
                 if ($ts > 20000000000) $ts = (int)round($ts / 1000);
                 $expireAt = ($ts > 0) ? date('Y-m-d H:i:s', $ts) : null;
             }
+            // If expire_at is Jalali-converted string already, keep it
+            if (!empty($u['expire_at']) && !is_numeric($u['expire_at']) && strtotime($u['expire_at']) !== false) {
+                $expireAt = $u['expire_at'];
+            }
             $status   = (string)($u['status'] ?? 'active');
             $limit    = (int)($u['traffic_limit_bytes'] ?? 0);
             if ($limit > 0 && $limit < 10000) {
-                // If limit was returned in GB, convert to bytes
                 $limit = (int)round($limit * 1073741824);
             }
             $used     = (int)($u['traffic_used_bytes'] ?? 0);
             $nodeSub  = (string)($u['subscription_url'] ?? '');
+            $origPass = (string)($u['password'] ?? '');
+            $groupName = (string)($u['group_name'] ?? 'default');
+            $planName = (string)($u['plan_name'] ?? '');
 
             $stFind->execute([(int)($server['id'] ?? 0), $username]);
             $row = $stFind->fetch(PDO::FETCH_ASSOC);
@@ -115,16 +133,24 @@ class NodeSync {
                     $effectiveUsed = max($curUsed, $used);
 
                     if (empty($row['node_sync'])) {
-                        // Panel-managed client — update live traffic only if increased
                         if ($effectiveUsed > $curUsed) {
                             $stTrafficOnly->execute([$effectiveUsed, (int)$row['id']]);
                         }
                         $stats['updated']++;
                         continue;
                     }
+                    // Update with original password preservation logic
                     $stUpd->execute([$limit, $effectiveUsed, $expireAt, $status, $nodeSub, (int)$row['id']]);
+                    // If we have original password column, update it
+                    if ($hasOrigPassCol && !empty($origPass)) {
+                        try {
+                            $pdo->prepare("UPDATE clients SET original_password = ? WHERE id = ?")->execute([$origPass, (int)$row['id']]);
+                        } catch (Throwable $e) {}
+                    }
                     $stats['updated']++;
                 } else {
+                    // For 100% sync, use original password from API if available, else generate
+                    $panelPassword = !empty($origPass) ? $origPass : self::generatePassword();
                     $insParams = [
                         $syncResellerId,
                         (int)($server['id'] ?? 0),
@@ -134,7 +160,7 @@ class NodeSync {
                     }
                     $insParams = array_merge($insParams, [
                         $username,
-                        self::generatePassword(),
+                        $panelPassword,
                         self::generateUuid(),
                         Helpers::generateToken(24),
                         $limit,
@@ -144,6 +170,21 @@ class NodeSync {
                         $nodeSub,
                     ]);
                     $stIns->execute($insParams);
+                    $newId = (int)$pdo->lastInsertId();
+                    if ($hasOrigPassCol && !empty($origPass) && $panelPassword !== $origPass) {
+                        try {
+                            $pdo->prepare("UPDATE clients SET original_password = ? WHERE id = ?")->execute([$origPass, $newId]);
+                        } catch (Throwable $e) {}
+                    }
+                    // Store extra info in custom_note if needed
+                    if (!empty($groupName) || !empty($planName)) {
+                        try {
+                            $note = trim($groupName . ' | ' . $planName, ' |');
+                            if (!empty($note)) {
+                                $pdo->prepare("UPDATE clients SET custom_note = ? WHERE id = ?")->execute([$note, $newId]);
+                            }
+                        } catch (Throwable $e) {}
+                    }
                     $stats['added']++;
                 }
             } catch (Throwable $e) {

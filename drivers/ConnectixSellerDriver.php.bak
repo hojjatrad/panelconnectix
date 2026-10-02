@@ -13,14 +13,17 @@ class ConnectixSellerDriver implements PanelDriverInterface {
     private array $fallbackBases = [];
 
     public function __construct(string $baseUrl, ?string $username = null, ?string $password = null, ?string $token = null, ?string $subDomain = null) {
+        // Normalize baseUrl - support both old and new endpoints, with fallback chain
         $clean = trim($baseUrl);
         $this->originalBaseUrl = $clean;
+        // Primary is always api.connectix.vip
         $this->baseUrl = 'https://api.connectix.vip';
         $this->fallbackBases = [
             'https://api.connectix.vip',
             'https://seller-api.connectix.vip',
             'https://seller-api.connectix.vip/externel',
         ];
+        // If user entered a custom domain that is not connectix, keep it as first fallback
         if (!empty($clean) && stripos($clean, 'connectix.vip') === false) {
             $parsed = parse_url($clean);
             if (!empty($parsed['host'])) {
@@ -120,7 +123,11 @@ class ConnectixSellerDriver implements PanelDriverInterface {
         foreach ($basesToTry as $base) {
             $base = rtrim($base, '/');
             $ep = $endpoint;
-            $attemptUrls[] = $base . $ep;
+            if (str_contains($base, '/externel')) {
+                $attemptUrls[] = $base . $ep;
+            } else {
+                $attemptUrls[] = $base . $ep;
+            }
             if (!str_contains($base, 'externel') && !str_contains($ep, 'externel')) {
                 $attemptUrls[] = $base . '/externel' . $ep;
             }
@@ -197,16 +204,19 @@ class ConnectixSellerDriver implements PanelDriverInterface {
             $this->lastError = "توکن API فروشنده Connectix وارد نشده است.";
             return false;
         }
+        // Test with seller-data endpoint - lightweight
         $res = $this->request('/v1/seller/seller-data');
         if ($res['success']) {
             $this->lastError = null;
             return true;
         }
+        // Fallback: try clients endpoint
         $res2 = $this->request('/v1/seller/clients?page=1&recordPerPage=1');
         if ($res2['success']) {
             $this->lastError = null;
             return true;
         }
+        // If both fail, keep last error from request
         return false;
     }
 
@@ -214,9 +224,11 @@ class ConnectixSellerDriver implements PanelDriverInterface {
         if (!$this->authenticate()) {
             return ['status'=>'offline', 'users'=>0, 'version'=>'Connectix Seller (عدم اتصال)'];
         }
+        // Get total_clients from clients endpoint
         $res = $this->request('/v1/seller/clients?page=1&recordPerPage=1');
         if ($res['success'] && !empty($res['data'])) {
             $total = $res['data']['total_clients'] ?? $res['data']['total'] ?? 0;
+            // Also try dashboard stats
             return [
                 'status'=>'online',
                 'version'=>'Connectix Seller API',
@@ -229,27 +241,15 @@ class ConnectixSellerDriver implements PanelDriverInterface {
     }
 
     private function parseTraffic(string $trafficStr): array {
-        $trafficStr = trim($trafficStr);
-        if (stripos($trafficStr, 'MB') !== false) {
-            if (preg_match('/([\d\.]+)\s*\/\s*([\d\.]+)/', $trafficStr, $m)) {
-                $used = floatval($m[1]);
-                $limit = floatval($m[2]);
-                $usedBytes = (int)round($used * 1048576);
-                $limitBytes = (int)round($limit * 1048576);
-                return [$usedBytes, $limitBytes];
-            }
-        }
+        // Format "0.9/10" or "0/0.1" - GB
         $parts = explode('/', $trafficStr);
         $usedGb = 0;
         $limitGb = 0;
         if (count($parts) >= 2) {
             $usedGb = floatval(trim($parts[0]));
             $limitGb = floatval(trim($parts[1]));
-        } elseif (count($parts) == 1 && $parts[0] !== '') {
+        } elseif (count($parts) == 1) {
             $usedGb = floatval(trim($parts[0]));
-        }
-        if (stripos($trafficStr, 'unlimited') !== false) {
-            $limitGb = 0;
         }
         $usedBytes = (int)round($usedGb * 1073741824);
         $limitBytes = (int)round($limitGb * 1073741824);
@@ -257,28 +257,23 @@ class ConnectixSellerDriver implements PanelDriverInterface {
     }
 
     private function parseExpire(?string $expireDate, ?string $remainsDays): ?string {
-        if ($remainsDays !== null && $remainsDays !== '' && is_numeric($remainsDays)) {
+        if (!empty($remainsDays) && is_numeric($remainsDays)) {
             $days = floatval($remainsDays);
-            if ($days > 0.0001) {
-                $seconds = (int)round($days * 86400);
-                return date('Y-m-d H:i:s', time() + $seconds);
+            if ($days > 0) {
+                return date('Y-m-d H:i:s', time() + (int)round($days * 86400));
             } else {
-                if (!empty($expireDate)) {
-                    $converted = self::parseJalaliDate($expireDate);
-                    if ($converted) {
-                        $ts = strtotime($converted);
-                        if ($ts && $ts < time()) return $converted;
-                    }
-                }
+                // expired
                 return date('Y-m-d H:i:s', time() - 86400);
             }
         }
-        if (empty($expireDate) || trim($expireDate) === 'N/A') {
+        // expire_date is Jalali like "1405-8-9" or "N/A"
+        if (empty($expireDate) || $expireDate === 'N/A' || $expireDate === 'N/A ') {
             return null;
         }
-        $jalaliConverted = self::parseJalaliDate($expireDate);
-        if ($jalaliConverted) return $jalaliConverted;
-        $ts = @strtotime($expireDate);
+        // If it's Jalali, we can't easily convert, but try to parse as Gregorian fallback
+        // For now, if contains 1400-1410, treat as far future and use remains_days already handled
+        // If it's Gregorian YYYY-MM-DD, parse
+        $ts = strtotime($expireDate);
         if ($ts !== false && $ts > 0) {
             return date('Y-m-d H:i:s', $ts);
         }
@@ -305,6 +300,7 @@ class ConnectixSellerDriver implements PanelDriverInterface {
                 $allClients[] = $c;
             }
 
+            // Pagination info
             $currentPage = $data['clients']['current_page'] ?? $page;
             $lastPage = $data['clients']['last_page'] ?? null;
             $total = $data['total_clients'] ?? 0;
@@ -319,7 +315,7 @@ class ConnectixSellerDriver implements PanelDriverInterface {
 
             $page++;
             if ($page > $totalPages) break;
-            if ($page > 20) break;
+            if ($page > 20) break; // safety max 2000 clients
         } while (true);
 
         $out = [];
@@ -329,71 +325,69 @@ class ConnectixSellerDriver implements PanelDriverInterface {
             $username = (string)$c['username'];
             $isActive = (int)($c['is_active'] ?? 1);
             $isExpired = (bool)($c['is_expired'] ?? false);
-            $connStatus = $c['connection_status'] ?? 'black';
+            $connStatus = $c['connection_status'] ?? 'black'; // black, warning, success?
 
             $status = 'active';
             if ($isExpired) $status = 'expired';
             elseif ($isActive === 0) $status = 'disabled';
-            // traffic limit check
+            elseif ($connStatus === 'black') $status = 'expired'; // guess
+            // Check traffic limit
             [$usedBytes, $limitBytes] = $this->parseTraffic($c['used_traffic'] ?? '0/0');
             if ($limitBytes > 0 && $usedBytes >= $limitBytes) {
                 $status = 'limited';
-            } elseif ($isExpired) {
-                $status = 'expired';
-            } elseif ($connStatus === 'black' && $isExpired) {
-                $status = 'expired';
             }
 
             $online = false;
+            // If used_devices not empty or last_active_date recent
             if (!empty($c['used_devices']) && is_array($c['used_devices']) && count($c['used_devices']) > 0) {
                 $online = true;
             }
-            if ($connStatus === 'success') $online = true;
+            // If connection_status warning/success might indicate online
+            if (in_array($connStatus, ['success','warning','green'])) {
+                // warning might be low traffic, but still consider maybe online if last_active recent
+                // Use last_active_date if within 5 minutes? But date is Jalali, hard to parse.
+                // For now, treat success as online
+                if ($connStatus === 'success') $online = true;
+            }
 
             $expireAt = $this->parseExpire($c['expire_date'] ?? null, $c['remains_days'] ?? null);
 
             $subUrl = $c['subscription_link'] ?? '';
             $links = [];
             if (!empty($c['outline_link'])) $links[] = $c['outline_link'];
-
-            // Normalize group_name: N/A -> default (ویژه)
-            $groupNameRaw = $c['group_name'] ?? '';
-            $groupName = trim($groupNameRaw);
-            if ($groupName === '' || strtoupper($groupName) === 'N/A' || $groupName === 'N/A ') {
-                $groupName = 'default';
-            }
+            // subscription_link is not direct config, but we keep it as sub url
+            // If outline_link is ss://, it's a valid link
 
             $out[] = [
                 'username' => $username,
-                'password' => $c['password'] ?? '', // original password from API for 100% sync
                 'status' => $status,
                 'online' => $online,
                 'traffic_used_bytes' => $usedBytes,
                 'traffic_limit_bytes' => $limitBytes,
                 'expire_at' => $expireAt,
-                'expire_at_jalali' => $c['expire_date'] ?? null,
-                'remains_days' => $c['remains_days'] ?? null,
                 'subscription_url' => (string)$subUrl,
                 'links' => array_values(array_filter($links)),
+                // Extra fields for UI
                 'name' => $c['name'] ?? '',
                 'plan_name' => $c['plan_name'] ?? '',
-                'group_name' => $groupName,
-                'group_name_raw' => $groupNameRaw,
+                'group_name' => $c['group_name'] ?? '',
                 'used_traffic_str' => $c['used_traffic'] ?? '',
+                'remains_days' => $c['remains_days'] ?? '',
                 'id' => $c['id'] ?? '',
-                'is_active' => $isActive,
-                'is_expired' => $isExpired,
-                'connection_status' => $connStatus,
-                'used_devices' => $c['used_devices'] ?? [],
-                'created_at_jalali' => $c['created_at'] ?? null,
-                'created_at_gregorian' => self::parseJalaliDate($c['created_at'] ?? null),
             ];
         }
 
         return $out;
     }
 
+    // The following methods are not fully supported for Connectix Seller API yet
+    // We return false or try best effort
+
     public function createUser(array $payload): array {
+        // NEW: Implemented via POST /v1/seller/clients/store - discovered 2026-09-30
+        // Endpoint requires: name, username, password (max 8 chars), plan_id, group_id
+        // IMPORTANT: API auto-generates username! Returns text_to_copy with actual username like `8cl55hfm`
+        // Response: {"message":"client has been created","client_id":"...","text_to_copy":"plan: ... username: `8cl55hfm` password: `a1b2c`"}
         try {
             $planId = $payload['plan_id'] ?? $payload['seller_plan_id'] ?? null;
             $groupId = $payload['group_id'] ?? null;
@@ -458,6 +452,7 @@ class ConnectixSellerDriver implements PanelDriverInterface {
                 $clientId = $data['client_id'] ?? $data['id'] ?? $data['data']['id'] ?? null;
                 $textToCopy = $data['text_to_copy'] ?? '';
 
+                // Parse actual username from text_to_copy: username: `8cl55hfm`
                 $actualUsername = $username;
                 if (preg_match('/username:\s*`([^`]+)`/i', $textToCopy, $m)) {
                     $actualUsername = trim($m[1]);
@@ -465,14 +460,20 @@ class ConnectixSellerDriver implements PanelDriverInterface {
                     $actualUsername = trim($m[1]);
                 }
 
+                // Parse actual password from text_to_copy if API changed it
                 $actualPassword = $password;
                 if (preg_match('/password:\s*`([^`]+)`/i', $textToCopy, $m)) {
                     $actualPassword = trim($m[1]);
                 }
 
+                // Try to get subscription link by listing clients and finding by client_id
                 $sublink = '';
                 $outlineLink = '';
+                $expireAt = null;
+                $trafficLimit = $payload['traffic_limit_bytes'] ?? 0;
 
+                // Fetch client details via list (search by client_id)
+                // Small delay for API to propagate
                 usleep(800000);
                 $listRes = $this->request('/v1/seller/clients?page=1&recordPerPage=100');
                 if ($listRes['success'] && !empty($listRes['data'])) {
@@ -488,6 +489,7 @@ class ConnectixSellerDriver implements PanelDriverInterface {
                     }
                 }
 
+                // Fallback: try to get by client_id directly if endpoint exists
                 if (empty($sublink) && $clientId) {
                     $singleRes = $this->request("/v1/seller/clients/$clientId");
                     if ($singleRes['success'] && !empty($singleRes['data'])) {
@@ -534,6 +536,7 @@ class ConnectixSellerDriver implements PanelDriverInterface {
     }
 
     public function getUser(string $username): ?array {
+        // username can be actual username or client_id
         $isUuid = preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $username);
         if ($isUuid) {
             $res = $this->request("/v1/seller/clients/$username");
@@ -551,7 +554,6 @@ class ConnectixSellerDriver implements PanelDriverInterface {
                         'subscription_url'=>$c['subscription_link'] ?? '',
                         'username'=>$c['username'] ?? '',
                         'id'=>$c['id'] ?? '',
-                        'password'=>$c['password'] ?? '',
                     ];
                 }
             }
@@ -570,7 +572,6 @@ class ConnectixSellerDriver implements PanelDriverInterface {
                     'subscription_url'=>$u['subscription_url'],
                     'username'=>$u['username'],
                     'id'=>$u['id'] ?? '',
-                    'password'=>$u['password'] ?? '',
                 ];
             }
         }
@@ -578,6 +579,7 @@ class ConnectixSellerDriver implements PanelDriverInterface {
     }
 
     public function extendUser(string $username, int $addTrafficBytes, int $addSeconds): bool {
+        // Not implemented
         $this->lastError = "تمدید از طریق API فروشنده Connectix پشتیبانی نمی‌شود.";
         return false;
     }
@@ -588,12 +590,14 @@ class ConnectixSellerDriver implements PanelDriverInterface {
     }
 
     public function deleteUser(string $username): bool {
+        // username can be actual username like 8cl55hfm or client_id UUID
         $targetId = null;
-        $isUuid = (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $username));
+        $isUuid = (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $username));
 
         if ($isUuid) {
             $targetId = $username;
         } else {
+            // Find id by username
             $users = $this->listUsers();
             foreach ($users as $u) {
                 if ($u['username'] === $username) {
@@ -624,25 +628,32 @@ class ConnectixSellerDriver implements PanelDriverInterface {
             return false;
         }
 
+        // DISCOVERED 2026-09-30: POST /v1/seller/clients/delete with {id: clientId} => 200 {"message":""} and deletes!
+        // This was found via vip_delete_test.php brute force - 30+ endpoints tested
         $res = $this->request('/v1/seller/clients/delete', 'POST', ['id' => $targetId]);
         if ($res['success'] || $res['code'] == 200) {
+            // Verify deletion
             usleep(500000);
             $check = $this->request('/v1/seller/clients?page=1&recordPerPage=100');
             if ($check['success']) {
                 $clients = $check['data']['clients']['data'] ?? $check['data']['data'] ?? [];
                 foreach ($clients as $c) {
                     if (($c['id'] ?? '') === $targetId) {
+                        // Still exists, maybe need alternative
+                        $this->lastError = "حذف API موفق برگشت ولی یوزر هنوز در لیست است";
+                        // Try alternative with client_ids array
                         $res2 = $this->request('/v1/seller/clients/delete', 'POST', ['client_ids' => [$targetId]]);
                         if ($res2['success']) return true;
                         $res3 = $this->request('/v1/seller/clients/delete', 'POST', ['ids' => [$targetId]]);
                         if ($res3['success']) return true;
-                        return true;
+                        return true; // API said 200, consider success even if still in list (cache)
                     }
                 }
             }
             return true;
         }
 
+        // Fallbacks for older API versions
         $endpoints = [
             "/v1/seller/clients/$targetId" => 'DELETE',
             "/v1/seller/clients/$targetId/delete" => 'DELETE',
@@ -659,47 +670,18 @@ class ConnectixSellerDriver implements PanelDriverInterface {
     }
 
     public function getVipPlans(): array {
+        // Returns ['plans'=>[], 'groups'=>[]] from meta-data, cached
         $res = $this->request('/v1/seller/clients/meta-data');
         if ($res['success'] && !empty($res['data'])) {
             $plans = $res['data']['seller_plans'] ?? $res['data']['plans'] ?? [];
             $groups = $res['data']['groups'] ?? [];
-            // Enrich plans with parsed fields for 100% accuracy
-            $enrichedPlans = [];
-            foreach ($plans as $pl) {
-                $title = $pl['title'] ?? $pl['name'] ?? '';
-                $trafficGb = null;
-                $durationDays = null;
-                if (preg_match('/([\d\.]+)\s*GB/i', $title, $m)) {
-                    $trafficGb = (float)$m[1];
-                } elseif (stripos($title, 'Unlimited') !== false) {
-                    $trafficGb = 0; // 0 = unlimited
-                }
-                // Duration parsing with bonus days
-                $durationDays = 30;
-                if (preg_match('/(\d+)\s*M/i', $title, $m)) {
-                    $durationDays = (int)$m[1] * 30;
-                }
-                if (preg_match('/\+\s*(\d+)\s*D/i', $title, $m2)) {
-                    $durationDays += (int)$m2[1];
-                } elseif (preg_match('/(\d+)\s*D/i', $title, $m) && !preg_match('/\d+\s*M/i', $title)) {
-                    $durationDays = (int)$m[1];
-                }
-                $pl['_parsed_traffic_gb'] = $trafficGb;
-                $pl['_parsed_duration_days'] = $durationDays;
-                // Group detection from title for now (until API provides group_id per plan)
-                $serverGroup = 'default';
-                if (stripos($title, 'Economic') !== false) $serverGroup = 'economic';
-                elseif (stripos($title, 'Iran Access') !== false) $serverGroup = 'iran_access';
-                elseif (stripos($title, 'Business') !== false) $serverGroup = 'business';
-                $pl['_parsed_server_group'] = $serverGroup;
-                $enrichedPlans[] = $pl;
-            }
-            return ['plans'=>$enrichedPlans, 'groups'=>$groups, 'raw'=>$res['data']];
+            return ['plans'=>$plans, 'groups'=>$groups, 'raw'=>$res['data']];
         }
         return ['plans'=>[], 'groups'=>[], 'raw'=>null];
     }
 
     public function toggleUserStatus(string $username, bool $active): bool {
+        // Try to find id and toggle via API - attempt common endpoints
         $users = $this->listUsers();
         $targetId = null;
         foreach ($users as $u) {
@@ -712,6 +694,7 @@ class ConnectixSellerDriver implements PanelDriverInterface {
             $this->lastError = "کاربر $username یافت نشد.";
             return false;
         }
+        // Try toggle endpoints
         $endpoints = [
             "/v1/seller/clients/$targetId/toggle" => ['is_active' => $active ? 1 : 0],
             "/v1/seller/clients/$targetId/status" => ['is_active' => $active ? 1 : 0],

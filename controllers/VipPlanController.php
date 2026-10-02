@@ -310,20 +310,27 @@ class VipPlanController {
                     continue;
                 }
 
-                // Smart category handling — find existing, don't create duplicate
-                $categoryName = CategoryManager::canonicalFromDuration($durationDays);
-                $categoryRow = CategoryManager::findOrCreateCategory($pdo, $categoryName, $durationDays, 'plans');
+                // NEW v4.1: Hierarchical category handling — Type (Economic/ویژه) -> Duration (۱ ماهه)
+                // For 100% accuracy per user request: اقتصادی/ویژه first, then month
+                // Also handle Free plans as separate type
+                $effectiveGroup = $serverGroup;
+                if ($trafficGb <= 0.5) {
+                    $effectiveGroup = 'free';
+                    $serverGroup = 'free';
+                }
+                $categoryRow = CategoryManager::findOrCreateVipCategory($pdo, $effectiveGroup, $durationDays, 'plans');
                 $categoryId = $categoryRow['id'] ?? null;
-                // Track if we created new (check if just created by looking at creation time or count)
-                // For simplicity, we don't increment here, but merge logic ensures no duplicates
+                $categoryName = $categoryRow['name'] ?? CategoryManager::canonicalFromDuration($durationDays);
+                // Parent category info for logging
+                $parentTypeLabel = CategoryManager::getVipTypeLabel($effectiveGroup);
 
-                // Generate local title in Persian
+                // Generate local title in Persian - keep original volume+price visible
                 $persianTitle = $vpTitle;
                 $persianTitle = str_replace(['Economic', 'Iran Access', 'Business Class', 'BCSublink', 'Sublink', 'Free', 'Unlimited'], ['اقتصادی', 'ایران‌اکسس', 'بیزنس', 'بیزنس ساب‌لینک', 'ساب‌لینک', 'رایگان', 'نامحدود'], $persianTitle);
                 $localTitle = $persianTitle . ' - VIP';
 
-                // Base price - auto calculate based on traffic - SUPPORT <1GB, use real price if available
-                $basePrice = $norm['price'] ?? 100000;
+                // Base price - use real price if available from API, else auto-calc but DON'T overwrite if manually edited later
+                $basePrice = $norm['price'] ?? 0;
                 if (empty($basePrice) || $basePrice < 1000) {
                     $basePrice = 100000;
                     if ($trafficGb <= 0.3) $basePrice = 20000;
@@ -336,8 +343,9 @@ class VipPlanController {
                     elseif ($trafficGb <= 100) $basePrice = 500000;
                     elseif ($trafficGb >= 1000) $basePrice = 800000;
 
-                    if ($serverGroup === 'economic') $basePrice = (int)($basePrice * 0.7);
-                    if ($serverGroup === 'iran_access') $basePrice = (int)($basePrice * 0.9);
+                    if ($effectiveGroup === 'economic') $basePrice = (int)($basePrice * 0.7);
+                    if ($effectiveGroup === 'iran_access') $basePrice = (int)($basePrice * 0.9);
+                    if ($effectiveGroup === 'free') $basePrice = (int)($basePrice * 0.3);
                 }
 
                 $resellerPrice = (int)($basePrice * 0.7);

@@ -417,7 +417,11 @@ class Database {
                 'duration_days' => 'INT DEFAULT 30',
                 'node_sublink' => 'TEXT NULL',
                 'node_sync' => 'TINYINT(1) DEFAULT 0',
-                'custom_note' => 'TEXT NULL'
+                'custom_note' => 'TEXT NULL',
+                'original_password' => 'VARCHAR(64) NULL',
+                'api_group_name' => 'VARCHAR(64) NULL',
+                'api_plan_name' => 'VARCHAR(128) NULL',
+                'api_created_at' => 'VARCHAR(32) NULL'
             ];
             foreach ($clientCols as $c => $d) {
                 self::safeAddColumn($pdo, 'clients', $c, $d);

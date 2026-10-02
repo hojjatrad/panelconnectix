@@ -141,21 +141,26 @@ class ServerController {
                             $dup2 = $pdo->prepare("SELECT id FROM plans WHERE vip_plan_id = ? LIMIT 1");
                             $dup2->execute([$vp['id'] ?? '']);
                             if ($dup2->fetch()) continue;
-                            $catName = CategoryManager::canonicalFromDuration($norm['duration_days']);
-                            $catRow = CategoryManager::findOrCreateCategory($pdo, $catName, $norm['duration_days'], 'plans');
+                            $effGroup = $norm['server_group'];
+                            if ($norm['traffic_gb'] <= 0.5) $effGroup = 'free';
+                            $catRow = CategoryManager::findOrCreateVipCategory($pdo, $effGroup, $norm['duration_days'], 'plans');
                             $catId = $catRow['id'] ?? null;
+                            $catName = $catRow['name'] ?? CategoryManager::canonicalFromDuration($norm['duration_days']);
                             $basePrice = $norm['price'] ?? 120000;
                             if (empty($basePrice) || $basePrice < 1000) {
                                 $basePrice = 120000;
-                                if ($norm['traffic_gb'] <= 1) $basePrice = 50000;
+                                if ($norm['traffic_gb'] <= 0.5) $basePrice = 25000;
+                                elseif ($norm['traffic_gb'] <= 1) $basePrice = 50000;
                                 elseif ($norm['traffic_gb'] <= 10) $basePrice = 120000;
                                 elseif ($norm['traffic_gb'] <= 50) $basePrice = 300000;
                                 else $basePrice = 500000;
+                                if ($effGroup === 'economic') $basePrice = (int)($basePrice * 0.7);
+                                if ($effGroup === 'free') $basePrice = (int)($basePrice * 0.3);
                             }
                             $resellerPrice = (int)($basePrice * 0.7);
                             $localTitle = str_replace(['Economic', 'Iran Access', 'Business Class'], ['اقتصادی', 'ایران‌اکسس', 'بیزنس'], $vp['title'] ?? 'پلن') . ' - VIP';
                             $pdo->prepare("INSERT INTO plans (title, traffic_gb, duration_days, base_price, reseller_price, server_group, server_id, category, category_id, vip_plan_id, vip_group_id, vip_group_name, vip_plan_title, is_active, show_in_bot) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1)")
-                                ->execute([$localTitle, $norm['traffic_gb'], $norm['duration_days'], $basePrice, $resellerPrice, $norm['server_group'], $newServerId, $catName, $catId, $vp['id'] ?? null, $norm['group_id'], $norm['group_name'], $vp['title'] ?? '']);
+                                ->execute([$localTitle, $norm['traffic_gb'], $norm['duration_days'], $basePrice, $resellerPrice, $effGroup, $newServerId, $catName, $catId, $vp['id'] ?? null, $norm['group_id'], $norm['group_name'], $vp['title'] ?? '']);
                             $imported++;
                         }
                         try { $pdo->prepare("INSERT INTO server_sync_logs (server_id, action, details, plans_imported) VALUES (?, 'auto_import_on_add', ?, ?)")->execute([$newServerId, "Auto imported on server add", $imported]); } catch (Throwable $e) {}

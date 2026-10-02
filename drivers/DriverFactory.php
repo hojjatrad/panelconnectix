@@ -50,7 +50,16 @@ class DriverFactory {
             default:
                 // Auto-detect Connectix Seller API by URL pattern
                 $lowUrl = strtolower($url);
+                $lowToken = strtolower($token);
                 if (str_contains($lowUrl, 'api.connectix.vip') || str_contains($lowUrl, 'seller-api.connectix.vip') || str_contains($lowUrl, 'seller.connectix.vip')) {
+                    return new ConnectixSellerDriver($url, $user, $pass, $token, $subDomain);
+                }
+                // Auto-detect PasarGuard API Key format pg_key_
+                if (str_starts_with($lowToken, 'pg_key_') || str_contains($lowUrl, 'speedur.org')) {
+                    return new PasargadDriver($url, $user, $pass, $token, $subDomain);
+                }
+                // Auto-detect Connectix token format (40 chars alphanumeric)
+                if (preg_match('/^[a-z0-9]{35,45}$/i', $token) && strlen($token) >= 35) {
                     return new ConnectixSellerDriver($url, $user, $pass, $token, $subDomain);
                 }
                 return new MockDriver($url, $user, $pass, $token);
