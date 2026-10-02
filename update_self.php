@@ -1,45 +1,50 @@
 <?php
-// v4.1 - self updater with multi-URL fallback to bypass CDN cache
+// v4.3 - self updater with jsDelivr bypass for CDN cache
+function fetchRaw($url) {
+    $ch = curl_init($url.'?t='.time().rand(1000,9999).'&cb='.rand(100000,999999));
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Cache-Control: no-cache', 'Pragma: no-cache', 'User-Agent: Connectix-Updater-Bypass']);
+    $data = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    return ($code === 200 && strlen($data) > 500) ? $data : false;
+}
+
 $files = [
     'fix_361_now.php' => [
+        'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/fix_361_now.php',
         'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/fix_361_now.php',
-        'https://github.com/hojjatrad/panelconnectix/raw/main/fix_361_now.php',
-        'https://codeload.github.com/hojjatrad/panelconnectix/zip/main',
+    ],
+    'set_app_version_361.php' => [
+        'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/set_app_version_361.php',
+        'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/set_app_version_361.php',
     ],
     'set_app_version_400.php' => [
+        'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/set_app_version_400.php',
         'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/set_app_version_400.php',
+    ],
+    'controllers/ApiControllerV2.php' => [
+        'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/controllers/ApiControllerV2.php',
+        'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/controllers/ApiControllerV2.php',
     ],
 ];
 
 foreach ($files as $local => $urls) {
-    $success = false;
-    foreach ((array)$urls as $baseUrl) {
-        if (str_ends_with($baseUrl, '.zip')) continue; // skip zip for now
-        $url = $baseUrl . '?t=' . time() . rand(1000,9999) . '&cb=' . rand(100000,999999);
-        $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Cache-Control: no-cache', 'Pragma: no-cache', 'User-Agent: Connectix-Updater-Bypass']);
-        $data = curl_exec($ch);
-        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-        if ($data && strlen($data) > 500 && $code === 200) {
-            // Check if it's the ultra minimal version (contains ULTRA FAST)
-            if ($local === 'fix_361_now.php' && !str_contains($data, 'ULTRA')) {
-                echo "Fetched $local but not ULTRA version (size ".strlen($data)."), trying next URL...\n";
-                continue;
-            }
-            file_put_contents(__DIR__ . '/' . $local, $data);
-            echo "Updated $local ".strlen($data)." bytes from $baseUrl\n";
-            $success = true;
+    foreach ((array)$urls as $u) {
+        $data = fetchRaw($u);
+        if ($data) {
+            $path = __DIR__ . '/' . $local;
+            if (!is_dir(dirname($path))) @mkdir(dirname($path), 0755, true);
+            file_put_contents($path, $data);
+            echo "Updated $local ".strlen($data)." bytes from ".parse_url($u, PHP_URL_HOST)."\n";
             break;
         } else {
-            echo "Failed $local from $baseUrl code $code\n";
+            echo "Failed $local from $u\n";
         }
     }
-    if (!$success) echo "All URLs failed for $local\n";
 }
 if (function_exists('opcache_reset')) @opcache_reset();
 echo "DONE - now run fix_361_now.php\n";
