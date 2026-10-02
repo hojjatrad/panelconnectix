@@ -3,11 +3,15 @@
  * Connectix Panel - Public Apps Download & Connection Guides Center
  */
 $manifest = $manifest ?? [];
-$appVersion = $manifest['version'] ?? '3.5.8';
-$apkUniversalUrl = $manifest['apk']['universal'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.8/Connectix-Android-Universal.apk';
-$apkArm64Url = $manifest['apk']['arm64'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.8/Connectix-Android-ARM64.apk';
-$apkArm32Url = $manifest['apk']['arm32'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.8/Connectix-Android-ARM32.apk';
-$windowsUrl = $manifest['windows']['url'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.5.8/Connectix-Windows-x64.zip';
+$appVersion = $manifest['version'] ?? '3.6.1';
+$apkUniversalUrl = $manifest['apk']['universal'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.6.1/Connectix-Android-Universal.apk';
+$apkArm64Url = $manifest['apk']['arm64'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.6.1/Connectix-Android-ARM64.apk';
+$apkArm32Url = $manifest['apk']['arm32'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.6.1/Connectix-Android-ARM32.apk';
+$windowsUrl = $manifest['windows']['url'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.6.1/Connectix-Windows-x64.zip';
+$iosSibappUrl = $manifest['ios']['sibapp'] ?? 'https://sibapp.com/applications/connectix-vpn';
+$iosAnardoniUrl = $manifest['ios']['anardoni'] ?? 'https://anardoni.com/applications/connectix-vpn';
+$iosTestFlightUrl = $manifest['ios']['testflight'] ?? 'https://testflight.apple.com/join/connectix';
+$iosIpaUrl = $manifest['ios']['ipa'] ?? '/contax/assets/Connectix-iOS-3.6.1.ipa';
 $brandName = htmlspecialchars($brandName ?? 'Connectix VPN');
 $logoUrl = $logoUrl ?? '';
 $guides = $guides ?? [];
@@ -101,7 +105,7 @@ foreach ($guides as $g) {
         <div class="text-center space-y-4 max-w-2xl mx-auto">
             <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-300 text-xs font-bold">
                 <i class="fa-solid fa-sparkles text-amber-400"></i>
-                <span>نگارش جدید ۳.۵.۱ اپلیکیشن اختصاصی منتشر شد</span>
+                <span>نگارش جدید ۳.۶.۱ اپلیکیشن اختصاصی اندروید و iOS منتشر شد</span>
             </div>
             <h2 class="text-2xl md:text-4xl font-black text-white leading-tight">
                 دانلود نرم‌افزارهای اتصال و <span class="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400">راهنمای هوشمند</span>
@@ -128,7 +132,7 @@ foreach ($guides as $g) {
                 </span>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                 <!-- Android Card -->
                 <div class="bg-gradient-to-br from-slate-900/90 via-slate-900/60 to-purple-950/20 border border-emerald-500/30 rounded-3xl p-6 shadow-xl flex flex-col justify-between space-y-5 relative overflow-hidden group hover:border-emerald-500/60 transition-all">
                     <div class="absolute -top-12 -left-12 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl group-hover:bg-emerald-500/20 transition-all"></div>
@@ -189,6 +193,69 @@ foreach ($guides as $g) {
                                 <span>نسخه ARM32 (قدیمی)</span>
                             </a>
                         </div>
+                    </div>
+                </div>
+
+                <!-- iOS Card - NEW in 3.6.1 -->
+                <div class="bg-gradient-to-br from-slate-900/90 via-slate-900/60 to-indigo-950/20 border border-indigo-500/30 rounded-3xl p-6 shadow-xl flex flex-col justify-between space-y-5 relative overflow-hidden group hover:border-indigo-500/60 transition-all">
+                    <div class="absolute -top-12 -left-12 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl group-hover:bg-indigo-500/20 transition-all"></div>
+                    
+                    <div class="space-y-3 relative z-10">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="w-12 h-12 rounded-2xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center text-2xl shadow-inner">
+                                    <i class="fa-brands fa-apple"></i>
+                                </div>
+                                <div>
+                                    <h4 class="text-base font-bold text-white flex items-center gap-2">
+                                        <span>نسخه اختصاصی آیفون (iOS)</span>
+                                        <span class="text-[9px] px-2 py-0.5 rounded font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">جدید 3.6.1</span>
+                                    </h4>
+                                    <span class="text-[11px] text-slate-400 font-mono">v<?= $appVersion ?> • iOS 12 به بالا - iPhone & iPad</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <p class="text-xs text-slate-300 leading-relaxed">
+                            اپ اختصاصی iOS با Network Extension، اتصال پایدار، فیلتر خودکار اپ‌های بانکی، انتخاب هوشمند سرور، مصرف کم باتری. قابل نصب از سیب‌اپ، اناردونی و TestFlight.
+                        </p>
+
+                        <div class="grid grid-cols-2 gap-2 text-[11px] text-slate-300 pt-1">
+                            <div class="flex items-center gap-1.5">
+                                <i class="fa-solid fa-check text-indigo-400 text-xs"></i>
+                                <span>Network Extension اختصاصی</span>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <i class="fa-solid fa-check text-indigo-400 text-xs"></i>
+                                <span>فیلتر خودکار بانکی</span>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <i class="fa-solid fa-check text-indigo-400 text-xs"></i>
+                                <span>اتصال 3 مرحله‌ای هوشمند</span>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <i class="fa-solid fa-check text-indigo-400 text-xs"></i>
+                                <span>سیب‌اپ + اناردونی</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2 pt-3 border-t border-slate-800/80 relative z-10">
+                        <a href="<?= htmlspecialchars($iosSibappUrl) ?>" target="_blank" class="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold rounded-2xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/30 transition-all">
+                            <i class="fa-solid fa-download text-sm"></i>
+                            <span>دانلود از سیب‌اپ (پیشنهادی - با شماره ایرانی)</span>
+                        </a>
+                        <div class="grid grid-cols-2 gap-2 pt-1 text-[11px]">
+                            <a href="<?= htmlspecialchars($iosAnardoniUrl) ?>" target="_blank" class="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-center font-semibold border border-slate-700/80 transition flex items-center justify-center gap-1.5">
+                                <i class="fa-solid fa-apple-whole text-slate-400"></i>
+                                <span>اناردونی</span>
+                            </a>
+                            <a href="<?= htmlspecialchars($iosTestFlightUrl) ?>" target="_blank" class="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-center font-semibold border border-slate-700/80 transition flex items-center justify-center gap-1.5">
+                                <i class="fa-solid fa-flask text-slate-400"></i>
+                                <span>TestFlight</span>
+                            </a>
+                        </div>
+                        <p class="text-[10px] text-slate-400 text-center">یا فایل IPA مستقیم: <a href="<?= htmlspecialchars($iosIpaUrl) ?>" class="text-indigo-400 hover:underline">دانلود IPA</a> + آموزش AltStore</p>
                     </div>
                 </div>
 
