@@ -30,18 +30,37 @@ $files = [
     'controllers/ApiControllerV2.php' => [
         'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/controllers/ApiControllerV2.php',
         'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/controllers/ApiControllerV2.php',
+        'https://github.com/hojjatrad/panelconnectix/raw/main/controllers/ApiControllerV2.php',
     ],
     'set_app_version_361.php' => [
         'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/set_app_version_361.php',
         'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/set_app_version_361.php',
+        'https://github.com/hojjatrad/panelconnectix/raw/main/set_app_version_361.php',
     ],
     'set_app_version_400.php' => [
         'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/set_app_version_400.php',
         'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/set_app_version_400.php',
+        'https://github.com/hojjatrad/panelconnectix/raw/main/set_app_version_400.php',
     ],
     'emergency_ai_fix.php' => [
         'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/emergency_ai_fix.php',
         'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/emergency_ai_fix.php',
+        'https://github.com/hojjatrad/panelconnectix/raw/main/emergency_ai_fix.php',
+    ],
+    'debug_app_version.php' => [
+        'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/debug_app_version.php',
+        'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/debug_app_version.php',
+        'https://github.com/hojjatrad/panelconnectix/raw/main/debug_app_version.php',
+    ],
+    'check_db.php' => [
+        'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/check_db.php',
+        'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/check_db.php',
+        'https://github.com/hojjatrad/panelconnectix/raw/main/check_db.php',
+    ],
+    'update_self.php' => [
+        'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/update_self.php',
+        'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/update_self.php',
+        'https://github.com/hojjatrad/panelconnectix/raw/main/update_self.php',
     ],
 ];
 
