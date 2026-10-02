@@ -62,6 +62,10 @@ try {
         foreach ($urls as $u) {
             $data = fetchRaw($u);
             if ($data) {
+                if (str_contains($local, 'fix_361_now') && !str_contains($data, 'v4.6')) {
+                    echo "Fetched $local but not v4.6 from ".parse_url($u, PHP_URL_HOST)." (".strlen($data)." bytes), trying next...\n";
+                    continue;
+                }
                 $path = __DIR__ . '/' . $local;
                 if (!is_dir(dirname($path))) @mkdir(dirname($path), 0755, true);
                 file_put_contents($path, $data);
