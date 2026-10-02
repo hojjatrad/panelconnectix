@@ -1,13 +1,9 @@
 <?php
 /**
- * OPcache Self-Healing Prepend (runs before EVERY PHP script in this directory,
- * in EVERY PHP-FPM pool that serves it — including pools with frozen OPcache).
- *
- * After each deployment the updater touches .deploy_stamp. The first request
- * that reaches a given pool after a deployment resets that pool's OPcache
- * exactly once, forcing a recompile of ALL scripts from the fresh on-disk
- * files. Subsequent requests in the same pool skip the reset (marker file).
- * Cost: one tiny file check per request; one cache reset per pool per deploy.
+ * OPcache Self-Healing Prepend + Emergency Disk Cleanup (v6.8.4)
+ * Runs before EVERY PHP script in this directory, in EVERY PHP-FPM pool.
+ * - After each deployment: resets OPcache once per pool
+ * - When disk free < 50MB: auto-cleanup old backups and temp files
  */
 
 $__stampFile = __DIR__ . '/.deploy_stamp';
@@ -34,4 +30,31 @@ if (is_file($__stampFile)) {
         }
     }
 }
-unset($__stampFile, $__stampM, $__doneMarker, $__old, $__f);
+
+// === EMERGENCY DISK CLEANUP v6.8.4 - Auto cleanup when disk low ===
+$__freeSpace = @disk_free_space(__DIR__);
+if ($__freeSpace !== false && $__freeSpace < 50*1024*1024) { // Less than 50MB free
+    // Clean temp files
+    foreach ([sys_get_temp_dir(), '/tmp'] as $__tmpDir) {
+        if (!is_dir($__tmpDir)) continue;
+        foreach (glob($__tmpDir . '/cx_*') as $__f) { if (is_file($__f)) @unlink($__f); }
+        foreach (glob($__tmpDir . '/connectix_*') as $__f) { if (is_file($__f)) @unlink($__f); }
+    }
+    // Clean old backups
+    foreach (glob(__DIR__ . '/*.old.*') as $__f) { @unlink($__f); }
+    foreach (glob(__DIR__ . '/*.bak_*') as $__f) { @unlink($__f); }
+    foreach (glob(__DIR__ . '/index_backup_*.php') as $__f) { @unlink($__f); }
+    foreach (glob(__DIR__ . '/__canary_*.txt') as $__f) { @unlink($__f); }
+    // Clean rollback dir if large
+    $__rollback = __DIR__ . '/.rollback_backup_20261002';
+    if (is_dir($__rollback)) {
+        $__it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($__rollback, RecursiveDirectoryIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST);
+        foreach ($__it as $__file) {
+            if ($__file->isFile()) @unlink($__file->getPathname());
+            else @rmdir($__file->getPathname());
+        }
+        @rmdir($__rollback);
+    }
+}
+unset($__stampFile, $__stampM, $__doneMarker, $__old, $__f, $__freeSpace, $__tmpDir, $__rollback, $__it, $__file);
+

@@ -4,7 +4,7 @@ require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Setting.php';
 
 class Updater {
-    public const CURRENT_VERSION = '6.8.3'; // Fix version naming - never show commit-xxxx
+    public const CURRENT_VERSION = '6.8.4'; // Fix disk quota + version naming - emergency cleanup
 
     public static function getCurrentVersion(): string {
         $dbVer = Setting::get('current_version', '');
@@ -362,9 +362,110 @@ class Updater {
     }
 
     /**
+     * Emergency disk cleanup - frees space before update to fix "Disk quota exceeded"
+     */
+    public static function emergencyDiskCleanup(): array {
+        $freed = 0;
+        $deleted = [];
+        $contaxDir = realpath(__DIR__ . '/..') ?: __DIR__ . '/..';
+        
+        // Clean temp files
+        $tmpDirs = [sys_get_temp_dir(), '/tmp', $contaxDir . '/data'];
+        foreach ($tmpDirs as $tmpDir) {
+            if (!is_dir($tmpDir)) continue;
+            foreach (glob($tmpDir . '/cx_*') as $f) {
+                if (is_file($f)) {
+                    $size = @filesize($f) ?: 0;
+                    if (@unlink($f)) {
+                        $freed += $size;
+                        $deleted[] = basename($f);
+                    }
+                }
+            }
+            foreach (glob($tmpDir . '/connectix_*') as $f) {
+                if (is_file($f)) {
+                    $size = @filesize($f) ?: 0;
+                    if (@unlink($f)) {
+                        $freed += $size;
+                        $deleted[] = basename($f);
+                    }
+                }
+            }
+            foreach (glob($tmpDir . '/repair_*') as $f) {
+                if (is_file($f)) {
+                    $size = @filesize($f) ?: 0;
+                    if (@unlink($f)) {
+                        $freed += $size;
+                        $deleted[] = basename($f);
+                    }
+                }
+            }
+        }
+        
+        // Clean old backups
+        $patterns = [
+            $contaxDir . '/*.old.*',
+            $contaxDir . '/*.bak_*',
+            $contaxDir . '/index_backup_*.php',
+            $contaxDir . '/force_update_*.php.bak_*',
+            $contaxDir . '/__canary_*.txt',
+            $contaxDir . '/.opcache_reset_done_*',
+            $contaxDir . '/data/*.log',
+            dirname($contaxDir) . '/index_backup_*.php'
+        ];
+        
+        foreach ($patterns as $pattern) {
+            foreach (glob($pattern) as $f) {
+                if (is_file($f)) {
+                    $size = @filesize($f) ?: 0;
+                    if (@unlink($f)) {
+                        $freed += $size;
+                        $deleted[] = basename($f);
+                    }
+                }
+            }
+        }
+        
+        // Clean rollback backup if exists (can be large)
+        $rollbackDir = $contaxDir . '/.rollback_backup_20261002';
+        if (is_dir($rollbackDir)) {
+            $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($rollbackDir, RecursiveDirectoryIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST);
+            foreach ($it as $file) {
+                if ($file->isFile()) {
+                    $size = $file->getSize();
+                    if (@unlink($file->getPathname())) $freed += $size;
+                } else {
+                    @rmdir($file->getPathname());
+                }
+            }
+            @rmdir($rollbackDir);
+            $deleted[] = ".rollback_backup_20261002 (DIR)";
+        }
+        
+        // Keep only latest 2 force_update files
+        $forceFiles = glob($contaxDir . '/force_update_*.php');
+        if (count($forceFiles) > 3) {
+            usort($forceFiles, function($a,$b) { return filemtime($b) - filemtime($a); });
+            $toDelete = array_slice($forceFiles, 3);
+            foreach ($toDelete as $f) {
+                $size = @filesize($f) ?: 0;
+                if (@unlink($f)) {
+                    $freed += $size;
+                    $deleted[] = basename($f) . " (old)";
+                }
+            }
+        }
+        
+        return ['freed' => $freed, 'deleted' => $deleted, 'free_space' => disk_free_space($contaxDir)];
+    }
+
+    /**
      * Download ZIP and perform 1-Click Update.
      */
     public static function applyUpdate(bool $notify = true): array {
+        // CRITICAL v6.8.4: Emergency cleanup BEFORE any download to fix Disk quota exceeded
+        $cleanup = self::emergencyDiskCleanup();
+        
         $check = self::checkForUpdates(true);
 
         $repo = self::getRepo();

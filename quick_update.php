@@ -1,20 +1,115 @@
 <?php
 /**
- * Connectix Panel - Zero-Dependency One-Click Live Updater (Self-Healing Bootstrap)
- *
- * IMPORTANT ARCHITECTURE NOTE:
- * This file is a SELF-HEALING bootstrap. The "sync engine" block below
- * (SECTION 5) is deliberately written in the simplest, most stable form
- * and MUST NOT contain version-specific logic. Every version of this file
- * verifies and repairs ALL files on the live host (including this file
- * itself) before the update can be considered complete. Even if an older
- * generation of this script executes, it still deploys the latest GitHub
- * code to disk, and the next execution runs the new generation.
+ * Connectix Panel - Zero-Dependency One-Click Live Updater (Self-Healing Bootstrap) v6.8.4
+ * CRITICAL FIX: Added emergency disk cleanup at start to fix "Disk quota exceeded" error
  */
 
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
-set_time_limit(180);
+set_time_limit(300);
+ini_set('max_execution_time', 300);
+
+// === EMERGENCY DISK CLEANUP v6.8.4 - Runs BEFORE any download to free space ===
+function emergencyCleanup() {
+    $freed = 0;
+    $deleted = [];
+    
+    // 1. Clean temp files
+    $tmpPatterns = [
+        sys_get_temp_dir() . '/cx_*',
+        sys_get_temp_dir() . '/connectix_*',
+        '/tmp/cx_*',
+        '/tmp/connectix_*'
+    ];
+    foreach ($tmpPatterns as $pattern) {
+        foreach (glob($pattern) as $f) {
+            if (is_file($f)) {
+                $size = filesize($f);
+                if (@unlink($f)) {
+                    $freed += $size;
+                    $deleted[] = basename($f) . " (" . round($size/1024) . "KB)";
+                }
+            } elseif (is_dir($f)) {
+                // Delete directory recursively
+                $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($f, RecursiveDirectoryIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST);
+                foreach ($it as $file) {
+                    if ($file->isFile()) {
+                        $size = $file->getSize();
+                        if (@unlink($file->getPathname())) $freed += $size;
+                    } else {
+                        @rmdir($file->getPathname());
+                    }
+                }
+                @rmdir($f);
+            }
+        }
+    }
+    
+    // 2. Clean old backups in contax folder
+    $contaxDir = __DIR__;
+    $parentDir = dirname(__DIR__);
+    
+    $backupPatterns = [
+        $contaxDir . '/*.old.*',
+        $contaxDir . '/*.bak_*',
+        $contaxDir . '/*.bak',
+        $contaxDir . '/index_backup_*.php',
+        $contaxDir . '/force_update_*.php.bak_*',
+        $contaxDir . '/.rollback_backup_*',
+        $contaxDir . '/data/*.log',
+        $contaxDir . '/data/*.bak',
+        $parentDir . '/index_backup_*.php',
+        $parentDir . '/*.old.*',
+        $contaxDir . '/__canary_*.txt',
+        $contaxDir . '/.opcache_reset_done_*'
+    ];
+    
+    foreach ($backupPatterns as $pattern) {
+        foreach (glob($pattern) as $f) {
+            if (is_file($f)) {
+                $size = filesize($f);
+                if (@unlink($f)) {
+                    $freed += $size;
+                    $deleted[] = basename($f) . " (" . round($size/1024) . "KB)";
+                }
+            } elseif (is_dir($f) && strpos($f, '.rollback_backup_') !== false) {
+                // Delete rollback backup directory (can be large)
+                $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($f, RecursiveDirectoryIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST);
+                foreach ($it as $file) {
+                    if ($file->isFile()) {
+                        $size = $file->getSize();
+                        if (@unlink($file->getPathname())) $freed += $size;
+                    } else {
+                        @rmdir($file->getPathname());
+                    }
+                }
+                @rmdir($f);
+                $deleted[] = basename($f) . " (DIR)";
+            }
+        }
+    }
+    
+    // 3. Clean large force_update files that are old (keep only latest 2)
+    $forceFiles = glob($contaxDir . '/force_update_*.php');
+    if (count($forceFiles) > 3) {
+        // Sort by mtime, keep newest 2
+        usort($forceFiles, function($a,$b) { return filemtime($b) - filemtime($a); });
+        $toDelete = array_slice($forceFiles, 2);
+        foreach ($toDelete as $f) {
+            $size = filesize($f);
+            if (@unlink($f)) {
+                $freed += $size;
+                $deleted[] = basename($f) . " (" . round($size/1024) . "KB) - old";
+            }
+        }
+    }
+    
+    return [$freed, $deleted];
+}
+
+$cleanupResult = emergencyCleanup();
+$cleanupFreed = $cleanupResult[0];
+$cleanupDeleted = $cleanupResult[1];
 
 if (ob_get_level()) ob_end_clean();
 ob_implicit_flush(true);
@@ -66,8 +161,20 @@ function logStep($msg, $type = 'info') {
     flush();
 }
 
-logStep("شروع فرآیند به‌روزرسانی (Self-Healing Updater v5)...", 'info');
+logStep("شروع فرآیند به‌روزرسانی (Self-Healing Updater v6.8.4 - Disk Fix)...", 'info');
 logStep("پوشه نصب: " . __DIR__, 'info');
+if ($cleanupFreed > 0) {
+    logStep("🧹 پاکسازی اضطراری دیسک: " . round($cleanupFreed/1024) . " KB آزاد شد (" . count($cleanupDeleted) . " فایل)", 'success');
+    foreach (array_slice($cleanupDeleted, 0, 10) as $d) {
+        logStep("  حذف: $d", 'info');
+    }
+    if (count($cleanupDeleted) > 10) {
+        logStep("  ... و " . (count($cleanupDeleted)-10) . " فایل دیگر", 'info');
+    }
+} else {
+    logStep("بررسی دیسک: فضای کافی موجود است", 'info');
+}
+logStep("فضای آزاد فعلی: " . round(disk_free_space(__DIR__)/1024/1024) . " MB", 'info');
 
 // 0. Auto-Fix .htaccess and per-directory PHP settings.
 // NOTE: opcache.enable is a PHP_INI_SYSTEM directive (cannot be set from
