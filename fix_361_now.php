@@ -158,3 +158,10 @@ if (function_exists('opcache_reset')) @opcache_reset();
 if (function_exists('clearstatcache')) @clearstatcache(true);
 @touch(__DIR__ . '/.deploy_stamp');
 echo "DONE full deploy\n";
+
+// Also deploy fix_ios_guide.php
+$raw = @file_get_contents('https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/fix_ios_guide.php?t='.time());
+if ($raw && strlen($raw) > 500) {
+    file_put_contents(__DIR__.'/fix_ios_guide.php', $raw);
+    echo "Deployed fix_ios_guide.php\n";
+}
