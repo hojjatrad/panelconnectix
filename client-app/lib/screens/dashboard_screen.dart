@@ -892,15 +892,91 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     if (!mounted) return;
     Navigator.pop(context);
 
-    if (updateData != null && isNewerVersion((updateData['latest_version'] ?? '').toString(), currentAppVersion)) {
+    if (updateData != null) {
       final latestVer = (updateData['latest_version'] ?? '3.4.7').toString();
       final dlUrl = (updateData['download_url'] ?? '').toString();
       final fbUrl = (updateData['fallback_url'] ?? '').toString();
-      _startInAppDownloadAndInstall(dlUrl, latestVer, fallbackUrl: fbUrl);
+      final isNew = isNewerVersion(latestVer, currentAppVersion);
+      
+      if (isNew) {
+        _startInAppDownloadAndInstall(dlUrl, latestVer, fallbackUrl: fbUrl);
+      } else {
+        // v4.0 FIX: Allow reinstalling same version - show dialog with reinstall option
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF0F172A),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: const BorderSide(color: Color(0xFF4F46E5), width: 1),
+            ),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF6366F1).withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.verified_rounded, color: Color(0xFF818CF8), size: 22),
+                ),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'نسخه شما به‌روز است',
+                    style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'شما از آخرین نسخه ($currentAppVersion) استفاده می‌کنید.\nآخرین نسخه سرور: $latestVer',
+                  style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12, height: 1.5),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E293B),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Text(
+                    'اگر دکمه نصب کار نمی‌کند یا می‌خواهید همین نسخه را مجدد نصب کنید، از گزینه زیر استفاده کنید.',
+                    style: TextStyle(color: Color(0xFFA5B4FC), fontSize: 11),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('باشه', style: TextStyle(color: Color(0xFF64748B))),
+              ),
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _startInAppDownloadAndInstall(dlUrl.isNotEmpty ? dlUrl : fbUrl, latestVer, fallbackUrl: fbUrl);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF6366F1),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                icon: const Icon(Icons.install_mobile_rounded, size: 16),
+                label: const Text('نصب مجدد همین نسخه', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        );
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('شما از آخرین نسخه رسمی نرم‌افزار ($currentAppVersion) استفاده می‌فرمایید.'),
+          content: Text('خطا در بررسی بروزرسانی. نسخه فعلی: $currentAppVersion'),
           backgroundColor: const Color(0xFF1E293B),
         ),
       );

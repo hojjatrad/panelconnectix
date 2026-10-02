@@ -656,8 +656,12 @@ class ApiService {
         bool installOk = false;
         String installError = '';
         try {
-          final installResult = await _updaterChannel.invokeMethod('installApk', {'filePath': file.path});
-          log('installApk result: $installResult path=${file.path}');
+          // v4.0 FIX: allowSameVersion=true to support reinstalling same version
+          final installResult = await _updaterChannel.invokeMethod('installApk', {
+            'filePath': file.path,
+            'allowSameVersion': true,
+          });
+          log('installApk result: $installResult path=${file.path} allowSameVersion=true');
           installOk = true;
         } catch (nativeErr) {
           log('Native install invoke failed: $nativeErr');

@@ -201,6 +201,7 @@ class MainActivity: FlutterActivity() {
                 }
                 "installApk" -> {
                     val filePath = call.argument<String>("filePath")
+                    val allowSameVersion = call.argument<Boolean>("allowSameVersion") ?: true // v4.0 FIX: allow reinstall same version
                     if (filePath == null) {
                         result.error("INVALID_ARGUMENT", "filePath is null", null)
                         return@setMethodCallHandler
@@ -215,14 +216,68 @@ class MainActivity: FlutterActivity() {
                         return@setMethodCallHandler
                     }
                     try {
-                        // Ensure file is readable
                         file.setReadable(true, false)
 
+                        // v4.0 FIX: Try PackageInstaller API first (supports same-version reinstall on Android 5+)
+                        var installedViaSession = false
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                            try {
+                                val packageInstaller = packageManager.packageInstaller
+                                val params = android.content.pm.PackageInstaller.SessionParams(
+                                    android.content.pm.PackageInstaller.SessionParams.MODE_FULL_INSTALL
+                                ).apply {
+                                    // Allow same version reinstall
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                        setRequireUserAction(
+                                            android.content.pm.PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED
+                                        )
+                                    }
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                        setInstallReason(android.content.pm.PackageManager.INSTALL_REASON_USER)
+                                    }
+                                }
+                                val sessionId = packageInstaller.createSession(params)
+                                val session = packageInstaller.openSession(sessionId)
+                                session.openWrite("package", 0, -1).use { output ->
+                                    file.inputStream().use { input ->
+                                        input.copyTo(output)
+                                    }
+                                    session.fsync(output)
+                                }
+                                val intent = Intent(context, MainActivity::class.java).apply {
+                                    action = "INSTALL_COMPLETE"
+                                }
+                                val pendingIntent = PendingIntent.getActivity(
+                                    context, sessionId,
+                                    intent,
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                        PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+                                    } else {
+                                        PendingIntent.FLAG_UPDATE_CURRENT
+                                    }
+                                )
+                                session.commit(pendingIntent.intentSender)
+                                session.close()
+                                installedViaSession = true
+                                // Session commit is async, but we consider it success and let system handle UI
+                            } catch (e: Exception) {
+                                // PackageInstaller failed, fallback to ACTION_VIEW
+                                android.util.Log.w("ConnectixInstaller", "PackageInstaller failed, fallback to VIEW: ${e.message}")
+                            }
+                        }
+
+                        if (installedViaSession) {
+                            // For PackageInstaller, we already committed session, return success
+                            // The system installer UI will appear automatically
+                            result.success(true)
+                            return@setMethodCallHandler
+                        }
+
+                        // Fallback: ACTION_VIEW with FileProvider (works for upgrades and same-version on most devices)
                         val uri: Uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                             try {
                                 FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file)
                             } catch (e: Exception) {
-                                // Try alternative locations for FileProvider
                                 try {
                                     val extDir = context.getExternalFilesDir(null)
                                     if (extDir != null) {
@@ -247,49 +302,76 @@ class MainActivity: FlutterActivity() {
                             Uri.fromFile(file)
                         }
 
-                        val intent = Intent(Intent.ACTION_VIEW).apply {
+                        // Try ACTION_INSTALL_PACKAGE first (more explicit for same-version), then ACTION_VIEW
+                        val installIntents = mutableListOf<Intent>()
+
+                        // Intent 1: ACTION_INSTALL_PACKAGE (Android 6+ supports same-version with EXTRA_RETURN_RESULT)
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
+                            val installPkgIntent = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
+                                setDataAndType(uri, "application/vnd.android.package-archive")
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                putExtra(Intent.EXTRA_RETURN_RESULT, true)
+                                putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
+                                // Allow same version reinstall hint
+                                putExtra("android.intent.extra.ALLOW_REPLACE", true)
+                            }
+                            installIntents.add(installPkgIntent)
+                        }
+
+                        // Intent 2: ACTION_VIEW (traditional)
+                        val viewIntent = Intent(Intent.ACTION_VIEW).apply {
                             setDataAndType(uri, "application/vnd.android.package-archive")
                             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                             addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                            // Android 14+ needs this for package installer
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                                 addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
                             }
+                            putExtra(Intent.EXTRA_RETURN_RESULT, true)
                         }
+                        installIntents.add(viewIntent)
 
-                        // Grant URI permission to all potential installer packages
-                        try {
-                            val resInfoList = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                packageManager.queryIntentActivities(intent, PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY.toLong()))
-                            } else {
-                                @Suppress("DEPRECATION")
-                                packageManager.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
-                            }
-                            if (resInfoList.isEmpty()) {
-                                // No activity found to handle APK install — try generic chooser
-                                val chooser = Intent.createChooser(intent, "نصب بروزرسانی")
-                                chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                context.startActivity(chooser)
+                        var lastError: Exception? = null
+                        for (intent in installIntents) {
+                            try {
+                                // Grant URI permission to all handlers
+                                try {
+                                    val resInfoList = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                        packageManager.queryIntentActivities(intent, PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY.toLong()))
+                                    } else {
+                                        @Suppress("DEPRECATION")
+                                        packageManager.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
+                                    }
+                                    if (resInfoList.isEmpty() && intent === viewIntent) {
+                                        val chooser = Intent.createChooser(intent, "نصب بروزرسانی")
+                                        chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                        chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                        context.startActivity(chooser)
+                                        result.success(true)
+                                        return@setMethodCallHandler
+                                    }
+                                    for (resolveInfo in resInfoList) {
+                                        try {
+                                            val pkgName = resolveInfo.activityInfo.packageName
+                                            context.grantUriPermission(pkgName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                        } catch (_: Exception) {}
+                                    }
+                                } catch (_: Exception) {}
+
+                                context.startActivity(intent)
                                 result.success(true)
                                 return@setMethodCallHandler
+                            } catch (e: Exception) {
+                                lastError = e
+                                continue
                             }
-                            for (resolveInfo in resInfoList) {
-                                try {
-                                    val pkgName = resolveInfo.activityInfo.packageName
-                                    context.grantUriPermission(pkgName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                } catch (_: Exception) {}
-                            }
-                        } catch (e: Exception) {
-                            // Non-fatal, continue to startActivity
                         }
 
-                        context.startActivity(intent)
-                        result.success(true)
+                        throw lastError ?: Exception("No installer activity found")
+
                     } catch (e: Exception) {
-                        // Detailed error for Dart side to show
-                        val msg = "INSTALL_ERROR: ${e.message} path=$filePath len=${file.length()} canRequest=${if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) packageManager.canRequestPackageInstalls() else true}"
+                        val msg = "INSTALL_ERROR: ${e.message} path=$filePath len=${file.length()} canRequest=${if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) packageManager.canRequestPackageInstalls() else true} sameVer=$allowSameVersion"
                         result.error("INSTALL_ERROR", msg, null)
                     }
                 }
