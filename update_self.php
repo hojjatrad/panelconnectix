@@ -1,5 +1,5 @@
 <?php
-// v4.6 - self updater with validation to bypass throttled jsDelivr cache
+// v4.6 - self updater with validation to bypass throttled jsDelivr cache + DEBUG DUMP strict check
 function fetchRaw($url) {
     $ch = curl_init($url.'?t='.time().rand(1000,9999).'&cb='.rand(100000,999999));
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -27,22 +27,27 @@ $files = [
     'set_app_version_400.php' => [
         'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/set_app_version_400.php',
         'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/set_app_version_400.php',
+        'https://github.com/hojjatrad/panelconnectix/raw/main/set_app_version_400.php',
     ],
     'controllers/ApiControllerV2.php' => [
         'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/controllers/ApiControllerV2.php',
         'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/controllers/ApiControllerV2.php',
+        'https://github.com/hojjatrad/panelconnectix/raw/main/controllers/ApiControllerV2.php',
     ],
     'check_db.php' => [
-            'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/check_db.php',
-            'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/check_db.php',
-        ],
-        'debug_app_version.php' => [
-            'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/debug_app_version.php',
-            'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/debug_app_version.php',
-        ],
-        'emergency_ai_fix.php' => [
+        'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/check_db.php',
+        'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/check_db.php',
+        'https://github.com/hojjatrad/panelconnectix/raw/main/check_db.php',
+    ],
+    'debug_app_version.php' => [
+        'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/debug_app_version.php',
+        'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/debug_app_version.php',
+        'https://github.com/hojjatrad/panelconnectix/raw/main/debug_app_version.php',
+    ],
+    'emergency_ai_fix.php' => [
         'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/emergency_ai_fix.php',
         'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/emergency_ai_fix.php',
+        'https://github.com/hojjatrad/panelconnectix/raw/main/emergency_ai_fix.php',
     ],
 ];
 
@@ -50,10 +55,10 @@ foreach ($files as $local => $urls) {
     foreach ((array)$urls as $u) {
         $data = fetchRaw($u);
         if ($data) {
-            // Validate v4.6 content for critical files
-            if (str_contains($local, 'fix_361_now') && !str_contains($data, 'v4.6')) {
-                echo "Fetched $local but not v4.6 from ".parse_url($u, PHP_URL_HOST)." (".strlen($data)." bytes), trying next...\n";
-                continue;
+            // Strict validation for fix_361_now to force DEBUG DUMP version (6711 bytes)
+            if (str_contains($local, 'fix_361_now')) {
+                if (!str_contains($data, 'v4.6')) { echo "Fetched $local but not v4.6 from ".parse_url($u, PHP_URL_HOST)." (".strlen($data)." bytes), trying next...\n"; continue; }
+                if (!str_contains($data, 'DEBUG DUMP') && strlen($data) < 6500) { echo "Fetched $local old 6282 without DEBUG DUMP from ".parse_url($u, PHP_URL_HOST)." (".strlen($data)." bytes), trying next...\n"; continue; }
             }
             if (str_contains($local, 'set_app_version') && !str_contains($data, 'v4.6')) {
                 echo "Fetched $local but not v4.6 from ".parse_url($u, PHP_URL_HOST)." (".strlen($data)." bytes), trying next...\n";
