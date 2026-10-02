@@ -252,6 +252,7 @@ jobs:
                           }
                           "installApk" -> {
                               val filePath = call.argument<String>("filePath")
+                              val allowSameVersion = call.argument<Boolean>("allowSameVersion") ?: false
                               if (filePath != null) {
                                   val file = File(filePath)
                                   if (file.exists() && file.length() > 1000000) {
@@ -270,30 +271,91 @@ jobs:
                                           } else {
                                               Uri.fromFile(file)
                                           }
-                                          val intent = Intent(Intent.ACTION_VIEW).apply {
-                                              setDataAndType(uri, "application/vnd.android.package-archive")
-                                              flags = Intent.FLAG_ACTIVITY_NEW_TASK or 
-                                                      Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                                                      Intent.FLAG_ACTIVITY_CLEAR_TOP
+
+                                          // FIX 2026-10-02: Robust installer for ALL OEMs (Xiaomi MIUI, Samsung OneUI, Android 14+)
+                                          // No PackageInstaller Session API (requires INSTALL_PACKAGES system permission, fails silently on MIUI/OneUI)
+                                          // Strategy: ACTION_INSTALL_PACKAGE with ALLOW_REPLACE first, then ACTION_VIEW, then chooser
+                                          var installed = false
+                                          var lastError: Exception? = null
+
+                                          // Attempt 1: ACTION_INSTALL_PACKAGE with ALLOW_REPLACE (handles same-version reinstall)
+                                          try {
+                                              val installIntent = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
+                                                  setDataAndType(uri, "application/vnd.android.package-archive")
+                                                  flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
+                                                  putExtra(Intent.EXTRA_RETURN_RESULT, true)
+                                                  putExtra(Intent.EXTRA_ALLOW_REPLACE, true)
+                                                  putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
+                                              }
+                                              try {
+                                                  val resList = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                                      packageManager.queryIntentActivities(installIntent, PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY.toLong()))
+                                                  } else {
+                                                      @Suppress("DEPRECATION")
+                                                      packageManager.queryIntentActivities(installIntent, PackageManager.MATCH_DEFAULT_ONLY)
+                                                  }
+                                                  for (ri in resList) {
+                                                      try {
+                                                          context.grantUriPermission(ri.activityInfo.packageName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                      } catch (_: Exception) {}
+                                                  }
+                                              } catch (_: Exception) {}
+                                              context.startActivity(installIntent)
+                                              installed = true
+                                          } catch (e: Exception) {
+                                              lastError = e
                                           }
 
-                                          try {
-                                              val resInfoList = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                                  packageManager.queryIntentActivities(intent, PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY.toLong()))
-                                              } else {
-                                                  @Suppress("DEPRECATION")
-                                                  packageManager.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
-                                              }
-                                              for (resolveInfo in resInfoList) {
+                                          // Attempt 2: ACTION_VIEW (proven on all OEMs for upgrades)
+                                          if (!installed) {
+                                              try {
+                                                  val viewIntent = Intent(Intent.ACTION_VIEW).apply {
+                                                      setDataAndType(uri, "application/vnd.android.package-archive")
+                                                      flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                                                  }
                                                   try {
-                                                      val pkgName = resolveInfo.activityInfo.packageName
-                                                      context.grantUriPermission(pkgName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                      val resInfoList = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                                          packageManager.queryIntentActivities(viewIntent, PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY.toLong()))
+                                                      } else {
+                                                          @Suppress("DEPRECATION")
+                                                          packageManager.queryIntentActivities(viewIntent, PackageManager.MATCH_DEFAULT_ONLY)
+                                                      }
+                                                      for (resolveInfo in resInfoList) {
+                                                          try {
+                                                              val pkgName = resolveInfo.activityInfo.packageName
+                                                              context.grantUriPermission(pkgName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                          } catch (_: Exception) {}
+                                                      }
                                                   } catch (_: Exception) {}
+                                                  context.startActivity(viewIntent)
+                                                  installed = true
+                                              } catch (e: Exception) {
+                                                  lastError = e
                                               }
-                                          } catch (_: Exception) {}
+                                          }
 
-                                          context.startActivity(intent)
-                                          result.success(true)
+                                          // Attempt 3: Chooser (last resort, shows system installer picker)
+                                          if (!installed) {
+                                              try {
+                                                  val chooserIntent = Intent(Intent.ACTION_VIEW).apply {
+                                                      setDataAndType(uri, "application/vnd.android.package-archive")
+                                                      flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
+                                                  }
+                                                  val chooser = Intent.createChooser(chooserIntent, "نصب بروزرسانی").apply {
+                                                      flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                                  }
+                                                  context.startActivity(chooser)
+                                                  installed = true
+                                              } catch (e: Exception) {
+                                                  lastError = e
+                                              }
+                                          }
+
+                                          if (installed) {
+                                              result.success(true)
+                                          } else {
+                                              result.error("INSTALL_ERROR", (lastError?.message ?: "Unknown") + " path=" + filePath + " len=" + file.length() + " allowSame=" + allowSameVersion, null)
+                                          }
                                       } catch (e: Exception) {
                                           result.error("INSTALL_ERROR", e.message + " path=" + filePath + " len=" + file.length(), null)
                                       }

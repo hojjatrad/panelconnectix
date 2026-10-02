@@ -770,11 +770,27 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
         $repo = Updater::getRepo();
         $downloadUrl = trim(Setting::get('app_download_url', ''));
         $universalUrl= trim(Setting::get('app_universal_url', ''));
-        if ($downloadUrl === '' || !str_contains($downloadUrl, "v{$latest}")) {
-            $downloadUrl = "https://github.com/{$repo}/releases/download/v{$latest}/Connectix-Android-ARM64.apk";
+
+        // FIX 2026-10-02: Prefer PANEL-HOST mirrored APKs over GitHub (Iran filtering fix)
+        $panelBase = Helpers::baseUrl();
+        $mirroredArm64 = __DIR__ . '/../Connectix-ARM64-v8a.apk';
+        $mirroredUniversal = __DIR__ . '/../Connectix-Universal.apk';
+        $hasMirroredArm64 = is_file($mirroredArm64) && filesize($mirroredArm64) > 1024*1024;
+        $hasMirroredUniversal = is_file($mirroredUniversal) && filesize($mirroredUniversal) > 1024*1024;
+        $isGithubUrl = fn($u) => str_contains($u, 'github.com') || str_contains($u, 'githubusercontent.com');
+
+        if ($downloadUrl === '' || ($isGithubUrl($downloadUrl) && $hasMirroredArm64)) {
+            $downloadUrl = $hasMirroredArm64 ? $panelBase . '/Connectix-ARM64-v8a.apk' : "https://github.com/{$repo}/releases/download/v{$latest}/Connectix-Android-ARM64.apk";
         }
-        if ($universalUrl === '' || !str_contains($universalUrl, "v{$latest}")) {
-            $universalUrl = "https://github.com/{$repo}/releases/download/v{$latest}/Connectix-Android-Universal.apk";
+        if ($universalUrl === '' || ($isGithubUrl($universalUrl) && $hasMirroredUniversal)) {
+            $universalUrl = $hasMirroredUniversal ? $panelBase . '/Connectix-Universal.apk' : "https://github.com/{$repo}/releases/download/v{$latest}/Connectix-Android-Universal.apk";
+        }
+        // Override GitHub URLs if mirrored exists (Iran compatibility)
+        if ($hasMirroredArm64 && $isGithubUrl($downloadUrl)) {
+            $downloadUrl = $panelBase . '/Connectix-ARM64-v8a.apk';
+        }
+        if ($hasMirroredUniversal && $isGithubUrl($universalUrl)) {
+            $universalUrl = $panelBase . '/Connectix-Universal.apk';
         }
         $title       = trim(Setting::get('app_update_title', '')) ?: "Connectix v{$latest}";
         $changelog   = trim(Setting::get('app_update_changelog', '')) ?: "• نگارش جدید سامانه منتشر شد.";

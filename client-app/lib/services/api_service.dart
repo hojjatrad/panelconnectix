@@ -481,21 +481,77 @@ class ApiService {
           final map = Map<String, dynamic>.from(data['data']);
           final latestVer = (map['latest_version'] ?? '').toString();
           final serverUrl = (map['download_url'] ?? '').toString();
+          final universalUrlRaw = (map['universal_url'] ?? '').toString();
+          // Panel host URLs work for ALL Iranian operators (unfiltered)
+          final panelArm64 = "$currentBase/Connectix-ARM64-v8a.apk";
+          final panelUniversal = "$currentBase/Connectix-Universal.apk";
           final dynamicGhArm64 = "https://github.com/hojjatrad/panelconnectix/releases/download/v$latestVer/Connectix-Android-ARM64.apk";
           final dynamicGhUniversal = "https://github.com/hojjatrad/panelconnectix/releases/download/v$latestVer/Connectix-Android-Universal.apk";
 
-          map['download_url'] = (serverUrl.isNotEmpty && serverUrl.startsWith('http'))
-              ? serverUrl
-              : dynamicGhArm64;
-          map['fallback_url'] = (map['universal_url'] != null && map['universal_url'].toString().startsWith('http'))
-              ? map['universal_url'].toString()
-              : dynamicGhUniversal;
+          // Prefer panel host if server returns GitHub (GitHub filtered for some ISPs)
+          bool isGh(String u) => u.contains('github.com') || u.contains('githubusercontent.com');
+          if (serverUrl.isNotEmpty && serverUrl.startsWith('http')) {
+            map['download_url'] = serverUrl;
+            // If serverUrl is GitHub, keep panel URL as extra fallback
+            if (isGh(serverUrl)) {
+              map['panel_url'] = panelArm64;
+            }
+          } else {
+            map['download_url'] = panelArm64; // Prefer panel host first
+            map['github_url'] = dynamicGhArm64;
+          }
+
+          if (universalUrlRaw.isNotEmpty && universalUrlRaw.startsWith('http')) {
+            map['fallback_url'] = universalUrlRaw;
+            if (isGh(universalUrlRaw)) {
+              map['panel_fallback_url'] = panelUniversal;
+            }
+          } else {
+            map['fallback_url'] = panelUniversal;
+            map['github_fallback_url'] = dynamicGhUniversal;
+          }
+
+          // Ensure we have at least 4 URLs to try: panel primary, panel fallback, github primary, github fallback
+          map['panel_url'] ??= panelArm64;
+          map['panel_fallback_url'] ??= panelUniversal;
+          map['github_url'] ??= dynamicGhArm64;
+          map['github_fallback_url'] ??= dynamicGhUniversal;
+
+          log('checkAppUpdate: latest=$latestVer primary=${map['download_url']} panel=${map['panel_url']}');
           return map;
+        }
+      } catch (e) {
+        log('checkAppUpdate error via $currentBase: $e');
+      }
+    }
+
+    // 2. Direct Fallback: Panel host direct + GitHub app_release.json
+    // Try panel host first (works inside Iran)
+    for (final base in baseUrls) {
+      try {
+        final panelJsonUrl = "$base/app_release.json";
+        final resp = await http.get(Uri.parse(panelJsonUrl), headers: {'Accept': 'application/json'}).timeout(const Duration(seconds: 5));
+        if (resp.statusCode == 200) {
+          final d = jsonDecode(utf8.decode(resp.bodyBytes));
+          final ver = (d['version'] ?? '').toString();
+          if (ver.isNotEmpty) {
+            return {
+              'has_update': true,
+              'latest_version': ver,
+              'title': 'Connectix v$ver',
+              'changelog': (d['changelog'] ?? '• نگارش جدید سامانه منتشر شد.').toString(),
+              'download_url': "$base/Connectix-ARM64-v8a.apk",
+              'fallback_url': "$base/Connectix-Universal.apk",
+              'panel_url': "$base/Connectix-ARM64-v8a.apk",
+              'panel_fallback_url': "$base/Connectix-Universal.apk",
+              'github_url': "https://github.com/hojjatrad/panelconnectix/releases/download/v$ver/Connectix-Android-ARM64.apk",
+              'github_fallback_url': "https://github.com/hojjatrad/panelconnectix/releases/download/v$ver/Connectix-Android-Universal.apk",
+            };
+          }
         }
       } catch (_) {}
     }
 
-    // 2. Direct Fallback: GitHub (always accessible from Iran)
     try {
       final ghResp = await http.get(
         Uri.parse("https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/app_release.json"),
@@ -516,6 +572,10 @@ class ApiService {
             'changelog': (ghData['changelog'] ?? '• نگارش جدید سامانه منتشر شد.').toString(),
             'download_url': apkArm64,
             'fallback_url': apkUniversal,
+            'panel_url': "${baseUrls[0]}/Connectix-ARM64-v8a.apk",
+            'panel_fallback_url': "${baseUrls[0]}/Connectix-Universal.apk",
+            'github_url': apkArm64,
+            'github_fallback_url': apkUniversal,
           };
         }
       }
@@ -698,28 +758,59 @@ class ApiService {
         }
       } catch (_) {}
 
-      final primaryOk = await attemptDownload(downloadUrl, isFallback: false);
-      if (primaryOk) return;
+      // Build list of URLs to try: primary, panel, fallback, github etc
+      // This fixes "some phones update, some not" — GitHub filtered for some ISPs, panel host works for all
+      List<String> urlsToTry = [];
+      urlsToTry.add(downloadUrl);
 
       try {
-        String fallbackUrl = '';
-        try {
-          final updateData = await checkAppUpdate();
-          fallbackUrl = (updateData?['fallback_url'] ?? '').toString();
-        } catch (_) {}
-        if (fallbackUrl.isEmpty || fallbackUrl == downloadUrl) {
-          fallbackUrl = downloadUrl.replaceAll('ARM64', 'Universal').replaceAll('arm64-v8a', 'Universal');
+        final updateData = await checkAppUpdate();
+        if (updateData != null) {
+          final candidates = [
+            updateData['download_url']?.toString() ?? '',
+            updateData['panel_url']?.toString() ?? '',
+            updateData['fallback_url']?.toString() ?? '',
+            updateData['panel_fallback_url']?.toString() ?? '',
+            updateData['github_url']?.toString() ?? '',
+            updateData['github_fallback_url']?.toString() ?? '',
+            updateData['universal_url']?.toString() ?? '',
+          ];
+          for (final u in candidates) {
+            if (u.isNotEmpty && !urlsToTry.contains(u)) {
+              urlsToTry.add(u);
+            }
+          }
         }
-        if (fallbackUrl.isNotEmpty && fallbackUrl != downloadUrl) {
-          log('Retrying download with fallback: $fallbackUrl');
-          final fallbackOk = await attemptDownload(fallbackUrl, isFallback: true);
-          if (fallbackOk) return;
-        }
-      } catch (e) {
-        log('Fallback retry error: $e');
+      } catch (_) {}
+
+      // Add hardcoded panel mirrors as ultimate fallback (works inside Iran for all operators)
+      for (final base in baseUrls) {
+        final panelArm64 = "$base/Connectix-ARM64-v8a.apk";
+        final panelUni = "$base/Connectix-Universal.apk";
+        if (!urlsToTry.contains(panelArm64)) urlsToTry.add(panelArm64);
+        if (!urlsToTry.contains(panelUni)) urlsToTry.add(panelUni);
       }
 
-      onError('فایل دانلود شده ناقص است. لطفا با اینترنت پایدارتر دوباره تلاش کنید یا از مرورگر دانلود کنید.');
+      // Add GitHub direct as last resort
+      final ghFallback = downloadUrl.replaceAll('ARM64', 'Universal').replaceAll('arm64-v8a', 'Universal');
+      if (ghFallback.isNotEmpty && !urlsToTry.contains(ghFallback)) {
+        urlsToTry.add(ghFallback);
+      }
+
+      log('downloadAndInstallApk will try ${urlsToTry.length} URLs: $urlsToTry');
+
+      for (int i = 0; i < urlsToTry.length; i++) {
+        final url = urlsToTry[i];
+        if (url.isEmpty) continue;
+        final isLast = i == urlsToTry.length - 1;
+        log('Trying download ${i+1}/${urlsToTry.length}: $url');
+        final ok = await attemptDownload(url, isFallback: isLast);
+        if (ok) return;
+        // Small delay before next try
+        if (!isLast) await Future.delayed(const Duration(milliseconds: 500));
+      }
+
+      onError('دانلود از هیچ سروری موفق نبود (${urlsToTry.length} آدرس تست شد). لطفا اینترنت خود را بررسی کنید، VPN را خاموش کنید و دوباره تلاش کنید. اگر مشکل ادامه داشت از مرورگر دانلود کنید: ${urlsToTry.first}');
     } catch (e) {
       log('downloadAndInstallApk top-level error: $e');
       onError('خطا در دانلود یا نصب: $e');

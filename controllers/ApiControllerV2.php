@@ -872,13 +872,39 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
         $repo = Updater::getRepo();
         $downloadUrl = trim(Setting::get('app_download_url', ''));
         $universalUrl= trim(Setting::get('app_universal_url', ''));
-        // v4.0 FIX: Don't force v{latest} in URL — allow v3.6.1 fallback until v4.0.0 APKs built by Actions
-        // Old logic overwrote working v3.6.1 URLs with 404 v4.0.0 URLs, causing Android update not showing
-        if ($downloadUrl === '') {
-            $downloadUrl = "https://github.com/{$repo}/releases/download/v{$latest}/Connectix-Android-ARM64.apk";
+
+        // FIX 2026-10-02: Prefer PANEL-HOST mirrored APKs over GitHub
+        // GitHub is filtered in Iran for some ISPs (MCI etc) — causes "some phones update, some not"
+        // Panel host https://vpbotn.ir/contax/Connectix-*.apk works for ALL Iranian operators
+        $panelBase = Helpers::baseUrl(); // e.g. https://vpbotn.ir/contax
+        $mirroredArm64 = __DIR__ . '/../Connectix-ARM64-v8a.apk';
+        $mirroredUniversal = __DIR__ . '/../Connectix-Universal.apk';
+        $hasMirroredArm64 = is_file($mirroredArm64) && filesize($mirroredArm64) > 1024*1024;
+        $hasMirroredUniversal = is_file($mirroredUniversal) && filesize($mirroredUniversal) > 1024*1024;
+
+        // If setting is empty OR points to GitHub but we have mirrored file, use mirrored
+        $isGithubUrl = fn($u) => str_contains($u, 'github.com') || str_contains($u, 'githubusercontent.com');
+        if ($downloadUrl === '' || ($isGithubUrl($downloadUrl) && $hasMirroredArm64)) {
+            if ($hasMirroredArm64) {
+                $downloadUrl = $panelBase . '/Connectix-ARM64-v8a.apk';
+            } elseif ($downloadUrl === '') {
+                $downloadUrl = "https://github.com/{$repo}/releases/download/v{$latest}/Connectix-Android-ARM64.apk";
+            }
         }
-        if ($universalUrl === '') {
-            $universalUrl = "https://github.com/{$repo}/releases/download/v{$latest}/Connectix-Android-Universal.apk";
+        if ($universalUrl === '' || ($isGithubUrl($universalUrl) && $hasMirroredUniversal)) {
+            if ($hasMirroredUniversal) {
+                $universalUrl = $panelBase . '/Connectix-Universal.apk';
+            } elseif ($universalUrl === '') {
+                $universalUrl = "https://github.com/{$repo}/releases/download/v{$latest}/Connectix-Android-Universal.apk";
+            }
+        }
+        // Extra safety: if mirrored files exist but settings still GitHub, override to panel host
+        // This fixes the "some phones" issue — panel host is unfiltered inside Iran
+        if ($hasMirroredArm64 && $isGithubUrl($downloadUrl)) {
+            $downloadUrl = $panelBase . '/Connectix-ARM64-v8a.apk';
+        }
+        if ($hasMirroredUniversal && $isGithubUrl($universalUrl)) {
+            $universalUrl = $panelBase . '/Connectix-Universal.apk';
         }
         $title       = trim(Setting::get('app_update_title', '')) ?: "Connectix v{$latest}";
         $changelog   = trim(Setting::get('app_update_changelog', '')) ?: "• نگارش جدید سامانه منتشر شد.";

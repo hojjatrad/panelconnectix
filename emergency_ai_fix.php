@@ -139,80 +139,105 @@ echo "</ul>";
 echo "<br>Checking tables now:<br>";
 
 
-// v4.6 FIX: Also update app version to 4.0.2 (Fix connection button + infinite loop) + update ApiControllerV2 via jsDelivr
+// v4.7 FIX: Also update app version to 4.0.3 (Fix some-phones-update-fail - Iran filtering)
 try {
     require_once __DIR__ . '/core/Setting.php';
-    $version = '4.0.2';
+    require_once __DIR__ . '/core/Helpers.php';
+    $version = '4.0.3';
     $repo = 'hojjatrad/panelconnectix';
-    // Check v4.0.2 -> v4.0.1 -> v4.0.0 -> v3.6.1
+    $v403Arm64 = "https://github.com/$repo/releases/download/v4.0.3/Connectix-Android-ARM64.apk";
     $v402Arm64 = "https://github.com/$repo/releases/download/v4.0.2/Connectix-Android-ARM64.apk";
     $v401Arm64 = "https://github.com/$repo/releases/download/v4.0.1/Connectix-Android-ARM64.apk";
-    $v400Arm64 = "https://github.com/$repo/releases/download/v4.0.0/Connectix-Android-ARM64.apk";
     $v361Arm64 = "https://github.com/$repo/releases/download/v3.6.1/Connectix-Android-ARM64.apk";
+    $v403Universal = "https://github.com/$repo/releases/download/v4.0.3/Connectix-Android-Universal.apk";
     $v402Universal = "https://github.com/$repo/releases/download/v4.0.2/Connectix-Android-Universal.apk";
     $v401Universal = "https://github.com/$repo/releases/download/v4.0.1/Connectix-Android-Universal.apk";
-    $v400Universal = "https://github.com/$repo/releases/download/v4.0.0/Connectix-Android-Universal.apk";
     $v361Universal = "https://github.com/$repo/releases/download/v3.6.1/Connectix-Android-Universal.apk";
+    $v403Win = "https://github.com/$repo/releases/download/v4.0.3/Connectix-Windows-x64.zip";
     $v402Win = "https://github.com/$repo/releases/download/v4.0.2/Connectix-Windows-x64.zip";
     $v401Win = "https://github.com/$repo/releases/download/v4.0.1/Connectix-Windows-x64.zip";
-    $v400Win = "https://github.com/$repo/releases/download/v4.0.0/Connectix-Windows-x64.zip";
     $v361Win = "https://github.com/$repo/releases/download/v3.6.1/Connectix-Windows-x64.zip";
-    // Simple existence check via HEAD
-    $check = function($url) {
-        $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_NOBODY, true);
-        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 5);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_exec($ch);
-        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-        return $code >= 200 && $code < 400;
-    };
-    $apkArm64 = $v361Arm64;
-    $apkUniversal = $v361Universal;
-    $winUrl = $v361Win;
-    if ($check($v402Arm64)) {
-        $apkArm64 = $v402Arm64; $apkUniversal = $v402Universal; $winUrl = $v402Win;
-        $version = '4.0.2';
-    } elseif ($check($v401Arm64)) {
-        $apkArm64 = $v401Arm64; $apkUniversal = $v401Universal; $winUrl = $v401Win;
-        $version = '4.0.1';
-    } elseif ($check($v400Arm64)) {
-        $apkArm64 = $v400Arm64; $apkUniversal = $v400Universal; $winUrl = $v400Win;
+
+    $panelBase = Helpers::baseUrl();
+    $localArm64 = __DIR__ . '/Connectix-ARM64-v8a.apk';
+    $localUni = __DIR__ . '/Connectix-Universal.apk';
+    $hasLocalArm64 = is_file($localArm64) && filesize($localArm64) > 1024*1024;
+    $hasLocalUni = is_file($localUni) && filesize($localUni) > 1024*1024;
+
+    if ($hasLocalArm64) {
+        $apkArm64 = $panelBase . '/Connectix-ARM64-v8a.apk';
+        $apkUniversal = $hasLocalUni ? $panelBase . '/Connectix-Universal.apk' : $v403Universal;
+        $winUrl = $v403Win;
+    } else {
+        $check = function($url) {
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_NOBODY, true);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_exec($ch);
+            $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            return $code >= 200 && $code < 400;
+        };
+        $apkArm64 = $v361Arm64;
+        $apkUniversal = $v361Universal;
+        $winUrl = $v361Win;
+        if ($check($v403Arm64)) {
+            $apkArm64 = $v403Arm64; $apkUniversal = $v403Universal; $winUrl = $v403Win;
+            $version = '4.0.3';
+        } elseif ($check($v402Arm64)) {
+            $apkArm64 = $v402Arm64; $apkUniversal = $v402Universal; $winUrl = $v402Win;
+            $version = '4.0.2';
+        } elseif ($check($v401Arm64)) {
+            $apkArm64 = $v401Arm64; $apkUniversal = $v401Universal; $winUrl = $v401Win;
+            $version = '4.0.1';
+        }
+        if ($hasLocalArm64) $apkArm64 = $panelBase . '/Connectix-ARM64-v8a.apk';
+        if ($hasLocalUni) $apkUniversal = $panelBase . '/Connectix-Universal.apk';
     }
+
     Setting::set('app_latest_version', $version);
     Setting::set('app_download_url', $apkArm64);
     Setting::set('app_universal_url', $apkUniversal);
-    $title = $version === '4.0.2' ? "Connectix VPN 4.0.2 - Fix Connection Button" : "Connectix VPN $version - Fix";
-    $changelog = $version === '4.0.2' ? "🚀 نسخه 4.0.2 - رفع قطعی مشکل اتصال
+    $title = "Connectix VPN $version - Fix Some Phones Update Fail";
+    $changelog = "🚀 نسخه $version - رفع مشکل بروزرسانی در بعضی گوشی‌ها
 
-✅ رفع مشکل دکمه اتصال
-✅ علت: لیست 130 تایی bypass
-✅ فیکس: split tunneling پیش‌فرض غیرفعال، حداکثر 12 اپ
-✅ timeout 15 ثانیه + تلاش خودکار
-✅ رفع حلقه بی‌نهایت آپدیت" : "🚀 نسخه $version - رفع باگ نصب
+✅ علت: گیت‌هاب در بعضی اپراتورها فیلتر است
+✅ فیکس: دانلود از هاست پنل + 6 URL fallback
+✅ فیکس AppApkMirror: حذف ?cb= و token
+✅ نصب‌کننده 3 مرحله‌ای برای همه برندها
+✅ رفع مشکل شیائومی، سامسونگ، اندروید 14+
+✅ رفع قطعی اتصال و حلقه آپدیت";
+    if ($version === '4.0.3') {
+        $changelog = "🚀 نسخه 4.0.3 - رفع مشکل بروزرسانی در بعضی گوشی‌ها
 
-✅ رفع مشکل دکمه نصب
-✅ نصب مجدد همین نسخه
-✅ رفع حلقه بی‌نهایت";
+✅ علت اصلی: گیت‌هاب در بعضی اپراتورها (همراه اول/ایرانسل) فیلتر است
+✅ فیکس: دانلود از هاست پنل (vpbotn.ir) که برای همه اپراتورها کار می‌کند
+✅ فیکس AppApkMirror: حذف ?cb= و token header که باعث شکست دانلود از گیت‌هاب بود
+✅ اپ اندروید: تلاش 6+ URL (پنل اصلی، بکاپ، گیت‌هاب) برای دانلود
+✅ نصب‌کننده بهبود یافته: 3 مرحله‌ای (INSTALL_PACKAGE + VIEW + Chooser) برای همه برندها
+✅ رفع مشکل نصب روی شیائومی MIUI، سامسونگ OneUI، اندروید 14+
+✅ رفع قطعی مشکل اتصال و حلقه بی‌نهایت آپدیت از نسخه‌های قبل";
+    }
     Setting::set('app_update_title', $title);
     Setting::set('app_update_changelog', $changelog);
     Setting::set('app_update_enabled', '1');
     Setting::set('app_update_source', 'admin');
     Setting::set('app_update_published_at', date('Y-m-d H:i:s'));
-    Setting::set('app_update_auto_code', '42');
+    Setting::set('app_update_auto_code', '43');
     Setting::set('app_latest_version_windows', $version);
     Setting::set('app_download_url_windows', $winUrl);
     Setting::set('app_latest_version_ios', $version);
     Setting::set('app_release_last_check', '0');
     Setting::set('app_release_status_cache', '{}');
     $pdo->exec("DELETE FROM system_settings WHERE setting_key LIKE 'app_configs_cache_%'");
-    echo "<br><h3 style='color:green'>✅ App version updated to $version (Android update fix) source=admin working APKs</h3>";
-    echo "app_latest_version = $version<br>";
+    echo "<br><h3 style='color:green'>✅ App version updated to $version (Some-phones fix) source=admin panel_host=".($hasLocalArm64?'yes':'no')."</h3>";
+    echo "app_latest_version = $version<br>download_url = $apkArm64<br>";
 } catch (Throwable $e) {
     echo "<br>App version update error: ".$e->getMessage()."<br>";
 }
+
 
 // Also try to update update_self.php + ApiControllerV2.php + fix_361_now.php to latest via jsDelivr to bypass CDN cache
 try {
@@ -228,6 +253,11 @@ try {
         'controllers/ApiControllerV2.php' => [
             'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/controllers/ApiControllerV2.php',
             'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/controllers/ApiControllerV2.php',
+        ],
+        'force_update_403.php' => [
+            'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/force_update_403.php',
+            'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/force_update_403.php',
+            'https://github.com/hojjatrad/panelconnectix/raw/main/force_update_403.php',
         ],
         'force_update_402.php' => [
             'https://cdn.jsdelivr.net/gh/hojjatrad/panelconnectix@main/force_update_402.php',

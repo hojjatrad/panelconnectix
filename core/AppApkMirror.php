@@ -123,44 +123,69 @@ class AppApkMirror {
                 continue;
             }
 
-            // Unique cache-buster: the release-asset URL does NOT change
-            // between builds, so the host's egress network cache can serve a
-            // stale (same-size!) copy of the old APK without a fresh key.
-            $assetUrl = $asset['browser_download_url'] . '?cb=' . (string)time() . rand(1000, 9999);
+            // FIX 2026-10-02: GitHub browser_download_url is PUBLIC and must NOT
+            // have ?cb= query param (breaks GitHub's asset handler -> returns HTML)
+            // and must NOT have Authorization token header (github.com rejects it).
+            // Correct: use clean URL, no token, follow redirect to release-assets.
+            $assetUrl = $asset['browser_download_url'];
             $ch = curl_init($assetUrl);
-            $headers = ['User-Agent: Connectix-Panel-AppApkMirror/1.0'];
-            $token = Updater::getToken();
-            if (!empty($token)) $headers[] = "Authorization: token {$token}";
+            $headers = [
+                'User-Agent: Connectix-Panel-AppApkMirror/1.0',
+                'Accept: application/octet-stream',
+            ];
             curl_setopt_array($ch, [
                 CURLOPT_FILE => $fp,
                 CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_MAXREDIRS => 10,
                 CURLOPT_TIMEOUT => 900,
                 CURLOPT_CONNECTTIMEOUT => 30,
                 CURLOPT_SSL_VERIFYPEER => false,
                 CURLOPT_SSL_VERIFYHOST => false,
                 CURLOPT_HTTPHEADER => $headers,
+                CURLOPT_USERAGENT => 'Connectix-Panel-AppApkMirror/1.0',
             ]);
             $ok = curl_exec($ch);
             $http = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             $err = curl_error($ch);
+            $finalUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
             curl_close($ch);
             fclose($fp);
 
-            if ($ok === false || $http !== 200 || !is_file($tmp) || filesize($tmp) < 1024) {
+            // Debug: if file is tiny (<10KB) it's HTML error page, not APK
+            $tmpSize = is_file($tmp) ? filesize($tmp) : 0;
+            if ($ok === false || $http !== 200 || !is_file($tmp) || $tmpSize < 1024) {
                 @unlink($tmp);
-                $res['files'][$name] = 'download_failed(' . ($http ?: 'curl:' . $err) . ')';
+                $res['files'][$name] = 'download_failed(' . ($http ?: 'curl:' . $err) . ') size=' . $tmpSize . ' url=' . substr($finalUrl ?? $assetUrl, 0, 80);
                 $res['ok'] = false;
                 continue;
             }
+            // If file is <1MB but expected >10MB, it's likely HTML error page
+            if ($tmpSize < 1024 * 1024 && $expectedSize > 5 * 1024 * 1024) {
+                $content = @file_get_contents($tmp, false, null, 0, 500);
+                if ($content && (str_contains($content, '<html') || str_contains($content, 'Not Found'))) {
+                    @unlink($tmp);
+                    $res['files'][$name] = 'download_failed(html_page_not_apk)';
+                    $res['ok'] = false;
+                    continue;
+                }
+            }
 
-            if (filesize($tmp) !== $expectedSize) {
-                // Partial/corrupt transfer — retry once
-                @unlink($tmp);
-                $retry = self::downloadOne($asset['browser_download_url'], $local, $expectedSize);
-                $res['files'][$name] = $retry ? 'downloaded' : 'size_mismatch';
-                $res['changed'] = $retry ? true : $res['changed'];
-                if (!$retry) $res['ok'] = false;
-                continue;
+            if ($expectedSize > 0 && $tmpSize !== $expectedSize) {
+                // Size mismatch — could be new build with same name but different size
+                // Accept if >1MB and looks like APK (ZIP header), otherwise retry
+                $fh = @fopen($tmp, 'rb');
+                $header = $fh ? @fread($fh, 4) : '';
+                if ($fh) @fclose($fh);
+                $isApk = $header && $header[0] === "\x50" && $header[1] === "\x4B";
+                if (!$isApk || $tmpSize < 1024 * 1024) {
+                    @unlink($tmp);
+                    $retry = self::downloadOne($asset['browser_download_url'], $local, $expectedSize);
+                    $res['files'][$name] = $retry ? 'downloaded' : 'size_mismatch_exp' . $expectedSize . '_got' . $tmpSize;
+                    $res['changed'] = $retry ? true : $res['changed'];
+                    if (!$retry) $res['ok'] = false;
+                    continue;
+                }
+                // Accept if APK header valid even if size differs (GitHub size may be stale)
             }
 
             if (!@rename($tmp, $local)) {
@@ -188,26 +213,42 @@ class AppApkMirror {
         $tmp = $target . '.part';
         $fp = @fopen($tmp, 'wb');
         if (!$fp) return false;
-        $url .= (strpos($url, '?') === false ? '?' : '&') . 'cb=' . (string)time() . rand(1000, 9999);
+        // FIX: no ?cb= param, no token header for public browser_download_url
         $ch = curl_init($url);
-        $headers = ['User-Agent: Connectix-Panel-AppApkMirror/1.0'];
-        $token = Updater::getToken();
-        if (!empty($token)) $headers[] = "Authorization: token {$token}";
+        $headers = [
+            'User-Agent: Connectix-Panel-AppApkMirror/1.0',
+            'Accept: application/octet-stream',
+        ];
         curl_setopt_array($ch, [
             CURLOPT_FILE => $fp,
             CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_MAXREDIRS => 10,
             CURLOPT_TIMEOUT => 900,
+            CURLOPT_CONNECTTIMEOUT => 30,
             CURLOPT_SSL_VERIFYPEER => false,
             CURLOPT_SSL_VERIFYHOST => false,
             CURLOPT_HTTPHEADER => $headers,
+            CURLOPT_USERAGENT => 'Connectix-Panel-AppApkMirror/1.0',
         ]);
         $ok = curl_exec($ch);
         $http = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
         fclose($fp);
-        if ($ok === false || $http !== 200 || filesize($tmp) !== $expectedSize) {
+        $sz = is_file($tmp) ? filesize($tmp) : 0;
+        if ($ok === false || $http !== 200 || $sz < 1024 * 1024) {
             @unlink($tmp);
             return false;
+        }
+        // If expectedSize given, check header but accept if APK valid
+        if ($expectedSize > 0 && $sz !== $expectedSize) {
+            $fh = @fopen($tmp, 'rb');
+            $header = $fh ? @fread($fh, 4) : '';
+            if ($fh) @fclose($fh);
+            $isApk = $header && strlen($header) >= 2 && $header[0] === "\x50" && $header[1] === "\x4B";
+            if (!$isApk) {
+                @unlink($tmp);
+                return false;
+            }
         }
         @rename($tmp, $target);
         @chmod($target, 0644);
