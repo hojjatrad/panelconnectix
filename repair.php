@@ -167,7 +167,69 @@ if (isset($_GET['test_api_configs'])) {
     exit;
 }
 
-// Direct Zero-Dependency One-Click Restoration Hook
+// Direct Zero-Dependency One-Click Restoration Hook - v6.8.4 with disk cleanup and small file restore
+if (isset($_GET['free_disk'])) {
+    header('Content-Type: text/html; charset=utf-8');
+    echo "<h2>🧹 Freeing disk...</h2>";
+    $freed=0;
+    foreach ([sys_get_temp_dir(), "/tmp"] as $d) {
+        if(!is_dir($d)) continue;
+        foreach (glob($d."/cx_*") as $f) { if(is_file($f)) { $s=@filesize($f); if(@unlink($f)) $freed+=$s; } }
+        foreach (glob($d."/connectix_*") as $f) { if(is_file($f)) { $s=@filesize($f); if(@unlink($f)) $freed+=$s; } }
+        foreach (glob($d."/repair_*") as $f) { if(is_file($f)) { $s=@filesize($f); if(@unlink($f)) $freed+=$s; } }
+    }
+    foreach (glob(__DIR__."/*.old.*") as $f) { $s=@filesize($f); if(@unlink($f)) $freed+=$s; }
+    foreach (glob(__DIR__."/*.bak_*") as $f) { $s=@filesize($f); if(@unlink($f)) $freed+=$s; }
+    foreach (glob(__DIR__."/index_backup_*.php") as $f) { $s=@filesize($f); if(@unlink($f)) $freed+=$s; }
+    foreach (glob(__DIR__."/__canary_*.txt") as $f) { $s=@filesize($f); if(@unlink($f)) $freed+=$s; }
+    $dir=__DIR__."/.rollback_backup_20261002";
+    if(is_dir($dir)) {
+        $it=new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST);
+        foreach($it as $file) { if($file->isFile()) { $s=$file->getSize(); if(@unlink($file->getPathname())) $freed+=$s; } else @rmdir($file->getPathname()); }
+        @rmdir($dir);
+    }
+    $forceFiles=glob(__DIR__."/force_update_*.php");
+    if(count($forceFiles)>2) {
+        usort($forceFiles, function($a,$b){return filemtime($b)-filemtime($a);});
+        foreach(array_slice($forceFiles,2) as $f) { $s=@filesize($f); if(@unlink($f)) $freed+=$s; }
+    }
+    echo "Freed: ".round($freed/1024/1024,2)." MB, Free: ".round(disk_free_space(__DIR__)/1024/1024,2)." MB";
+    exit;
+}
+
+if (isset($_GET['restore_index'])) {
+    header('Content-Type: text/html; charset=utf-8');
+    echo "<h2>🔧 Restoring index.php and .htaccess...</h2>";
+    $files = [
+        "https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/index.php" => __DIR__ . "/index.php",
+        "https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/.htaccess" => __DIR__ . "/.htaccess",
+        "https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/.pre_reset.php" => __DIR__ . "/.pre_reset.php",
+        "https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/core/Updater.php" => __DIR__ . "/core/Updater.php",
+    ];
+    foreach ($files as $url => $dest) {
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        $data = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        if ($code == 200 && strlen($data) > 100) {
+            $dir = dirname($dest);
+            if (!is_dir($dir)) @mkdir($dir, 0755, true);
+            if (file_exists($dest)) @copy($dest, $dest . ".bak_" . date("Ymd_His"));
+            file_put_contents($dest, $data);
+            echo "✅ " . basename($dest) . " restored (" . round(strlen($data)/1024,1) . "KB)<br>";
+        } else {
+            echo "❌ Failed to fetch " . basename($dest) . " (HTTP $code)<br>";
+        }
+    }
+    if (function_exists('opcache_reset')) @opcache_reset();
+    echo "<p><a href='login'>رفتن به لاگین</a></p>";
+    exit;
+}
+
 if (isset($_GET['update_from_git']) || (isset($_GET['restore_files']) && $_GET['restore_files'] === '1')) {
     header('Content-Type: text/html; charset=utf-8');
     echo "<!DOCTYPE html><html lang='fa' dir='rtl'><head><meta charset='UTF-8'><title>به‌روزرسانی آنی</title><style>body{background:#0b0f19;color:#fff;font-family:sans-serif;padding:30px;text-align:center;}</style></head><body><h2>🚀 در حال به‌روزرسانی آنی کدهای پنل از مخزن گیت‌هاب...</h2>";
