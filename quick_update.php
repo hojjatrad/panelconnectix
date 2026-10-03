@@ -455,18 +455,50 @@ foreach ($rii as $fileInfo) {
 
 logStep("مجموع: {$repaired} فایل تعمیر/نصب شد، {$skipped} فایل قبلاً همگام بودند.", 'success');
 
-// 5b. Auto-sync root https://vpbotn.ir/ - never manual (user request)
+// 5b. Auto-sync root - v6.8.13: Respect show_promo_at_root setting
 try {
-    $promoSrc = __DIR__ . '/promo/index.php';
-    if (file_exists($promoSrc)) {
-        require_once __DIR__ . '/core/Helpers.php';
-        $publicHtml = Helpers::getPublicHtmlPath();
-        $rootTargets = [dirname(__DIR__) . '/index.php', __DIR__ . '/../index.php', $publicHtml . '/index.php'];
-        foreach ($rootTargets as $rt) {
-            if (is_dir(dirname($rt))) { @copy($promoSrc, $rt); logStep("سینک روت: $rt", 'success'); }
+    require_once __DIR__ . '/core/Setting.php';
+    $showPromo = Setting::get('show_promo_at_root', '1');
+    if ($showPromo === '0') {
+        logStep("تنظیم: show_promo_at_root=0 → سینک تبلیغات به روت غیرفعال (پنل در روت می‌ماند)", 'info');
+    } else {
+        $promoSrc = __DIR__ . '/promo/index.php';
+        if (file_exists($promoSrc)) {
+            require_once __DIR__ . '/core/Helpers.php';
+            $publicHtml = Helpers::getPublicHtmlPath();
+            $rootTargets = [dirname(__DIR__) . '/index.php', __DIR__ . '/../index.php', $publicHtml . '/index.php'];
+            foreach ($rootTargets as $rt) {
+                if (is_dir(dirname($rt))) { 
+                    // Don't overwrite if target is panel root itself
+                    if (realpath(dirname($rt)) === realpath(__DIR__)) continue;
+                    @copy($promoSrc, $rt); 
+                    logStep("سینک روت تبلیغات: $rt", 'success'); 
+                }
+            }
         }
     }
 } catch (Throwable $e) { logStep("خطا سینک روت: ".$e->getMessage(), 'warn'); }
+
+// 5c. If user requested panel at root via ?panel_at_root=1 or setting=0, restore panel
+try {
+    $forcePanel = isset($_GET['panel_at_root']) && $_GET['panel_at_root'] == '1';
+    $settingPanel = Setting::get('show_promo_at_root', '1') === '0';
+    if ($forcePanel || $settingPanel) {
+        require_once __DIR__ . '/core/Helpers.php';
+        $publicHtml = Helpers::getPublicHtmlPath();
+        $panelIndex = __DIR__ . '/index.php';
+        $rootTargets = [dirname(__DIR__) . '/index.php', __DIR__ . '/../index.php', $publicHtml . '/index.php'];
+        foreach ($rootTargets as $rt) {
+            if (!is_dir(dirname($rt))) continue;
+            if (realpath(dirname($rt)) === realpath(__DIR__)) continue;
+            if (is_file($panelIndex)) {
+                if (@copy($panelIndex, $rt)) {
+                    logStep("✅ پنل در روت بازیابی شد: $rt", 'success');
+                }
+            }
+        }
+    }
+} catch (Throwable $e) { logStep("خطا بازیابی پنل در روت: ".$e->getMessage(), 'warn'); }
 
 // 6. Purge stale legacy diagnostic / mock files from the live host
 $stalePurge = ['diag_fresh_99.php', 'diag_step_100.php', 'find_mock.php', 'fix_now.php', 'test_class.php'];
