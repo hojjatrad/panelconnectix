@@ -597,6 +597,30 @@ class Database {
                     UNIQUE(report_date, server_id, reseller_id)
                 )");
             } catch (Throwable $e) {}
+            // v7.0 ULTRA: Reseller loyalty points + onboarding
+            try {
+                $pdo->exec("CREATE TABLE IF NOT EXISTS reseller_points (
+                    id $autoInc,
+                    reseller_id INT NOT NULL,
+                    points INT DEFAULT 0,
+                    level VARCHAR(32) DEFAULT 'bronze',
+                    total_sales BIGINT DEFAULT 0,
+                    total_clients INT DEFAULT 0,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(reseller_id)
+                )");
+            } catch (Throwable $e) {}
+            try {
+                $pdo->exec("CREATE TABLE IF NOT EXISTS onboarding_progress (
+                    id $autoInc,
+                    user_id INT NOT NULL,
+                    step INT DEFAULT 0,
+                    completed TINYINT(1) DEFAULT 0,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(user_id)
+                )");
+            } catch (Throwable $e) {}
 
 
             $planCols = [

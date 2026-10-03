@@ -105,6 +105,42 @@ class DashboardController {
             }
         }
 
+        // 7b. ULTRA v7.0: Server health live + queue + domains + financial
+        $serverHealth = [];
+        $syncQueueRecent = [];
+        $sublinkDomains = [];
+        $expiringSoon = [];
+        $financialMonthly = [];
+        try {
+            // Server health with uptime
+            require_once __DIR__ . '/../core/ServerMonitor.php';
+            $allServers = $pdo->query("SELECT * FROM server_nodes WHERE is_active=1 ORDER BY health_status DESC, latency_ms ASC LIMIT 8")->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($allServers as $srv) {
+                $st = [];
+                try { $st = \ServerMonitor::getUptimeStats((int)$srv['id'], 24); } catch (Throwable $e) { $st = ['uptime_percent'=>0,'avg_latency'=>0]; }
+                $serverHealth[] = array_merge($srv, $st);
+            }
+        } catch (Throwable $e) { $serverHealth = $activeNodes; }
+
+        try {
+            require_once __DIR__ . '/../core/SyncQueue.php';
+            $syncQueueRecent = \SyncQueue::listRecent(5);
+        } catch (Throwable $e) {}
+
+        try {
+            require_once __DIR__ . '/../core/SublinkRotator.php';
+            $sublinkDomains = \SublinkRotator::getActiveDomains();
+        } catch (Throwable $e) {}
+
+        try {
+            $expiringSoon = $pdo->query("SELECT c.username, c.expire_at, p.title as plan_title FROM clients c LEFT JOIN plans p ON p.id=c.plan_id WHERE $clientWhere AND c.status='active' AND c.expire_at IS NOT NULL AND c.expire_at <= DATE_ADD(NOW(), INTERVAL 3 DAY) ORDER BY c.expire_at ASC LIMIT 6")->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Throwable $e) {}
+
+        try {
+            // Monthly financial for chart (real data from transactions)
+            $financialMonthly = $pdo->query("SELECT DATE_FORMAT(created_at, '%Y-%m') as ym, SUM(CASE WHEN amount>0 THEN amount ELSE 0 END) as income, SUM(CASE WHEN amount<0 THEN ABS(amount) ELSE 0 END) as spent FROM transactions WHERE $transWhere AND created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH) GROUP BY ym ORDER BY ym ASC")->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Throwable $e) { $financialMonthly = []; }
+
         // 8. Net Profit & Sales Analytics
         $totalIncome = (int)$pdo->query("SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE amount > 0 AND $transWhere")->fetchColumn();
         $netProfit = max(0, (int)round($totalSpent * 0.45)); // Estimated profit margin

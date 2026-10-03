@@ -744,6 +744,13 @@ $router->post('switch_root', function() { require __DIR__ . '/switch_root.php'; 
 $router->get('settings/switch_root', function() { require __DIR__ . '/switch_root.php'; });
 
 // v6.8.15: Bank auto-verification
+// v7.0 ULTRA: Onboarding Wizard + Financial Reports PRO
+$router->get('onboarding', [OnboardingController::class, 'index']);
+$router->post('onboarding/complete', [OnboardingController::class, 'complete']);
+$router->post('onboarding/skip', [OnboardingController::class, 'skip']);
+// v7.0 ULTRA: Financial Reports PRO
+$router->get('financial', [FinancialController::class, 'index']);
+$router->get('financial/export', [FinancialController::class, 'export']);
 $router->get('settings/bank-verification', [BankVerificationController::class, 'index']);
 $router->post('settings/bank-verification/save', [BankVerificationController::class, 'save']);
 $router->post('settings/bank-verification/test-sms', [BankVerificationController::class, 'testSms']);

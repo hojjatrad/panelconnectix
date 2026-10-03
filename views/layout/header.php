@@ -99,6 +99,10 @@ if (!function_exists('isActiveRoute')) {
     <?php else: ?>
     <style>@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap');</style>
     <?php endif; ?>
+    <link rel="manifest" href="<?= $base ?>/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Connectix ULTRA">
+    <link rel="apple-touch-icon" href="<?= $base ?>/assets/img/icon-192.png">
     <style>
         * { font-family: 'Vazirmatn', sans-serif; }
         ::-webkit-scrollbar { width: 5px; height: 5px; }
@@ -365,6 +369,11 @@ if (!function_exists('isActiveRoute')) {
                         <i class="fa-solid fa-credit-card w-4 text-center text-emerald-400"></i>
                         <span>کیف پول و تراکنش‌ها</span>
                     </a>
+                    <a href="<?= Helpers::url('financial') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('financial', $currentUri) ? 'bg-emerald-600/15 text-emerald-300 font-bold border-r-2 border-emerald-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
+                        <i class="fa-solid fa-chart-pie w-4 text-center text-violet-400"></i>
+                        <span>گزارش مالی پیشرفته</span>
+                        <span class="mr-auto text-[9px] bg-violet-500/20 text-violet-300 px-1.5 py-0.5 rounded-full border border-violet-500/30">ULTRA</span>
+                    </a>
                     <?php if (Auth::isAdmin()): ?>
                     <a href="<?= Helpers::url('settings/bank-verification') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('bank-verification', $currentUri) ? 'bg-emerald-600/15 text-emerald-300 font-bold border-r-2 border-emerald-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
                         <i class="fa-solid fa-building-columns w-4 text-center text-emerald-400"></i>
@@ -474,22 +483,67 @@ if (!function_exists('isActiveRoute')) {
 
     <!-- Main Content Area -->
     <main class="flex-1 flex flex-col min-w-0 overflow-y-auto">
-        <!-- Top Navbar -->
-        <header class="h-14 bg-slate-900/60 border-b border-slate-800/80 flex items-center justify-between px-6 shrink-0 backdrop-blur-md">
+        <!-- Top Navbar ULTRA v7.0 -->
+        <header class="h-14 bg-slate-900/70 border-b border-slate-800/80 flex items-center justify-between px-6 shrink-0 backdrop-blur-xl sticky top-0 z-30">
             <div class="flex items-center gap-3">
-                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                     <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                    سامانه هوشمند متصل و برخط
+                    سامانه هوشمند ULTRA v7.0
                 </span>
+                <div class="hidden md:flex items-center gap-2 text-[11px] text-slate-500">
+                    <span class="w-1 h-1 bg-slate-600 rounded-full"></span>
+                    <span id="liveClock" class="font-mono">--:--</span>
+                </div>
             </div>
 
-            <div class="flex items-center gap-3">
-                <a href="<?= Helpers::url('clients/create') ?>" class="px-3.5 py-1.5 text-xs font-semibold rounded-lg <?= $t['primary'] ?> <?= $t['hover'] ?> text-white transition-all shadow-md flex items-center gap-1.5">
+            <div class="flex items-center gap-2.5">
+                <!-- Search Quick -->
+                <button onclick="document.getElementById('quickSearchModal').classList.remove('hidden')" class="w-9 h-9 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl flex items-center justify-center text-slate-400 hover:text-white transition" title="جستجوی سریع (Ctrl+K)">
+                    <i class="fa-solid fa-magnifying-glass text-xs"></i>
+                </button>
+                <!-- Notifications Bell -->
+                <a href="<?= Helpers::url('notifications') ?>" class="relative w-9 h-9 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl flex items-center justify-center text-slate-400 hover:text-white transition" title="اعلان‌ها">
+                    <i class="fa-solid fa-bell text-xs"></i>
+                    <?php if (($headerOpenTickets ?? 0) + ($headerPendingApps ?? 0) > 0): ?>
+                    <span class="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-slate-900"><?= ($headerOpenTickets ?? 0) + ($headerPendingApps ?? 0) ?></span>
+                    <?php endif; ?>
+                </a>
+                <!-- Monitoring LIVE -->
+                <a href="<?= Helpers::url('monitoring') ?>" class="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-emerald-950/30 hover:bg-emerald-900/40 text-emerald-300 border border-emerald-800/30 rounded-xl text-[11px] font-bold transition">
+                    <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span>
+                    LIVE
+                </a>
+                <a href="<?= Helpers::url('clients/create') ?>" class="px-4 py-2 text-xs font-black rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white shadow-lg shadow-violet-900/20 flex items-center gap-1.5 transition-all">
                     <i class="fa-solid fa-plus text-xs"></i>
                     <span>کاربر جدید</span>
                 </a>
             </div>
         </header>
+
+        <!-- Quick Search Modal ULTRA -->
+        <div id="quickSearchModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[100] flex items-start justify-center pt-[20vh] p-4" onclick="if(event.target===this) this.classList.add('hidden')">
+            <div class="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
+                <div class="p-4 border-b border-slate-800 flex items-center gap-3">
+                    <i class="fa-solid fa-magnifying-glass text-slate-500"></i>
+                    <input type="text" id="quickSearchInput" placeholder="جستجوی کلاینت، سرور، نماینده... (نام کاربری)" class="flex-1 bg-transparent text-white text-sm outline-none placeholder:text-slate-500" autofocus onkeyup="quickSearch(this.value)">
+                    <button onclick="document.getElementById('quickSearchModal').classList.add('hidden')" class="w-7 h-7 bg-slate-800 rounded-lg flex items-center justify-center text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xs"></i></button>
+                </div>
+                <div id="quickSearchResults" class="max-h-80 overflow-y-auto p-2 text-xs text-slate-400 text-center py-8">برای جستجو تایپ کنید...</div>
+            </div>
+        </div>
+        <script>
+        // Live clock
+        setInterval(()=>{ const el=document.getElementById('liveClock'); if(el){ const now=new Date(); el.textContent=now.toLocaleTimeString('fa-IR',{hour:'2-digit',minute:'2-digit'}); } },1000);
+        // Ctrl+K quick search
+        document.addEventListener('keydown', (e)=>{ if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='k'){ e.preventDefault(); document.getElementById('quickSearchModal').classList.remove('hidden'); document.getElementById('quickSearchInput').focus(); } if(e.key==='Escape'){ document.getElementById('quickSearchModal').classList.add('hidden'); } });
+        function quickSearch(q){
+            if(q.length<2){ document.getElementById('quickSearchResults').innerHTML='<div class="py-8 text-slate-500">حداقل 2 حرف...</div>'; return; }
+            document.getElementById('quickSearchResults').innerHTML='<div class="py-4"><i class="fa-solid fa-spinner fa-spin"></i> جستجو...</div>';
+            fetch('<?= Helpers::url('clients') ?>?search='+encodeURIComponent(q)+'&ajax=1').then(r=>r.text()).then(html=>{
+                document.getElementById('quickSearchResults').innerHTML='<div class="p-3 bg-slate-800/50 rounded-xl"><a href="<?= Helpers::url('clients') ?>?search='+encodeURIComponent(q)+'" class="text-violet-400 hover:text-violet-300 font-bold">🔍 مشاهده نتایج کامل برای "'+q+'" در صفحه کلاینت‌ها →</a></div>';
+            }).catch(()=>{ document.getElementById('quickSearchResults').innerHTML='<div class="py-4 text-rose-400">خطا در جستجو</div>'; });
+        }
+        </script>
 
         <!-- Flash Messages Alert -->
         <?php $flash = Helpers::getFlash(); if ($flash): ?>
@@ -573,6 +627,11 @@ if (!function_exists('isActiveRoute')) {
             if (chevron) chevron.classList.add('rotated');
             localStorage.setItem('menu_' + sectionId, 'closed');
         }
+    }
+
+    // PWA Service Worker registration v7.0 ULTRA
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('<?= $base ?>/sw.js').then(()=>console.log('PWA SW registered')).catch(()=>{});
     }
 
     // Initialize state on page load
