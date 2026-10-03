@@ -1243,10 +1243,20 @@ class TelegramBotController {
         $finalPrice = (int)$plan['display_price'];
         $planServerId = !empty($plan['server_id']) ? (int)$plan['server_id'] : null;
 
+        // v6.8.15: Generate unique amount if enabled
+        $uniqueAmount = null;
+        try {
+            if (file_exists(__DIR__ . '/../core/BankVerification.php')) {
+                require_once __DIR__ . '/../core/BankVerification.php';
+                if (Setting::get('auto_verify_enabled','1')==='1' && Setting::get('verify_method_unique_amount','1')==='1') {
+                    $uniqueAmount = BankVerification::generateUniqueAmount($finalPrice);
+                }
+            }
+        } catch (Throwable $e) {}
         $stmtOrder = $pdo->prepare("INSERT INTO bot_orders 
-            (order_code, reseller_id, bot_token, user_tg_id, user_tg_name, user_tg_username, order_type, plan_id, server_id, client_id, amount, payment_method, payment_status) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'card', 'pending_receipt')");
-        $stmtOrder->execute([$orderCode, $resellerId, $botToken, $fromId, $userTgName, $userTgUsername, $orderType, $planId, $planServerId, $clientId, $finalPrice]);
+            (order_code, reseller_id, bot_token, user_tg_id, user_tg_name, user_tg_username, order_type, plan_id, server_id, client_id, amount, unique_amount, payment_method, payment_status) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'card', 'pending_receipt')");
+        $stmtOrder->execute([$orderCode, $resellerId, $botToken, $fromId, $userTgName, $userTgUsername, $orderType, $planId, $planServerId, $clientId, $finalPrice, $uniqueAmount]);
         $orderId = (int)$pdo->lastInsertId();
 
         self::renderOrderInvoice($pdo, $orderId, $chatId, $messageId, $botToken);

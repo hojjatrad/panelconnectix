@@ -111,6 +111,33 @@ class Database {
                 setting_value TEXT NULL
             )");
 
+            // v6.8.15: Bank auto-verification tables
+            $pdo->exec("CREATE TABLE IF NOT EXISTS bank_transactions (
+                id $autoInc,
+                amount BIGINT NOT NULL,
+                raw_sms TEXT NULL,
+                tracking_code VARCHAR(64) NULL,
+                card_last4 VARCHAR(16) NULL,
+                sender_number VARCHAR(32) NULL,
+                received_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                used_for_order_id INT NULL,
+                verified TINYINT(1) DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )");
+            // Index for fast lookup
+            try {
+                $pdo->exec("CREATE INDEX IF NOT EXISTS idx_bank_tx_amount ON bank_transactions(amount)");
+                $pdo->exec("CREATE INDEX IF NOT EXISTS idx_bank_tx_tracking ON bank_transactions(tracking_code)");
+                $pdo->exec("CREATE INDEX IF NOT EXISTS idx_bank_tx_used ON bank_transactions(used_for_order_id)");
+            } catch (Throwable $e) {}
+            try {
+                $pdo->exec("CREATE INDEX idx_bank_tx_amount ON bank_transactions(amount)");
+            } catch (Throwable $e) {}
+            try {
+                $pdo->exec("CREATE INDEX idx_bank_tx_tracking ON bank_transactions(tracking_code)");
+            } catch (Throwable $e) {}
+
+
             $pdo->exec("CREATE TABLE IF NOT EXISTS bot_orders (
                 id $autoInc,
                 order_code VARCHAR(32) UNIQUE,
@@ -392,7 +419,12 @@ class Database {
                 'reseller_id' => 'INT NULL DEFAULT 1',
                 'bot_token' => 'VARCHAR(255) NULL',
                 'coupon_code' => 'VARCHAR(64) NULL',
-                'discount_amount' => 'BIGINT DEFAULT 0'
+                'discount_amount' => 'BIGINT DEFAULT 0',
+                'unique_amount' => 'BIGINT NULL',
+                'verification_method' => 'VARCHAR(32) NULL',
+                'bank_tracking_code' => 'VARCHAR(64) NULL',
+                'verified_at' => 'DATETIME NULL',
+                'verification_data' => 'TEXT NULL'
             ];
             foreach ($orderCols as $c => $d) {
                 self::safeAddColumn($pdo, 'bot_orders', $c, $d);

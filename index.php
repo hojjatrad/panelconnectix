@@ -655,6 +655,14 @@ $router->get('switch_root', function() { require __DIR__ . '/switch_root.php'; }
 $router->post('switch_root', function() { require __DIR__ . '/switch_root.php'; });
 $router->get('settings/switch_root', function() { require __DIR__ . '/switch_root.php'; });
 
+// v6.8.15: Bank auto-verification
+$router->get('settings/bank-verification', [BankVerificationController::class, 'index']);
+$router->post('settings/bank-verification/save', [BankVerificationController::class, 'save']);
+$router->post('settings/bank-verification/test-sms', [BankVerificationController::class, 'testSms']);
+$router->post('settings/bank-verification/manual-match', [BankVerificationController::class, 'manualMatch']);
+$router->get('api/bank-webhook', [BankVerificationController::class, 'webhook']);
+$router->post('api/bank-webhook', [BankVerificationController::class, 'webhook']);
+
 // Public Subscription & Dynamic QR Landing Endpoint
 $router->get('sub/{token}', [SublinkControllerV2::class, 'show']);
 

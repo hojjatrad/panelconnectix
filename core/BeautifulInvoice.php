@@ -54,11 +54,20 @@ class BeautifulInvoice
 
         $msg .= "💰 <b>صورتحساب:</b>\n";
         $msg .= "   ├─ مبلغ نهایی: <b>{$priceFa}</b>\n";
+        // v6.8.15: Show unique amount if enabled
+        if (!empty($order['unique_amount']) && $order['unique_amount'] != $order['amount']) {
+            $uniqueFa = number_format($order['unique_amount']) . ' تومان';
+            $msg .= "   ├─ 💎 مبلغ واریزی یکتا: <b>{$uniqueFa}</b> (برای تایید خودکار)\n";
+            $msg .= "   │   └─ ⚠️ لطفاً دقیقاً همین مبلغ را واریز کنید!\n";
+        }
         $msg .= "   ├─ کد رهگیری: <code>{$order['order_code']}</code>\n";
         $msg .= "   ├─ تاریخ صدور: {$orderDate}\n";
         $msg .= "   └─ انقضای اشتراک: {$expireJalali}\n\n";
 
         $msg .= "💡 <i>برای کپی هر کد، روی آن ضربه بزنید</i>\n";
+        if (!empty($order['unique_amount'])) {
+            $msg .= "🤖 <i>با واریز مبلغ یکتا، تایید خودکار در 1 دقیقه انجام می‌شود</i>\n";
+        }
         $msg .= "👇 روش پرداخت را انتخاب کنید:";
 
         return [
