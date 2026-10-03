@@ -1,6 +1,6 @@
 <?php
 /**
- * Connectix Panel - Zero-Dependency One-Click Live Updater (Self-Healing Bootstrap) v6.8.4
+ * Connectix Panel - Zero-Dependency One-Click Live Updater (Self-Healing Bootstrap) v6.8.5
  * CRITICAL FIX: Added emergency disk cleanup at start to fix "Disk quota exceeded" error
  */
 
@@ -9,7 +9,7 @@ ini_set('display_errors', 1);
 set_time_limit(300);
 ini_set('max_execution_time', 300);
 
-// === EMERGENCY DISK CLEANUP v6.8.4 - Runs BEFORE any download to free space ===
+// === EMERGENCY DISK CLEANUP v6.8.5 - Runs BEFORE any download to free space ===
 function emergencyCleanup() {
     $freed = 0;
     $deleted = [];
@@ -161,7 +161,7 @@ function logStep($msg, $type = 'info') {
     flush();
 }
 
-logStep("شروع فرآیند به‌روزرسانی (Self-Healing Updater v6.8.4 - Disk Fix)...", 'info');
+logStep("شروع فرآیند به‌روزرسانی (Self-Healing Updater v6.8.5 - Disk Fix)...", 'info');
 logStep("پوشه نصب: " . __DIR__, 'info');
 if ($cleanupFreed > 0) {
     logStep("🧹 پاکسازی اضطراری دیسک: " . round($cleanupFreed/1024) . " KB آزاد شد (" . count($cleanupDeleted) . " فایل)", 'success');
@@ -296,9 +296,24 @@ if (!$zipData) {
     exit;
 }
 
-$tmpZip = sys_get_temp_dir() . '/cx_upd_' . uniqid() . '.zip';
-$tmpExt = sys_get_temp_dir() . '/cx_ext_' . uniqid();
-file_put_contents($tmpZip, $zipData);
+// v6.8.5 FIX: Use data/tmp as fallback if sys_get_temp_dir() fails or not writable
+$__tmpBase = sys_get_temp_dir();
+if (empty($__tmpBase) || !@is_dir($__tmpBase) || !@is_writable($__tmpBase)) {
+    $__tmpBase = __DIR__ . '/data/tmp';
+    if (!is_dir($__tmpBase)) @mkdir($__tmpBase, 0755, true);
+}
+$tmpZip = $__tmpBase . '/cx_upd_' . uniqid() . '.zip';
+$tmpExt = $__tmpBase . '/cx_ext_' . uniqid();
+@mkdir($tmpExt, 0755, true);
+if (!@file_put_contents($tmpZip, $zipData)) {
+    // Fallback to data/tmp
+    $__tmpBase = __DIR__ . '/data/tmp';
+    if (!is_dir($__tmpBase)) @mkdir($__tmpBase, 0755, true);
+    $tmpZip = $__tmpBase . '/cx_upd_' . uniqid() . '.zip';
+    $tmpExt = $__tmpBase . '/cx_ext_' . uniqid();
+    @mkdir($tmpExt, 0755, true);
+    file_put_contents($tmpZip, $zipData);
+}
 
 logStep("در حال بازگشایی و استخراج فایل‌های جدید...", 'info');
 
