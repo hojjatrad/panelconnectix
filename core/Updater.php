@@ -4,7 +4,7 @@ require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Setting.php';
 
 class Updater {
-    public const CURRENT_VERSION = '6.8.10'; // FIX JSON parse error - bulletproof updater ajax-apply display_errors=0 + ob_end_clean
+    public const CURRENT_VERSION = '6.8.11'; // FIX JSON parse error - bulletproof updater ajax-apply display_errors=0 + ob_end_clean
 
     public static function getCurrentVersion(): string {
         $dbVer = Setting::get('current_version', '');
@@ -507,9 +507,32 @@ class Updater {
             $downloadUrl = "https://codeload.github.com/{$repo}/zip/{$sha}";
         }
 
-        $tmpDir = sys_get_temp_dir() . '/connectix_update_' . time();
-        if (!is_dir($tmpDir)) {
+        // v6.8.11: Robust tmp dir with fallback to data/tmp if sys temp fails or quota
+        $tmpCandidates = [
+            __DIR__ . '/../data/tmp/connectix_update_' . time() . '_' . rand(1000,9999),
+            sys_get_temp_dir() . '/connectix_update_' . time() . '_' . rand(1000,9999),
+            '/tmp/connectix_update_' . time() . '_' . rand(1000,9999),
+        ];
+        $tmpDir = '';
+        foreach ($tmpCandidates as $cand) {
+            if (!is_dir($cand)) {
+                @mkdir($cand, 0777, true);
+            }
+            if (is_dir($cand) && is_writable($cand)) {
+                $tmpDir = $cand;
+                break;
+            }
+        }
+        if (empty($tmpDir)) {
+            // Last resort: try to create in panel root
+            $tmpDir = __DIR__ . '/../data/tmp_update_' . time();
             @mkdir($tmpDir, 0777, true);
+        }
+        if (!is_dir($tmpDir) || !is_writable($tmpDir)) {
+            while (ob_get_level() > 0) { @ob_end_clean(); }
+            @ini_set('display_errors', $prevDisplay);
+            @error_reporting($prevReporting);
+            return ['success' => false, 'error' => 'پوشه موقت قابل نوشتن نیست (Disk quota؟) - مسیرها: ' . implode(', ', $tmpCandidates) . ' - فضای آزاد: ' . round(@disk_free_space(__DIR__.'/..')/1024/1024,2) . 'MB'];
         }
 
         $zipFile = $tmpDir . '/update.zip';
@@ -560,15 +583,32 @@ class Updater {
             return ['success' => false, 'error' => "خطا در دانلود فایل پکیج از گیت‌هاب (کد HTTP: {$httpCode})"];
         }
 
-        @file_put_contents($zipFile, $zipData);
-
-        $extractPath = $tmpDir . '/extracted';
-        if (!self::extractZip($zipFile, $extractPath)) {
+        $written = @file_put_contents($zipFile, $zipData);
+        if ($written === false || $written < 1000) {
             self::deleteDirectory($tmpDir);
             while (ob_get_level() > 0) { @ob_end_clean(); }
             @ini_set('display_errors', $prevDisplay);
             @error_reporting($prevReporting);
-            return ['success' => false, 'error' => 'فایل فشرده دانلود شده قابل استخراج نیست.'];
+            return ['success' => false, 'error' => 'نوشتن فایل ZIP روی دیسک ناموفق (Disk quota؟) - نوشته شده: ' . ($written ?: '0') . ' بایت از ' . strlen($zipData) . ' بایت - فضای آزاد: ' . round(@disk_free_space(__DIR__.'/..')/1024/1024,2) . 'MB'];
+        }
+
+        $extractPath = $tmpDir . '/extracted';
+        if (!self::extractZip($zipFile, $extractPath)) {
+            $zipSize = @filesize($zipFile);
+            $freeSpace = @disk_free_space(__DIR__.'/..');
+            $firstBytes = @file_get_contents($zipFile, false, null, 0, 300);
+            $firstPreview = $firstBytes ? substr($firstBytes,0,200) : 'empty';
+            // Check if it's HTML error page
+            $isHtml = $firstBytes && (str_contains($firstBytes, '<html') || str_contains($firstBytes, '<!DOCTYPE') || str_contains($firstBytes, '<br'));
+            $detail = "سایز: " . ($zipSize ? round($zipSize/1024) . "KB" : "نامشخص") . " | فضای آزاد: " . round($freeSpace/1024/1024,2) . "MB | ZipArchive: " . (class_exists('ZipArchive') ? 'فعال' : 'غیرفعال') . " | پیش‌نمایش: " . htmlspecialchars(substr($firstPreview,0,120));
+            if ($isHtml) {
+                $detail .= " | ⚠️ فایل دریافتی HTML است نه ZIP (احتمالاً خطای گیت‌هاب یا محدودیت API)";
+            }
+            self::deleteDirectory($tmpDir);
+            while (ob_get_level() > 0) { @ob_end_clean(); }
+            @ini_set('display_errors', $prevDisplay);
+            @error_reporting($prevReporting);
+            return ['success' => false, 'error' => 'فایل فشرده دانلود شده قابل استخراج نیست. ' . $detail . ' - لطفاً quick_update.php را امتحان کنید یا فضای دیسک را چک کنید.'];
         }
 
         if (file_exists($extractPath . '/index.php')) {
@@ -664,24 +704,57 @@ class Updater {
         if (!is_dir($extractPath)) {
             @mkdir($extractPath, 0777, true);
         }
-
-        if (class_exists('ZipArchive')) {
-            $zip = new ZipArchive();
-            if ($zip->open($zipFile) === true) {
-                $zip->extractTo($extractPath);
-                $zip->close();
-                $files = glob($extractPath . '/*');
-                if (!empty($files)) return true;
+        // Ensure zip file exists and is readable
+        if (!is_file($zipFile) || !is_readable($zipFile)) {
+            error_log("extractZip: zip file not found or not readable: $zipFile");
+            return false;
+        }
+        $size = @filesize($zipFile);
+        if ($size !== false && $size < 100) {
+            error_log("extractZip: zip too small: $size bytes");
+            return false;
+        }
+        // Check PK header
+        $fh = @fopen($zipFile, 'rb');
+        if ($fh) {
+            $header = @fread($fh, 4);
+            @fclose($fh);
+            if ($header !== "PK\x03\x04" && $header !== "PK\x05\x06" && substr($header,0,2) !== "PK") {
+                $first200 = @file_get_contents($zipFile, false, null, 0, 200);
+                error_log("extractZip: not a zip, first 200: " . substr((string)$first200,0,200));
+                // If it's HTML (GitHub error page), fail fast
+                if (str_contains((string)$first200, '<html') || str_contains((string)$first200, '<!DOCTYPE')) {
+                    error_log("extractZip: file is HTML not ZIP");
+                    return false;
+                }
             }
         }
 
-        if (function_exists('shell_exec')) {
-            $cmd = 'unzip -q -o ' . escapeshellarg($zipFile) . ' -d ' . escapeshellarg($extractPath) . ' 2>&1';
-            @shell_exec($cmd);
-            $files = glob($extractPath . '/*');
-            if (!empty($files)) return true;
+        // Method 1: ZipArchive
+        if (class_exists('ZipArchive')) {
+            $zip = new ZipArchive();
+            $res = $zip->open($zipFile);
+            if ($res === true) {
+                $ok = $zip->extractTo($extractPath);
+                $zip->close();
+                $files = @glob($extractPath . '/*');
+                if ($ok && !empty($files)) return true;
+                error_log("extractZip: ZipArchive extractTo failed, ok=$ok, files=" . count($files ?? []));
+            } else {
+                error_log("extractZip: ZipArchive open failed code=$res for $zipFile");
+            }
         }
 
+        // Method 2: shell unzip
+        if (function_exists('shell_exec')) {
+            $cmd = 'unzip -q -o ' . escapeshellarg($zipFile) . ' -d ' . escapeshellarg($extractPath) . ' 2>&1';
+            $out = @shell_exec($cmd);
+            $files = @glob($extractPath . '/*');
+            if (!empty($files)) return true;
+            error_log("extractZip: shell unzip failed, output: " . substr((string)$out,0,500));
+        }
+
+        // Method 3: pure PHP fallback
         return self::purePhpUnzip($zipFile, $extractPath);
     }
 

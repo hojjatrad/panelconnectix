@@ -1,6 +1,6 @@
 <?php
 /**
- * Connectix Panel - Easy Installer v6.8.10 FINAL
+ * Connectix Panel - Easy Installer v6.8.11 FINAL
  * - Robust admin creation (always login)
  * - Option to clean DB (raw install)
  * - Session fix for cPanel ea-php84
@@ -60,7 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $allPassed) {
     $dbPass   = trim($_POST['db_pass'] ?? '');
 
     $adminUser  = trim($_POST['admin_user'] ?? 'admin');
-    $adminPass  = $_POST['admin_pass'] ?? ''; // v6.8.10: Do NOT trim password - spaces are valid
+    $adminPass  = $_POST['admin_pass'] ?? ''; // v6.8.11: Do NOT trim password - spaces are valid
     $adminEmail = trim($_POST['admin_email'] ?? 'admin@example.com');
 
     $botToken = trim($_POST['telegram_bot_token'] ?? '');
@@ -68,7 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $allPassed) {
 
     $brandName = trim($_POST['brand_name'] ?? 'Connectix VPN');
     $appUrl    = rtrim(trim($_POST['app_url'] ?? $detectedUrl), '/');
-    $cleanDb   = !empty($_POST['clean_db']); // v6.8.10 NEW: option to clean DB
+    $cleanDb   = !empty($_POST['clean_db']); // v6.8.11 NEW: option to clean DB
 
     if (empty($adminUser) || empty($adminPass)) {
         $errorMessage = "نام کاربری و رمز عبور مدیر کل الزامی است.";
@@ -103,7 +103,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $allPassed) {
                 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             }
 
-            // v6.8.10: If clean_db checked, DROP all tables for raw install
+            // v6.8.11: If clean_db checked, DROP all tables for raw install
             if ($cleanDb) {
                 try {
                     if ($dbDriver === 'mysql') {
@@ -153,13 +153,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $allPassed) {
                 Database::initializeSqliteSchema($pdo);
             }
 
-            // v6.8.10: Ensure extended tables exist
+            // v6.8.11: Ensure extended tables exist
             try {
                 require_once __DIR__ . '/core/Database.php';
                 Database::ensureExtendedTablesExist($pdo);
             } catch (Throwable $e) {}
 
-            // v6.8.10 FINAL: Robust admin creation - ALWAYS works
+            // v6.8.11 FINAL: Robust admin creation - ALWAYS works
             $adminHash = password_hash($adminPass, PASSWORD_BCRYPT);
             $adminApiToken = 'admin_secret_' . bin2hex(random_bytes(16));
             $adminId = null;
@@ -286,7 +286,7 @@ if (file_exists(__DIR__ . '/config.secrets.php')) { require_once __DIR__ . '/con
                 } catch (Throwable $e2) {}
             }
 
-            file_put_contents($lockFile, "Installed v6.8.10 on " . date('Y-m-d H:i:s') . " clean_db=" . ($cleanDb?'yes':'no'));
+            file_put_contents($lockFile, "Installed v6.8.11 on " . date('Y-m-d H:i:s') . " clean_db=" . ($cleanDb?'yes':'no'));
             $success = true;
         } catch (Exception $e) {
             $errorMessage = "خطا: " . $e->getMessage();
@@ -299,7 +299,7 @@ if (file_exists(__DIR__ . '/config.secrets.php')) { require_once __DIR__ . '/con
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>نصب پنل v6.8.10 - نسخه نهایی</title>
+    <title>نصب پنل v6.8.11 - نسخه نهایی</title>
     <?php $base=''; if(isset($_SERVER['SCRIPT_NAME'])){ $sd=str_replace('\\','/',dirname($_SERVER['SCRIPT_NAME'])); $base=($sd==='/'||$sd==='.')?'':rtrim($sd,'/'); } ?>
     <script src="<?= $base ?>/assets/js/tailwind.js"></script>
     <link rel="stylesheet" href="<?= $base ?>/assets/css/fontawesome.min.css">
@@ -313,7 +313,7 @@ if (file_exists(__DIR__ . '/config.secrets.php')) { require_once __DIR__ . '/con
         <?php if ($success): ?>
             <div class="text-center space-y-6 py-6">
                 <div class="w-20 h-20 bg-emerald-500/20 border border-emerald-500/30 rounded-3xl mx-auto flex items-center justify-center text-emerald-400 text-4xl animate-bounce"><i class="fa-solid fa-check"></i></div>
-                <div><h2 class="text-2xl font-black text-white">نصب با موفقیت انجام شد! v6.8.10</h2><p class="text-xs text-slate-400 mt-2">ادمین فعال شد و سشن فیکس شد. حتماً لاگین میشی.</p></div>
+                <div><h2 class="text-2xl font-black text-white">نصب با موفقیت انجام شد! v6.8.11</h2><p class="text-xs text-slate-400 mt-2">ادمین فعال شد و سشن فیکس شد. حتماً لاگین میشی.</p></div>
                 <div class="bg-slate-950/70 border border-slate-800 p-5 rounded-2xl text-right text-xs space-y-2.5 max-w-md mx-auto">
                     <div class="flex justify-between text-slate-400"><span>یوزرنیم:</span><strong class="font-mono text-purple-300"><?= htmlspecialchars($adminUser) ?></strong></div>
                     <div class="flex justify-between text-slate-400"><span>پسورد:</span><strong class="font-mono text-emerald-300">همونی که وارد کردی</strong></div>
@@ -327,7 +327,7 @@ if (file_exists(__DIR__ . '/config.secrets.php')) { require_once __DIR__ . '/con
         <?php else: ?>
             <div class="text-center mb-6">
                 <div class="w-16 h-16 rounded-2xl bg-purple-600 mx-auto flex items-center justify-center text-white shadow-xl mb-4"><i class="fa-solid fa-wand-magic-sparkles text-2xl"></i></div>
-                <h1 class="text-2xl font-black text-white">نصب پنل v6.8.10 - فیکس نهایی لاگین</h1>
+                <h1 class="text-2xl font-black text-white">نصب پنل v6.8.11 - فیکس نهایی لاگین</h1>
                 <p class="text-xs text-slate-400 mt-1.5">با گزینه پاکسازی دیتابیس برای نصب خام</p>
             </div>
 
@@ -392,7 +392,7 @@ if (file_exists(__DIR__ . '/config.secrets.php')) { require_once __DIR__ . '/con
                     </div>
                 </div>
 
-                <button type="submit" <?= !$allPassed ? 'disabled' : '' ?> class="w-full py-4 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold rounded-2xl text-sm shadow-xl flex items-center justify-center gap-2"><i class="fa-solid fa-circle-check"></i><span>نصب نهایی v6.8.10 - تضمینی لاگین</span></button>
+                <button type="submit" <?= !$allPassed ? 'disabled' : '' ?> class="w-full py-4 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold rounded-2xl text-sm shadow-xl flex items-center justify-center gap-2"><i class="fa-solid fa-circle-check"></i><span>نصب نهایی v6.8.11 - تضمینی لاگین</span></button>
             </form>
         <?php endif; ?>
     </div>

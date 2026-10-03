@@ -298,39 +298,94 @@ if (!$zipData) {
     exit;
 }
 
-// v6.8.5 FIX: Use data/tmp as fallback if sys_get_temp_dir() fails or not writable
-$__tmpBase = sys_get_temp_dir();
-if (empty($__tmpBase) || !@is_dir($__tmpBase) || !@is_writable($__tmpBase)) {
+// v6.8.11 FIX: Robust tmp with multiple fallbacks + disk quota check
+$__tmpCandidates = [
+    __DIR__ . '/data/tmp',
+    sys_get_temp_dir(),
+    '/tmp',
+    __DIR__ . '/cache',
+];
+$__tmpBase = '';
+foreach ($__tmpCandidates as $cand) {
+    if (!is_dir($cand)) @mkdir($cand, 0777, true);
+    if (is_dir($cand) && is_writable($cand) && @disk_free_space($cand) > 20*1024*1024) {
+        $__tmpBase = $cand;
+        break;
+    }
+}
+if (empty($__tmpBase)) {
     $__tmpBase = __DIR__ . '/data/tmp';
-    if (!is_dir($__tmpBase)) @mkdir($__tmpBase, 0755, true);
+    @mkdir($__tmpBase, 0777, true);
 }
 $tmpZip = $__tmpBase . '/cx_upd_' . uniqid() . '.zip';
 $tmpExt = $__tmpBase . '/cx_ext_' . uniqid();
 @mkdir($tmpExt, 0755, true);
-if (!@file_put_contents($tmpZip, $zipData)) {
-    // Fallback to data/tmp
-    $__tmpBase = __DIR__ . '/data/tmp';
-    if (!is_dir($__tmpBase)) @mkdir($__tmpBase, 0755, true);
-    $tmpZip = $__tmpBase . '/cx_upd_' . uniqid() . '.zip';
-    $tmpExt = $__tmpBase . '/cx_ext_' . uniqid();
-    @mkdir($tmpExt, 0755, true);
-    file_put_contents($tmpZip, $zipData);
+$written = @file_put_contents($tmpZip, $zipData);
+if ($written === false || $written < 1000) {
+    // Try alternative base
+    foreach ($__tmpCandidates as $cand) {
+        if ($cand === $__tmpBase) continue;
+        if (!is_dir($cand)) @mkdir($cand, 0777, true);
+        if (is_dir($cand) && is_writable($cand)) {
+            $tmpZip = $cand . '/cx_upd_' . uniqid() . '.zip';
+            $tmpExt = $cand . '/cx_ext_' . uniqid();
+            @mkdir($tmpExt, 0755, true);
+            $written = @file_put_contents($tmpZip, $zipData);
+            if ($written && $written > 1000) {
+                $__tmpBase = $cand;
+                break;
+            }
+        }
+    }
 }
+if ($written === false || $written < 1000) {
+    logStep("خطا: نوشتن ZIP روی دیسک ناموفق - فضای آزاد: " . round(@disk_free_space(__DIR__)/1024/1024) . "MB - Disk quota؟", 'error');
+    echo "</div></div></body></html>";
+    exit;
+}
+logStep("فایل ZIP نوشته شد: " . round($written/1024) . "KB در " . $__tmpBase, 'success');
 
 logStep("در حال بازگشایی و استخراج فایل‌های جدید...", 'info');
 
 $extracted = false;
+$zipError = '';
 if (class_exists('ZipArchive')) {
     $zip = new ZipArchive();
-    if ($zip->open($tmpZip) === true) {
-        $zip->extractTo($tmpExt);
+    $res = $zip->open($tmpZip);
+    if ($res === true) {
+        $ok = $zip->extractTo($tmpExt);
         $zip->close();
-        $extracted = true;
+        if ($ok && !empty(glob($tmpExt . '/*'))) {
+            $extracted = true;
+            logStep("استخراج با ZipArchive موفق", 'success');
+        } else {
+            $zipError = "ZipArchive extractTo failed";
+            logStep("ZipArchive extractTo ناموفق", 'warn');
+        }
+    } else {
+        $zipError = "ZipArchive open code $res";
+        logStep("ZipArchive باز نشد: کد $res", 'warn');
     }
+} else {
+    logStep("ZipArchive غیرفعال است", 'warn');
 }
 if (!$extracted && function_exists('shell_exec')) {
-    @shell_exec('unzip -q -o ' . escapeshellarg($tmpZip) . ' -d ' . escapeshellarg($tmpExt) . ' 2>&1');
-    if (!empty(glob($tmpExt . '/*'))) $extracted = true;
+    $cmd = 'unzip -q -o ' . escapeshellarg($tmpZip) . ' -d ' . escapeshellarg($tmpExt) . ' 2>&1';
+    $out = @shell_exec($cmd);
+    if (!empty(glob($tmpExt . '/*'))) {
+        $extracted = true;
+        logStep("استخراج با shell unzip موفق", 'success');
+    } else {
+        logStep("shell unzip ناموفق: " . substr($out ?? '',0,200), 'warn');
+    }
+}
+if (!$extracted) {
+    // Check if file is actually HTML
+    $first = @file_get_contents($tmpZip, false, null, 0, 500);
+    if ($first && (str_contains($first, '<html') || str_contains($first, '<!DOCTYPE'))) {
+        logStep("خطا: فایل دریافتی HTML است نه ZIP! پیش‌نمایش: " . htmlspecialchars(substr($first,0,200)), 'error');
+    }
+    logStep("فضای آزاد: " . round(@disk_free_space(__DIR__)/1024/1024) . "MB | سایز ZIP: " . round(@filesize($tmpZip)/1024) . "KB", 'info');
 }
 
 if (!$extracted) {
