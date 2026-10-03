@@ -120,22 +120,32 @@ class ServerBackupManager {
             
             // پلن‌ها
             if (in_array($type, ['full','plans','auto_delete'])) {
-                if ($serverId > 0) {
-                    $stmt = $pdo->prepare("SELECT * FROM plans WHERE server_id = ? OR server_id IS NULL");
-                    $stmt->execute([$serverId]);
-                    $plans = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                    // همچنین vip_plans
-                    $stmt2 = $pdo->prepare("SELECT * FROM vip_plans WHERE server_id = ?");
-                    $stmt2->execute([$serverId]);
-                    $vipPlans = $stmt2->fetchAll(PDO::FETCH_ASSOC);
-                    $backupData['vip_plans'] = $vipPlans;
-                } else {
-                    $plans = $pdo->query("SELECT * FROM plans")->fetchAll(PDO::FETCH_ASSOC);
-                    $vipPlans = $pdo->query("SELECT * FROM vip_plans")->fetchAll(PDO::FETCH_ASSOC);
-                    $backupData['vip_plans'] = $vipPlans;
+                try {
+                    if ($serverId > 0) {
+                        $stmt = $pdo->prepare("SELECT * FROM plans WHERE server_id = ? OR server_id IS NULL");
+                        $stmt->execute([$serverId]);
+                        $plans = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                        // همچنین vip_plans - با مدیریت خطای جدول موجود نبودن
+                        try {
+                            $stmt2 = $pdo->prepare("SELECT * FROM vip_plans WHERE server_id = ?");
+                            $stmt2->execute([$serverId]);
+                            $vipPlans = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+                        } catch (Throwable $e) { $vipPlans = []; }
+                        $backupData['vip_plans'] = $vipPlans;
+                    } else {
+                        $plans = $pdo->query("SELECT * FROM plans")->fetchAll(PDO::FETCH_ASSOC);
+                        try {
+                            $vipPlans = $pdo->query("SELECT * FROM vip_plans")->fetchAll(PDO::FETCH_ASSOC);
+                        } catch (Throwable $e) { $vipPlans = []; }
+                        $backupData['vip_plans'] = $vipPlans;
+                    }
+                    $backupData['plans'] = $plans;
+                    $planCount = count($plans) + count($backupData['vip_plans'] ?? []);
+                } catch (Throwable $e) {
+                    $backupData['plans'] = [];
+                    $backupData['vip_plans'] = [];
+                    $planCount = 0;
                 }
-                $backupData['plans'] = $plans;
-                $planCount = count($plans) + count($backupData['vip_plans'] ?? []);
             }
             
             // کلاینت‌ها - مهم‌ترین بخش با ساب‌لینک دقیق
