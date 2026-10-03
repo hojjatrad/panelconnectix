@@ -1,7 +1,7 @@
 <?php
 require __DIR__ . '/../layout/header.php';
 ?>
-<div class="p-6">
+<div class="max-w-6xl mx-auto space-y-6">
     <div class="flex items-center justify-between mb-6">
         <h1 class="text-xl font-bold text-white">👁️ پیش‌نمایش بکاپ #<?= $backup['id'] ?> - <?= htmlspecialchars($backup['server_name']) ?></h1>
         <a href="<?= Helpers::url('backups') ?>" class="px-4 py-2 bg-slate-800 text-white rounded-xl text-sm">بازگشت</a>
