@@ -85,7 +85,7 @@ class AuthController {
         }
 
         $username = trim($_POST['username'] ?? '');
-        $password = trim($_POST['password'] ?? '');
+        $password = $_POST['password'] ?? ''; // v6.8.7: Do NOT trim password
         $twoFactorCode = trim($_POST['two_factor_code'] ?? '');
 
         if (empty($username) || empty($password)) {

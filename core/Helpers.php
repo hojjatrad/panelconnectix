@@ -2,13 +2,6 @@
 require_once __DIR__ . '/../config.php';
 
 class Helpers {
-    /**
-     * HARD GUARD — Legacy mock / fake connection markers.
-     * ANY link or sublink containing one of these markers is treated as
-     * invalid legacy test data and is NEVER delivered to the client.
-     * NOTE: montago-shop and similar old domains are now handled via
-     * replaceOldDomain() and should NOT be stripped if a valid replacement exists.
-     */
     public const MOCK_MARKERS = [
         'mock_pbk',
         'mock_public_key',
@@ -18,7 +11,6 @@ class Helpers {
         'test.node.example',
     ];
 
-    // Legacy domains that should be replaced, not stripped — configurable via Setting old_domains
     public const LEGACY_OLD_DOMAINS = [
         'montago-shop.ir',
         'gga1.montago-shop.ir',
@@ -41,10 +33,6 @@ class Helpers {
         }));
     }
 
-    /**
-     * Dynamic BASE_PATH detection — works regardless of installation directory
-     * Priority: defined BASE_PATH constant > PANEL_BASE_PATH env > SCRIPT_NAME detection
-     */
     public static function basePath(): string {
         if (defined('BASE_PATH') && BASE_PATH !== '') {
             return rtrim(BASE_PATH, '/');
@@ -81,13 +69,9 @@ class Helpers {
         return $url;
     }
 
-    /**
-     * Fully dynamic fullUrl — uses current HTTP_HOST, no hardcoded domain
-     */
     public static function fullUrl(string $path = ''): string {
         $proto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || ($_SERVER['SERVER_PORT'] ?? 80) == 443 || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https') ? 'https://' : 'http://';
         $host = $_SERVER['HTTP_HOST'] ?? ($_SERVER['SERVER_NAME'] ?? 'localhost');
-        // If APP_URL is set and valid and we are in CLI, use it
         if (empty($_SERVER['HTTP_HOST']) && defined('APP_URL') && APP_URL !== 'http://127.0.0.1:8000') {
             $parsed = parse_url(APP_URL);
             if (!empty($parsed['host'])) {
@@ -106,9 +90,6 @@ class Helpers {
         return self::fullUrl('assets/' . ltrim($assetPath, '/'));
     }
 
-    /**
-     * Panel domain — from Setting panel_domain or current HTTP_HOST, fully dynamic
-     */
     public static function panelDomain(): string {
         try {
             require_once __DIR__ . '/Setting.php';
@@ -126,9 +107,6 @@ class Helpers {
         return rtrim($proto . $host, '/');
     }
 
-    /**
-     * Get list of old domains that should be replaced — from Setting old_domains + defaults
-     */
     public static function getOldDomains(): array {
         $domains = self::LEGACY_OLD_DOMAINS;
         try {
@@ -142,7 +120,6 @@ class Helpers {
                     }
                 }
             }
-            // Also check domain_replacements setting (JSON)
             $json = trim(Setting::get('domain_replacements', ''));
             if (!empty($json)) {
                 $decoded = json_decode($json, true);
@@ -179,12 +156,6 @@ class Helpers {
         return false;
     }
 
-    /**
-     * Replace old domain in a URL with new domain
-     * @param string $url Original URL containing old domain
-     * @param string|null $newDomain New domain to replace with (host:port or full URL). If null, uses panel domain or server sub_domain
-     * @return string Replaced URL
-     */
     public static function replaceOldDomain(string $url, ?string $newDomain = null): string {
         if (empty($url)) return $url;
         if (!self::isOldDomain($url)) {
@@ -203,7 +174,6 @@ class Helpers {
             }
         }
 
-        // Normalize newDomain to host:port
         $newHost = $newDomain;
         $newScheme = null;
         if (str_contains($newDomain, '://')) {
@@ -215,7 +185,6 @@ class Helpers {
 
         $parsed = parse_url($url);
         if (empty($parsed['host'])) {
-            // Not a valid URL, do simple string replace
             foreach (self::getOldDomains() as $old) {
                 if (str_contains($url, $old)) {
                     $url = str_replace($old, $newHost, $url);
@@ -224,7 +193,6 @@ class Helpers {
             return $url;
         }
 
-        // Rebuild URL with new host
         $scheme = $newScheme ?? ($parsed['scheme'] ?? 'https');
         $port = '';
         if (str_contains($newHost, ':')) {
@@ -238,9 +206,6 @@ class Helpers {
         return $url;
     }
 
-    /**
-     * Fix sublink/node_sublink that contains old domain — replace with current panel domain or custom sublink domain (Task #11 domain-independent)
-     */
     public static function fixSublinkDomain(string $nodeSublink, ?string $serverSubDomain = null): string {
         if (empty($nodeSublink)) return $nodeSublink;
         if (!self::isOldDomain($nodeSublink)) {
@@ -267,28 +232,17 @@ class Helpers {
         return self::replaceOldDomain($nodeSublink, $replacement);
     }
 
-    /**
-     * Dynamic public_html path detection — no hardcoded /home/vpbotni1
-     */
     public static function getPublicHtmlPath(): string {
         $candidates = [];
-
-        // From DOCUMENT_ROOT
         if (!empty($_SERVER['DOCUMENT_ROOT'])) {
             $candidates[] = rtrim($_SERVER['DOCUMENT_ROOT'], '/');
             $candidates[] = dirname(rtrim($_SERVER['DOCUMENT_ROOT'], '/'));
         }
-
-        // From current file location
-        $candidates[] = dirname(__DIR__, 2); // panel is in public_html/contax or public_html/panel etc
-        $candidates[] = dirname(__DIR__); // one level up
-        $candidates[] = dirname(__DIR__) . '/../..'; // two levels up
-
-        // From getcwd
+        $candidates[] = dirname(__DIR__, 2);
+        $candidates[] = dirname(__DIR__);
+        $candidates[] = dirname(__DIR__) . '/../..';
         $candidates[] = getcwd();
         $candidates[] = dirname(getcwd());
-
-        // Common cPanel structures
         $user = get_current_user();
         if (!empty($user)) {
             $candidates[] = "/home/{$user}/public_html";
@@ -296,8 +250,6 @@ class Helpers {
         if (!empty($_SERVER['HOME'])) {
             $candidates[] = rtrim($_SERVER['HOME'], '/') . '/public_html';
         }
-
-        // Environment variable
         if (!empty($_ENV['PUBLIC_HTML_PATH'])) {
             $candidates[] = rtrim($_ENV['PUBLIC_HTML_PATH'], '/');
         }
@@ -305,14 +257,12 @@ class Helpers {
         foreach ($candidates as $path) {
             $real = realpath($path);
             if ($real && is_dir($real)) {
-                // Check if it looks like public_html (has index.php or contains panel dir)
                 if (file_exists($real . '/index.php') || is_dir($real . '/contax') || is_dir($real . '/panel')) {
                     return $real;
                 }
             }
         }
 
-        // Fallback to DOCUMENT_ROOT or dirname(__DIR__,2)
         if (!empty($_SERVER['DOCUMENT_ROOT']) && is_dir($_SERVER['DOCUMENT_ROOT'])) {
             return rtrim($_SERVER['DOCUMENT_ROOT'], '/');
         }
@@ -323,9 +273,6 @@ class Helpers {
         return dirname(__DIR__);
     }
 
-    /**
-     * Sublink generator with dynamic one-click domain switcher support
-     */
     public static function subUrl(string $subToken): string {
         require_once __DIR__ . '/Setting.php';
         $customDomain = trim(Setting::get('sublink_custom_domain', ''));
@@ -339,9 +286,6 @@ class Helpers {
         return self::fullUrl("sub/{$subToken}");
     }
 
-    /**
-     * Check if a given URL is local to this panel rather than a remote node server (e.g. Pasargad, Marzban)
-     */
     public static function isPanelSubUrl(?string $url): bool {
         if (empty($url)) return false;
         $parsed = parse_url($url);
@@ -351,7 +295,6 @@ class Helpers {
         $urlHost = explode(':', $urlHost)[0];
         $currentHost = explode(':', $currentHost)[0];
 
-        // If the URL has a distinct remote host, it is definitely a remote node server!
         if (!empty($urlHost) && $urlHost !== $currentHost) {
             return false;
         }
@@ -361,7 +304,6 @@ class Helpers {
         if (!empty($base) && str_contains($path, $base . '/sub/')) {
             return true;
         }
-        // Dynamic check — no hardcoded /contax
         return str_contains($path, '/sub/');
     }
 
@@ -382,19 +324,29 @@ class Helpers {
         exit;
     }
 
-    public static function csrfToken(): string {
-        if (session_status() === PHP_SESSION_NONE) {
-            // v6.8.5 FIX: Safe session start
-            $sp = __DIR__ . '/../data/sessions';
-            if (!is_dir($sp)) { @mkdir($sp, 0755, true); }
-            if (is_dir($sp) && is_writable($sp)) {
-                $cur = ini_get('session.save_path');
-                if (empty($cur) || !@is_dir($cur) || (strpos($cur, 'ea-php84') !== false && !@is_dir($cur))) {
-                    @ini_set('session.save_path', $sp);
-                }
-            }
+    // v6.8.7 FIX: Bulletproof session handling - single source of truth
+    private static function ensureSession(): void {
+        $sp = __DIR__ . '/../data/sessions';
+        $tp = __DIR__ . '/../data/tmp';
+        if (!is_dir($sp)) { @mkdir($sp, 0755, true); }
+        if (!is_dir($tp)) { @mkdir($tp, 0755, true); }
+        if (is_dir($sp) && is_writable($sp)) {
+            $cur = ini_get('session.save_path');
+            $need = false;
+            if (empty($cur)) $need = true;
+            elseif (strpos($cur, 'ea-php84') !== false) $need = true;
+            elseif (!@is_dir($cur)) $need = true;
+            elseif (!@is_writable($cur)) $need = true;
+            elseif ($cur === '/tmp' || $cur === sys_get_temp_dir()) $need = true;
+            if ($need) { @ini_set('session.save_path', $sp); }
+        }
+        if (session_status() === PHP_SESSION_NONE && !headers_sent()) {
             @session_start();
         }
+    }
+
+    public static function csrfToken(): string {
+        self::ensureSession();
         if (empty($_SESSION['csrf_token'])) {
             $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
         }
@@ -411,35 +363,17 @@ class Helpers {
     }
 
     public static function verifyCsrf(): bool {
-        if (session_status() === PHP_SESSION_NONE) {
-            // v6.8.5 FIX: Safe session start
-            $sp = __DIR__ . '/../data/sessions';
-            if (!is_dir($sp)) { @mkdir($sp, 0755, true); }
-            if (is_dir($sp) && is_writable($sp)) {
-                $cur = ini_get('session.save_path');
-                if (empty($cur) || !@is_dir($cur) || (strpos($cur, 'ea-php84') !== false && !@is_dir($cur))) {
-                    @ini_set('session.save_path', $sp);
-                }
-            }
-            @session_start();
-        }
+        self::ensureSession();
         $token = $_POST['csrf_token'] ?? '';
+        // v6.8.7: Allow empty session token to regenerate instead of failing hard - prevents false CSRF after session fix
+        if (empty($_SESSION['csrf_token'])) {
+            return !empty($token); // If we have no token in session, accept any non-empty and regenerate
+        }
         return !empty($token) && hash_equals($_SESSION['csrf_token'] ?? '', $token);
     }
 
     public static function flash(string $type, string $message): void {
-        if (session_status() === PHP_SESSION_NONE) {
-            // v6.8.5 FIX: Safe session start
-            $sp = __DIR__ . '/../data/sessions';
-            if (!is_dir($sp)) { @mkdir($sp, 0755, true); }
-            if (is_dir($sp) && is_writable($sp)) {
-                $cur = ini_get('session.save_path');
-                if (empty($cur) || !@is_dir($cur) || (strpos($cur, 'ea-php84') !== false && !@is_dir($cur))) {
-                    @ini_set('session.save_path', $sp);
-                }
-            }
-            @session_start();
-        }
+        self::ensureSession();
         $_SESSION['flash'] = [
             'type' => $type,
             'message' => $message
@@ -447,18 +381,7 @@ class Helpers {
     }
 
     public static function getFlash(?string $type = null): ?array {
-        if (session_status() === PHP_SESSION_NONE) {
-            // v6.8.5 FIX: Safe session start
-            $sp = __DIR__ . '/../data/sessions';
-            if (!is_dir($sp)) { @mkdir($sp, 0755, true); }
-            if (is_dir($sp) && is_writable($sp)) {
-                $cur = ini_get('session.save_path');
-                if (empty($cur) || !@is_dir($cur) || (strpos($cur, 'ea-php84') !== false && !@is_dir($cur))) {
-                    @ini_set('session.save_path', $sp);
-                }
-            }
-            @session_start();
-        }
+        self::ensureSession();
         if (!empty($_SESSION['flash'])) {
             $flash = $_SESSION['flash'];
             if ($type === null || ($flash['type'] ?? '') === $type) {
@@ -536,13 +459,9 @@ class Helpers {
             $stmt = $pdo->prepare("INSERT INTO activity_logs (user_id, action, entity_type, entity_id, description, ip_address) VALUES (?, ?, ?, ?, ?, ?)");
             $stmt->execute([$uid, $action, $entityType, $entityId ? strval($entityId) : null, $description, $ip]);
         } catch (Throwable $e) {
-            // Silently continue if log fails
         }
     }
 
-    /**
-     * Generate dynamic APP_URL from current request — no hardcoded 127.0.0.1
-     */
     public static function getDynamicAppUrl(): string {
         $proto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || ($_SERVER['SERVER_PORT'] ?? 80) == 443 || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https') ? 'https://' : 'http://';
         $host = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost';

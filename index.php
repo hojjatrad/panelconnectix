@@ -2,6 +2,26 @@
 error_reporting(E_ALL & ~E_NOTICE & ~E_DEPRECATED);
 ini_set('display_errors', 1);
 
+// v6.8.7 FIX: Bulletproof session path - MUST be before any session_start
+$__sessFix = __DIR__ . '/data/sessions';
+$__tmpFix = __DIR__ . '/data/tmp';
+if (!is_dir($__sessFix)) { @mkdir($__sessFix, 0755, true); }
+if (!is_dir($__tmpFix)) { @mkdir($__tmpFix, 0755, true); }
+if (is_dir($__sessFix) && is_writable($__sessFix)) {
+    $__curPath = ini_get('session.save_path');
+    // Always force our path if current is empty, not writable, contains ea-php84, or is /tmp
+    $__needFix = false;
+    if (empty($__curPath)) $__needFix = true;
+    elseif (strpos($__curPath, 'ea-php84') !== false) $__needFix = true;
+    elseif (!is_dir($__curPath)) $__needFix = true;
+    elseif (!is_writable($__curPath)) $__needFix = true;
+    elseif ($__curPath === '/tmp' || $__curPath === sys_get_temp_dir()) $__needFix = true;
+    if ($__needFix) {
+        @ini_set('session.save_path', $__sessFix);
+    }
+}
+unset($__sessFix, $__tmpFix, $__curPath, $__needFix);
+
 // Safely start session before any output
 if (session_status() === PHP_SESSION_NONE && !headers_sent()) {
     @session_start();

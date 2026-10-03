@@ -4,18 +4,24 @@ require_once __DIR__ . '/Helpers.php';
 
 class Auth {
     public static function init(): void {
+        // v6.8.7 FIX: Bulletproof session - always ensure correct path
+        $savePath = __DIR__ . '/../data/sessions';
+        $tmpPath = __DIR__ . '/../data/tmp';
+        if (!is_dir($savePath)) { @mkdir($savePath, 0755, true); }
+        if (!is_dir($tmpPath)) { @mkdir($tmpPath, 0755, true); }
+        if (is_dir($savePath) && is_writable($savePath)) {
+            $current = ini_get('session.save_path');
+            $needFix = false;
+            if (empty($current)) $needFix = true;
+            elseif (strpos($current, 'ea-php84') !== false) $needFix = true;
+            elseif (!@is_dir($current)) $needFix = true;
+            elseif (!@is_writable($current)) $needFix = true;
+            elseif ($current === '/tmp' || $current === sys_get_temp_dir()) $needFix = true;
+            if ($needFix) {
+                @ini_set('session.save_path', $savePath);
+            }
+        }
         if (session_status() === PHP_SESSION_NONE) {
-            // v6.8.5 FIX: Safe session start with custom path fallback
-            $savePath = __DIR__ . '/../data/sessions';
-            if (!is_dir($savePath)) {
-                @mkdir($savePath, 0755, true);
-            }
-            if (is_dir($savePath) && is_writable($savePath)) {
-                $current = ini_get('session.save_path');
-                if (empty($current) || !@is_dir($current) || strpos($current, 'ea-php84') !== false && !@is_dir($current)) {
-                    @ini_set('session.save_path', $savePath);
-                }
-            }
             @session_start();
         }
     }

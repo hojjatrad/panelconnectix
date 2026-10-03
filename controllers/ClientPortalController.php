@@ -14,6 +14,15 @@ class ClientPortalController {
 
     public function __construct()
     {
+        // v6.8.7 FIX: Bulletproof session
+        $sp = __DIR__ . '/../data/sessions';
+        if (!is_dir($sp)) { @mkdir($sp, 0755, true); }
+        if (is_dir($sp) && is_writable($sp)) {
+            $cur = ini_get('session.save_path');
+            if (empty($cur) || strpos($cur, 'ea-php84') !== false || !@is_dir($cur) || !@is_writable($cur)) {
+                @ini_set('session.save_path', $sp);
+            }
+        }
         if (session_status() === PHP_SESSION_NONE && !headers_sent()) {
             @session_start();
         }
