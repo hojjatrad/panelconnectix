@@ -438,4 +438,143 @@ class ServerBackupManager {
     public static function autoBackupBeforeDelete(int $serverId, string $reason = 'حذف کلاینت'): array {
         return self::createBackup($serverId, 'auto_delete', true, "بکاپ خودکار قبل از $reason - ".date('Y-m-d H:i:s'));
     }
+
+    // ==================== PRO Features v6.8.30 ====================
+
+    /**
+     * بکاپ رمزنگاری شده با AES-256
+     */
+    public static function createEncryptedBackup(int $serverId = 0, string $type = 'full', string $password = ''): array {
+        $result = self::createBackup($serverId, $type, false, 'بکاپ رمزنگاری شده');
+        if (!$result['success']) return $result;
+        if (empty($password)) {
+            $password = Setting::get('backup_encryption_key', '');
+            if (empty($password)) {
+                $password = bin2hex(random_bytes(16));
+                Setting::set('backup_encryption_key', $password);
+            }
+        }
+        $data = file_get_contents($result['file_path']);
+        $iv = random_bytes(16);
+        $encrypted = openssl_encrypt($data, 'AES-256-CBC', hash('sha256', $password, true), OPENSSL_RAW_DATA, $iv);
+        $encData = base64_encode($iv . $encrypted);
+        $encPath = $result['file_path'] . '.enc';
+        file_put_contents($encPath, $encData);
+        @unlink($result['file_path']);
+        // Update DB record
+        try {
+            $pdo = Database::getConnection();
+            $pdo->prepare("UPDATE server_backups SET file_path = ?, file_name = ?, file_size = ? WHERE id = ?")
+                ->execute([$encPath, basename($encPath), filesize($encPath), $result['id']]);
+        } catch (Throwable $e) {}
+        $result['file_path'] = $encPath;
+        $result['file_name'] = basename($encPath);
+        $result['encrypted'] = true;
+        return $result;
+    }
+
+    /**
+     * ارسال بکاپ به تلگرام ادمین
+     */
+    public static function sendToTelegram(int $backupId): array {
+        $backup = self::getBackup($backupId);
+        if (!$backup || !file_exists($backup['file_path'])) {
+            return ['success'=>false, 'error'=>'فایل یافت نشد'];
+        }
+        try {
+            require_once __DIR__ . '/TelegramBot.php';
+            $botToken = Setting::get('telegram_bot_token');
+            $adminChatId = Setting::get('telegram_admin_chat_id');
+            if (empty($botToken) || empty($adminChatId)) {
+                return ['success'=>false, 'error'=>'توکن ربات یا چت ادمین تنظیم نشده'];
+            }
+            $caption = "📦 بکاپ سرور: {$backup['server_name']}\n📅 تاریخ: {$backup['created_at']}\n👥 کلاینت: {$backup['clients_count']}\n📋 پلن: {$backup['plans_count']}\n📂 دسته: {$backup['categories_count']}\n💾 حجم: ".round($backup['file_size']/1024,1)."KB\n#Backup #Server{$backup['server_id']}";
+            $res = TelegramBot::sendDocument($adminChatId, $backup['file_path'], $caption, $botToken);
+            return $res ? ['success'=>true] : ['success'=>false, 'error'=>'ارسال ناموفق'];
+        } catch (Throwable $e) {
+            return ['success'=>false, 'error'=>$e->getMessage()];
+        }
+    }
+
+    /**
+     * خروجی اکسل حرفه‌ای از کلاینت‌های سرور
+     */
+    public static function exportClientsExcel(int $serverId = 0): array {
+        $pdo = Database::getConnection();
+        if ($serverId > 0) {
+            $stmt = $pdo->prepare("SELECT c.*, s.name as server_name FROM clients c LEFT JOIN server_nodes s ON s.id = c.server_id WHERE c.server_id = ? ORDER BY c.id DESC");
+            $stmt->execute([$serverId]);
+        } else {
+            $stmt = $pdo->query("SELECT c.*, s.name as server_name FROM clients c LEFT JOIN server_nodes s ON s.id = c.server_id ORDER BY c.id DESC");
+        }
+        $clients = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        $dir = self::ensureDir($serverId);
+        $fileName = date('Y-m-d_H-i-s')."_clients_export.csv";
+        $filePath = $dir . '/' . $fileName;
+        
+        $fp = fopen($filePath, 'w');
+        // BOM for Excel Persian support
+        fwrite($fp, "\xEF\xBB\xBF");
+        fputcsv($fp, ['ID','Username','Server','Password','UUID','SubToken','Node Sublink (Exact)','Traffic Limit GB','Traffic Used GB','Expire At','Status','Created At','Note']);
+        foreach ($clients as $c) {
+            fputcsv($fp, [
+                $c['id'],
+                $c['username'],
+                $c['server_name'] ?? $c['server_id'],
+                $c['password'],
+                $c['uuid'],
+                $c['sub_token'],
+                $c['node_sublink'] ?? '',
+                round(($c['traffic_limit_bytes'] ?? 0)/1024/1024/1024,2),
+                round(($c['traffic_used_bytes'] ?? 0)/1024/1024/1024,2),
+                $c['expire_at'],
+                $c['status'],
+                $c['created_at'],
+                $c['custom_note'] ?? ''
+            ]);
+        }
+        fclose($fp);
+        return ['success'=>true, 'file_path'=>$filePath, 'file_name'=>$fileName, 'count'=>count($clients)];
+    }
+
+    /**
+     * بکاپ روزانه خودکار همه سرورها (برای cron)
+     */
+    public static function dailyAutoBackup(): array {
+        $pdo = Database::getConnection();
+        $servers = $pdo->query("SELECT id, name FROM server_nodes WHERE is_active = 1")->fetchAll(PDO::FETCH_ASSOC);
+        $results = [];
+        foreach ($servers as $s) {
+            $res = self::createBackup((int)$s['id'], 'full', true, 'بکاپ روزانه خودکار - '.date('Y-m-d'));
+            $results[] = ['server'=>$s['name'], 'success'=>$res['success'] ?? false];
+        }
+        // Also full all-servers backup weekly
+        if (date('w') == 0) { // Sunday
+            self::createBackup(0, 'full', true, 'بکاپ هفتگی همه سرورها - '.date('Y-m-d'));
+        }
+        return $results;
+    }
+
+    /**
+     * آمار بکاپ‌ها برای داشبورد
+     */
+    public static function getStats(): array {
+        try {
+            $pdo = Database::getConnection();
+            $total = (int)$pdo->query("SELECT COUNT(*) FROM server_backups")->fetchColumn();
+            $auto = (int)$pdo->query("SELECT COUNT(*) FROM server_backups WHERE is_auto = 1")->fetchColumn();
+            $totalSize = (int)$pdo->query("SELECT SUM(file_size) FROM server_backups")->fetchColumn();
+            $last = $pdo->query("SELECT * FROM server_backups ORDER BY id DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+            return [
+                'total'=>$total,
+                'auto'=>$auto,
+                'manual'=>$total-$auto,
+                'total_size_mb'=>round($totalSize/1024/1024,2),
+                'last_backup'=>$last
+            ];
+        } catch (Throwable $e) {
+            return ['total'=>0,'auto'=>0,'manual'=>0,'total_size_mb'=>0,'last_backup'=>null];
+        }
+    }
 }

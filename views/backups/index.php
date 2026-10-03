@@ -6,6 +6,9 @@
             <span class="text-xs bg-cyan-900/40 text-cyan-300 px-2 py-1 rounded-lg border border-cyan-800/50">v6.8.28 PRO</span>
         </h1>
         <div class="flex gap-2">
+            <a href="<?= Helpers::url('backups/export-excel?server_id='.(($_GET['server_id'] ?? 0))) ?>" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold flex items-center gap-2">
+                <i class="fa-solid fa-file-excel"></i> خروجی اکسل کلاینت‌ها
+            </a>
             <form method="POST" action="<?= Helpers::url('backups/auto-all') ?>" class="m-0">
                 <?= Helpers::csrfField() ?>
                 <button type="submit" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-sm font-bold flex items-center gap-2">
@@ -106,6 +109,10 @@
                                 <div class="flex items-center justify-center gap-1">
                                     <a href="<?= Helpers::url('backups/'.$b['id'].'/preview') ?>" class="w-7 h-7 flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg" title="پیش‌نمایش"><i class="fa-solid fa-eye text-[11px]"></i></a>
                                     <a href="<?= Helpers::url('backups/'.$b['id'].'/download') ?>" class="w-7 h-7 flex items-center justify-center bg-cyan-900/40 hover:bg-cyan-800/60 text-cyan-300 rounded-lg" title="دانلود"><i class="fa-solid fa-download text-[11px]"></i></a>
+                                    <form method="POST" action="<?= Helpers::url('backups/'.$b['id'].'/send-telegram') ?>" class="m-0 inline">
+                                        <?= Helpers::csrfField() ?>
+                                        <button type="submit" class="w-7 h-7 flex items-center justify-center bg-blue-900/40 hover:bg-blue-800/60 text-blue-300 rounded-lg" title="ارسال به تلگرام"><i class="fa-brands fa-telegram text-[11px]"></i></button>
+                                    </form>
                                     <button onclick="openRestoreModal(<?= $b['id'] ?>, '<?= htmlspecialchars($b['server_name']) ?>')" class="w-7 h-7 flex items-center justify-center bg-emerald-900/40 hover:bg-emerald-800/60 text-emerald-300 rounded-lg" title="بازگردانی"><i class="fa-solid fa-rotate-left text-[11px]"></i></button>
                                     <form method="POST" action="<?= Helpers::url('backups/'.$b['id'].'/delete') ?>" class="m-0" onsubmit="return confirm('آیا از حذف این بکاپ اطمینان دارید؟')">
                                         <?= Helpers::csrfField() ?>

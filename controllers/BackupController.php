@@ -122,4 +122,35 @@ class BackupController {
         Helpers::flash('success', "بکاپ خودکار $count سرور انجام شد");
         Helpers::redirect('backups');
     }
+
+    public function sendTelegram(string $id = ''): void {
+        Auth::requireAdmin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن نامعتبر');
+            Helpers::redirect('backups');
+        }
+        $id = (int)$id;
+        $res = ServerBackupManager::sendToTelegram($id);
+        if ($res['success']) {
+            Helpers::flash('success', 'بکاپ به تلگرام ادمین ارسال شد');
+        } else {
+            Helpers::flash('error', 'خطا: '.($res['error'] ?? 'نامشخص'));
+        }
+        Helpers::redirect('backups');
+    }
+
+    public function exportExcel(): void {
+        Auth::requireAdmin();
+        $serverId = (int)($_GET['server_id'] ?? 0);
+        $res = ServerBackupManager::exportClientsExcel($serverId);
+        if (!$res['success'] || !file_exists($res['file_path'])) {
+            Helpers::flash('error', 'خطا در خروجی اکسل');
+            Helpers::redirect('backups');
+        }
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="'.$res['file_name'].'"');
+        readfile($res['file_path']);
+        @unlink($res['file_path']);
+        exit;
+    }
 }
