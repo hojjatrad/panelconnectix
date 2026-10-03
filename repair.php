@@ -208,6 +208,7 @@ if (isset($_GET['restore_index'])) {
         "https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/core/Auth.php" => __DIR__ . "/core/Auth.php",
         "https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/core/Helpers.php" => __DIR__ . "/core/Helpers.php",
         "https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/quick_update.php" => __DIR__ . "/quick_update.php",
+        "https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/reset_admin.php" => __DIR__ . "/reset_admin.php",
     ];
     foreach ($files as $url => $dest) {
         $ch = curl_init($url);
