@@ -125,8 +125,13 @@ class UpdateController {
         @set_time_limit(300);
         @ini_set('max_execution_time', '300');
         @ini_set('memory_limit', '512M');
+        @ignore_user_abort(true);
         header('Content-Type: application/json; charset=utf-8');
-        header('Cache-Control: no-cache, no-store, must-revalidate');
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+        header('cf-cache-status: BYPASS');
+        header('X-Accel-Buffering: no');
 
         $startTime = microtime(true);
         try {

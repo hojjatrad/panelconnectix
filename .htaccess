@@ -20,6 +20,17 @@
     FileETag None
 </IfModule>
 
+# v6.8.26 Cloudflare 520 fix - bypass cache for heavy endpoints
+<IfModule mod_headers.c>
+    <FilesMatch "(quick_update|repair|cron)\.php$">
+        Header set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
+        Header set Pragma "no-cache"
+        Header set cf-cache-status "BYPASS"
+        Header set CDN-Cache-Control "no-store"
+        Header set Cloudflare-CDN-Cache-Control "no-store"
+    </FilesMatch>
+</IfModule>
+
 # S7: Protect sensitive directories - deny direct access to core, cache, data
 <IfModule mod_rewrite.c>
     RewriteEngine On

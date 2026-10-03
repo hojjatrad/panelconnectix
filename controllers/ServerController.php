@@ -1102,6 +1102,16 @@ class ServerController {
 
     public function syncNow(): void {
         Auth::requireAdmin();
+        @set_time_limit(300);
+        @ignore_user_abort(true);
+        @ini_set('memory_limit', '512M');
+        // v6.8.26 Cloudflare 520 hardening: bypass cache
+        if (!headers_sent()) {
+            header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+            header('Pragma: no-cache');
+            header('cf-cache-status: BYPASS');
+            header('X-Accel-Buffering: no');
+        }
         $pdo = Database::getConnection();
 
         // 1. First run NodeSync to import and re-read all users and traffic from the remote servers in bulk
@@ -1526,6 +1536,15 @@ class ServerController {
      */
     public function fullSync(string $id = ''): void {
         Auth::requireAdmin();
+        @set_time_limit(300);
+        @ignore_user_abort(true);
+        @ini_set('memory_limit', '512M');
+        if (!headers_sent()) {
+            header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+            header('Pragma: no-cache');
+            header('cf-cache-status: BYPASS');
+            header('X-Accel-Buffering: no');
+        }
         if (!Helpers::verifyCsrf()) {
             Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
             Helpers::redirect('servers');
