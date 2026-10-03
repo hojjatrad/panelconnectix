@@ -741,7 +741,8 @@ try {
     $lastVipImport = (int)Setting::get('last_cron_vip_import', '0');
     if (time() - $lastVipImport >= 86400) { // once per 24h
         Setting::set('last_cron_vip_import', (string)time());
-        $vipServers = $pdo->query("SELECT * FROM server_nodes WHERE driver = 'connectix_seller' AND is_active = 1 AND (auto_import_plans = 1 OR auto_import_plans IS NULL)")->fetchAll();
+        // v6.8.19 FIX: Only auto-import if explicitly enabled (auto_import_plans=1), NOT NULL - prevents deleted plans from resurrecting
+        $vipServers = $pdo->query("SELECT * FROM server_nodes WHERE driver = 'connectix_seller' AND is_active = 1 AND auto_import_plans = 1")->fetchAll();
         foreach ($vipServers as $vs) {
             try {
                 $driver = DriverFactory::create($vs);

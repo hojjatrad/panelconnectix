@@ -546,6 +546,11 @@ class Database {
                 }
             } catch (Throwable $e) {}
 
+            // v6.8.19 FIX: Prevent deleted plans from resurrecting - set NULL auto_import_plans to 0 (disabled)
+            try {
+                $pdo->exec("UPDATE server_nodes SET auto_import_plans = 0 WHERE auto_import_plans IS NULL");
+            } catch (Throwable $e) {}
+
             // Seed Default Categories if empty
             try {
                 $catCount = (int)$pdo->query("SELECT COUNT(*) FROM categories")->fetchColumn();

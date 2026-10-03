@@ -358,6 +358,16 @@ if (empty($category)) {
         $id = (int)($_POST['id'] ?? 0);
         $pdo = Database::getConnection();
 
+        // v6.8.19: Get server_id before delete to disable auto_import for that server (prevent resurrection)
+        try {
+            $planRow = $pdo->prepare("SELECT server_id FROM plans WHERE id = ?");
+            $planRow->execute([$id]);
+            $pr = $planRow->fetch();
+            if (!empty($pr['server_id'])) {
+                $pdo->prepare("UPDATE server_nodes SET auto_import_plans = 0 WHERE id = ?")->execute([$pr['server_id']]);
+            }
+        } catch (Throwable $e) {}
+
         // Safely detach clients, orders, and reseller mappings before plan deletion
         $pdo->prepare("UPDATE clients SET plan_id = NULL WHERE plan_id = ?")->execute([$id]);
         $pdo->prepare("UPDATE bot_orders SET plan_id = NULL WHERE plan_id = ?")->execute([$id]);
@@ -365,7 +375,7 @@ if (empty($category)) {
         $pdo->prepare("DELETE FROM reserved_plans WHERE plan_id = ?")->execute([$id]);
 
         $pdo->prepare("DELETE FROM plans WHERE id = ?")->execute([$id]);
-        Helpers::flash('success', 'پلن مورد نظر با موفقیت حذف گردید.');
+        Helpers::flash('success', 'پلن حذف شد و ایمپورت خودکار سرور مربوطه غیرفعال شد تا دوباره برنگردد.');
         Helpers::redirect('plans');
     }
 
@@ -382,11 +392,13 @@ if (empty($category)) {
             $pdo->exec("DELETE FROM reserved_plans");
             $pdo->exec("UPDATE clients SET plan_id = NULL");
             $pdo->exec("UPDATE bot_orders SET plan_id = NULL");
+            // v6.8.19 FIX: Disable auto_import_plans for all servers to prevent resurrection
+            $pdo->exec("UPDATE server_nodes SET auto_import_plans = 0");
 
             if ($driver === 'mysql') $pdo->exec("SET FOREIGN_KEY_CHECKS=1");
             else $pdo->exec("PRAGMA foreign_keys = ON");
 
-            Helpers::flash('success', 'تمامی پلن‌ها به طور کامل پاکسازی شدند. اکنون می‌توانید پلن‌های اختصاصی خود را تعریف فرمایید.');
+            Helpers::flash('success', 'تمامی پلن‌ها به طور کامل پاکسازی شدند و ایمپورت خودکار غیرفعال شد تا دوباره برنگردند. اکنون می‌توانید پلن‌های اختصاصی خود را تعریف فرمایید.');
         } catch (Throwable $e) {
             Helpers::flash('error', 'خطا در پاکسازی پلن‌ها: ' . $e->getMessage());
         }

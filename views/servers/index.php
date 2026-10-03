@@ -327,10 +327,10 @@ require __DIR__ . '/../layout/header.php';
                             <span class="text-slate-300 font-semibold">🌟 سرور ویژه (VIP)</span>
                         </label>
                         <label class="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" name="auto_import_plans" value="1" checked class="rounded border-slate-700 bg-slate-800 text-emerald-600 focus:ring-emerald-600">
-                            <span class="text-slate-300 font-semibold">📥 ایمپورت خودکار پلن‌ها</span>
+                            <input type="checkbox" name="auto_import_plans" value="1" class="rounded border-slate-700 bg-slate-800 text-emerald-600 focus:ring-emerald-600">
+                            <span class="text-slate-300 font-semibold">📥 ایمپورت خودکار پلن‌ها (خاموش بگذارید تا پلن‌های حذف شده برنگردند)</span>
                         </label>
-                        <p class="col-span-2 text-[10px] text-slate-400 mt-1">سرور ویژه در ربات به صورت ⭐ ویژه نمایش داده می‌شود و دسته‌بندی اقتصادی/ویژه را پشتیبانی می‌کند. ایمپورت خودکار پلن‌های سرور را بلافاصله پس از افزودن، با دسته‌بندی هوشمند موجود همگام می‌کند.</p>
+                        <p class="col-span-2 text-[10px] text-slate-400 mt-1">⚠️ اگر این گزینه فعال باشد، هر ۲۴ ساعت پلن‌های حذف شده دوباره برمی‌گردند. برای جلوگیری از بازگشت، تیک را خاموش بگذارید. سرور ویژه در ربات به صورت ⭐ ویژه نمایش داده می‌شود.</p>
                     </div>
 
                     <div>

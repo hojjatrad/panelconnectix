@@ -4,7 +4,7 @@ require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Setting.php';
 
 class Updater {
-    public const CURRENT_VERSION = '6.8.18'; // FIX JSON parse error - bulletproof updater ajax-apply display_errors=0 + ob_end_clean
+    public const CURRENT_VERSION = '6.8.19'; // FIX JSON parse error - bulletproof updater ajax-apply display_errors=0 + ob_end_clean
 
     public static function getCurrentVersion(): string {
         $dbVer = Setting::get('current_version', '');
@@ -472,7 +472,7 @@ class Updater {
         while (ob_get_level() > 0) { @ob_end_clean(); }
         ob_start();
         
-        // v6.8.18: Early disk check - fail fast if <10MB
+        // v6.8.19: Early disk check - fail fast if <10MB
         $free = @disk_free_space(__DIR__.'/..');
         if ($free !== false && $free < 10*1024*1024) {
             $cleanupEarly = self::emergencyDiskCleanup();
@@ -487,7 +487,7 @@ class Updater {
         // CRITICAL v6.8.4: Emergency cleanup BEFORE any download to fix Disk quota exceeded
         $cleanup = self::emergencyDiskCleanup();
         
-        $check = self::checkForUpdates(false); // v6.8.18: Use cache for speed, avoid extra GitHub API call that causes 520
+        $check = self::checkForUpdates(false); // v6.8.19: Use cache for speed, avoid extra GitHub API call that causes 520
         // If cache says no update, force refresh once
         if (empty($check['has_update']) && empty($check['latest_version'])) {
             $check = self::checkForUpdates(true);
@@ -824,7 +824,7 @@ class Updater {
 
     public static function syncRootLanding(string $panelRoot): void {
         try {
-            // v6.8.18: Check setting - if user disabled promo at root, skip
+            // v6.8.19: Check setting - if user disabled promo at root, skip
             try {
                 require_once __DIR__ . '/Setting.php';
                 $showPromo = Setting::get('show_promo_at_root', '1');
