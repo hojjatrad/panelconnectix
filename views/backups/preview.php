@@ -1,3 +1,6 @@
+<?php
+require __DIR__ . '/../layout/header.php';
+?>
 <div class="p-6">
     <div class="flex items-center justify-between mb-6">
         <h1 class="text-xl font-bold text-white">👁️ پیش‌نمایش بکاپ #<?= $backup['id'] ?> - <?= htmlspecialchars($backup['server_name']) ?></h1>
@@ -71,3 +74,7 @@
         <a href="<?= Helpers::url('backups') ?>" class="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-sm">بازگشت به لیست</a>
     </div>
 </div>
+
+<?php
+require __DIR__ . '/../layout/footer.php';
+?>

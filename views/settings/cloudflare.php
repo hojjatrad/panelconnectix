@@ -1,3 +1,6 @@
+<?php
+require __DIR__ . '/../layout/header.php';
+?>
 <div class="p-6">
     <div class="flex items-center justify-between mb-6">
         <h1 class="text-2xl font-bold text-white flex items-center gap-3">
@@ -160,3 +163,7 @@
         <a href="<?= Helpers::url('../repair_cloudflare.php') ?>" target="_blank" class="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-sm">اجرای تعمیر 520</a>
     </div>
 </div>
+
+<?php
+require __DIR__ . '/../layout/footer.php';
+?>
