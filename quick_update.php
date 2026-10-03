@@ -4,8 +4,10 @@
  * CRITICAL FIX: Added emergency disk cleanup at start to fix "Disk quota exceeded" error
  */
 
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
+// v6.8.9 FINAL: Bulletproof - never output <br> before HTML, but allow HTML output
+error_reporting(E_ALL & ~E_NOTICE & ~E_DEPRECATED);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
 set_time_limit(300);
 ini_set('max_execution_time', 300);
 
@@ -161,7 +163,7 @@ function logStep($msg, $type = 'info') {
     flush();
 }
 
-logStep("شروع فرآیند به‌روزرسانی (Self-Healing Updater v6.8.5 - Disk Fix)...", 'info');
+logStep("شروع فرآیند به‌روزرسانی (Self-Healing Updater v6.8.9 - Disk Fix)...", 'info');
 logStep("پوشه نصب: " . __DIR__, 'info');
 if ($cleanupFreed > 0) {
     logStep("🧹 پاکسازی اضطراری دیسک: " . round($cleanupFreed/1024) . " KB آزاد شد (" . count($cleanupDeleted) . " فایل)", 'success');
@@ -498,10 +500,10 @@ try {
     require_once __DIR__ . '/core/Setting.php';
     require_once __DIR__ . '/core/TelegramBot.php';
 
-    Setting::set('current_version', '6.2.3');
+    Setting::set('current_version', '6.8.9');
     if (!empty($latestSha)) {
         Setting::set('last_installed_commit_sha', substr($latestSha, 0, 7));
-        Setting::set('last_installed_version', '6.2.3');
+        Setting::set('last_installed_version', '6.8.9');
     }
     Setting::set('update_check_cache', '');
     Setting::set('update_check_time', '0');
