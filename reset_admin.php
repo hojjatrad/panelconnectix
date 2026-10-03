@@ -1,5 +1,6 @@
 <?php
-// Reset Admin Password - v6.8.5 - Path Independent
+// Reset Admin Password - v6.8.6 - Path Independent - Final Fix
+// Upload to public_html/ and open https://yourdomain.com/reset_admin.php
 // Upload to public_html/ and open https://yourdomain.com/reset_admin.php
 // After use, DELETE this file!
 
@@ -27,13 +28,18 @@ try {
     }
     echo "</table><br>";
 
-    // If ?reset=1, reset admin password to admin123
+    // If ?reset=1, reset admin password to admin123 - v6.8.6 FIX: also set active
     if (isset($_GET['reset'])) {
         $newPass = $_GET['newpass'] ?? 'admin123';
         $hash = password_hash($newPass, PASSWORD_BCRYPT);
-        // Update all admins and first user
-        $stmt = $pdo->prepare("UPDATE users SET password_hash = ? WHERE role = 'admin' OR id = 1");
+        // Update all admins and first user, ensure active status
+        $stmt = $pdo->prepare("UPDATE users SET password_hash = ?, status = 'active', role = 'admin' WHERE role = 'admin' OR id = 1 OR username = 'admin'");
         $stmt->execute([$hash]);
+        // Also ensure custom admin if provided via ?user= parameter
+        if (!empty($_GET['user'])) {
+            $customUser = $_GET['user'];
+            $pdo->prepare("UPDATE users SET password_hash = ?, status = 'active', role = 'admin' WHERE username = ?")->execute([$hash, $customUser]);
+        }
         echo "<div style='background:#065f46;padding:12px;border-radius:8px;color:#10b981'>✅ پسورد تمام ادمین‌ها به <b>$newPass</b> تغییر کرد! تعداد: {$stmt->rowCount()}</div><br>";
         echo "<a href='login' style='background:#7c3aed;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none'>رفتن به لاگین</a><br><br>";
     } else {

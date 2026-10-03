@@ -195,22 +195,70 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $allPassed) {
                 throw new Exception("درایور پایگاه داده نامعتبر: $dbDriver");
             }
 
-            // Step 3: Insert / Update Admin User
+            // Step 3: Insert / Update Admin User - v6.8.6 FIX: Robust admin creation
             $adminHash = password_hash($adminPass, PASSWORD_BCRYPT);
             $adminApiToken = 'admin_secret_' . bin2hex(random_bytes(16));
 
-            $stmtCheck = $pdo->prepare("SELECT id FROM users WHERE username = ? OR id = 1");
-            $stmtCheck->execute([$adminUser]);
-            $existingAdmin = $stmtCheck->fetch();
+            // Ensure data dirs exist for session fix
+            $sessDir = __DIR__ . '/data/sessions';
+            $tmpDir = __DIR__ . '/data/tmp';
+            if (!is_dir($sessDir)) @mkdir($sessDir, 0755, true);
+            if (!is_dir($tmpDir)) @mkdir($tmpDir, 0755, true);
+            @file_put_contents($sessDir . '/.htaccess', "<IfModule mod_authz_core.c>\n    Require all denied\n</IfModule>\n<IfModule !mod_authz_core.c>\n    Order deny,allow\n    Deny from all\n</IfModule>\n");
+            @file_put_contents($tmpDir . '/.htaccess', "<IfModule mod_authz_core.c>\n    Require all denied\n</IfModule>\n<IfModule !mod_authz_core.c>\n    Order deny,allow\n    Deny from all\n</IfModule>\n");
 
-            if ($existingAdmin) {
-                $stmtAdmin = $pdo->prepare("UPDATE users SET username = ?, password_hash = ?, role = 'admin', full_name = 'مدیر ارشد سامانه', email = ?, api_token = ? WHERE id = ?");
-                $stmtAdmin->execute([$adminUser, $adminHash, $adminEmail, $adminApiToken, $existingAdmin['id']]);
-                $adminId = $existingAdmin['id'];
-            } else {
-                $stmtAdmin = $pdo->prepare("INSERT INTO users (username, password_hash, role, full_name, email, wallet_balance, api_token) VALUES (?, ?, 'admin', 'مدیر ارشد سامانه', ?, 0, ?)");
-                $stmtAdmin->execute([$adminUser, $adminHash, $adminEmail, $adminApiToken]);
-                $adminId = $pdo->lastInsertId();
+            // v6.8.6: Robust admin handling - check by username first, then id=1
+            $adminId = null;
+            try {
+                $stmtByUser = $pdo->prepare("SELECT id FROM users WHERE username = ? LIMIT 1");
+                $stmtByUser->execute([$adminUser]);
+                $byUsername = $stmtByUser->fetch(PDO::FETCH_ASSOC);
+
+                $stmtById = $pdo->prepare("SELECT id, username FROM users WHERE id = 1 LIMIT 1");
+                $stmtById->execute();
+                $byId = $stmtById->fetch(PDO::FETCH_ASSOC);
+
+                if ($byUsername) {
+                    // Update existing user with this username to be active admin
+                    $pdo->prepare("UPDATE users SET password_hash = ?, role = 'admin', status = 'active', full_name = 'مدیر ارشد سامانه', email = ?, api_token = ?, wallet_balance = 0 WHERE id = ?")
+                        ->execute([$adminHash, $adminEmail, $adminApiToken, $byUsername['id']]);
+                    $adminId = $byUsername['id'];
+                    // Also ensure id=1 if different and is 'admin' gets same password (avoid confusion)
+                    if ($byId && $byId['id'] != $adminId && $byId['username'] === 'admin') {
+                        $pdo->prepare("UPDATE users SET password_hash = ?, status = 'active', role = 'admin' WHERE id = 1")->execute([$adminHash]);
+                    }
+                } elseif ($byId) {
+                    // No user with custom name, but id=1 exists - update it
+                    $pdo->prepare("UPDATE users SET username = ?, password_hash = ?, role = 'admin', status = 'active', full_name = 'مدیر ارشد سامانه', email = ?, api_token = ?, wallet_balance = 0 WHERE id = 1")
+                        ->execute([$adminUser, $adminHash, $adminEmail, $adminApiToken]);
+                    $adminId = 1;
+                } else {
+                    // Fresh install - insert
+                    $stmtAdmin = $pdo->prepare("INSERT INTO users (username, password_hash, role, full_name, email, status, wallet_balance, api_token) VALUES (?, ?, 'admin', 'مدیر ارشد سامانه', ?, 'active', 0, ?)");
+                    $stmtAdmin->execute([$adminUser, $adminHash, $adminEmail, $adminApiToken]);
+                    $adminId = $pdo->lastInsertId();
+                }
+
+                // Ensure no duplicate admin with old 'admin' username if custom is different - keep but make sure it's active
+                // Also ensure at least one active admin exists
+                $pdo->exec("UPDATE users SET status = 'active' WHERE role = 'admin'");
+
+            } catch (Throwable $e) {
+                // Fallback simple insert
+                try {
+                    $stmtAdmin = $pdo->prepare("INSERT INTO users (username, password_hash, role, full_name, email, status, wallet_balance, api_token) VALUES (?, ?, 'admin', 'مدیر ارشد سامانه', ?, 'active', 0, ?) ON DUPLICATE KEY UPDATE password_hash = VALUES(password_hash), role = 'admin', status = 'active', email = VALUES(email)");
+                    if ($dbDriver === 'sqlite') {
+                        $stmtAdmin = $pdo->prepare("INSERT OR REPLACE INTO users (id, username, password_hash, role, full_name, email, status, wallet_balance, api_token) VALUES (1, ?, ?, 'admin', 'مدیر ارشد سامانه', ?, 'active', 0, ?)");
+                        $stmtAdmin->execute([$adminUser, $adminHash, $adminEmail, $adminApiToken]);
+                    } else {
+                        $stmtAdmin->execute([$adminUser, $adminHash, $adminEmail, $adminApiToken]);
+                    }
+                    $adminId = $pdo->lastInsertId() ?: 1;
+                } catch (Throwable $e2) {
+                    // Last resort
+                    $pdo->exec("INSERT INTO users (username, password_hash, role, full_name, email, status) VALUES ('" . addslashes($adminUser) . "', '" . addslashes($adminHash) . "', 'admin', 'مدیر ارشد', '" . addslashes($adminEmail) . "', 'active') ON DUPLICATE KEY UPDATE password_hash = '" . addslashes($adminHash) . "', status = 'active'");
+                    $adminId = 1;
+                }
             }
 
             // Step 4: Insert Branding Metadata
