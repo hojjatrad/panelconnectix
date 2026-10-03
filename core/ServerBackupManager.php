@@ -220,6 +220,16 @@ class ServerBackupManager {
         
         // پاکسازی قدیمی‌ها
         self::cleanupOldBackups($serverId, self::KEEP_COUNT);
+
+        // v6.9.0 PRO MAX: Auto send to Telegram if enabled and is_auto
+        if ($isAuto) {
+            try {
+                $autoSend = Setting::get('auto_backup_telegram', '0') === '1';
+                if ($autoSend && $fileSize < 45*1024*1024) { // Telegram limit 50MB
+                    self::sendToTelegram($backupId);
+                }
+            } catch (Throwable $e) {}
+        }
         
         return [
             'success' => true,

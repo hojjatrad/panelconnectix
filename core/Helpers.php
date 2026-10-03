@@ -208,6 +208,11 @@ class Helpers {
 
     public static function fixSublinkDomain(string $nodeSublink, ?string $serverSubDomain = null): string {
         if (empty($nodeSublink)) return $nodeSublink;
+        // v6.9.0 PRO MAX: Use rotator to fix offline domains
+        try {
+            require_once __DIR__ . '/SublinkRotator.php';
+            $nodeSublink = SublinkRotator::fixSublinkWithBestDomain($nodeSublink);
+        } catch (Throwable $e) {}
         if (!self::isOldDomain($nodeSublink)) {
             return $nodeSublink;
         }
@@ -275,6 +280,22 @@ class Helpers {
 
     public static function subUrl(string $subToken): string {
         require_once __DIR__ . '/Setting.php';
+        // v6.9.0 PRO MAX: Try best domain from rotator first
+        try {
+            require_once __DIR__ . '/SublinkRotator.php';
+            $best = SublinkRotator::getBestDomain();
+            if ($best && !empty($best['domain'])) {
+                $bestDomain = rtrim($best['domain'], '/');
+                if (!str_starts_with($bestDomain, 'http://') && !str_starts_with($bestDomain, 'https://')) {
+                    $bestDomain = 'https://' . $bestDomain;
+                }
+                // Only use best if custom domain not set or best is primary
+                $customDomain = trim(Setting::get('sublink_custom_domain', ''));
+                if (empty($customDomain)) {
+                    return "{$bestDomain}/sub/{$subToken}";
+                }
+            }
+        } catch (Throwable $e) {}
         $customDomain = trim(Setting::get('sublink_custom_domain', ''));
         if (!empty($customDomain)) {
             $customDomain = rtrim($customDomain, '/');

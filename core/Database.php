@@ -497,6 +497,70 @@ class Database {
                 ServerBackupManager::ensureTable();
             } catch (Throwable $e) {}
 
+            // v6.9.0 PRO MAX: Monitoring, Sync Queue, Sublink Domains
+            try {
+                $pdo->exec("CREATE TABLE IF NOT EXISTS server_monitor_logs (
+                    id $autoInc,
+                    server_id INT NOT NULL,
+                    latency_ms INT DEFAULT 0,
+                    status VARCHAR(32) DEFAULT 'online',
+                    error_message TEXT NULL,
+                    checked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_monitor_server (server_id),
+                    INDEX idx_monitor_checked (checked_at)
+                )");
+            } catch (Throwable $e) {}
+            try {
+                $pdo->exec("CREATE TABLE IF NOT EXISTS sync_queue (
+                    id $autoInc,
+                    server_id INT NOT NULL,
+                    type VARCHAR(32) DEFAULT 'full',
+                    status VARCHAR(32) DEFAULT 'pending',
+                    progress INT DEFAULT 0,
+                    total INT DEFAULT 100,
+                    result TEXT NULL,
+                    created_by INT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    started_at DATETIME NULL,
+                    finished_at DATETIME NULL,
+                    INDEX idx_queue_server (server_id),
+                    INDEX idx_queue_status (status)
+                )");
+            } catch (Throwable $e) {}
+            try {
+                $pdo->exec("CREATE TABLE IF NOT EXISTS sublink_domains (
+                    id $autoInc,
+                    domain VARCHAR(255) NOT NULL UNIQUE,
+                    is_active TINYINT(1) DEFAULT 1,
+                    is_primary TINYINT(1) DEFAULT 0,
+                    health_status VARCHAR(32) DEFAULT 'online',
+                    latency_ms INT DEFAULT 0,
+                    fail_count INT DEFAULT 0,
+                    last_checked_at DATETIME NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )");
+                // Seed default domains if empty
+                $cnt = (int)$pdo->query("SELECT COUNT(*) FROM sublink_domains")->fetchColumn();
+                if ($cnt === 0) {
+                    $pdo->exec("INSERT INTO sublink_domains (domain, is_active, is_primary, health_status) VALUES ('direct.vpbotn.ir', 1, 1, 'online')");
+                    $pdo->exec("INSERT INTO sublink_domains (domain, is_active, is_primary, health_status) VALUES ('vpbotn.ir', 1, 0, 'online')");
+                }
+            } catch (Throwable $e) {}
+            try {
+                $pdo->exec("CREATE TABLE IF NOT EXISTS financial_reports (
+                    id $autoInc,
+                    report_date DATE NOT NULL,
+                    server_id INT NULL,
+                    reseller_id INT NULL,
+                    total_sales INT DEFAULT 0,
+                    total_revenue BIGINT DEFAULT 0,
+                    total_clients INT DEFAULT 0,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(report_date, server_id, reseller_id)
+                )");
+            } catch (Throwable $e) {}
+
+
             $planCols = [
                 'show_in_bot' => 'TINYINT(1) DEFAULT 1',
                 'category' => "VARCHAR(64) DEFAULT '۱ ماهه'",

@@ -1561,15 +1561,6 @@ class ServerController {
      */
     public function fullSync(string $id = ''): void {
         Auth::requireAdmin();
-        @set_time_limit(300);
-        @ignore_user_abort(true);
-        @ini_set('memory_limit', '512M');
-        if (!headers_sent()) {
-            header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
-            header('Pragma: no-cache');
-            header('cf-cache-status: BYPASS');
-            header('X-Accel-Buffering: no');
-        }
         if (!Helpers::verifyCsrf()) {
             Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
             Helpers::redirect('servers');
@@ -1583,90 +1574,66 @@ class ServerController {
             Helpers::flash('error', 'سرور یافت نشد.');
             Helpers::redirect('servers');
         }
-        $importDetails = [];
+        // v6.9.0 PRO MAX: Use queue to avoid 520
         try {
-            require_once __DIR__ . '/../drivers/DriverFactory.php';
-            require_once __DIR__ . '/../core/CategoryManager.php';
-            require_once __DIR__ . '/../core/NodeSync.php';
-            $driver = DriverFactory::create($server);
-            $importedCats = 0;
-            $importedPlans = 0;
-            // 1. Categories
-            if (method_exists($driver, 'getVipPlans')) {
-                try {
-                    $plansData = $driver->getVipPlans();
-                    $groups = $plansData['groups'] ?? [];
-                    foreach ($groups as $g) {
-                        if (!is_array($g)) continue;
-                        $gName = trim($g['name'] ?? $g['title'] ?? '');
-                        if ($gName === '') continue;
-                        try {
-                            $cat = CategoryManager::findOrCreateCategory($pdo, $gName, null, 'servers');
-                            if ($cat) $importedCats++;
-                        } catch (Throwable $e) {}
-                    }
-                } catch (Throwable $e) {}
-            }
-            // 2. Plans - reuse logic from store()
-            try {
-                if (method_exists($driver, 'getVipPlans')) {
-                    $data = $driver->getVipPlans();
-                    $vipPlans = $data['plans'] ?? [];
-                    $vipGroups = $data['groups'] ?? [];
-                    foreach ($vipPlans as $vp) {
-                        try {
-                            if (!is_array($vp)) continue;
-                            $norm = CategoryManager::normalizePlan($vp, $vipGroups);
-                            $dup = $pdo->prepare("SELECT id FROM plans WHERE traffic_gb = ? AND duration_days = ? AND server_group = ? AND server_id = ? LIMIT 1");
-                            $dup->execute([$norm['traffic_gb'], $norm['duration_days'], $norm['server_group'], $id]);
-                            if ($dup->fetch()) continue;
-                            $dup2 = $pdo->prepare("SELECT id FROM plans WHERE vip_plan_id = ? LIMIT 1");
-                            $dup2->execute([$vp['id'] ?? '']);
-                            if ($dup2->fetch()) continue;
-                            $effGroup = $norm['server_group'];
-                            if ($norm['traffic_gb'] <= 0.5) $effGroup = 'free';
-                            $catRow = CategoryManager::findOrCreateVipCategory($pdo, $effGroup, $norm['duration_days'], 'plans');
-                            $catId = $catRow['id'] ?? null;
-                            $catName = $catRow['name'] ?? CategoryManager::canonicalFromDuration($norm['duration_days']);
-                            $basePrice = $norm['price'] ?? 120000;
-                            if (empty($basePrice) || $basePrice < 1000) {
-                                $basePrice = 120000;
-                                if ($norm['traffic_gb'] <= 0.5) $basePrice = 25000;
-                                elseif ($norm['traffic_gb'] <= 1) $basePrice = 50000;
-                                elseif ($norm['traffic_gb'] <= 10) $basePrice = 120000;
-                                elseif ($norm['traffic_gb'] <= 50) $basePrice = 300000;
-                                else $basePrice = 500000;
-                                if ($effGroup === 'economic') $basePrice = (int)($basePrice * 0.7);
-                                if ($effGroup === 'free') $basePrice = (int)($basePrice * 0.3);
-                            }
-                            $resellerPrice = (int)($basePrice * 0.7);
-                            $localTitle = str_replace(['Economic', 'Iran Access', 'Business Class'], ['اقتصادی', 'ایران‌اکسس', 'بیزنس'], $vp['title'] ?? 'پلن') . ' - VIP';
-                            $pdo->prepare("INSERT INTO plans (title, traffic_gb, duration_days, base_price, reseller_price, server_group, server_id, category, category_id, vip_plan_id, vip_group_id, vip_group_name, vip_plan_title, is_active, show_in_bot) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1)")
-                                ->execute([$localTitle, $norm['traffic_gb'], $norm['duration_days'], $basePrice, $resellerPrice, $effGroup, $id, $catName, $catId, $vp['id'] ?? null, $norm['group_id'], $norm['group_name'], $vp['title'] ?? '']);
-                            $importedPlans++;
-                        } catch (Throwable $e) {}
-                    }
+            require_once __DIR__ . '/../core/SyncQueue.php';
+            require_once __DIR__ . '/../core/ServerBackupManager.php';
+            // Auto backup before queue
+            ServerBackupManager::createBackup((int)$server['id'], 'full', true, 'بکاپ خودکار قبل از همگام‌سازی صف');
+            $queueRes = SyncQueue::create((int)$server['id'], 'full', Auth::id());
+            if ($queueRes['success']) {
+                // Try immediate processing for small servers, otherwise background
+                $queueId = $queueRes['id'];
+                // Process in background via cron or immediate if requested
+                if (!empty($_POST['immediate'])) {
+                    SyncQueue::process($queueId);
+                    $q = SyncQueue::get($queueId);
+                    $result = json_decode($q['result'] ?? '{}', true);
+                    Helpers::flash('success', "همگام‌سازی «{$server['name']}» انجام شد: ".($result['categories'] ?? 0)." دسته، ".($result['plans'] ?? 0)." پلن، ".($result['clients_added'] ?? 0)." کلاینت جدید - ساب‌لینک دقیق");
+                } else {
+                    Helpers::flash('success', "همگام‌سازی «{$server['name']}» به صف اضافه شد (#{$queueId}) - به صورت پس‌زمینه انجام می‌شود و نتیجه به تلگرام ارسال می‌گردد. می‌توانید پیشرفت را در /monitoring ببینید.");
                 }
-            } catch (Throwable $e) {}
-            // 3. Clients with exact sublink
-            // v6.8.28 PRO: Auto backup before full sync
-            try {
-                ServerBackupManager::createBackup((int)$server['id'], 'full', true, 'بکاپ خودکار قبل از همگام‌سازی کامل');
-            } catch (Throwable $e) {}
-            $clientStats = NodeSync::syncServer($pdo, $server);
-            $importDetails[] = $importedCats . ' دسته';
-            $importDetails[] = $importedPlans . ' پلن';
-            $importDetails[] = ($clientStats['added'] ?? 0) . ' کلاینت جدید';
-            $importDetails[] = ($clientStats['updated'] ?? 0) . ' به‌روزرسانی';
-            try {
-                $pdo->prepare("INSERT INTO server_sync_logs (server_id, action, details, created_at) VALUES (?, ?, ?, NOW())")
-                    ->execute([$server['id'], 'full_sync_manual', implode(' | ', $importDetails)]);
-            } catch (Throwable $e) {}
-            Helpers::flash('success', 'همگام‌سازی کامل «' . $server['name'] . '» انجام شد: ' . implode('، ', $importDetails) . ' - ساب‌لینک‌ها دقیقاً از سرور اصلی استخراج شدند.');
+            } else {
+                Helpers::flash('error', 'خطا در ایجاد صف: '.($queueRes['error'] ?? ''));
+            }
         } catch (Throwable $e) {
-            Helpers::flash('error', 'خطا در همگام‌سازی کامل: ' . $e->getMessage());
+            Helpers::flash('error', 'خطا: '.$e->getMessage());
         }
         Helpers::redirect('servers');
+    }
+
+    public function syncQueueStatus(string $id = ''): void {
+        Auth::requireAdmin();
+        $id = (int)$id;
+        require_once __DIR__ . '/../core/SyncQueue.php';
+        $queue = SyncQueue::get($id);
+        if (!$queue) {
+            header('Content-Type: application/json');
+            echo json_encode(['error'=>'not found']);
+            exit;
+        }
+        header('Content-Type: application/json');
+        header('Cache-Control: no-cache');
+        header('cf-cache-status: BYPASS');
+        echo json_encode($queue, JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    public function syncQueueProcess(string $id = ''): void {
+        Auth::requireAdmin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن نامعتبر');
+            Helpers::redirect('monitoring');
+        }
+        $id = (int)$id;
+        require_once __DIR__ . '/../core/SyncQueue.php';
+        $res = SyncQueue::process($id);
+        if ($res['success']) {
+            Helpers::flash('success', 'صف #'.$id.' با موفقیت پردازش شد');
+        } else {
+            Helpers::flash('error', 'خطا: '.($res['error'] ?? ''));
+        }
+        Helpers::redirect('monitoring');
     }
 
     /**

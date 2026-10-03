@@ -215,6 +215,16 @@ if (!function_exists('isActiveRoute')) {
                         <span>بکاپ‌های حرفه‌ای</span>
                         <span class="mr-auto text-[9px] bg-cyan-500/20 text-cyan-300 px-1.5 py-0.5 rounded-full border border-cyan-500/30">PRO</span>
                     </a>
+                    <a href="<?= Helpers::url('monitoring') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('monitoring', $currentUri) ? 'bg-emerald-600/15 text-emerald-300 font-bold border-r-2 border-emerald-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
+                        <i class="fa-solid fa-heart-pulse w-4 text-center text-emerald-400"></i>
+                        <span>مانیتورینگ زنده</span>
+                        <span class="mr-auto text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded-full border border-emerald-500/30">LIVE</span>
+                    </a>
+                    <a href="<?= Helpers::url('settings/sublink-domains') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('sublink-domains', $currentUri) ? 'bg-cyan-600/15 text-cyan-300 font-bold border-r-2 border-cyan-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
+                        <i class="fa-solid fa-globe w-4 text-center text-cyan-400"></i>
+                        <span>دامنه چرخشی</span>
+                        <span class="mr-auto text-[9px] bg-cyan-500/20 text-cyan-300 px-1.5 py-0.5 rounded-full border border-cyan-500/30">ANTI-FILTER</span>
+                    </a>
                 </div>
             </div>
             <?php endif; ?>
