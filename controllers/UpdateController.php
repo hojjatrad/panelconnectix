@@ -63,17 +63,30 @@ class UpdateController {
     }
 
     public function ajaxApply(): void {
-        // v6.8.9 FINAL - ABSOLUTELY BULLETPROOF JSON - deep audit fix
-        // 1. Clean ALL output buffers (nested)
+        // v6.8.12 FINAL - Fix Cloudflare 520 - shutdown handler + ignore abort + lightweight
         while (ob_get_level() > 0) { @ob_end_clean(); }
-        ob_start();
-        // 2. Force silence
         @ini_set('display_errors', '0');
         @ini_set('display_startup_errors', '0');
         @ini_set('log_errors', '1');
         @error_reporting(0);
+        @set_time_limit(0);
+        @ignore_user_abort(true);
         
-        // 3. Session path fix BEFORE any Auth
+        // Shutdown handler to guarantee JSON even on fatal error (prevents Cloudflare 520 empty response)
+        register_shutdown_function(function() {
+            $err = error_get_last();
+            if ($err && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
+                while (ob_get_level() > 0) { @ob_end_clean(); }
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode([
+                    'success' => false,
+                    'error' => 'خطای مرگبار PHP: ' . $err['message'] . ' در ' . basename($err['file']) . ':' . $err['line'] . ' - فضای آزاد: ' . round(@disk_free_space(__DIR__.'/..')/1024/1024,2) . 'MB - لطفاً quick_update.php را امتحان کنید',
+                    'is_fatal' => true
+                ], JSON_UNESCAPED_UNICODE);
+            }
+        });
+        
+        // Session path fix BEFORE any Auth - lightweight
         $sp = __DIR__ . '/../data/sessions';
         if (!is_dir($sp)) { @mkdir($sp, 0755, true); }
         if (is_dir($sp) && is_writable($sp)) {
@@ -82,18 +95,15 @@ class UpdateController {
                 @ini_set('session.save_path', $sp);
             }
         }
-        // Ensure session started
         if (session_status() === PHP_SESSION_NONE) { @session_start(); }
         
-        // 4. Auth check - but return JSON not redirect if fails (for AJAX)
+        // Auth check - return JSON not redirect
         try {
             if (empty($_SESSION['user_id'])) {
-                throw new Exception('نشست شما منقضی شده - لطفاً دوباره لاگین کنید');
+                throw new Exception('نشست منقضی شده - لطفاً دوباره لاگین کنید');
             }
-            // Check role via DB, not via requireAdmin which redirects
             $role = $_SESSION['role'] ?? null;
             if ($role !== 'admin') {
-                // Try to fetch from DB
                 try {
                     $pdo = Database::getConnection();
                     $stmt = $pdo->prepare("SELECT role FROM users WHERE id = ? LIMIT 1");
@@ -112,11 +122,11 @@ class UpdateController {
             exit;
         }
         
-        // 5. Set limits
         @set_time_limit(300);
         @ini_set('max_execution_time', '300');
         @ini_set('memory_limit', '512M');
         header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-cache, no-store, must-revalidate');
 
         $startTime = microtime(true);
         try {
@@ -124,7 +134,7 @@ class UpdateController {
         } catch (Throwable $e) {
             $result = [
                 'success' => false,
-                'error' => 'خطای سیستمی: ' . $e->getMessage() . ' (فایل: ' . basename($e->getFile()) . ':' . $e->getLine() . ')',
+                'error' => 'خطای سیستمی: ' . $e->getMessage() . ' (فایل: ' . basename($e->getFile()) . ':' . $e->getLine() . ') - فضای آزاد: ' . round(@disk_free_space(__DIR__.'/..')/1024/1024,2) . 'MB',
             ];
             try { Updater::emergencyDiskCleanup(); } catch (Throwable $e2) {}
         }
@@ -137,13 +147,12 @@ class UpdateController {
             $result['free_space_mb'] = 0;
         }
         
-        // 6. FINAL CLEAN - guarantee ONLY JSON
         while (ob_get_level() > 0) { @ob_end_clean(); }
         echo json_encode($result, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
         exit;
     }
 
-    public function saveSettings(): void {
+        public function saveSettings(): void {
         Auth::requireAdmin();
         if (!Helpers::verifyCsrf()) {
             Helpers::flash('error', 'توکن امنیتی نامعتبر است.');

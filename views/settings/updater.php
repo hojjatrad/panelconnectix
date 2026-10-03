@@ -363,7 +363,7 @@ function startLiveUpdate(e) {
             // Step 3: Extracting
             updateStepUI(3, 70, 'مرحله ۳ از ۵: استخراج فایل‌ها با موتور Pure PHP...');
 
-            // v6.8.9 FINAL: Bulletproof fetch - never fail with Unexpected token '<'
+            // v6.8.12 FINAL: Fix Cloudflare 520 - bulletproof + fallback to quick_update.php
             fetch('<?= Helpers::url('updater/ajax-apply') ?>', {
                 method: 'POST',
                 headers: {
@@ -374,12 +374,22 @@ function startLiveUpdate(e) {
             })
             .then(async res => {
                 const txt = await res.text();
+                // Detect Cloudflare 520/524 or HTML error page
+                if (txt.includes('520') && txt.includes('Web server is returning an unknown error')) {
+                    throw new Error('Cloudflare 520: سرور اصلی پاسخ نداد (احتمالاً تایم‌اوت یا خطای PHP). به صورت خودکار به quick_update.php منتقل می‌شوید...|FALLBACK_QUICK_UPDATE');
+                }
+                if (txt.includes('524') && txt.includes('timeout')) {
+                    throw new Error('Cloudflare 524 Timeout: عملیات طولانی شد. به quick_update.php منتقل می‌شوید...|FALLBACK_QUICK_UPDATE');
+                }
                 try {
                     return JSON.parse(txt);
                 } catch(e) {
-                    // Show first 600 chars of actual server response for debugging
                     console.error('Server returned non-JSON:', txt);
-                    throw new Error('پاسخ سرور JSON نبود (احتمالاً خطای PHP): ' + txt.substring(0,600).replace(/<[^>]*>/g,' ').trim());
+                    const clean = txt.substring(0,600).replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim();
+                    if (clean.includes('520') || clean.includes('unknown error') || txt.length < 10) {
+                        throw new Error('خطای 520 کلودفلر: ' + clean + '|FALLBACK_QUICK_UPDATE');
+                    }
+                    throw new Error('پاسخ سرور JSON نبود (احتمالاً خطای PHP): ' + clean);
                 }
             })
             .then(data => {
@@ -407,15 +417,31 @@ function startLiveUpdate(e) {
                         }, 2200);
                     }, 800);
                 } else {
-                    alert('خطا در ارتقای خودکار: ' + (data.error || 'خطای ناشناخته'));
+                    // If error mentions disk or extraction, suggest quick_update
+                    const errMsg = (data.error || 'خطای ناشناخته');
+                    if (errMsg.includes('قابل استخراج نیست') || errMsg.includes('Disk quota') || errMsg.includes('فضای دیسک')) {
+                        if (confirm('خطا: ' + errMsg + '\n\nآیا می‌خواهید از طریق quick_update.php (روش جایگزین بدون JSON) آپدیت کنید؟')) {
+                            window.location.href = '<?= Helpers::url('') ?>quick_update.php';
+                            return;
+                        }
+                    }
+                    alert('خطا در ارتقای خودکار: ' + errMsg);
                     window.location.reload();
                 }
             })
             .catch(err => {
-                alert('خطا در برقراری ارتباط با سرور: ' + err.message);
                 console.error(err);
-                // Don't auto-reload on error so user can see console
-                setTimeout(()=>window.location.reload(), 4000);
+                const msg = err.message || '';
+                if (msg.includes('FALLBACK_QUICK_UPDATE') || msg.includes('520') || msg.includes('524')) {
+                    const cleanMsg = msg.replace('|FALLBACK_QUICK_UPDATE','');
+                    if (confirm(cleanMsg + '\n\nاین خطای 520 کلودفلر به دلیل تایم‌اوت عملیات طولانی است.\n\nآیا می‌خواهید به روش جایگزین quick_update.php بروید؟ (این روش با HTML کار می‌کند و 520 نمی‌دهد)')) {
+                        window.location.href = '<?= Helpers::url('') ?>quick_update.php';
+                        return;
+                    }
+                }
+                alert('خطا در برقراری ارتباط با سرور: ' + msg);
+                // Don't auto-reload immediately, let user see
+                setTimeout(()=>window.location.reload(), 5000);
             });
         }, 800);
     }, 600);

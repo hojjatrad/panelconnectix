@@ -4,7 +4,7 @@ require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Setting.php';
 
 class Updater {
-    public const CURRENT_VERSION = '6.8.11'; // FIX JSON parse error - bulletproof updater ajax-apply display_errors=0 + ob_end_clean
+    public const CURRENT_VERSION = '6.8.12'; // FIX JSON parse error - bulletproof updater ajax-apply display_errors=0 + ob_end_clean
 
     public static function getCurrentVersion(): string {
         $dbVer = Setting::get('current_version', '');
@@ -472,10 +472,26 @@ class Updater {
         while (ob_get_level() > 0) { @ob_end_clean(); }
         ob_start();
         
+        // v6.8.12: Early disk check - fail fast if <10MB
+        $free = @disk_free_space(__DIR__.'/..');
+        if ($free !== false && $free < 10*1024*1024) {
+            $cleanupEarly = self::emergencyDiskCleanup();
+            $free = @disk_free_space(__DIR__.'/..');
+            if ($free !== false && $free < 5*1024*1024) {
+                while (ob_get_level() > 0) { @ob_end_clean(); }
+                @ini_set('display_errors', $prevDisplay);
+                @error_reporting($prevReporting);
+                return ['success' => false, 'error' => 'فضای دیسک بسیار کم: ' . round($free/1024/1024,2) . 'MB - لطفاً از cPanel فایل‌های لاگ و بکاپ را حذف کنید. پاکسازی انجام شد: ' . round(($cleanupEarly['free_space'] ?? 0)/1024/1024,2) . 'MB آزاد'];
+            }
+        }
         // CRITICAL v6.8.4: Emergency cleanup BEFORE any download to fix Disk quota exceeded
         $cleanup = self::emergencyDiskCleanup();
         
-        $check = self::checkForUpdates(true);
+        $check = self::checkForUpdates(false); // v6.8.12: Use cache for speed, avoid extra GitHub API call that causes 520
+        // If cache says no update, force refresh once
+        if (empty($check['has_update']) && empty($check['latest_version'])) {
+            $check = self::checkForUpdates(true);
+        }
 
         $repo = self::getRepo();
         $branch = self::getBranch();
@@ -543,7 +559,7 @@ class Updater {
         curl_setopt($ch, CURLOPT_URL, $zipUrl);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 90);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
 
@@ -566,7 +582,7 @@ class Updater {
             curl_setopt($ch, CURLOPT_URL, $zipUrl);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 90);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
             curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
             curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
             curl_setopt($ch, CURLOPT_HTTPHEADER, ['User-Agent: Connectix-Panel-Updater', 'Cache-Control: no-cache, no-store', 'Pragma: no-cache']);
