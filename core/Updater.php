@@ -4,7 +4,7 @@ require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Setting.php';
 
 class Updater {
-    public const CURRENT_VERSION = '6.8.4'; // Fix disk quota + version naming - emergency cleanup
+    public const CURRENT_VERSION = '6.8.5'; // Fix disk quota + version naming - emergency cleanup
 
     public static function getCurrentVersion(): string {
         $dbVer = Setting::get('current_version', '');

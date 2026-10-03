@@ -153,6 +153,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $allPassed) {
             } else {
                 $sqlitePath = __DIR__ . '/data/panel.sqlite';
                 if (!is_dir(dirname($sqlitePath))) mkdir(dirname($sqlitePath), 0777, true);
+                // v6.8.5 FIX: Create sessions dir for path-independent install
+                $sessionsPath = __DIR__ . '/data/sessions';
+                if (!is_dir($sessionsPath)) mkdir($sessionsPath, 0755, true);
+                // Protect sessions dir
+                @file_put_contents($sessionsPath . '/.htaccess', "<IfModule mod_authz_core.c>\n    Require all denied\n</IfModule>\n<IfModule !mod_authz_core.c>\n    Order deny,allow\n    Deny from all\n</IfModule>\n");
                 $pdo = new PDO('sqlite:' . $sqlitePath);
                 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             }

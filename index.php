@@ -38,6 +38,12 @@ $basePath = ($scriptDir === '/' || $scriptDir === '.') ? '' : rtrim($scriptDir, 
 
 // Direct install or repair route handling
 $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
+// v6.8.5 FIX: Path-independent routing - strip basePath from requestPath for consistent routing
+$basePathForRouting = $basePath;
+if (!empty($basePathForRouting) && str_starts_with($requestPath, $basePathForRouting)) {
+    $requestPath = substr($requestPath, strlen($basePathForRouting));
+    if (empty($requestPath)) $requestPath = '/';
+}
 $routeParam = $_GET['route'] ?? '';
 
 if (str_ends_with($requestPath, 'install.php') || str_ends_with($requestPath, '/install') || $routeParam === 'install.php' || $routeParam === 'install') {

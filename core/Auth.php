@@ -5,7 +5,18 @@ require_once __DIR__ . '/Helpers.php';
 class Auth {
     public static function init(): void {
         if (session_status() === PHP_SESSION_NONE) {
-            session_start();
+            // v6.8.5 FIX: Safe session start with custom path fallback
+            $savePath = __DIR__ . '/../data/sessions';
+            if (!is_dir($savePath)) {
+                @mkdir($savePath, 0755, true);
+            }
+            if (is_dir($savePath) && is_writable($savePath)) {
+                $current = ini_get('session.save_path');
+                if (empty($current) || !@is_dir($current) || strpos($current, 'ea-php84') !== false && !@is_dir($current)) {
+                    @ini_set('session.save_path', $savePath);
+                }
+            }
+            @session_start();
         }
     }
 

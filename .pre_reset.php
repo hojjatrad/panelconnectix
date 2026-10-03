@@ -1,10 +1,34 @@
 <?php
 /**
- * OPcache Self-Healing Prepend + Emergency Disk Cleanup (v6.8.4)
+ * OPcache Self-Healing Prepend + Emergency Disk Cleanup + Session Fix (v6.8.5)
  * Runs before EVERY PHP script in this directory, in EVERY PHP-FPM pool.
  * - After each deployment: resets OPcache once per pool
  * - When disk free < 50MB: auto-cleanup old backups and temp files
+ * - Fixes session save_path for cPanel (ea-php84 missing dir)
  */
+
+// === SESSION FIX v6.8.5 - Fix cPanel session path ===
+$__sessionDir = __DIR__ . '/data/sessions';
+if (!is_dir($__sessionDir)) {
+    @mkdir($__sessionDir, 0755, true);
+}
+if (is_dir($__sessionDir) && is_writable($__sessionDir)) {
+    // Only set if default path is not writable or missing
+    $__defaultPath = ini_get('session.save_path');
+    if (empty($__defaultPath) || !is_dir($__defaultPath) || !is_writable($__defaultPath)) {
+        @ini_set('session.save_path', $__sessionDir);
+    } else {
+        // Check if default path exists, if not, use our own
+        if (!@is_dir($__defaultPath)) {
+            @ini_set('session.save_path', $__sessionDir);
+        }
+    }
+    // Also check for ea-php84 specific issue
+    if (strpos(ini_get('session.save_path'), 'ea-php84') !== false && !is_dir(ini_get('session.save_path'))) {
+        @ini_set('session.save_path', $__sessionDir);
+    }
+}
+unset($__sessionDir, $__defaultPath);
 
 $__stampFile = __DIR__ . '/.deploy_stamp';
 if (is_file($__stampFile)) {
@@ -57,4 +81,3 @@ if ($__freeSpace !== false && $__freeSpace < 50*1024*1024) { // Less than 50MB f
     }
 }
 unset($__stampFile, $__stampM, $__doneMarker, $__old, $__f, $__freeSpace, $__tmpDir, $__rollback, $__it, $__file);
-

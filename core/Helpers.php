@@ -384,7 +384,16 @@ class Helpers {
 
     public static function csrfToken(): string {
         if (session_status() === PHP_SESSION_NONE) {
-            session_start();
+            // v6.8.5 FIX: Safe session start
+            $sp = __DIR__ . '/../data/sessions';
+            if (!is_dir($sp)) { @mkdir($sp, 0755, true); }
+            if (is_dir($sp) && is_writable($sp)) {
+                $cur = ini_get('session.save_path');
+                if (empty($cur) || !@is_dir($cur) || (strpos($cur, 'ea-php84') !== false && !@is_dir($cur))) {
+                    @ini_set('session.save_path', $sp);
+                }
+            }
+            @session_start();
         }
         if (empty($_SESSION['csrf_token'])) {
             $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
@@ -403,7 +412,16 @@ class Helpers {
 
     public static function verifyCsrf(): bool {
         if (session_status() === PHP_SESSION_NONE) {
-            session_start();
+            // v6.8.5 FIX: Safe session start
+            $sp = __DIR__ . '/../data/sessions';
+            if (!is_dir($sp)) { @mkdir($sp, 0755, true); }
+            if (is_dir($sp) && is_writable($sp)) {
+                $cur = ini_get('session.save_path');
+                if (empty($cur) || !@is_dir($cur) || (strpos($cur, 'ea-php84') !== false && !@is_dir($cur))) {
+                    @ini_set('session.save_path', $sp);
+                }
+            }
+            @session_start();
         }
         $token = $_POST['csrf_token'] ?? '';
         return !empty($token) && hash_equals($_SESSION['csrf_token'] ?? '', $token);
@@ -411,7 +429,16 @@ class Helpers {
 
     public static function flash(string $type, string $message): void {
         if (session_status() === PHP_SESSION_NONE) {
-            session_start();
+            // v6.8.5 FIX: Safe session start
+            $sp = __DIR__ . '/../data/sessions';
+            if (!is_dir($sp)) { @mkdir($sp, 0755, true); }
+            if (is_dir($sp) && is_writable($sp)) {
+                $cur = ini_get('session.save_path');
+                if (empty($cur) || !@is_dir($cur) || (strpos($cur, 'ea-php84') !== false && !@is_dir($cur))) {
+                    @ini_set('session.save_path', $sp);
+                }
+            }
+            @session_start();
         }
         $_SESSION['flash'] = [
             'type' => $type,
@@ -421,7 +448,16 @@ class Helpers {
 
     public static function getFlash(?string $type = null): ?array {
         if (session_status() === PHP_SESSION_NONE) {
-            session_start();
+            // v6.8.5 FIX: Safe session start
+            $sp = __DIR__ . '/../data/sessions';
+            if (!is_dir($sp)) { @mkdir($sp, 0755, true); }
+            if (is_dir($sp) && is_writable($sp)) {
+                $cur = ini_get('session.save_path');
+                if (empty($cur) || !@is_dir($cur) || (strpos($cur, 'ea-php84') !== false && !@is_dir($cur))) {
+                    @ini_set('session.save_path', $sp);
+                }
+            }
+            @session_start();
         }
         if (!empty($_SESSION['flash'])) {
             $flash = $_SESSION['flash'];
