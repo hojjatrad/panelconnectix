@@ -82,7 +82,14 @@ date_default_timezone_set('Asia/Tehran');
 if (!defined('APP_DEBUG')) {
     define('APP_DEBUG', __connectix_secret('APP_DEBUG', true));
 }
-if (APP_DEBUG) {
+// v6.8.9 CRITICAL: For AJAX updater, FORCE silence even if APP_DEBUG=true to prevent <br> before JSON
+$isAjaxUpdaterCfg = (defined('IS_AJAX_UPDATER') && IS_AJAX_UPDATER) || str_contains($_SERVER['REQUEST_URI'] ?? '', 'updater/ajax-apply') || ($_GET['route'] ?? '') === 'updater/ajax-apply';
+if ($isAjaxUpdaterCfg) {
+    ini_set('display_errors', 0);
+    ini_set('display_startup_errors', 0);
+    error_reporting(0);
+    while (ob_get_level() > 0) { @ob_end_clean(); }
+} elseif (APP_DEBUG) {
     ini_set('display_errors', 1);
     error_reporting(E_ALL & ~E_NOTICE & ~E_DEPRECATED);
 } else {

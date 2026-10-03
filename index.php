@@ -1,6 +1,25 @@
 <?php
-error_reporting(E_ALL & ~E_NOTICE & ~E_DEPRECATED);
-ini_set('display_errors', 1);
+// v6.8.9 CRITICAL: Detect AJAX updater BEFORE any output - force silent mode
+$__isAjaxUpdater = false;
+$__reqUri = $_SERVER['REQUEST_URI'] ?? '';
+$__routeParam = $_GET['route'] ?? '';
+if (str_contains($__reqUri, 'updater/ajax-apply') || $__routeParam === 'updater/ajax-apply' || str_contains($__reqUri, 'updater%2Fajax-apply')) {
+    $__isAjaxUpdater = true;
+}
+if ($__isAjaxUpdater) {
+    // ABSOLUTE SILENCE - never output <br> warnings before JSON
+    ini_set('display_errors', '0');
+    ini_set('display_startup_errors', '0');
+    error_reporting(0);
+    // Clean any pre-existing output buffers
+    while (ob_get_level() > 0) { @ob_end_clean(); }
+    ob_start();
+    define('IS_AJAX_UPDATER', true);
+} else {
+    error_reporting(E_ALL & ~E_NOTICE & ~E_DEPRECATED);
+    ini_set('display_errors', 1);
+    define('IS_AJAX_UPDATER', false);
+}
 
 // v6.8.7 FIX: Bulletproof session path - MUST be before any session_start
 $__sessFix = __DIR__ . '/data/sessions';
@@ -668,8 +687,17 @@ try {
     $errorLine = $e->getLine();
     error_log("Connectix Critical Error: {$errorMsg} in {$errorFile}:{$errorLine}");
     
-    // Check if it's an API request or sublink
+    // v6.8.9: If this is ajax-apply, ALWAYS return JSON never HTML
     $path = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
+    $route = $_GET['route'] ?? '';
+    $isAjaxUpdaterReq = (defined('IS_AJAX_UPDATER') && IS_AJAX_UPDATER) || str_contains($path, 'updater/ajax-apply') || $route === 'updater/ajax-apply' || str_contains($_SERVER['REQUEST_URI'] ?? '', 'updater/ajax-apply');
+    if ($isAjaxUpdaterReq) {
+        while (ob_get_level() > 0) { @ob_end_clean(); }
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => false, 'error' => 'خطای سیستمی: ' . $errorMsg . ' (' . $errorFile . ':' . $errorLine . ')'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    // Check if it's an API request or sublink
     if (str_contains($path, '/api/') || (isset($_GET['route']) && str_starts_with($_GET['route'], 'api/'))) {
         header('Content-Type: application/json; charset=utf-8');
         echo json_encode(['status' => 'error', 'message' => 'Internal Server Error: ' . $errorMsg], JSON_UNESCAPED_UNICODE);

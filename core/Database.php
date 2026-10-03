@@ -66,7 +66,13 @@ class Database {
                 }
                 self::ensureExtendedTablesExist(self::$instance);
             } catch (Throwable $e) {
-                if (defined('CONNECTIX_REPAIR') || defined('CONNECTIX_INSTALL') || (defined('CONNECTIX_NO_DIE') && CONNECTIX_NO_DIE)) {
+                if (defined('CONNECTIX_REPAIR') || defined('CONNECTIX_INSTALL') || (defined('CONNECTIX_NO_DIE') && CONNECTIX_NO_DIE) || (defined('IS_AJAX_UPDATER') && IS_AJAX_UPDATER)) {
+                    throw $e;
+                }
+                // v6.8.9: For AJAX updater, never die with HTML - throw instead
+                $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+                $isUpdaterRoute = str_contains($_SERVER['REQUEST_URI'] ?? '', 'updater/ajax-apply') || ($_GET['route'] ?? '') === 'updater/ajax-apply';
+                if ($isAjax || $isUpdaterRoute) {
                     throw $e;
                 }
                 die("<!DOCTYPE html><html lang='fa' dir='rtl'><head><meta charset='UTF-8'><title>خطای پایگاه داده</title><script src='https://cdn.tailwindcss.com'></script><style>@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700&display=swap'); *{font-family:'Vazirmatn',sans-serif;}</style></head><body class='bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center p-4'><div class='bg-slate-900 border border-rose-900/50 p-8 rounded-2xl max-w-md w-full text-center shadow-2xl space-y-4'><div class='w-16 h-16 rounded-2xl bg-rose-500/20 text-rose-400 mx-auto flex items-center justify-center text-3xl'>⚠️</div><h2 class='text-lg font-bold text-white'>خطا در ارتباط با دیتابیس</h2><p class='text-xs text-rose-300 leading-relaxed'>" . htmlspecialchars($e->getMessage()) . "</p><div class='pt-2'><a href='install.php?reinstall=1' class='inline-block w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs transition-all shadow-md'>ورود به نصب‌کننده و تنظیم مجدد دیتابیس</a></div></div></body></html>");

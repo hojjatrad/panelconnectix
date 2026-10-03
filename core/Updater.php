@@ -4,7 +4,7 @@ require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Setting.php';
 
 class Updater {
-    public const CURRENT_VERSION = '6.8.8'; // FIX JSON parse error - bulletproof updater ajax-apply display_errors=0 + ob_end_clean
+    public const CURRENT_VERSION = '6.8.9'; // FIX JSON parse error - bulletproof updater ajax-apply display_errors=0 + ob_end_clean
 
     public static function getCurrentVersion(): string {
         $dbVer = Setting::get('current_version', '');
@@ -463,12 +463,14 @@ class Updater {
      * Download ZIP and perform 1-Click Update.
      */
     public static function applyUpdate(bool $notify = true): array {
-        // v6.8.7 FIX: Bulletproof - suppress all warnings that break JSON
+        // v6.8.9 FINAL: ABSOLUTE SILENCE - prevent ANY <br> before JSON
         $prevDisplay = ini_get('display_errors');
         $prevReporting = error_reporting();
-        ini_set('display_errors', '0');
-        error_reporting(0);
-        if (ob_get_level()) { ob_start(); }
+        @ini_set('display_errors', '0');
+        @ini_set('display_startup_errors', '0');
+        @error_reporting(0);
+        while (ob_get_level() > 0) { @ob_end_clean(); }
+        ob_start();
         
         // CRITICAL v6.8.4: Emergency cleanup BEFORE any download to fix Disk quota exceeded
         $cleanup = self::emergencyDiskCleanup();
@@ -552,18 +554,18 @@ class Updater {
 
         if (!$zipData || $httpCode >= 400 || strlen($zipData) < 1000) {
             self::deleteDirectory($tmpDir);
-            if (ob_get_level()) { @ob_end_clean(); }
+            while (ob_get_level() > 0) { @ob_end_clean(); }
             @ini_set('display_errors', $prevDisplay);
             @error_reporting($prevReporting);
             return ['success' => false, 'error' => "خطا در دانلود فایل پکیج از گیت‌هاب (کد HTTP: {$httpCode})"];
         }
 
-        file_put_contents($zipFile, $zipData);
+        @file_put_contents($zipFile, $zipData);
 
         $extractPath = $tmpDir . '/extracted';
         if (!self::extractZip($zipFile, $extractPath)) {
             self::deleteDirectory($tmpDir);
-            if (ob_get_level()) { @ob_end_clean(); }
+            while (ob_get_level() > 0) { @ob_end_clean(); }
             @ini_set('display_errors', $prevDisplay);
             @error_reporting($prevReporting);
             return ['success' => false, 'error' => 'فایل فشرده دانلود شده قابل استخراج نیست.'];
@@ -585,14 +587,14 @@ class Updater {
         }
         if ($expectedVer !== '' && $pkgVer !== '' && version_compare($pkgVer, $expectedVer, '<')) {
             self::deleteDirectory($tmpDir);
-            if (ob_get_level()) { @ob_end_clean(); }
+            while (ob_get_level() > 0) { @ob_end_clean(); }
             @ini_set('display_errors', $prevDisplay);
             @error_reporting($prevReporting);
             return ['success' => false, 'error' => "فایل پکیج دریافت‌شده (نسخه {$pkgVer}) با انتظار ({$expectedVer}) مطابقت ندارد — اعمال نشد."];
         }
         if ($pkgVer !== '' && version_compare($pkgVer, $localVer, '<')) {
             self::deleteDirectory($tmpDir);
-            if (ob_get_level()) { @ob_end_clean(); }
+            while (ob_get_level() > 0) { @ob_end_clean(); }
             @ini_set('display_errors', $prevDisplay);
             @error_reporting($prevReporting);
             return ['success' => false, 'error' => "پکیج دریافت‌شده ({$pkgVer}) قدیمی‌تر از نسخه نصب‌شده ({$localVer}) است — اعمال نشد."];
@@ -646,8 +648,8 @@ class Updater {
             }
         } catch (Throwable $e) {}
 
-        // v6.8.7: Restore + clean buffer to guarantee JSON output
-        if (ob_get_level()) { @ob_end_clean(); }
+        // v6.8.9: Restore + CLEAN ALL buffers
+        while (ob_get_level() > 0) { @ob_end_clean(); }
         @ini_set('display_errors', $prevDisplay);
         @error_reporting($prevReporting);
 
@@ -722,7 +724,7 @@ class Updater {
                 $targetFile = $extractPath . '/' . $fileName;
                 @mkdir(dirname($targetFile), 0777, true);
                 if ($uncompressed !== false) {
-                    file_put_contents($targetFile, $uncompressed);
+                    @file_put_contents($targetFile, $uncompressed);
                     $fileCount++;
                 }
             }

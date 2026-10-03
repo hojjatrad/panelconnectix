@@ -363,7 +363,7 @@ function startLiveUpdate(e) {
             // Step 3: Extracting
             updateStepUI(3, 70, 'مرحله ۳ از ۵: استخراج فایل‌ها با موتور Pure PHP...');
 
-            // Call AJAX Apply
+            // v6.8.9 FINAL: Bulletproof fetch - never fail with Unexpected token '<'
             fetch('<?= Helpers::url('updater/ajax-apply') ?>', {
                 method: 'POST',
                 headers: {
@@ -372,7 +372,16 @@ function startLiveUpdate(e) {
                 },
                 body: 'csrf_token=' + encodeURIComponent('<?= Helpers::csrfToken() ?>')
             })
-            .then(res => res.json())
+            .then(async res => {
+                const txt = await res.text();
+                try {
+                    return JSON.parse(txt);
+                } catch(e) {
+                    // Show first 600 chars of actual server response for debugging
+                    console.error('Server returned non-JSON:', txt);
+                    throw new Error('پاسخ سرور JSON نبود (احتمالاً خطای PHP): ' + txt.substring(0,600).replace(/<[^>]*>/g,' ').trim());
+                }
+            })
             .then(data => {
                 if (data.success) {
                     // Step 4: Database & Sync
@@ -404,7 +413,9 @@ function startLiveUpdate(e) {
             })
             .catch(err => {
                 alert('خطا در برقراری ارتباط با سرور: ' + err.message);
-                window.location.reload();
+                console.error(err);
+                // Don't auto-reload on error so user can see console
+                setTimeout(()=>window.location.reload(), 4000);
             });
         }, 800);
     }, 600);

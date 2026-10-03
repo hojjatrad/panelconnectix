@@ -63,29 +63,60 @@ class UpdateController {
     }
 
     public function ajaxApply(): void {
-        // v6.8.7 FIX: Bulletproof JSON - never output HTML before JSON
-        // Clear any previous output and disable error display
-        if (ob_get_level()) { ob_end_clean(); }
+        // v6.8.9 FINAL - ABSOLUTELY BULLETPROOF JSON - deep audit fix
+        // 1. Clean ALL output buffers (nested)
+        while (ob_get_level() > 0) { @ob_end_clean(); }
         ob_start();
-        ini_set('display_errors', '0');
-        ini_set('display_startup_errors', '0');
-        error_reporting(0);
+        // 2. Force silence
+        @ini_set('display_errors', '0');
+        @ini_set('display_startup_errors', '0');
+        @ini_set('log_errors', '1');
+        @error_reporting(0);
         
-        // Ensure session path is correct before Auth check
+        // 3. Session path fix BEFORE any Auth
         $sp = __DIR__ . '/../data/sessions';
         if (!is_dir($sp)) { @mkdir($sp, 0755, true); }
         if (is_dir($sp) && is_writable($sp)) {
-            $cur = ini_get('session.save_path');
-            if (empty($cur) || strpos($cur, 'ea-php84') !== false || !@is_dir($cur) || !@is_writable($cur)) {
+            $cur = @ini_get('session.save_path');
+            if (empty($cur) || strpos($cur, 'ea-php84') !== false || !@is_dir($cur) || !@is_writable($cur) || $cur === '/tmp' || $cur === sys_get_temp_dir()) {
                 @ini_set('session.save_path', $sp);
             }
         }
+        // Ensure session started
+        if (session_status() === PHP_SESSION_NONE) { @session_start(); }
         
-        Auth::requireAdmin();
+        // 4. Auth check - but return JSON not redirect if fails (for AJAX)
+        try {
+            if (empty($_SESSION['user_id'])) {
+                throw new Exception('نشست شما منقضی شده - لطفاً دوباره لاگین کنید');
+            }
+            // Check role via DB, not via requireAdmin which redirects
+            $role = $_SESSION['role'] ?? null;
+            if ($role !== 'admin') {
+                // Try to fetch from DB
+                try {
+                    $pdo = Database::getConnection();
+                    $stmt = $pdo->prepare("SELECT role FROM users WHERE id = ? LIMIT 1");
+                    $stmt->execute([(int)$_SESSION['user_id']]);
+                    $role = $stmt->fetchColumn();
+                    $_SESSION['role'] = $role;
+                } catch (Throwable $e) {}
+                if ($role !== 'admin') {
+                    throw new Exception('دسترسی غیرمجاز - فقط ادمین');
+                }
+            }
+        } catch (Throwable $authEx) {
+            while (ob_get_level() > 0) { @ob_end_clean(); }
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['success' => false, 'error' => 'احراز هویت: ' . $authEx->getMessage()], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        
+        // 5. Set limits
+        @set_time_limit(300);
+        @ini_set('max_execution_time', '300');
+        @ini_set('memory_limit', '512M');
         header('Content-Type: application/json; charset=utf-8');
-        set_time_limit(300);
-        ini_set('max_execution_time', '300');
-        ini_set('memory_limit', '256M');
 
         $startTime = microtime(true);
         try {
@@ -94,19 +125,21 @@ class UpdateController {
             $result = [
                 'success' => false,
                 'error' => 'خطای سیستمی: ' . $e->getMessage() . ' (فایل: ' . basename($e->getFile()) . ':' . $e->getLine() . ')',
-                'details' => $e->getTraceAsString()
             ];
             try { Updater::emergencyDiskCleanup(); } catch (Throwable $e2) {}
         }
         $duration = round(microtime(true) - $startTime, 2);
-
         $result['duration'] = $duration . ' ثانیه';
         $result['finished_at'] = date('H:i:s (Y/m/d)');
-        $result['free_space_mb'] = round(disk_free_space(__DIR__ . '/..') / 1024 / 1024, 2);
+        try {
+            $result['free_space_mb'] = round(@disk_free_space(__DIR__ . '/..') / 1024 / 1024, 2);
+        } catch (Throwable $e) {
+            $result['free_space_mb'] = 0;
+        }
         
-        // Clean any stray output before JSON
-        if (ob_get_level()) { ob_end_clean(); }
-        echo json_encode($result, JSON_UNESCAPED_UNICODE);
+        // 6. FINAL CLEAN - guarantee ONLY JSON
+        while (ob_get_level() > 0) { @ob_end_clean(); }
+        echo json_encode($result, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
         exit;
     }
 

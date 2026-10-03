@@ -143,6 +143,14 @@ class Auth {
 
     public static function requireLogin(): void {
         if (!self::check()) {
+            // v6.8.9: If AJAX updater, return JSON not redirect HTML
+            $isAjaxUpdater = (defined('IS_AJAX_UPDATER') && IS_AJAX_UPDATER) || str_contains($_SERVER['REQUEST_URI'] ?? '', 'updater/ajax-apply') || ($_GET['route'] ?? '') === 'updater/ajax-apply' || (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest');
+            if ($isAjaxUpdater) {
+                while (ob_get_level() > 0) { @ob_end_clean(); }
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => false, 'error' => 'نشست منقضی شده - لطفاً دوباره لاگین کنید'], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
             Helpers::flash('error', 'لطفاً ابتدا وارد حساب کاربری خود شوید.');
             Helpers::redirect('login');
         }
@@ -165,6 +173,13 @@ class Auth {
     public static function requireAdmin(): void {
         self::requireLogin();
         if (!self::isAdmin()) {
+            $isAjaxUpdater = (defined('IS_AJAX_UPDATER') && IS_AJAX_UPDATER) || str_contains($_SERVER['REQUEST_URI'] ?? '', 'updater/ajax-apply') || ($_GET['route'] ?? '') === 'updater/ajax-apply' || (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest');
+            if ($isAjaxUpdater) {
+                while (ob_get_level() > 0) { @ob_end_clean(); }
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => false, 'error' => 'دسترسی غیرمجاز - فقط ادمین'], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
             Helpers::flash('error', 'دسترسی غیرمجاز! این بخش مخصوص مدیریت کل سیستم است.');
             Helpers::redirect('dashboard');
         }
