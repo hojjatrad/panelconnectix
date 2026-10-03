@@ -116,6 +116,18 @@ if (str_ends_with($requestPath, 'quick_update.php') || str_ends_with($requestPat
     exit;
 }
 
+// v6.8.32 Auto fix all
+if (str_ends_with($requestPath, 'auto_fix_all.php') || str_ends_with($requestPath, '/auto_fix_all') || $routeParam === 'auto_fix_all.php' || $routeParam === 'auto_fix_all') {
+    if (file_exists(__DIR__ . '/auto_fix_all.php')) {
+        require_once __DIR__ . '/auto_fix_all.php';
+    } elseif (file_exists(__DIR__ . '/connectix-panel/auto_fix_all.php')) {
+        require_once __DIR__ . '/connectix-panel/auto_fix_all.php';
+    } else {
+        echo "<h3>فایل auto_fix_all.php یافت نشد</h3>";
+    }
+    exit;
+}
+
 // v6.8.30 Cloudflare repair tool
 if (str_ends_with($requestPath, 'repair_cloudflare.php') || str_ends_with($requestPath, '/repair_cloudflare') || $routeParam === 'repair_cloudflare.php' || $routeParam === 'repair_cloudflare') {
     if (file_exists(__DIR__ . '/repair_cloudflare.php')) {
