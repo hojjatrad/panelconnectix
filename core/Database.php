@@ -539,11 +539,49 @@ class Database {
                     last_checked_at DATETIME NULL,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 )");
-                // Seed default domains if empty
+                // v6.9.1 PRO MAX: Dynamic seed based on current domain - 100% domain independent
                 $cnt = (int)$pdo->query("SELECT COUNT(*) FROM sublink_domains")->fetchColumn();
                 if ($cnt === 0) {
-                    $pdo->exec("INSERT INTO sublink_domains (domain, is_active, is_primary, health_status) VALUES ('direct.vpbotn.ir', 1, 1, 'online')");
-                    $pdo->exec("INSERT INTO sublink_domains (domain, is_active, is_primary, health_status) VALUES ('vpbotn.ir', 1, 0, 'online')");
+                    $currentDomain = '';
+                    if (!empty($_SERVER['HTTP_HOST'])) {
+                        $currentDomain = strtolower(trim($_SERVER['HTTP_HOST']));
+                        $currentDomain = preg_replace('/:\d+$/', '', $currentDomain);
+                        $currentDomain = preg_replace('/^www\./', '', $currentDomain);
+                    }
+                    if ($currentDomain !== '' && $currentDomain !== 'localhost' && $currentDomain !== '127.0.0.1') {
+                        $direct = 'direct.' . $currentDomain;
+                        $pdo->prepare("INSERT INTO sublink_domains (domain, is_active, is_primary, health_status) VALUES (?, 1, 1, 'online')")->execute([$direct]);
+                        $pdo->prepare("INSERT INTO sublink_domains (domain, is_active, is_primary, health_status) VALUES (?, 1, 0, 'online')")->execute([$currentDomain]);
+                        // Also try to ensure direct.vpbotn.ir still works as fallback if different
+                        if ($currentDomain !== 'vpbotn.ir' && $currentDomain !== 'direct.vpbotn.ir') {
+                            try { $pdo->prepare("INSERT IGNORE INTO sublink_domains (domain, is_active, is_primary, health_status) VALUES (?, 1, 0, 'online')")->execute(['direct.vpbotn.ir']); } catch (Throwable $e) {}
+                            try { $pdo->prepare("INSERT IGNORE INTO sublink_domains (domain, is_active, is_primary, health_status) VALUES (?, 1, 0, 'online')")->execute(['vpbotn.ir']); } catch (Throwable $e) {}
+                        }
+                    } else {
+                        // Fallback to defaults when no HTTP_HOST (CLI, cron)
+                        $pdo->exec("INSERT INTO sublink_domains (domain, is_active, is_primary, health_status) VALUES ('direct.vpbotn.ir', 1, 1, 'online')");
+                        $pdo->exec("INSERT INTO sublink_domains (domain, is_active, is_primary, health_status) VALUES ('vpbotn.ir', 1, 0, 'online')");
+                    }
+                } else {
+                    // v6.9.1: If current domain not in list, auto-add it (domain changed)
+                    try {
+                        $currentDomain = '';
+                        if (!empty($_SERVER['HTTP_HOST'])) {
+                            $currentDomain = strtolower(trim($_SERVER['HTTP_HOST']));
+                            $currentDomain = preg_replace('/:\d+$/', '', $currentDomain);
+                            $currentDomain = preg_replace('/^www\./', '', $currentDomain);
+                        }
+                        if ($currentDomain !== '' && !in_array($currentDomain, ['localhost','127.0.0.1'])) {
+                            $existing = $pdo->query("SELECT domain FROM sublink_domains")->fetchAll(PDO::FETCH_COLUMN);
+                            $direct = 'direct.' . $currentDomain;
+                            if (!in_array($direct, $existing)) {
+                                $pdo->prepare("INSERT INTO sublink_domains (domain, is_active, is_primary, health_status) VALUES (?, 1, 0, 'online')")->execute([$direct]);
+                            }
+                            if (!in_array($currentDomain, $existing)) {
+                                $pdo->prepare("INSERT INTO sublink_domains (domain, is_active, is_primary, health_status) VALUES (?, 1, 0, 'online')")->execute([$currentDomain]);
+                            }
+                        }
+                    } catch (Throwable $e) {}
                 }
             } catch (Throwable $e) {}
             try {

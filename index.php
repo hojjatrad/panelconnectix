@@ -105,6 +105,17 @@ if (str_ends_with($requestPath, 'fix_now.php') || str_ends_with($requestPath, '/
     exit;
 }
 
+// v6.9.1 PRO MAX: Auto domain migration - runs on every request, ensures domain independence
+try {
+    require_once __DIR__ . '/core/DomainMigrationManager.php';
+    // Only run once per hour to avoid overhead
+    $lastMigrationCheck = (int)Setting::get('last_domain_migration_check', '0');
+    if (time() - $lastMigrationCheck > 3600) {
+        DomainMigrationManager::autoMigrateIfNeeded();
+        Setting::set('last_domain_migration_check', (string)time());
+    }
+} catch (Throwable $e) {}
+
 if (str_ends_with($requestPath, 'quick_update.php') || str_ends_with($requestPath, '/quick_update') || $routeParam === 'quick_update.php' || $routeParam === 'quick_update') {
     if (file_exists(__DIR__ . '/quick_update.php')) {
         require_once __DIR__ . '/quick_update.php';

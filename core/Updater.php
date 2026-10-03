@@ -4,7 +4,7 @@ require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Setting.php';
 
 class Updater {
-    public const CURRENT_VERSION = '6.9.0'; // FIX JSON parse error - bulletproof updater ajax-apply display_errors=0 + ob_end_clean
+    public const CURRENT_VERSION = '6.9.1'; // Domain Independence - auto migration, seed sublink_domains, 100% domain-free
 
     public static function getCurrentVersion(): string {
         $dbVer = Setting::get('current_version', '');
