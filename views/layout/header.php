@@ -344,6 +344,12 @@ if (!function_exists('isActiveRoute')) {
                         <i class="fa-solid fa-credit-card w-4 text-center text-emerald-400"></i>
                         <span>کیف پول و تراکنش‌ها</span>
                     </a>
+                    <?php if (Auth::isAdmin()): ?>
+                    <a href="<?= Helpers::url('settings/bank-verification') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('bank-verification', $currentUri) ? 'bg-emerald-600/15 text-emerald-300 font-bold border-r-2 border-emerald-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
+                        <i class="fa-solid fa-building-columns w-4 text-center text-emerald-400"></i>
+                        <span>تایید خودکار بانکی 🤖</span>
+                    </a>
+                    <?php endif; ?>
                     <a href="<?= Helpers::url('tickets') ?>" class="flex items-center justify-between px-3 py-1.5 rounded-lg transition <?= isActiveRoute('tickets', $currentUri) ? 'bg-emerald-600/15 text-emerald-300 font-bold border-r-2 border-emerald-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
                         <span class="flex items-center gap-2.5">
                             <i class="fa-solid fa-headset w-4 text-center text-rose-400"></i>
@@ -396,6 +402,10 @@ if (!function_exists('isActiveRoute')) {
                     <a href="<?= Helpers::url('updater') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('updater', $currentUri) ? 'bg-teal-600/15 text-teal-300 font-bold border-r-2 border-teal-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
                         <i class="fa-brands fa-github w-4 text-center text-purple-400"></i>
                         <span>به‌روزرسانی پنل</span>
+                    </a>
+                    <a href="<?= Helpers::url('settings/switch_root') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('switch_root', $currentUri) ? 'bg-teal-600/15 text-teal-300 font-bold border-r-2 border-teal-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
+                        <i class="fa-solid fa-shuffle w-4 text-center text-cyan-400"></i>
+                        <span>صفحه اصلی دامنه</span>
                     </a>
                     <?php endif; ?>
                 </div>
