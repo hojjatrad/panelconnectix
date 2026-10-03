@@ -751,6 +751,12 @@ $router->post('onboarding/skip', [OnboardingController::class, 'skip']);
 // v7.0 ULTRA: Financial Reports PRO
 $router->get('financial', [FinancialController::class, 'index']);
 $router->get('financial/export', [FinancialController::class, 'export']);
+// v7.1 ULTRA COMPLETE: Loyalty, Usage History, Theme
+$router->get('resellers/points', [ResellerPointsController::class, 'index']);
+$router->get('reseller/points', [ResellerPointsController::class, 'myPoints']);
+$router->post('resellers/points/adjust', [ResellerPointsController::class, 'adjust']);
+$router->get('clients/{id}/usage', [ClientController::class, 'usageHistory']);
+$router->get('clients/{id}/usage-history', [ClientController::class, 'usageHistory']);
 $router->get('settings/bank-verification', [BankVerificationController::class, 'index']);
 $router->post('settings/bank-verification/save', [BankVerificationController::class, 'save']);
 $router->post('settings/bank-verification/test-sms', [BankVerificationController::class, 'testSms']);

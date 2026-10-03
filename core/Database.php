@@ -621,6 +621,33 @@ class Database {
                     UNIQUE(user_id)
                 )");
             } catch (Throwable $e) {}
+            // v7.1 ULTRA: Server system stats + client usage history
+            try {
+                $pdo->exec("CREATE TABLE IF NOT EXISTS server_system_stats (
+                    id $autoInc,
+                    server_id INT NOT NULL,
+                    cpu_percent FLOAT DEFAULT 0,
+                    ram_percent FLOAT DEFAULT 0,
+                    disk_percent FLOAT DEFAULT 0,
+                    uptime_seconds BIGINT DEFAULT 0,
+                    online_users INT DEFAULT 0,
+                    total_traffic BIGINT DEFAULT 0,
+                    checked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_sys_server (server_id),
+                    INDEX idx_sys_checked (checked_at)
+                )");
+            } catch (Throwable $e) {}
+            try {
+                $pdo->exec("CREATE TABLE IF NOT EXISTS client_usage_logs (
+                    id $autoInc,
+                    client_id INT NOT NULL,
+                    used_bytes BIGINT DEFAULT 0,
+                    total_bytes BIGINT DEFAULT 0,
+                    recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_usage_client (client_id),
+                    INDEX idx_usage_date (recorded_at)
+                )");
+            } catch (Throwable $e) {}
 
 
             $planCols = [

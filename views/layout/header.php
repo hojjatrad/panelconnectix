@@ -278,6 +278,11 @@ if (!function_exists('isActiveRoute')) {
                             <i class="fa-solid fa-file-invoice-dollar w-4 text-center text-emerald-400"></i>
                             <span>فاکتور ماهانه همکاران</span>
                         </a>
+                        <a href="<?= Helpers::url('resellers/points') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('resellers/points', $currentUri) ? 'bg-amber-600/15 text-amber-300 font-bold border-r-2 border-amber-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
+                            <i class="fa-solid fa-trophy w-4 text-center text-amber-400"></i>
+                            <span>امتیاز و وفاداری</span>
+                            <span class="mr-auto text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded-full border border-amber-500/30">LOYALTY</span>
+                        </a>
                     <?php else: ?>
                         <a href="<?= Helpers::url('reseller/orders') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('reseller/orders', $currentUri) ? 'bg-indigo-600/15 text-indigo-300 font-bold border-r-2 border-indigo-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
                             <i class="fa-solid fa-cart-shopping w-4 text-center text-cyan-400"></i>
@@ -310,6 +315,11 @@ if (!function_exists('isActiveRoute')) {
                         <a href="<?= Helpers::url('reseller/ai') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('reseller/ai', $currentUri) ? 'bg-indigo-600/15 text-indigo-300 font-bold border-r-2 border-indigo-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
                             <i class="fa-solid fa-robot w-4 text-center text-violet-400"></i>
                             <span>دستیار هوشمند (شارژ)</span>
+                        </a>
+                        <a href="<?= Helpers::url('reseller/points') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('reseller/points', $currentUri) ? 'bg-amber-600/15 text-amber-300 font-bold border-r-2 border-amber-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
+                            <i class="fa-solid fa-trophy w-4 text-center text-amber-400"></i>
+                            <span>امتیاز و جایزه من</span>
+                            <span class="mr-auto text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded-full border border-amber-500/30">LOYALTY</span>
                         </a>
                     <?php endif; ?>
                 </div>
@@ -497,6 +507,10 @@ if (!function_exists('isActiveRoute')) {
             </div>
 
             <div class="flex items-center gap-2.5">
+                <!-- Theme Toggle -->
+                <button onclick="toggleTheme()" id="themeToggle" class="w-9 h-9 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl flex items-center justify-center text-slate-400 hover:text-white transition" title="تغییر تم">
+                    <i class="fa-solid fa-moon text-xs" id="themeIcon"></i>
+                </button>
                 <!-- Search Quick -->
                 <button onclick="document.getElementById('quickSearchModal').classList.remove('hidden')" class="w-9 h-9 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl flex items-center justify-center text-slate-400 hover:text-white transition" title="جستجوی سریع (Ctrl+K)">
                     <i class="fa-solid fa-magnifying-glass text-xs"></i>
@@ -532,6 +546,32 @@ if (!function_exists('isActiveRoute')) {
             </div>
         </div>
         <script>
+        // Theme toggle ULTRA v7.1
+        function toggleTheme(){
+            const isDark = document.documentElement.classList.contains('dark') || document.body.classList.contains('bg-slate-950');
+            const newTheme = isDark ? 'light' : 'dark';
+            localStorage.setItem('theme', newTheme);
+            document.getElementById('themeIcon').className = newTheme==='dark' ? 'fa-solid fa-moon text-xs' : 'fa-solid fa-sun text-xs';
+            // For now just toggle class on html and show toast - full light theme needs Tailwind config
+            if(newTheme==='light'){
+                document.body.classList.remove('bg-slate-950','text-slate-100');
+                document.body.classList.add('bg-slate-50','text-slate-900');
+                document.querySelectorAll('.glass-card, .glass').forEach(el=>{
+                    el.style.background='rgba(255,255,255,0.9)';
+                    el.style.borderColor='rgba(0,0,0,0.08)';
+                });
+            } else {
+                document.body.classList.add('bg-slate-950','text-slate-100');
+                document.body.classList.remove('bg-slate-50','text-slate-900');
+                document.querySelectorAll('.glass-card, .glass').forEach(el=>{
+                    el.style.background='';
+                    el.style.borderColor='';
+                });
+            }
+        }
+        // Init theme
+        (function(){ const saved=localStorage.getItem('theme')||'dark'; document.getElementById('themeIcon').className = saved==='dark' ? 'fa-solid fa-moon text-xs' : 'fa-solid fa-sun text-xs'; })();
+
         // Live clock
         setInterval(()=>{ const el=document.getElementById('liveClock'); if(el){ const now=new Date(); el.textContent=now.toLocaleTimeString('fa-IR',{hour:'2-digit',minute:'2-digit'}); } },1000);
         // Ctrl+K quick search
