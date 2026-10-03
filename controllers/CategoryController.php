@@ -240,6 +240,13 @@ class CategoryController {
         // Delete category
         $pdo->prepare("DELETE FROM categories WHERE id = ?")->execute([$id]);
 
+        // v6.8.22: Global kill switch for categories - prevent resurrection
+        try {
+            require_once __DIR__ . '/../core/Setting.php';
+            Setting::set('categories_auto_seed_disabled', '1');
+            Setting::set('categories_last_deleted_at', date('Y-m-d H:i:s'));
+        } catch (Throwable $e) {}
+
         Helpers::logActivity('category_delete', "حذف دسته‌بندی شناسه {$id} و انتقال موارد وابسته به پیش‌فرض", 'category', (string)$id);
         Helpers::flash('info', 'دسته‌بندی حذف شد و سرورها و پلن‌های وابسته به دسته پیش‌فرض منتقل شدند.');
         Helpers::redirect('categories');
@@ -294,6 +301,124 @@ class CategoryController {
         } catch (Throwable $e) {}
 
         Helpers::flash('success', "✅ ادغام: {$mergeResult['merged']} دسته تکراری، {$fixedPlans} پلن اصلاح شد.");
+        Helpers::redirect('categories');
+    }
+
+    public function bulkDelete(): void {
+        Auth::requireAdmin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
+            Helpers::redirect('categories');
+        }
+
+        $ids = $_POST['ids'] ?? [];
+        if (empty($ids) || !is_array($ids)) {
+            Helpers::flash('error', 'هیچ دسته‌ای برای حذف انتخاب نشده.');
+            Helpers::redirect('categories');
+        }
+
+        // Filter and sanitize
+        $ids = array_map('intval', $ids);
+        $ids = array_filter($ids, fn($id) => $id > 1); // Don't delete default id 1
+        if (empty($ids)) {
+            Helpers::flash('error', 'دسته پیش‌فرض قابل حذف نیست.');
+            Helpers::redirect('categories');
+        }
+
+        $pdo = Database::getConnection();
+        $deleted = 0;
+        try {
+            $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+            if ($driver === 'mysql') $pdo->exec("SET FOREIGN_KEY_CHECKS=0");
+            else $pdo->exec("PRAGMA foreign_keys = OFF");
+
+            foreach ($ids as $id) {
+                // Reassign children
+                $stmtParent = $pdo->prepare("SELECT parent_id FROM categories WHERE id = ?");
+                $stmtParent->execute([$id]);
+                $parentRow = $stmtParent->fetch();
+                $newParentId = $parentRow['parent_id'] ?? null;
+
+                if ($newParentId) {
+                    $pdo->prepare("UPDATE categories SET parent_id = ? WHERE parent_id = ?")->execute([$newParentId, $id]);
+                } else {
+                    $pdo->prepare("UPDATE categories SET parent_id = NULL, level = 0 WHERE parent_id = ?")->execute([$id]);
+                }
+
+                $pdo->prepare("UPDATE server_nodes SET category_id = 1, server_group = 'default' WHERE category_id = ?")->execute([$id]);
+                $pdo->prepare("UPDATE plans SET category_id = 1, server_group = 'default' WHERE category_id = ?")->execute([$id]);
+                $pdo->prepare("DELETE FROM categories WHERE id = ?")->execute([$id]);
+                $deleted++;
+            }
+
+            if ($driver === 'mysql') $pdo->exec("SET FOREIGN_KEY_CHECKS=1");
+            else $pdo->exec("PRAGMA foreign_keys = ON");
+
+            // Kill switch
+            require_once __DIR__ . '/../core/Setting.php';
+            Setting::set('categories_auto_seed_disabled', '1');
+            Setting::set('categories_last_deleted_at', date('Y-m-d H:i:s'));
+            Setting::set('categories_bulk_deleted', (string)$deleted);
+
+            Helpers::flash('success', "✅ {$deleted} دسته‌بندی با موفقیت حذف شد و ایمپورت خودکار دسته‌ها غیرفعال شد تا دوباره برنگردند.");
+        } catch (Throwable $e) {
+            Helpers::flash('error', 'خطا در حذف گروهی: ' . $e->getMessage());
+        }
+        Helpers::redirect('categories');
+    }
+
+    public function purgeAll(): void {
+        Auth::requireAdmin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن نامعتبر');
+            Helpers::redirect('categories');
+        }
+        $pdo = Database::getConnection();
+        try {
+            $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+            if ($driver === 'mysql') $pdo->exec("SET FOREIGN_KEY_CHECKS=0");
+            else $pdo->exec("PRAGMA foreign_keys = OFF");
+
+            // Keep default id 1
+            $pdo->exec("DELETE FROM categories WHERE id > 1");
+            $pdo->exec("UPDATE server_nodes SET category_id = 1, server_group = 'default' WHERE category_id > 1");
+            $pdo->exec("UPDATE plans SET category_id = 1, server_group = 'default' WHERE category_id > 1");
+
+            if ($driver === 'mysql') $pdo->exec("SET FOREIGN_KEY_CHECKS=1");
+            else $pdo->exec("PRAGMA foreign_keys = ON");
+
+            require_once __DIR__ . '/../core/Setting.php';
+            Setting::set('categories_auto_seed_disabled', '1');
+            Setting::set('categories_purged_at', date('Y-m-d H:i:s'));
+
+            Helpers::flash('success', '🗑️ تمام دسته‌بندی‌ها به جز پیش‌فرض پاک شدند و ایمپورت خودکار غیرفعال شد.');
+        } catch (Throwable $e) {
+            Helpers::flash('error', 'خطا: '.$e->getMessage());
+        }
+        Helpers::redirect('categories');
+    }
+
+    public function enableAutoSeed(): void {
+        Auth::requireAdmin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن نامعتبر');
+            Helpers::redirect('categories');
+        }
+        require_once __DIR__ . '/../core/Setting.php';
+        Setting::set('categories_auto_seed_disabled', '0');
+        Helpers::flash('success', '✅ ایمپورت خودکار دسته‌بندی‌ها فعال شد.');
+        Helpers::redirect('categories');
+    }
+
+    public function disableAutoSeed(): void {
+        Auth::requireAdmin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن نامعتبر');
+            Helpers::redirect('categories');
+        }
+        require_once __DIR__ . '/../core/Setting.php';
+        Setting::set('categories_auto_seed_disabled', '1');
+        Helpers::flash('success', '🚫 ایمپورت خودکار دسته‌بندی‌ها غیرفعال شد. دیگر برنمی‌گردند.');
         Helpers::redirect('categories');
     }
 }

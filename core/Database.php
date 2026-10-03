@@ -567,8 +567,13 @@ class Database {
                 }
             } catch (Throwable $e) {}
 
-            // Seed Default Categories if empty
+            // Seed Default Categories if empty - v6.8.22: Respect kill switch
             try {
+                require_once __DIR__ . '/Setting.php';
+                $catSeedDisabled = Setting::get('categories_auto_seed_disabled','0') === '1';
+                if ($catSeedDisabled) {
+                    // Skip all auto-seeding if user disabled categories
+                } else {
                 $catCount = (int)$pdo->query("SELECT COUNT(*) FROM categories")->fetchColumn();
                 if ($catCount === 0) {
                     $defaultCats = [
@@ -745,6 +750,7 @@ class Database {
                         error_log("Category merge error: " . $e->getMessage());
                     }
                 }
+                } // end else for categories_auto_seed_disabled
             } catch (Throwable $e) {}
 
             // 3. Seed Default App Guides if empty or ensure proprietary Connectix apps are present

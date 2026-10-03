@@ -47,23 +47,43 @@ function renderCategoryOptions($cats, $byParent, $level = 0, $excludeId = null, 
                 <i class="fa-solid fa-diagram-project text-purple-400 ml-1"></i>
                 ساختار: سرور ویژه → اقتصادی/ویژه → ۱ماهه/۲ماهه → پلن‌ها
             </div>
+            <?php
+            $catSeedDisabled = \Setting::get('categories_auto_seed_disabled','0') === '1';
+            if ($catSeedDisabled): ?>
+                <span class="px-3 py-2 bg-emerald-950/50 text-emerald-300 border border-emerald-800/50 text-[11px] font-bold rounded-xl flex items-center gap-1.5">
+                    <i class="fa-solid fa-shield-halved"></i> ایمپورت خودکار دسته خاموش - برنمی‌گردند
+                </span>
+                <a href="<?= Helpers::url('categories/enable-auto-seed') ?>" onclick="return confirm('ایمپورت خودکار دسته‌ها فعال شود؟')" class="px-3 py-2 bg-amber-900/30 hover:bg-amber-900/50 text-amber-300 border border-amber-800/50 text-xs font-bold rounded-xl transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-power-off"></i> فعال‌سازی ایمپورت
+                </a>
+            <?php else: ?>
+                <span class="px-3 py-2 bg-amber-950/30 text-amber-300 border border-amber-800/30 text-[11px] font-bold rounded-xl flex items-center gap-1.5">
+                    <i class="fa-solid fa-arrows-rotate"></i> ایمپورت خودکار روشن
+                </span>
+                <a href="<?= Helpers::url('categories/disable-auto-seed') ?>" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold rounded-xl transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-ban"></i> خاموش کردن ایمپورت
+                </a>
+            <?php endif; ?>
             <form action="<?= Helpers::url('categories/merge_duplicates') ?>" method="POST" class="inline">
                 <?= Helpers::csrfField() ?>
                 <button type="submit" onclick="return confirm('آیا از ادغام دسته‌بندی‌های تکراری (مثل 1 ماهه و یک ماهه) اطمینان دارید؟')" class="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs transition-all shadow-lg shadow-amber-900/30 flex items-center gap-2">
                     <i class="fa-solid fa-code-merge"></i>
-                    <span>ادغام تکراری‌ها (هوشمند)</span>
+                    <span>ادغام تکراری‌ها</span>
                 </button>
             </form>
             <form action="<?= Helpers::url('categories/fix_all') ?>" method="POST" class="inline">
                 <?= Helpers::csrfField() ?>
                 <button type="submit" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition-all shadow-lg shadow-emerald-900/30 flex items-center gap-2">
                     <i class="fa-solid fa-wand-magic-sparkles"></i>
-                    <span>اصلاح خودکار همه (Fix All)</span>
+                    <span>Fix All</span>
                 </button>
             </form>
+            <a href="<?= Helpers::url('categories/purge-all') ?>" onclick="return confirm('⚠️ تمام دسته‌ها به جز پیش‌فرض پاک شوند؟ این کار ایمپورت خودکار را خاموش می‌کند.')" class="px-3 py-2.5 bg-rose-950/40 hover:bg-rose-900/50 text-rose-300 border border-rose-800/50 text-xs font-bold rounded-xl transition flex items-center gap-1.5">
+                <i class="fa-solid fa-trash-can"></i> پاکسازی همه (ضد بازگشت)
+            </a>
             <button onclick="openCreateCatModal()" class="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs transition-all shadow-lg shadow-purple-900/30 flex items-center gap-2">
                 <i class="fa-solid fa-plus"></i>
-                <span>افزودن دسته‌بندی جدید</span>
+                <span>افزودن دسته جدید</span>
             </button>
         </div>
     </div>
@@ -135,17 +155,31 @@ function renderCategoryOptions($cats, $byParent, $level = 0, $excludeId = null, 
         </button>
     </div>
 
-    <!-- Categories Tree Table -->
+    <!-- Categories Tree Table with Bulk Delete -->
+    <form id="bulkDeleteForm" action="<?= Helpers::url('categories/bulk-delete') ?>" method="POST" class="hidden">
+        <?= Helpers::csrfField() ?>
+        <div id="bulkIdsContainer"></div>
+    </form>
+
     <div class="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
         <div class="p-4 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2">
             <div class="font-bold text-sm text-white flex items-center gap-2">
                 <i class="fa-solid fa-list text-purple-400"></i>
                 <span>فهرست دسته‌ها (نمایش درختی)</span>
+                <span class="text-[11px] text-slate-400 font-normal" id="selectedCount"></span>
             </div>
-            <div class="flex items-center gap-2 text-[10px] text-slate-400">
-                <span class="flex items-center gap-1"><span class="w-3 h-0.5 bg-slate-600 inline-block"></span> سطح ۱ (ریشه)</span>
-                <span class="flex items-center gap-1"><span class="w-3 h-0.5 bg-purple-500 inline-block"></span> سطح ۲ (زیرشاخه)</span>
-                <span class="flex items-center gap-1"><span class="w-3 h-0.5 bg-cyan-500 inline-block"></span> سطح ۳ (نوه)</span>
+            <div class="flex items-center gap-2">
+                <button onclick="toggleSelectAll()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[11px] font-bold rounded-lg transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-check-double"></i> انتخاب همه
+                </button>
+                <button onclick="bulkDeleteSelected()" class="px-3 py-1.5 bg-rose-900/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/50 text-[11px] font-bold rounded-lg transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-trash-can"></i> حذف انتخاب شده‌ها (ضد بازگشت)
+                </button>
+                <div class="flex items-center gap-2 text-[10px] text-slate-400 mr-2">
+                    <span class="flex items-center gap-1"><span class="w-3 h-0.5 bg-slate-600 inline-block"></span> L1</span>
+                    <span class="flex items-center gap-1"><span class="w-3 h-0.5 bg-purple-500 inline-block"></span> L2</span>
+                    <span class="flex items-center gap-1"><span class="w-3 h-0.5 bg-cyan-500 inline-block"></span> L3</span>
+                </div>
             </div>
         </div>
 
@@ -153,6 +187,7 @@ function renderCategoryOptions($cats, $byParent, $level = 0, $excludeId = null, 
             <table class="w-full text-right text-xs">
                 <thead class="bg-slate-950/60 text-slate-400 border-b border-slate-800/80">
                     <tr>
+                        <th class="p-3.5 font-semibold"><input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()" class="rounded border-slate-600 bg-slate-800"></th>
                         <th class="p-3.5 font-semibold">ساختار درختی</th>
                         <th class="p-3.5 font-semibold">عنوان و نشانگر</th>
                         <th class="p-3.5 font-semibold">Slug / والد</th>
@@ -166,7 +201,7 @@ function renderCategoryOptions($cats, $byParent, $level = 0, $excludeId = null, 
                 <tbody class="divide-y divide-slate-800/60">
                     <?php if (empty($categories)): ?>
                         <tr>
-                            <td colspan="8" class="p-8 text-center text-slate-500">
+                            <td colspan="9" class="p-8 text-center text-slate-500">
                                 هیچ دسته‌بندی یافت نشد.
                             </td>
                         </tr>
@@ -195,6 +230,13 @@ function renderCategoryOptions($cats, $byParent, $level = 0, $excludeId = null, 
                                 if ($level > 0) $levelIndent .= '<span class="inline-block w-3 h-3 border-l border-b '.$levelColor.' ml-1 mr-1 rounded-bl"></span>';
                         ?>
                             <tr class="cat-row hover:bg-slate-800/30 transition-colors" data-type="<?= htmlspecialchars($c['type'] ?? 'both') ?>" data-level="<?= $level ?>" data-parent="<?= $c['parent_id'] ?? 0 ?>">
+                                <td class="p-3.5 text-center">
+                                    <?php if ((int)$c['id'] > 1): ?>
+                                        <input type="checkbox" class="cat-checkbox rounded border-slate-600 bg-slate-800 w-4 h-4" value="<?= $c['id'] ?>" onchange="updateSelectedCount()">
+                                    <?php else: ?>
+                                        <span class="text-[10px] text-slate-600">🔒</span>
+                                    <?php endif; ?>
+                                </td>
                                 <td class="p-3.5 text-slate-500 font-mono">
                                     <div class="flex items-center gap-1">
                                         <?= $levelIndent ?>
@@ -584,10 +626,55 @@ function closeEditCatModal() {
 }
 
 function confirmDeleteCat(id, name) {
-    if (confirm(`آیا از حذف دسته‌بندی «${name}» اطمینان دارید؟\nزیرشاخه‌های آن به ریشه منتقل می‌شوند و سرورها/پلن‌های عضو به پیش‌فرض می‌روند.`)) {
+    if (confirm(`آیا از حذف دسته‌بندی «${name}» اطمینان دارید؟\nزیرشاخه‌های آن به ریشه منتقل می‌شوند و سرورها/پلن‌های عضو به پیش‌فرض می‌روند.\n\n⚠️ ایمپورت خودکار دسته‌ها خاموش می‌شود تا دوباره برنگردد.`)) {
         document.getElementById('deleteCatId').value = id;
         document.getElementById('deleteCatForm').submit();
     }
+}
+
+function toggleSelectAll() {
+    const allCheckbox = document.getElementById('selectAllCheckbox');
+    const checkboxes = document.querySelectorAll('.cat-checkbox');
+    const isChecked = allCheckbox ? allCheckbox.checked : false;
+    // If called from button, toggle based on current state
+    let shouldCheck = isChecked;
+    if (event && event.target && event.target.tagName === 'BUTTON') {
+        const anyUnchecked = Array.from(checkboxes).some(cb => !cb.checked);
+        shouldCheck = anyUnchecked;
+        if (allCheckbox) allCheckbox.checked = shouldCheck;
+    }
+    checkboxes.forEach(cb => cb.checked = shouldCheck);
+    updateSelectedCount();
+}
+
+function updateSelectedCount() {
+    const checkboxes = document.querySelectorAll('.cat-checkbox:checked');
+    const count = checkboxes.length;
+    const el = document.getElementById('selectedCount');
+    if (el) {
+        el.textContent = count > 0 ? `(${count} انتخاب شده)` : '';
+    }
+}
+
+function bulkDeleteSelected() {
+    const checkboxes = document.querySelectorAll('.cat-checkbox:checked');
+    if (checkboxes.length === 0) {
+        alert('هیچ دسته‌ای انتخاب نشده است.');
+        return;
+    }
+    if (!confirm(`⚠️ آیا از حذف ${checkboxes.length} دسته‌بندی انتخاب شده اطمینان دارید؟\n\nزیرشاخه‌ها به ریشه منتقل می‌شوند و پلن‌ها/سرورها به پیش‌فرض می‌روند.\n\n🚫 ایمپورت خودکار دسته‌ها خاموش می‌شود تا دیگر برنگردند.`)) {
+        return;
+    }
+    const container = document.getElementById('bulkIdsContainer');
+    container.innerHTML = '';
+    checkboxes.forEach(cb => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'ids[]';
+        input.value = cb.value;
+        container.appendChild(input);
+    });
+    document.getElementById('bulkDeleteForm').submit();
 }
 </script>
 

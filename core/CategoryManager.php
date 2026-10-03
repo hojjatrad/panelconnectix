@@ -108,7 +108,27 @@ class CategoryManager {
      * 2. Search by exact name, slug, alias, duration
      * 3. Only create if truly not exists
      */
-    public static function findOrCreateCategory(PDO $pdo, string $name, ?int $durationDays = null, string $type = 'plans'): array {
+    public static function findOrCreateCategory(PDO $pdo, string $name, ?int $durationDays = null, string $type = 'plans'): ?array {
+        // v6.8.22: Respect global kill switch for categories
+        try {
+            require_once __DIR__ . '/Setting.php';
+            if (Setting::get('categories_auto_seed_disabled','0') === '1') {
+                // Only find, never create
+                $canonicalTmp = self::normalizeCategoryName($name);
+                $stmtTmp = $pdo->prepare("SELECT * FROM categories WHERE name = ? LIMIT 1");
+                $stmtTmp->execute([$canonicalTmp]);
+                $existing = $stmtTmp->fetch(PDO::FETCH_ASSOC);
+                if ($existing) return $existing;
+                // Also try slug
+                $slugTmp = self::slugify($canonicalTmp);
+                $stmtTmp = $pdo->prepare("SELECT * FROM categories WHERE slug = ? LIMIT 1");
+                $stmtTmp->execute([$slugTmp]);
+                $existing = $stmtTmp->fetch(PDO::FETCH_ASSOC);
+                if ($existing) return $existing;
+                return null; // Don't create when disabled
+            }
+        } catch (Throwable $e) {}
+
         $canonical = self::normalizeCategoryName($name);
         if ($durationDays !== null) {
             // If duration provided, canonical from duration takes priority if name is variant
@@ -395,7 +415,30 @@ class CategoryManager {
      * Find or create hierarchical category for VIP: Type (parent) -> Duration (child)
      * Returns child category row (duration) with parent_id set
      */
-    public static function findOrCreateVipCategory(PDO $pdo, string $serverGroup, int $durationDays, string $type = 'plans'): array {
+    public static function findOrCreateVipCategory(PDO $pdo, string $serverGroup, int $durationDays, string $type = 'plans'): ?array {
+        // v6.8.22: Respect global kill switch for categories
+        try {
+            require_once __DIR__ . '/Setting.php';
+            if (Setting::get('categories_auto_seed_disabled','0') === '1') {
+                // Try to find existing, but don't create
+                $parentSlugTmp = self::getVipTypeSlug($serverGroup);
+                $stmtTmp = $pdo->prepare("SELECT * FROM categories WHERE slug = ? LIMIT 1");
+                $stmtTmp->execute([$parentSlugTmp]);
+                $existing = $stmtTmp->fetch(PDO::FETCH_ASSOC);
+                if ($existing) {
+                    // Try child
+                    $durationCanonicalTmp = self::canonicalFromDuration($durationDays);
+                    $childSlugTmp = $parentSlugTmp . '_' . self::slugify($durationCanonicalTmp);
+                    $stmtTmp = $pdo->prepare("SELECT * FROM categories WHERE slug = ? LIMIT 1");
+                    $stmtTmp->execute([$childSlugTmp]);
+                    $child = $stmtTmp->fetch(PDO::FETCH_ASSOC);
+                    if ($child) return $child;
+                    return $existing;
+                }
+                return null;
+            }
+        } catch (Throwable $e) {}
+
         // 1. Ensure parent type category exists
         $parentLabel = self::getVipTypeLabel($serverGroup);
         $parentSlug = self::getVipTypeSlug($serverGroup);
