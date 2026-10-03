@@ -1541,7 +1541,7 @@ class ServerController {
         }
         $importDetails = [];
         try {
-            require_once __DIR__ . '/../core/DriverFactory.php';
+            require_once __DIR__ . '/../drivers/DriverFactory.php';
             require_once __DIR__ . '/../core/CategoryManager.php';
             require_once __DIR__ . '/../core/NodeSync.php';
             $driver = DriverFactory::create($server);
