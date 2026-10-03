@@ -701,6 +701,10 @@ class TelegramBotController {
 
         // Customer Actions: Pay via Wallet Instant 1-Click
         if (str_starts_with($data, 'pay_wallet_')) {
+            if (Setting::get('bot_pay_wallet_enabled','1') !== '1') {
+                TelegramBot::sendMessage("⚠️ پرداخت از کیف‌پول در حال حاضر غیرفعال است.", $chatId);
+                return;
+            }
             $orderId = (int)str_replace('pay_wallet_', '', $data);
             self::processWalletPayment($pdo, $orderId, $chatId, $fromId, $messageId);
             return;
@@ -739,8 +743,12 @@ class TelegramBotController {
             return;
         }
 
-        // Customer Actions: Pay via Card
+        // Customer Actions: Pay via Card - v6.8.21 check if enabled
         if (str_starts_with($data, 'pay_card_')) {
+            if (Setting::get('bot_pay_card_enabled','1') !== '1') {
+                TelegramBot::sendMessage("⚠️ روش پرداخت کارت به کارت در حال حاضر غیرفعال است. لطفاً روش دیگری انتخاب کنید یا با پشتیبانی تماس بگیرید.", $chatId);
+                return;
+            }
             $orderId = (int)str_replace('pay_card_', '', $data);
             $stmt = $pdo->prepare("SELECT o.*, p.title as plan_title FROM bot_orders o LEFT JOIN plans p ON o.plan_id = p.id WHERE o.id = ?");
             $stmt->execute([$orderId]);
@@ -1114,15 +1122,23 @@ class TelegramBotController {
             return;
         }
 
-        // Crypto Payment Trigger
+        // Crypto Payment Trigger - v6.8.21 check if enabled
         if (str_starts_with($data, 'pay_crypto_')) {
+            if (Setting::get('bot_pay_usdt_enabled','1') !== '1') {
+                TelegramBot::sendMessage("⚠️ روش پرداخت تتر (USDT) در حال حاضر غیرفعال است.", $chatId);
+                return;
+            }
             $orderId = (int)str_replace('pay_crypto_', '', $data);
             self::showCryptoPayment($pdo, $chatId, $fromId, $orderId, $messageId);
             return;
         }
 
-        // TON Payment Trigger
+        // TON Payment Trigger - v6.8.21 check if enabled
         if (str_starts_with($data, 'pay_ton_')) {
+            if (Setting::get('bot_pay_ton_enabled','1') !== '1') {
+                TelegramBot::sendMessage("⚠️ روش پرداخت تون (TON) در حال حاضر غیرفعال است.", $chatId);
+                return;
+            }
             $orderId = (int)str_replace('pay_ton_', '', $data);
             self::showTonPayment($pdo, $chatId, $fromId, $orderId, $messageId);
             return;
@@ -1186,30 +1202,42 @@ class TelegramBotController {
         $invoice = BeautifulInvoice::renderPreInvoice($order, $userWallet);
         $msg = $invoice['text'];
 
+        // v6.8.21: Payment methods toggles
+        $payCardEnabled = Setting::get('bot_pay_card_enabled','1') === '1';
+        $payUsdtEnabled = Setting::get('bot_pay_usdt_enabled','1') === '1';
+        $payTonEnabled = Setting::get('bot_pay_ton_enabled','1') === '1';
+        $payWalletEnabled = Setting::get('bot_pay_wallet_enabled','1') === '1';
+
         $buttons = [];
-        if ($userWallet >= (int)$order['amount']) {
-            $buttons[] = [
-                ['text' => '⚡️ پرداخت آنی از موجودی کیف‌پول (' . number_format($userWallet) . ' تومان)', 'callback_data' => 'pay_wallet_' . $orderId]
-            ];
-        } else {
-            $deficit = (int)$order['amount'] - $userWallet;
-            $buttons[] = [
-                ['text' => '💳 موجودی: ' . number_format($userWallet) . ' ت (کسری: ' . number_format($deficit) . ' ت)', 'callback_data' => 'charge_wallet_for_' . $orderId]
-            ];
+        if ($payWalletEnabled) {
+            if ($userWallet >= (int)$order['amount']) {
+                $buttons[] = [
+                    ['text' => '⚡️ پرداخت آنی از موجودی کیف‌پول (' . number_format($userWallet) . ' تومان)', 'callback_data' => 'pay_wallet_' . $orderId]
+                ];
+            } else {
+                $deficit = (int)$order['amount'] - $userWallet;
+                $buttons[] = [
+                    ['text' => '💳 موجودی: ' . number_format($userWallet) . ' ت (کسری: ' . number_format($deficit) . ' ت)', 'callback_data' => 'charge_wallet_for_' . $orderId]
+                ];
+            }
         }
 
-        $buttons[] = [
-            ['text' => '💳 کارت به کارت', 'callback_data' => 'pay_card_' . $orderId],
-            ['text' => '🪙 پرداخت تتر (USDT)', 'callback_data' => 'pay_crypto_' . $orderId]
-        ];
+        $payRow = [];
+        if ($payCardEnabled) $payRow[] = ['text' => '💳 کارت به کارت', 'callback_data' => 'pay_card_' . $orderId];
+        if ($payUsdtEnabled) $payRow[] = ['text' => '🪙 پرداخت تتر (USDT)', 'callback_data' => 'pay_crypto_' . $orderId];
+        if (!empty($payRow)) $buttons[] = $payRow;
 
-        $tonAndCoupon = [
-            ['text' => '💎 پرداخت با تون (TON)', 'callback_data' => 'pay_ton_' . $orderId]
-        ];
+        $tonAndCoupon = [];
+        if ($payTonEnabled) $tonAndCoupon[] = ['text' => '💎 پرداخت با تون (TON)', 'callback_data' => 'pay_ton_' . $orderId];
         if (empty($order['coupon_code'])) {
             $tonAndCoupon[] = ['text' => '🎟 کد تخفیف', 'callback_data' => 'apply_coupon_' . $orderId];
         }
-        $buttons[] = $tonAndCoupon;
+        if (!empty($tonAndCoupon)) $buttons[] = $tonAndCoupon;
+
+        // If all payment methods disabled, show warning but still allow cancel
+        if (!$payCardEnabled && !$payUsdtEnabled && !$payTonEnabled && !$payWalletEnabled) {
+            $msg .= "\n\n⚠️ <b>در حال حاضر هیچ روش پرداختی فعال نیست. لطفاً با پشتیبانی تماس بگیرید.</b>";
+        }
 
         $buttons[] = [
             ['text' => '❌ انصراف از سفارش', 'callback_data' => 'cancel_order_' . $orderId]
@@ -1351,21 +1379,30 @@ class TelegramBotController {
         $uRow = $stmtUser->fetch();
         $userWallet = (int)($uRow['wallet_balance'] ?? 0) + (int)($uRow['referral_balance'] ?? 0);
 
+        // v6.8.21: Payment methods toggles
+        $payCardEnabled = Setting::get('bot_pay_card_enabled','1') === '1';
+        $payUsdtEnabled = Setting::get('bot_pay_usdt_enabled','1') === '1';
+        $payTonEnabled = Setting::get('bot_pay_ton_enabled','1') === '1';
+        $payWalletEnabled = Setting::get('bot_pay_wallet_enabled','1') === '1';
+
         $buttons = [];
-        if ($userWallet >= (int)$order['amount']) {
-            $buttons[] = [['text' => '⚡️ پرداخت آنی از کیف‌پول (' . number_format($userWallet) . ' ت)', 'callback_data' => 'pay_wallet_' . $orderId]];
-        } else {
-            $deficit = (int)$order['amount'] - $userWallet;
-            $buttons[] = [['text' => '💳 موجودی: ' . number_format($userWallet) . ' ت (کسری: ' . number_format($deficit) . ' ت)', 'callback_data' => 'charge_wallet_for_' . $orderId]];
+        if ($payWalletEnabled) {
+            if ($userWallet >= (int)$order['amount']) {
+                $buttons[] = [['text' => '⚡️ پرداخت آنی از کیف‌پول (' . number_format($userWallet) . ' ت)', 'callback_data' => 'pay_wallet_' . $orderId]];
+            } else {
+                $deficit = (int)$order['amount'] - $userWallet;
+                $buttons[] = [['text' => '💳 موجودی: ' . number_format($userWallet) . ' ت (کسری: ' . number_format($deficit) . ' ت)', 'callback_data' => 'charge_wallet_for_' . $orderId]];
+            }
         }
-        $buttons[] = [
-            ['text' => '💳 کارت به کارت', 'callback_data' => 'pay_card_' . $orderId],
-            ['text' => '🪙 تتر', 'callback_data' => 'pay_crypto_' . $orderId]
-        ];
-        $buttons[] = [
-            ['text' => '💎 تون', 'callback_data' => 'pay_ton_' . $orderId],
-            ['text' => '❌ انصراف', 'callback_data' => 'cancel_order_' . $orderId]
-        ];
+        $payRow = [];
+        if ($payCardEnabled) $payRow[] = ['text' => '💳 کارت به کارت', 'callback_data' => 'pay_card_' . $orderId];
+        if ($payUsdtEnabled) $payRow[] = ['text' => '🪙 تتر', 'callback_data' => 'pay_crypto_' . $orderId];
+        if (!empty($payRow)) $buttons[] = $payRow;
+        
+        $tonRow = [];
+        if ($payTonEnabled) $tonRow[] = ['text' => '💎 تون', 'callback_data' => 'pay_ton_' . $orderId];
+        $tonRow[] = ['text' => '❌ انصراف', 'callback_data' => 'cancel_order_' . $orderId];
+        $buttons[] = $tonRow;
 
         $keyboard = ['inline_keyboard' => $buttons];
         if ($messageId) {
@@ -2551,8 +2588,29 @@ class TelegramBotController {
 
         $allPlans = self::getPlansForReseller($pdo, $resellerId);
 
+        // v6.8.21: Robust empty check - if no plans OR no active servers, show proper message
         if (empty($allPlans)) {
-            $emptyText = "در حال حاضر پلنی برای فروش در این ربات فعال نیست.";
+            $emptyText = "🚫 <b>در حال حاضر پلنی برای فروش وجود ندارد</b>\n\n";
+            // Check why
+            try {
+                $plansCount = (int)$pdo->query("SELECT COUNT(*) FROM plans WHERE is_active=1")->fetchColumn();
+                $serversCount = (int)$pdo->query("SELECT COUNT(*) FROM server_nodes WHERE is_active=1")->fetchColumn();
+                if ($plansCount === 0 && $serversCount === 0) {
+                    $emptyText .= "❌ هیچ پلن و سروری در پنل تعریف نشده است.\n\n";
+                    $emptyText .= "👨‍💼 مدیر گرامی: لطفاً ابتدا از بخش مدیریت:\n";
+                    $emptyText .= "1️⃣ یک سرور فعال اضافه کنید\n";
+                    $emptyText .= "2️⃣ سپس پلن‌های فروش را تعریف کنید\n\n";
+                    $emptyText .= "بعد از آن ربات به صورت خودکار پلن‌ها را نمایش خواهد داد.";
+                } elseif ($plansCount === 0) {
+                    $emptyText .= "❌ هیچ پلنی در سیستم تعریف نشده.\nلطفاً از پنل مدیریت، بخش پلن‌ها، پلن جدید اضافه کنید.";
+                } elseif ($serversCount === 0) {
+                    $emptyText .= "❌ هیچ سرور فعالی وجود ندارد.\nلطفاً از پنل مدیریت، بخش سرورها، سرور فعال اضافه کنید.";
+                } else {
+                    $emptyText .= "پلن‌ها وجود دارند اما برای این ربات فعال نیستند یا نمایش در ربات غیرفعال است.";
+                }
+            } catch (Throwable $e) {
+                $emptyText .= "لطفاً بعداً تلاش کنید یا با پشتیبانی تماس بگیرید.";
+            }
             $kb = ['inline_keyboard' => [[['text' => '🔙 بازگشت به منوی اصلی', 'callback_data' => 'menu_main']]]];
             if ($messageId) {
                 TelegramBot::editMessageText($emptyText, $chatId, $messageId, $kb, $botToken);
@@ -2561,6 +2619,21 @@ class TelegramBotController {
             }
             return;
         }
+
+        // v6.8.21: Also check if no active servers at all
+        try {
+            $activeServers = (int)$pdo->query("SELECT COUNT(*) FROM server_nodes WHERE is_active=1")->fetchColumn();
+            if ($activeServers === 0) {
+                $emptyText = "🚫 <b>هیچ سرور فعالی وجود ندارد</b>\n\nلطفاً از پنل مدیریت یک سرور فعال اضافه کنید.";
+                $kb = ['inline_keyboard' => [[['text' => '🔙 بازگشت به منوی اصلی', 'callback_data' => 'menu_main']]]];
+                if ($messageId) {
+                    TelegramBot::editMessageText($emptyText, $chatId, $messageId, $kb, $botToken);
+                } else {
+                    TelegramBot::sendMessage($emptyText, $chatId, $kb, $botToken);
+                }
+                return;
+            }
+        } catch (Throwable $e) {}
 
         // Parse hierarchy
         $parsedServer = $selectedServer;
@@ -2800,7 +2873,17 @@ class TelegramBotController {
                     }
                 }
             }
-            if (empty($serverFilteredPlans)) $serverFilteredPlans = $allPlans;
+            // v6.8.21: Don't fallback to all plans if filtered empty - show empty message for that server
+            if (empty($serverFilteredPlans)) {
+                $emptyText = "🚫 <b>برای سرور {$serverName} پلنی یافت نشد</b>\n\nلطفاً سرور دیگری انتخاب کنید یا با پشتیبانی تماس بگیرید.";
+                $kb = ['inline_keyboard' => [[['text' => '🔙 بازگشت به انتخاب سرور', 'callback_data' => 'menu_buy']]]];
+                if ($messageId) {
+                    TelegramBot::editMessageText($emptyText, $chatId, $messageId, $kb, $botToken);
+                } else {
+                    TelegramBot::sendMessage($emptyText, $chatId, $kb, $botToken);
+                }
+                return;
+            }
         } else {
             if (count($serversMap) === 1) {
                 $onlySrv = array_values($serversMap)[0];
@@ -2809,7 +2892,11 @@ class TelegramBotController {
                 $parsedServer = $onlySrv['slug'] . '_' . $onlySrv['id'];
                 $parsedServerId = (string)$onlySrv['id'];
                 $serverFilteredPlans = array_values(array_filter($allPlans, fn($p) => (string)($p['server_id'] ?? '0') === $parsedServerId));
-                if (empty($serverFilteredPlans)) $serverFilteredPlans = $allPlans;
+                // v6.8.21: If single server has no plans, show its plans? If empty, show all to avoid dead end, but check
+                if (empty($serverFilteredPlans)) {
+                    // If single server but no plans tied to it, show all plans (maybe plans have server_id 0)
+                    $serverFilteredPlans = $allPlans;
+                }
             }
         }
 
@@ -4016,35 +4103,49 @@ class TelegramBotController {
         $cardHolder = $ctx['card']['holder'];
         $cardSheba = $ctx['card']['shaba'];
 
+        // v6.8.21: Payment toggles for wallet topup
+        $payCardEnabled = Setting::get('bot_pay_card_enabled','1') === '1';
+        $payUsdtEnabled = Setting::get('bot_pay_usdt_enabled','1') === '1';
+        $payTonEnabled = Setting::get('bot_pay_ton_enabled','1') === '1';
+
         $msg = "💳 <b>درخواست شارژ حساب کاربری ({$ctx['brand_name']})</b>\n\n"
              . "💰 <b>مبلغ واریزی:</b> <b>" . number_format($amount) . " تومان</b>\n";
         if ($bonusAmount > 0) {
             $msg .= "🎁 <b>هدیه ویژه ({$bonusPct}٪):</b> <b>+" . number_format($bonusAmount) . " تومان</b>\n"
                   . "💎 <b>اعتبار نهایی پس از تایید:</b> <b>" . number_format($totalWillCredit) . " تومان</b>\n";
         }
-        $msg .= "🔖 <b>شناسه سفارش شارژ:</b> <code>{$orderCode}</code>\n"
-              . "──────────────\n"
-              . "🔢 <b>شماره کارت مقصد:</b>\n<code>{$cardNumber}</code>\n"
-              . "👤 <b>به نام:</b> {$cardHolder}\n";
+        $msg .= "🔖 <b>شناسه سفارش شارژ:</b> <code>{$orderCode}</code>\n";
 
-        if (!empty($cardSheba)) {
-            $msg .= "📌 <b>شماره شبا:</b>\n<code>{$cardSheba}</code>\n";
+        if ($payCardEnabled) {
+            $msg .= "──────────────\n"
+                  . "🔢 <b>شماره کارت مقصد:</b>\n<code>{$cardNumber}</code>\n"
+                  . "👤 <b>به نام:</b> {$cardHolder}\n";
+            if (!empty($cardSheba)) {
+                $msg .= "📌 <b>شماره شبا:</b>\n<code>{$cardSheba}</code>\n";
+            }
+            $msg .= "\n⚠️ <b>دستورالعمل شارژ:</b>\n"
+                  . "۱. مبلغ فوق را به شماره کارت بالا انتقال دهید.\n"
+                  . "۲. سپس <b>عکس رسید فیش واریزی</b> یا <b>شماره پیگیری تراکنش</b> را همین‌جا ارسال فرمایید.\n\n"
+                  . "<i>پس از تایید ادمین، مبلغ بلافاصله به کیف‌پول شما واریز خواهد شد.</i>";
+        } else {
+            $msg .= "\n💡 <b>روش‌های پرداخت فعال:</b>\n";
+            if ($payUsdtEnabled) $msg .= "🪙 تتر (USDT)\n";
+            if ($payTonEnabled) $msg .= "💎 تون (TON)\n";
+            if (!$payUsdtEnabled && !$payTonEnabled) {
+                $msg .= "⚠️ هیچ روش پرداختی فعال نیست! با پشتیبانی تماس بگیرید.\n";
+            } else {
+                $msg .= "\nلطفاً از دکمه‌های زیر روش پرداخت را انتخاب کنید.";
+            }
         }
 
-        $msg .= "\n⚠️ <b>دستورالعمل شارژ:</b>\n"
-              . "۱. مبلغ فوق را به شماره کارت بالا انتقال دهید.\n"
-              . "۲. سپس <b>عکس رسید فیش واریزی</b> یا <b>شماره پیگیری تراکنش</b> را همین‌جا ارسال فرمایید.\n\n"
-              . "<i>پس از تایید ادمین، مبلغ بلافاصله به کیف‌پول شما واریز خواهد شد.</i>";
-
-        $buttons = [
-            [
-                ['text' => '🪙 پرداخت با تتر (USDT)', 'callback_data' => 'pay_crypto_' . $orderId],
-                ['text' => '💎 پرداخت با تون (TON)', 'callback_data' => 'pay_ton_' . $orderId]
-            ],
-            [
-                ['text' => '❌ انصراف', 'callback_data' => 'cancel_order_' . $orderId],
-                ['text' => '🔙 بازگشت به کیف‌پول', 'callback_data' => 'menu_wallet']
-            ]
+        $buttons = [];
+        $cryptoRow = [];
+        if ($payUsdtEnabled) $cryptoRow[] = ['text' => '🪙 پرداخت با تتر (USDT)', 'callback_data' => 'pay_crypto_' . $orderId];
+        if ($payTonEnabled) $cryptoRow[] = ['text' => '💎 پرداخت با تون (TON)', 'callback_data' => 'pay_ton_' . $orderId];
+        if (!empty($cryptoRow)) $buttons[] = $cryptoRow;
+        $buttons[] = [
+            ['text' => '❌ انصراف', 'callback_data' => 'cancel_order_' . $orderId],
+            ['text' => '🔙 بازگشت به کیف‌پول', 'callback_data' => 'menu_wallet']
         ];
 
         $kb = ['inline_keyboard' => $buttons];
@@ -4393,6 +4494,12 @@ class TelegramBotController {
         Setting::set('crypto_usdt_rate', (string)(int)($_POST['crypto_usdt_rate'] ?? 98000));
         Setting::set('crypto_ton_wallet_address', trim($_POST['crypto_ton_wallet_address'] ?? ''));
         Setting::set('crypto_ton_rate', (string)(int)($_POST['crypto_ton_rate'] ?? 380000));
+
+        // v6.8.21: Payment methods toggles for bot
+        Setting::set('bot_pay_card_enabled', isset($_POST['bot_pay_card_enabled']) ? '1' : '0');
+        Setting::set('bot_pay_usdt_enabled', isset($_POST['bot_pay_usdt_enabled']) ? '1' : '0');
+        Setting::set('bot_pay_ton_enabled', isset($_POST['bot_pay_ton_enabled']) ? '1' : '0');
+        Setting::set('bot_pay_wallet_enabled', isset($_POST['bot_pay_wallet_enabled']) ? '1' : '0');
 
         Helpers::flash('success', 'تنظیمات ربات تلگرام، جوین اجباری، موضوعات انجمن و دکمه‌ها با موفقیت ذخیره شد.');
         Helpers::redirect('settings/bot');

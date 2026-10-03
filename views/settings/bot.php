@@ -38,6 +38,13 @@ $cryptoUsdtWallet = $settings['crypto_usdt_trc20_address'] ?? '';
 $cryptoUsdtRate = $settings['crypto_usdt_rate'] ?? '98000';
 $cryptoTonWallet = $settings['crypto_ton_wallet_address'] ?? '';
 $cryptoTonRate = $settings['crypto_ton_rate'] ?? '380000';
+
+// v6.8.21: Payment methods toggles for bot
+$payCardEnabled = ($settings['bot_pay_card_enabled'] ?? '1') === '1';
+$payUsdtEnabled = ($settings['bot_pay_usdt_enabled'] ?? '1') === '1';
+$payTonEnabled = ($settings['bot_pay_ton_enabled'] ?? '1') === '1';
+$payWalletEnabled = ($settings['bot_pay_wallet_enabled'] ?? '1') === '1';
+
 $trialEnabled = ($settings['trial_enabled'] ?? '1') === '1';
 $trialHours = $settings['trial_duration_hours'] ?? '24';
 $trialGb = $settings['trial_traffic_gb'] ?? '1';
@@ -326,6 +333,73 @@ $isWebhookSet = !empty($webhookInfo['result']['url'] ?? '');
                         <div>
                             <label class="block text-[11px] font-medium text-slate-400 mb-1">آدرس ولت TON (Tonkeeper / Wallet)</label>
                             <input type="text" name="crypto_ton_wallet_address" value="<?= htmlspecialchars($cryptoTonWallet) ?>" placeholder="EQD4FPq-PRDieyQKkKZjmNu49pKypDryHyRMvzkBhzsJw6-h" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono text-left" dir="ltr">
+                        </div>
+                    </div>
+
+                    <!-- v6.8.21: Payment Methods Toggles for Bot -->
+                    <div class="pt-3 border-t border-slate-800/80 space-y-3">
+                        <div class="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                            <i class="fa-solid fa-toggle-on"></i>
+                            <span>فعال / غیرفعال کردن روش‌های پرداخت در ربات</span>
+                        </div>
+                        <p class="text-[10px] text-slate-400">انتخاب کنید کدام روش‌های پرداخت در ربات نمایش داده شوند. حداقل یک روش باید فعال باشد.</p>
+                        
+                        <div class="grid grid-cols-1 gap-2">
+                            <div class="flex items-center justify-between p-3 bg-slate-950/60 rounded-xl border border-slate-800/80">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center text-sm"><i class="fa-solid fa-credit-card"></i></span>
+                                    <div>
+                                        <div class="text-xs font-bold text-white">💳 کارت به کارت</div>
+                                        <div class="text-[10px] text-slate-400">واریز دستی + ارسال فیش</div>
+                                    </div>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" name="bot_pay_card_enabled" value="1" class="sr-only peer" <?= $payCardEnabled ? 'checked' : '' ?>>
+                                    <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                                </label>
+                            </div>
+
+                            <div class="flex items-center justify-between p-3 bg-slate-950/60 rounded-xl border border-slate-800/80">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-sm"><i class="fa-solid fa-coins"></i></span>
+                                    <div>
+                                        <div class="text-xs font-bold text-white">🪙 تتر (USDT TRC20)</div>
+                                        <div class="text-[10px] text-slate-400">پرداخت کریپتو تتر</div>
+                                    </div>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" name="bot_pay_usdt_enabled" value="1" class="sr-only peer" <?= $payUsdtEnabled ? 'checked' : '' ?>>
+                                    <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                                </label>
+                            </div>
+
+                            <div class="flex items-center justify-between p-3 bg-slate-950/60 rounded-xl border border-slate-800/80">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-sm"><i class="fa-solid fa-gem"></i></span>
+                                    <div>
+                                        <div class="text-xs font-bold text-white">💎 تون (TON)</div>
+                                        <div class="text-[10px] text-slate-400">پرداخت با شبکه TON</div>
+                                    </div>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" name="bot_pay_ton_enabled" value="1" class="sr-only peer" <?= $payTonEnabled ? 'checked' : '' ?>>
+                                    <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                                </label>
+                            </div>
+
+                            <div class="flex items-center justify-between p-3 bg-slate-950/60 rounded-xl border border-slate-800/80">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-8 h-8 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center text-sm"><i class="fa-solid fa-wallet"></i></span>
+                                    <div>
+                                        <div class="text-xs font-bold text-white">💰 کیف‌پول داخلی</div>
+                                        <div class="text-[10px] text-slate-400">پرداخت آنی از موجودی</div>
+                                    </div>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" name="bot_pay_wallet_enabled" value="1" class="sr-only peer" <?= $payWalletEnabled ? 'checked' : '' ?>>
+                                    <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                                </label>
+                            </div>
                         </div>
                     </div>
                 </div>
