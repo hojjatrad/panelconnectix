@@ -97,6 +97,8 @@ class ServerController {
 
                 $isVip = !empty($_POST['is_vip']) ? 1 : 0;
         $autoImport = !empty($_POST['auto_import_plans']) ? 1 : 0;
+        $autoImportClients = !empty($_POST['auto_import_clients']) ? 1 : 0;
+        $autoImportCategories = !empty($_POST['auto_import_categories']) ? 1 : 0;
         // v6.8.20: Handle global kill switch - if disabled and user explicitly enables, re-enable; if disabled and not enabled, force 0
         try {
             require_once __DIR__ . '/../core/Setting.php';
@@ -105,6 +107,12 @@ class ServerController {
                 Setting::set('auto_import_disabled', '0'); // User wants it, re-enable
             } elseif ($disabled === '1') {
                 $autoImport = 0;
+            }
+            $catDisabled = Setting::get('categories_auto_seed_disabled','0');
+            if ($autoImportCategories === 1) {
+                Setting::set('categories_auto_seed_disabled', '0');
+            } elseif ($catDisabled === '1') {
+                $autoImportCategories = 0;
             }
         } catch (Throwable $e) {}
         $priceMultiplier = isset($_POST['price_multiplier']) ? floatval($_POST['price_multiplier']) : 1.0;
@@ -169,72 +177,120 @@ class ServerController {
             } catch (Throwable $e) {}
         }
 
-        $stmt = $pdo->prepare("INSERT INTO server_nodes (name, driver, api_url, api_username, api_password, api_token, server_group, category_id, sub_domain, max_clients, config_template, selected_inbounds, is_vip, auto_import_plans, price_multiplier, region, seller_code) 
-                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt = $pdo->prepare("INSERT INTO server_nodes (name, driver, api_url, api_username, api_password, api_token, server_group, category_id, sub_domain, max_clients, config_template, selected_inbounds, is_vip, auto_import_plans, auto_import_clients, auto_import_categories, price_multiplier, region, seller_code) 
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $sellerCode = $autoDetected['seller_code'] ?? null;
-        $stmt->execute([$name, $driver, $apiUrl, $username, $password, $token, $serverGroup, $categoryId, $subDomain, $maxClients, $configTemplate, $selectedInbounds, $isVip, $autoImport, $priceMultiplier, $region ?: ($autoDetected['region'] ?? null), $sellerCode]);
+        $stmt->execute([$name, $driver, $apiUrl, $username, $password, $token, $serverGroup, $categoryId, $subDomain, $maxClients, $configTemplate, $selectedInbounds, $isVip, $autoImport, $autoImportClients, $autoImportCategories, $priceMultiplier, $region ?: ($autoDetected['region'] ?? null), $sellerCode]);
         $newServerId = (int)$pdo->lastInsertId();
 
         // v6.8.20: Global kill switch - respect auto_import_disabled setting
         try {
             require_once __DIR__ . '/../core/Setting.php';
-            if (Setting::get('auto_import_disabled','0') === '1') {
-                $autoImport = 0; // Force disable if user purged plans
+            if (Setting::get('auto_import_disabled','0') === '1' && $autoImport === 0) {
+                // Keep disabled only if user didn't explicitly enable now (already handled above)
             }
         } catch (Throwable $e) {}
 
-        // Auto import plans if requested
+        // v6.8.23: Full auto-import - plans + categories + clients with exact sublink extraction
         $imported = 0;
-        if ($autoImport) {
-            try {
-                require_once __DIR__ . '/../core/CategoryManager.php';
-                $newServer = $pdo->query("SELECT * FROM server_nodes WHERE id = $newServerId")->fetch();
-                if ($newServer) {
-                    $driverInstance = DriverFactory::create($newServer);
-                    if (method_exists($driverInstance, 'getVipPlans')) {
-                        $data = $driverInstance->getVipPlans();
-                        $vipPlans = $data['plans'] ?? [];
-                        $vipGroups = $data['groups'] ?? [];
-                        foreach ($vipPlans as $vp) {
-                            $norm = CategoryManager::normalizePlan($vp, $vipGroups);
-                            $dup = $pdo->prepare("SELECT id FROM plans WHERE traffic_gb = ? AND duration_days = ? AND server_group = ? AND server_id = ? LIMIT 1");
-                            $dup->execute([$norm['traffic_gb'], $norm['duration_days'], $norm['server_group'], $newServerId]);
-                            if ($dup->fetch()) continue;
-                            $dup2 = $pdo->prepare("SELECT id FROM plans WHERE vip_plan_id = ? LIMIT 1");
-                            $dup2->execute([$vp['id'] ?? '']);
-                            if ($dup2->fetch()) continue;
-                            $effGroup = $norm['server_group'];
-                            if ($norm['traffic_gb'] <= 0.5) $effGroup = 'free';
-                            $catRow = CategoryManager::findOrCreateVipCategory($pdo, $effGroup, $norm['duration_days'], 'plans');
-                            $catId = $catRow['id'] ?? null;
-                            $catName = $catRow['name'] ?? CategoryManager::canonicalFromDuration($norm['duration_days']);
-                            $basePrice = $norm['price'] ?? 120000;
-                            if (empty($basePrice) || $basePrice < 1000) {
-                                $basePrice = 120000;
-                                if ($norm['traffic_gb'] <= 0.5) $basePrice = 25000;
-                                elseif ($norm['traffic_gb'] <= 1) $basePrice = 50000;
-                                elseif ($norm['traffic_gb'] <= 10) $basePrice = 120000;
-                                elseif ($norm['traffic_gb'] <= 50) $basePrice = 300000;
-                                else $basePrice = 500000;
-                                if ($effGroup === 'economic') $basePrice = (int)($basePrice * 0.7);
-                                if ($effGroup === 'free') $basePrice = (int)($basePrice * 0.3);
+        $importedClients = 0;
+        $importedCats = 0;
+        $importDetails = [];
+        
+        try {
+            require_once __DIR__ . '/../core/CategoryManager.php';
+            require_once __DIR__ . '/../core/NodeSync.php';
+            $newServer = $pdo->query("SELECT * FROM server_nodes WHERE id = $newServerId")->fetch();
+            if ($newServer) {
+                $driverInstance = DriverFactory::create($newServer);
+                
+                // 1. Import categories from server groups (if enabled)
+                if ($autoImportCategories) {
+                    try {
+                        if (method_exists($driverInstance, 'getVipPlans')) {
+                            $data = $driverInstance->getVipPlans();
+                            $vipGroups = $data['groups'] ?? [];
+                            foreach ($vipGroups as $vg) {
+                                $gName = $vg['name'] ?? '';
+                                if (empty($gName)) continue;
+                                // Normalize group to category
+                                $catRow = CategoryManager::findOrCreateCategory($pdo, $gName, null, 'servers');
+                                if ($catRow) $importedCats++;
                             }
-                            $resellerPrice = (int)($basePrice * 0.7);
-                            $localTitle = str_replace(['Economic', 'Iran Access', 'Business Class'], ['اقتصادی', 'ایران‌اکسس', 'بیزنس'], $vp['title'] ?? 'پلن') . ' - VIP';
-                            $pdo->prepare("INSERT INTO plans (title, traffic_gb, duration_days, base_price, reseller_price, server_group, server_id, category, category_id, vip_plan_id, vip_group_id, vip_group_name, vip_plan_title, is_active, show_in_bot) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1)")
-                                ->execute([$localTitle, $norm['traffic_gb'], $norm['duration_days'], $basePrice, $resellerPrice, $effGroup, $newServerId, $catName, $catId, $vp['id'] ?? null, $norm['group_id'], $norm['group_name'], $vp['title'] ?? '']);
-                            $imported++;
+                            $importDetails[] = "{$importedCats} دسته از گروه‌های سرور";
                         }
-                        try { $pdo->prepare("INSERT INTO server_sync_logs (server_id, action, details, plans_imported) VALUES (?, 'auto_import_on_add', ?, ?)")->execute([$newServerId, "Auto imported on server add", $imported]); } catch (Throwable $e) {}
+                    } catch (Throwable $e) { error_log("Category import failed: ".$e->getMessage()); }
+                }
+
+                // 2. Import plans (if enabled) - supports both VIP and generic
+                if ($autoImport) {
+                    try {
+                        if (method_exists($driverInstance, 'getVipPlans')) {
+                            $data = $driverInstance->getVipPlans();
+                            $vipPlans = $data['plans'] ?? [];
+                            $vipGroups = $data['groups'] ?? [];
+                            foreach ($vipPlans as $vp) {
+                                $norm = CategoryManager::normalizePlan($vp, $vipGroups);
+                                $dup = $pdo->prepare("SELECT id FROM plans WHERE traffic_gb = ? AND duration_days = ? AND server_group = ? AND server_id = ? LIMIT 1");
+                                $dup->execute([$norm['traffic_gb'], $norm['duration_days'], $norm['server_group'], $newServerId]);
+                                if ($dup->fetch()) continue;
+                                $dup2 = $pdo->prepare("SELECT id FROM plans WHERE vip_plan_id = ? LIMIT 1");
+                                $dup2->execute([$vp['id'] ?? '']);
+                                if ($dup2->fetch()) continue;
+                                $effGroup = $norm['server_group'];
+                                if ($norm['traffic_gb'] <= 0.5) $effGroup = 'free';
+                                $catRow = CategoryManager::findOrCreateVipCategory($pdo, $effGroup, $norm['duration_days'], 'plans');
+                                $catId = $catRow['id'] ?? null;
+                                $catName = $catRow['name'] ?? CategoryManager::canonicalFromDuration($norm['duration_days']);
+                                $basePrice = $norm['price'] ?? 120000;
+                                if (empty($basePrice) || $basePrice < 1000) {
+                                    $basePrice = 120000;
+                                    if ($norm['traffic_gb'] <= 0.5) $basePrice = 25000;
+                                    elseif ($norm['traffic_gb'] <= 1) $basePrice = 50000;
+                                    elseif ($norm['traffic_gb'] <= 10) $basePrice = 120000;
+                                    elseif ($norm['traffic_gb'] <= 50) $basePrice = 300000;
+                                    else $basePrice = 500000;
+                                    if ($effGroup === 'economic') $basePrice = (int)($basePrice * 0.7);
+                                    if ($effGroup === 'free') $basePrice = (int)($basePrice * 0.3);
+                                }
+                                $resellerPrice = (int)($basePrice * 0.7);
+                                $localTitle = str_replace(['Economic', 'Iran Access', 'Business Class'], ['اقتصادی', 'ایران‌اکسس', 'بیزنس'], $vp['title'] ?? 'پلن') . ' - VIP';
+                                $pdo->prepare("INSERT INTO plans (title, traffic_gb, duration_days, base_price, reseller_price, server_group, server_id, category, category_id, vip_plan_id, vip_group_id, vip_group_name, vip_plan_title, is_active, show_in_bot) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1)")
+                                    ->execute([$localTitle, $norm['traffic_gb'], $norm['duration_days'], $basePrice, $resellerPrice, $effGroup, $newServerId, $catName, $catId, $vp['id'] ?? null, $norm['group_id'], $norm['group_name'], $vp['title'] ?? '']);
+                                $imported++;
+                            }
+                        }
+                        if ($imported > 0) $importDetails[] = "{$imported} پلن";
+                    } catch (Throwable $e) { error_log("Plan import failed: ".$e->getMessage()); }
+                }
+
+                // 3. Import clients with exact sublink extraction (if enabled) - WORKS FOR ALL DRIVERS
+                if ($autoImportClients) {
+                    try {
+                        $syncResult = NodeSync::syncServer($pdo, $newServer);
+                        $importedClients = $syncResult['added'] ?? 0;
+                        $updatedClients = $syncResult['updated'] ?? 0;
+                        if ($importedClients > 0 || $updatedClients > 0) {
+                            $importDetails[] = "{$importedClients} کلاینت جدید + {$updatedClients} بروزرسانی (ساب‌لینک دقیق از سرور اصلی)";
+                        }
+                        // Log
+                        try { 
+                            $pdo->prepare("INSERT INTO server_sync_logs (server_id, action, details, plans_imported) VALUES (?, 'full_import_on_add', ?, ?)")
+                                ->execute([$newServerId, "Full import: ".implode(', ', $importDetails), $imported]); 
+                        } catch (Throwable $e) {}
+                    } catch (Throwable $e) { error_log("Client sync failed: ".$e->getMessage()); }
+                } else {
+                    // Still log plans import if only plans
+                    if ($imported > 0) {
+                        try { $pdo->prepare("INSERT INTO server_sync_logs (server_id, action, details, plans_imported) VALUES (?, 'auto_import_on_add', ?, ?)")
+                            ->execute([$newServerId, "Auto imported on server add", $imported]); } catch (Throwable $e) {}
                     }
                 }
-            } catch (Throwable $e) { error_log("Auto import on add failed: " . $e->getMessage()); }
-        }
+            }
+        } catch (Throwable $e) { error_log("Full auto import on add failed: " . $e->getMessage()); }
 
-        Helpers::flash('success', "سرور جدید با موفقیت و تشخیص خودکار نوع پنل ({$driver}) و دامنه CDN ({$subDomain}) افزوده شد." . ($autoImport && $imported>0 ? " {$imported} پلن به صورت خودکار ایمپورت شد." : ""));
-        Helpers::redirect('servers');
-
-        Helpers::flash('success', "سرور جدید با موفقیت و تشخیص خودکار نوع پنل ({$driver}) و دامنه CDN ({$subDomain}) افزوده شد.");
+        $detailStr = !empty($importDetails) ? " (".implode('، ', $importDetails).")" : "";
+        Helpers::flash('success', "سرور جدید با موفقیت افزوده شد (نوع: {$driver}، دامنه: {$subDomain}){$detailStr} - ساب‌لینک‌ها دقیقاً از سرور اصلی استخراج می‌شوند.");
         Helpers::redirect('servers');
     }
 
@@ -303,16 +359,21 @@ class ServerController {
 
         $isVip = !empty($_POST['is_vip']) ? 1 : 0;
         $autoImport = !empty($_POST['auto_import_plans']) ? 1 : 0;
+        $autoImportClients = !empty($_POST['auto_import_clients']) ? 1 : 0;
+        $autoImportCategories = !empty($_POST['auto_import_categories']) ? 1 : 0;
         // v6.8.20: If user explicitly enables auto_import, re-enable global switch
+        // v6.8.23: Also handle categories and clients toggles
         try {
             require_once __DIR__ . '/../core/Setting.php';
             if ($autoImport === 1) {
                 Setting::set('auto_import_disabled', '0');
             } else {
-                // If disabled globally, force 0
                 if (Setting::get('auto_import_disabled','0') === '1') {
-                    $autoImport = 0;
+                    // Keep disabled if not explicitly enabled now
                 }
+            }
+            if ($autoImportCategories === 1) {
+                Setting::set('categories_auto_seed_disabled', '0');
             }
         } catch (Throwable $e) {}
         if (!$isVip) {
@@ -326,11 +387,11 @@ class ServerController {
         Database::ensureExtendedTablesExist($pdo);
 
         if (!empty($password)) {
-            $stmt = $pdo->prepare("UPDATE server_nodes SET name = ?, driver = ?, api_url = ?, api_username = ?, api_password = ?, api_token = ?, server_group = ?, category_id = ?, sub_domain = ?, max_clients = ?, config_template = ?, selected_inbounds = ?, is_vip = ?, auto_import_plans = ? WHERE id = ?");
-            $stmt->execute([$name, $driver, $apiUrl, $username, $password, $token, $serverGroup, $categoryId, $subDomain, $maxClients, $configTemplate, $selectedInbounds, $isVip, $autoImport, $id]);
+            $stmt = $pdo->prepare("UPDATE server_nodes SET name = ?, driver = ?, api_url = ?, api_username = ?, api_password = ?, api_token = ?, server_group = ?, category_id = ?, sub_domain = ?, max_clients = ?, config_template = ?, selected_inbounds = ?, is_vip = ?, auto_import_plans = ?, auto_import_clients = ?, auto_import_categories = ? WHERE id = ?");
+            $stmt->execute([$name, $driver, $apiUrl, $username, $password, $token, $serverGroup, $categoryId, $subDomain, $maxClients, $configTemplate, $selectedInbounds, $isVip, $autoImport, $autoImportClients, $autoImportCategories, $id]);
         } else {
-            $stmt = $pdo->prepare("UPDATE server_nodes SET name = ?, driver = ?, api_url = ?, api_username = ?, api_token = ?, server_group = ?, category_id = ?, sub_domain = ?, max_clients = ?, config_template = ?, selected_inbounds = ?, is_vip = ?, auto_import_plans = ? WHERE id = ?");
-            $stmt->execute([$name, $driver, $apiUrl, $username, $token, $serverGroup, $categoryId, $subDomain, $maxClients, $configTemplate, $selectedInbounds, $isVip, $autoImport, $id]);
+            $stmt = $pdo->prepare("UPDATE server_nodes SET name = ?, driver = ?, api_url = ?, api_username = ?, api_token = ?, server_group = ?, category_id = ?, sub_domain = ?, max_clients = ?, config_template = ?, selected_inbounds = ?, is_vip = ?, auto_import_plans = ?, auto_import_clients = ?, auto_import_categories = ? WHERE id = ?");
+            $stmt->execute([$name, $driver, $apiUrl, $username, $token, $serverGroup, $categoryId, $subDomain, $maxClients, $configTemplate, $selectedInbounds, $isVip, $autoImport, $autoImportClients, $autoImportCategories, $id]);
         }
 
         Helpers::flash('success', "تنظیمات سرور '{$name}' با موفقیت به‌روزرسانی شد.");
@@ -1457,6 +1518,107 @@ class ServerController {
         }
 
         Helpers::redirect('servers/' . $id . '/node-users');
+    }
+
+    /**
+     * v6.8.23 POST servers/{id}/full-sync
+     * Full import: categories + plans + clients with exact sublink from main server
+     */
+    public function fullSync(string $id = ''): void {
+        Auth::requireAdmin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
+            Helpers::redirect('servers');
+        }
+        $id = (int)$id;
+        $pdo = Database::getConnection();
+        $stmt = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ?");
+        $stmt->execute([$id]);
+        $server = $stmt->fetch();
+        if (!$server) {
+            Helpers::flash('error', 'سرور یافت نشد.');
+            Helpers::redirect('servers');
+        }
+        $importDetails = [];
+        try {
+            require_once __DIR__ . '/../core/DriverFactory.php';
+            require_once __DIR__ . '/../core/CategoryManager.php';
+            require_once __DIR__ . '/../core/NodeSync.php';
+            $driver = DriverFactory::create($server);
+            $importedCats = 0;
+            $importedPlans = 0;
+            // 1. Categories
+            if (method_exists($driver, 'getVipPlans')) {
+                try {
+                    $plansData = $driver->getVipPlans();
+                    $groups = $plansData['groups'] ?? [];
+                    foreach ($groups as $g) {
+                        if (!is_array($g)) continue;
+                        $gName = trim($g['name'] ?? $g['title'] ?? '');
+                        if ($gName === '') continue;
+                        try {
+                            $cat = CategoryManager::findOrCreateCategory($pdo, $gName, null, 'servers');
+                            if ($cat) $importedCats++;
+                        } catch (Throwable $e) {}
+                    }
+                } catch (Throwable $e) {}
+            }
+            // 2. Plans - reuse logic from store()
+            try {
+                if (method_exists($driver, 'getVipPlans')) {
+                    $data = $driver->getVipPlans();
+                    $vipPlans = $data['plans'] ?? [];
+                    $vipGroups = $data['groups'] ?? [];
+                    foreach ($vipPlans as $vp) {
+                        try {
+                            if (!is_array($vp)) continue;
+                            $norm = CategoryManager::normalizePlan($vp, $vipGroups);
+                            $dup = $pdo->prepare("SELECT id FROM plans WHERE traffic_gb = ? AND duration_days = ? AND server_group = ? AND server_id = ? LIMIT 1");
+                            $dup->execute([$norm['traffic_gb'], $norm['duration_days'], $norm['server_group'], $id]);
+                            if ($dup->fetch()) continue;
+                            $dup2 = $pdo->prepare("SELECT id FROM plans WHERE vip_plan_id = ? LIMIT 1");
+                            $dup2->execute([$vp['id'] ?? '']);
+                            if ($dup2->fetch()) continue;
+                            $effGroup = $norm['server_group'];
+                            if ($norm['traffic_gb'] <= 0.5) $effGroup = 'free';
+                            $catRow = CategoryManager::findOrCreateVipCategory($pdo, $effGroup, $norm['duration_days'], 'plans');
+                            $catId = $catRow['id'] ?? null;
+                            $catName = $catRow['name'] ?? CategoryManager::canonicalFromDuration($norm['duration_days']);
+                            $basePrice = $norm['price'] ?? 120000;
+                            if (empty($basePrice) || $basePrice < 1000) {
+                                $basePrice = 120000;
+                                if ($norm['traffic_gb'] <= 0.5) $basePrice = 25000;
+                                elseif ($norm['traffic_gb'] <= 1) $basePrice = 50000;
+                                elseif ($norm['traffic_gb'] <= 10) $basePrice = 120000;
+                                elseif ($norm['traffic_gb'] <= 50) $basePrice = 300000;
+                                else $basePrice = 500000;
+                                if ($effGroup === 'economic') $basePrice = (int)($basePrice * 0.7);
+                                if ($effGroup === 'free') $basePrice = (int)($basePrice * 0.3);
+                            }
+                            $resellerPrice = (int)($basePrice * 0.7);
+                            $localTitle = str_replace(['Economic', 'Iran Access', 'Business Class'], ['اقتصادی', 'ایران‌اکسس', 'بیزنس'], $vp['title'] ?? 'پلن') . ' - VIP';
+                            $pdo->prepare("INSERT INTO plans (title, traffic_gb, duration_days, base_price, reseller_price, server_group, server_id, category, category_id, vip_plan_id, vip_group_id, vip_group_name, vip_plan_title, is_active, show_in_bot) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1)")
+                                ->execute([$localTitle, $norm['traffic_gb'], $norm['duration_days'], $basePrice, $resellerPrice, $effGroup, $id, $catName, $catId, $vp['id'] ?? null, $norm['group_id'], $norm['group_name'], $vp['title'] ?? '']);
+                            $importedPlans++;
+                        } catch (Throwable $e) {}
+                    }
+                }
+            } catch (Throwable $e) {}
+            // 3. Clients with exact sublink
+            $clientStats = NodeSync::syncServer($pdo, $server);
+            $importDetails[] = $importedCats . ' دسته';
+            $importDetails[] = $importedPlans . ' پلن';
+            $importDetails[] = ($clientStats['added'] ?? 0) . ' کلاینت جدید';
+            $importDetails[] = ($clientStats['updated'] ?? 0) . ' به‌روزرسانی';
+            try {
+                $pdo->prepare("INSERT INTO server_sync_logs (server_id, action, details, created_at) VALUES (?, ?, ?, NOW())")
+                    ->execute([$server['id'], 'full_sync_manual', implode(' | ', $importDetails)]);
+            } catch (Throwable $e) {}
+            Helpers::flash('success', 'همگام‌سازی کامل «' . $server['name'] . '» انجام شد: ' . implode('، ', $importDetails) . ' - ساب‌لینک‌ها دقیقاً از سرور اصلی استخراج شدند.');
+        } catch (Throwable $e) {
+            Helpers::flash('error', 'خطا در همگام‌سازی کامل: ' . $e->getMessage());
+        }
+        Helpers::redirect('servers');
     }
 
     /**

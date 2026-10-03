@@ -165,9 +165,17 @@ require __DIR__ . '/../layout/header.php';
                         <span>تست API</span>
                     </button>
 
+                    <form method="POST" action="<?= Helpers::url('servers/' . (int)$s['id'] . '/full-sync') ?>" class="m-0" onsubmit="return confirm('همگام‌سازی کامل: دسته‌ها + پلن‌ها + کلاینت‌ها با ساب‌لینک دقیق از سرور اصلی ایمپورت شوند؟');">
+                        <?= Helpers::csrfField() ?>
+                        <button type="submit" title="همگام‌سازی کامل (دسته + پلن + کلاینت با ساب‌لینک دقیق)" class="px-2.5 py-1.5 bg-purple-900/40 hover:bg-purple-800/60 text-purple-300 rounded-lg text-xs font-medium border border-purple-800/50 transition-colors flex items-center gap-1">
+                            <i class="fa-solid fa-cloud-arrow-down text-[10px]"></i>
+                            <span>ایمپورت کامل</span>
+                        </button>
+                    </form>
+
                     <a href="<?= Helpers::url('servers/' . (int)$s['id'] . '/node-users') ?>" title="مشاهده و مدیریت کلاینت‌های این سرور (همه کلاینت‌های تعریف‌شده روی پنل سرور)" class="px-2.5 py-1.5 bg-cyan-900/40 hover:bg-cyan-800/60 text-cyan-300 rounded-lg text-xs font-medium border border-cyan-800/50 transition-colors flex items-center gap-1">
                         <i class="fa-solid fa-users text-[10px]"></i>
-                        <span>کلاینت‌های سرور</span>
+                        <span>کلاینت‌ها</span>
                     </a>
 
                     <button onclick='openEditServerModal(<?= json_encode($s) ?>)' title="ویرایش اطلاعات سرور" class="p-1.5 bg-slate-800 hover:bg-slate-700 text-amber-300 rounded-lg text-xs border border-slate-700 transition-colors">
@@ -321,16 +329,26 @@ require __DIR__ . '/../layout/header.php';
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-3 p-3 bg-slate-950/60 border border-slate-800 rounded-xl">
+                    <div class="grid grid-cols-1 gap-3 p-3 bg-slate-950/60 border border-slate-800 rounded-xl">
                         <label class="flex items-center gap-2 cursor-pointer">
                             <input type="checkbox" name="is_vip" value="1" class="rounded border-slate-700 bg-slate-800 text-purple-600 focus:ring-purple-600">
                             <span class="text-slate-300 font-semibold">🌟 سرور ویژه (VIP)</span>
                         </label>
-                        <label class="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" name="auto_import_plans" value="1" class="rounded border-slate-700 bg-slate-800 text-emerald-600 focus:ring-emerald-600">
-                            <span class="text-slate-300 font-semibold">📥 ایمپورت خودکار پلن‌ها (خاموش بگذارید تا پلن‌های حذف شده برنگردند)</span>
-                        </label>
-                        <p class="col-span-2 text-[10px] text-slate-400 mt-1">⚠️ اگر این گزینه فعال باشد، هر ۲۴ ساعت پلن‌های حذف شده دوباره برمی‌گردند. برای جلوگیری از بازگشت، تیک را خاموش بگذارید. سرور ویژه در ربات به صورت ⭐ ویژه نمایش داده می‌شود.</p>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-2 mt-2">
+                            <label class="flex items-center gap-2 cursor-pointer p-2 bg-emerald-950/20 border border-emerald-800/30 rounded-lg">
+                                <input type="checkbox" name="auto_import_plans" value="1" checked class="rounded border-slate-700 bg-slate-800 text-emerald-600 focus:ring-emerald-600">
+                                <span class="text-emerald-300 font-semibold text-xs">📦 ایمپورت پلن‌ها</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer p-2 bg-blue-950/20 border border-blue-800/30 rounded-lg">
+                                <input type="checkbox" name="auto_import_categories" value="1" checked class="rounded border-slate-700 bg-slate-800 text-blue-600 focus:ring-blue-600">
+                                <span class="text-blue-300 font-semibold text-xs">📂 ایمپورت دسته‌بندی‌ها</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer p-2 bg-purple-950/20 border border-purple-800/30 rounded-lg">
+                                <input type="checkbox" name="auto_import_clients" value="1" checked class="rounded border-slate-700 bg-slate-800 text-purple-600 focus:ring-purple-600">
+                                <span class="text-purple-300 font-semibold text-xs">👥 ایمپورت کلاینت‌ها + ساب‌لینک دقیق</span>
+                            </label>
+                        </div>
+                        <p class="text-[10px] text-slate-400 mt-1">✅ با فعال بودن این 3 تیک، هنگام افزودن سرور، تمام دسته‌بندی‌ها، پلن‌ها و کلاینت‌ها با ساب‌لینک دقیق از سرور اصلی استخراج و به پنل شما منتقل می‌شوند و قابل مدیریت هستند. ساب‌لینک مشتری دقیقاً همان لینک سرور اصلی خواهد بود.</p>
                     </div>
 
                     <div>
@@ -488,15 +506,25 @@ require __DIR__ . '/../layout/header.php';
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-3 p-3 bg-slate-950/60 border border-slate-800 rounded-xl">
+                    <div class="grid grid-cols-1 gap-3 p-3 bg-slate-950/60 border border-slate-800 rounded-xl">
                         <label class="flex items-center gap-2 cursor-pointer">
                             <input type="checkbox" name="is_vip" id="edit_server_is_vip" value="1" class="rounded border-slate-700 bg-slate-800 text-purple-600 focus:ring-purple-600">
                             <span class="text-slate-300 font-semibold">🌟 سرور ویژه (VIP)</span>
                         </label>
-                        <label class="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" name="auto_import_plans" id="edit_server_auto_import" value="1" class="rounded border-slate-700 bg-slate-800 text-emerald-600 focus:ring-emerald-600">
-                            <span class="text-slate-300 font-semibold">📥 ایمپورت خودکار</span>
-                        </label>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-2 mt-2">
+                            <label class="flex items-center gap-2 cursor-pointer p-2 bg-emerald-950/20 border border-emerald-800/30 rounded-lg">
+                                <input type="checkbox" name="auto_import_plans" id="edit_server_auto_import" value="1" class="rounded border-slate-700 bg-slate-800 text-emerald-600 focus:ring-emerald-600">
+                                <span class="text-emerald-300 font-semibold text-xs">📦 پلن‌ها</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer p-2 bg-blue-950/20 border border-blue-800/30 rounded-lg">
+                                <input type="checkbox" name="auto_import_categories" id="edit_server_auto_import_cats" value="1" class="rounded border-slate-700 bg-slate-800 text-blue-600 focus:ring-blue-600">
+                                <span class="text-blue-300 font-semibold text-xs">📂 دسته‌ها</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer p-2 bg-purple-950/20 border border-purple-800/30 rounded-lg">
+                                <input type="checkbox" name="auto_import_clients" id="edit_server_auto_import_clients" value="1" class="rounded border-slate-700 bg-slate-800 text-purple-600 focus:ring-purple-600">
+                                <span class="text-purple-300 font-semibold text-xs">👥 کلاینت‌ها</span>
+                            </label>
+                        </div>
                     </div>
 
                     <div>
@@ -575,6 +603,12 @@ require __DIR__ . '/../layout/header.php';
         }
         if (document.getElementById('edit_server_auto_import')) {
             document.getElementById('edit_server_auto_import').checked = !!(s.auto_import_plans && parseInt(s.auto_import_plans) === 1);
+        }
+        if (document.getElementById('edit_server_auto_import_cats')) {
+            document.getElementById('edit_server_auto_import_cats').checked = !!(s.auto_import_categories && parseInt(s.auto_import_categories) === 1);
+        }
+        if (document.getElementById('edit_server_auto_import_clients')) {
+            document.getElementById('edit_server_auto_import_clients').checked = !!(s.auto_import_clients && parseInt(s.auto_import_clients) === 1);
         }
         if (document.getElementById('edit_server_config_template')) {
             document.getElementById('edit_server_config_template').value = s.config_template || '';

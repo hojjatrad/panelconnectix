@@ -476,6 +476,8 @@ class Database {
                 'selected_inbounds' => 'TEXT NULL',
                 'is_vip' => 'TINYINT(1) DEFAULT 0',
                 'auto_import_plans' => 'TINYINT(1) DEFAULT 0',
+                'auto_import_clients' => 'TINYINT(1) DEFAULT 1',
+                'auto_import_categories' => 'TINYINT(1) DEFAULT 1',
                 'last_sync_at' => 'DATETIME NULL',
                 'sync_enabled' => 'TINYINT(1) DEFAULT 1',
                 'price_multiplier' => 'DECIMAL(4,2) DEFAULT 1.00',

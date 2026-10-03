@@ -388,6 +388,7 @@ $router->post('servers/ping-all', [ServerController::class, 'pingAll']);
 $router->get('servers/{id}/node-users', [ServerController::class, 'nodeUsers']);
 $router->post('servers/node-users/action', [ServerController::class, 'nodeUsersAction']);
 $router->post('servers/{id}/node-users/sync', [ServerController::class, 'nodeUsersSync']);
+$router->post('servers/{id}/full-sync', [ServerController::class, 'fullSync']);
 $router->get('servers/{id}/node-users/export', [ServerController::class, 'nodeUsersExport']);
 $router->get('servers/sync', [ServerController::class, 'syncNow']);
 $router->post('servers/sync', [ServerController::class, 'syncNow']);
