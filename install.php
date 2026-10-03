@@ -157,9 +157,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $allPassed) {
                 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             }
 
-            // Step 2: Execute Schema Queries
+            // Step 2: Execute Schema Queries - v6.8.4 FIX: Always require schema.sql for MySQL
             $schemaFile = __DIR__ . '/schema.sql';
-            if (file_exists($schemaFile) && $dbDriver === 'mysql') {
+            if ($dbDriver === 'mysql') {
+                if (!file_exists($schemaFile)) {
+                    throw new Exception("فایل schema.sql یافت نشد. لطفاً پکیج کامل را دوباره آپلود کنید. این فایل برای نصب MySQL ضروری است.");
+                }
                 $sqlContent = file_get_contents($schemaFile);
                 $sqlLines = explode("\n", $sqlContent);
                 $cleanSql = '';
@@ -180,9 +183,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $allPassed) {
                         }
                     }
                 }
-            } else {
+            } elseif ($dbDriver === 'sqlite') {
                 require_once __DIR__ . '/core/Database.php';
                 Database::initializeSqliteSchema($pdo);
+            } else {
+                throw new Exception("درایور پایگاه داده نامعتبر: $dbDriver");
             }
 
             // Step 3: Insert / Update Admin User

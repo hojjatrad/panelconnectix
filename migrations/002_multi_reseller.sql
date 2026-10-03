@@ -2,7 +2,7 @@
 
 -- Reseller Custom Plans & Pricing Table
 CREATE TABLE IF NOT EXISTS `reseller_plans` (
-    `id` INTEGER PRIMARY KEY AUTOINCREMENT,
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
     `reseller_id` INT NOT NULL,
     `plan_id` INT NOT NULL,
     `custom_title` VARCHAR(128) NULL,
@@ -13,6 +13,6 @@ CREATE TABLE IF NOT EXISTS `reseller_plans` (
     `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS `idx_uk_reseller_plan` ON `reseller_plans` (`reseller_id`, `plan_id`);
-CREATE INDEX IF NOT EXISTS `idx_rp_reseller` ON `reseller_plans` (`reseller_id`);
-CREATE INDEX IF NOT EXISTS `idx_rp_plan` ON `reseller_plans` (`plan_id`);
+CREATE UNIQUE INDEX `idx_uk_reseller_plan` ON `reseller_plans` (`reseller_id`, `plan_id`);
+CREATE INDEX `idx_rp_reseller` ON `reseller_plans` (`reseller_id`);
+CREATE INDEX `idx_rp_plan` ON `reseller_plans` (`plan_id`);
