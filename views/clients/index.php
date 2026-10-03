@@ -76,7 +76,7 @@ function initials($name,$user){
     <div class="flex items-center gap-2 flex-wrap">
         <span class="text-slate-400 font-semibold">عملیات گروهی:</span>
         <select name="bulk_action" required class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"><option value="">-- انتخاب --</option><option value="extend_30_days">+30 روز</option><option value="add_10_gb">+10GB</option><option value="disable">غیرفعال</option><option value="enable">فعال</option><option value="delete">حذف</option></select>
-        <button type="submit" onclick="return confirm('اعمال روی انتخاب‌شده‌ها؟')" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg shadow">اعمال</button>
+        <button type="submit" onclick="var act=this.form.bulk_action.value; if(act==='delete'){return confirm('⚠️ حذف گروهی - اخطار حرفه‌ای:\n\nقبل از حذف، بکاپ خودکار از کلاینت‌های انتخاب شده گرفته می‌شود\n📦 بکاپ شامل ساب‌لینک دقیق + ترافیک + تاریخ انقضا\nقابل بازگردانی از بخش بکاپ‌ها\n\nآیا ادامه می‌دهید؟');} return confirm('اعمال روی انتخاب‌شده‌ها؟')" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg shadow">اعمال</button>
     </div>
     <div class="flex items-center gap-3">
         <span class="text-slate-400">نمایش <?= count($clients) ?> کاربر</span>

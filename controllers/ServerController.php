@@ -305,6 +305,15 @@ class ServerController {
             }
         } catch (Throwable $e) { error_log("Full auto import on add failed: " . $e->getMessage()); }
 
+        // v6.8.28 PRO: Auto backup full server on add
+        try {
+            require_once __DIR__ . '/../core/ServerBackupManager.php';
+            $backupRes = ServerBackupManager::createBackup($newServerId, 'full', true, 'بکاپ خودکار هنگام افزودن سرور + ایمپورت اولیه');
+            if ($backupRes['success']) {
+                $importDetails[] = "بکاپ خودکار ساخته شد: {$backupRes['file_name']}";
+            }
+        } catch (Throwable $e) {}
+
         $detailStr = !empty($importDetails) ? " (".implode('، ', $importDetails).")" : "";
         Helpers::flash('success', "سرور جدید با موفقیت افزوده شد (نوع: {$driver}، دامنه: {$subDomain}){$detailStr} - ساب‌لینک‌ها دقیقاً از سرور اصلی استخراج می‌شوند.");
         Helpers::redirect('servers');
@@ -1640,6 +1649,10 @@ class ServerController {
                 }
             } catch (Throwable $e) {}
             // 3. Clients with exact sublink
+            // v6.8.28 PRO: Auto backup before full sync
+            try {
+                ServerBackupManager::createBackup((int)$server['id'], 'full', true, 'بکاپ خودکار قبل از همگام‌سازی کامل');
+            } catch (Throwable $e) {}
             $clientStats = NodeSync::syncServer($pdo, $server);
             $importDetails[] = $importedCats . ' دسته';
             $importDetails[] = $importedPlans . ' پلن';

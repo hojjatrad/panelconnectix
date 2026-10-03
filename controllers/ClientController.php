@@ -665,6 +665,12 @@ class ClientController {
             Helpers::redirect('clients');
         }
 
+        // v6.8.28 PRO: Auto backup before delete with warning
+        try {
+            require_once __DIR__ . '/../core/ServerBackupManager.php';
+            ServerBackupManager::autoBackupBeforeDelete((int)$client['server_id'], 'حذف کلاینت '.$client['username']);
+        } catch (Throwable $e) {}
+
         // Try deleting from remote server
         $server = $pdo->query("SELECT * FROM server_nodes WHERE id = " . intval($client['server_id']))->fetch();
         if ($server) {

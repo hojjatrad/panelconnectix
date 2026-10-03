@@ -657,6 +657,15 @@ $router->get('updater', [UpdateController::class, 'index']);
 $router->get('updater/check', [UpdateController::class, 'checkNow']);
 $router->get('updater/cloudflare', [UpdateController::class, 'cloudflare']);
 $router->get('settings/cloudflare', [UpdateController::class, 'cloudflare']);
+
+// Server Backups PRO v6.8.28
+$router->get('backups', [BackupController::class, 'index']);
+$router->post('backups/create', [BackupController::class, 'create']);
+$router->post('backups/auto-all', [BackupController::class, 'autoBackupAll']);
+$router->get('backups/{id}/download', [BackupController::class, 'download']);
+$router->get('backups/{id}/preview', [BackupController::class, 'preview']);
+$router->post('backups/{id}/delete', [BackupController::class, 'delete']);
+$router->post('backups/{id}/restore', [BackupController::class, 'restore']);
 $router->post('updater/apply', [UpdateController::class, 'apply']);
 $router->post('updater/ajax-apply', [UpdateController::class, 'ajaxApply']);
 $router->post('updater/settings', [UpdateController::class, 'saveSettings']);

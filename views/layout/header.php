@@ -210,6 +210,11 @@ if (!function_exists('isActiveRoute')) {
                         <i class="fa-solid fa-layer-group w-4 text-center text-purple-400"></i>
                         <span>دسته‌بندی و خوشه‌ها</span>
                     </a>
+                    <a href="<?= Helpers::url('backups') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('backups', $currentUri) ? 'bg-cyan-600/15 text-cyan-300 font-bold border-r-2 border-cyan-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
+                        <i class="fa-solid fa-box-archive w-4 text-center text-cyan-400"></i>
+                        <span>بکاپ‌های حرفه‌ای</span>
+                        <span class="mr-auto text-[9px] bg-cyan-500/20 text-cyan-300 px-1.5 py-0.5 rounded-full border border-cyan-500/30">PRO</span>
+                    </a>
                 </div>
             </div>
             <?php endif; ?>
