@@ -9,9 +9,8 @@ class BeautifulInvoice
      */
     public static function renderPreInvoice(array $order, int $userWallet = 0): array
     {
-        $priceFa = number_format($order['amount']) . ' تومان';
         $isRenew = ($order['order_type'] === 'renew');
-        $titlePrefix = $isRenew ? '🔄 پیش‌فاکتور تمدید اشتراک' : '🛒 پیش‌فاکتور خرید اشتراک جدید';
+        $titlePrefix = $isRenew ? '🔄 پیش‌فاکتور تمدید اشتراک' : '🛒 پیش‌فاکتور خرید';
         
         $trafficVal = (float)($order['traffic_gb'] ?? $order['custom_traffic_gb'] ?? 0);
         if ($trafficVal > 0 && $trafficVal < 1) {
@@ -32,6 +31,16 @@ class BeautifulInvoice
         $expirePreview = date('Y-m-d H:i:s', time() + $durationDays * 86400);
         $expireJalali = JalaliDate::format($expirePreview, 'date');
 
+        // v6.8.18: Price logic - if unique_amount exists, THAT is the price to pay (copyable)
+        $baseAmount = (int)($order['amount'] ?? 0);
+        $uniqueAmount = (int)($order['unique_amount'] ?? 0);
+        $hasUnique = !empty($uniqueAmount) && $uniqueAmount > 0 && $uniqueAmount != $baseAmount;
+        
+        // Final amount to pay is unique if exists, else base
+        $finalAmount = $hasUnique ? $uniqueAmount : $baseAmount;
+        $finalAmountFa = number_format($finalAmount) . ' تومان';
+        $finalAmountRaw = (string)$finalAmount; // For copyable code
+
         // Beautiful invoice
         $msg = "┏━━━━━━━━━━━━━━━━━━━━━━┓\n";
         $msg .= "┃ {$titlePrefix} ┃\n";
@@ -40,33 +49,36 @@ class BeautifulInvoice
         $msg .= "📦 <b>پلن انتخابی:</b>\n";
         $msg .= "   └─ {$order['display_title']}\n\n";
 
-        $msg .= "📊 <b>مشخصات پلن:</b>\n";
+        $msg .= "📊 <b>مشخصات:</b>\n";
         $msg .= "   ├─ 💾 حجم: <b>{$trafficText}</b>\n";
         $msg .= "   ├─ 👥 اتصال: <b>{$userLimitText}</b>\n";
         $msg .= "   └─ ⏳ مدت: <b>{$durationText}</b>\n\n";
 
         if (!empty($order['coupon_code'])) {
             $discount = number_format($order['discount_amount'] ?? 0);
-            $msg .= "🎟 <b>تخفیف اعمال شده:</b>\n";
+            $msg .= "🎟 <b>تخفیف:</b>\n";
             $msg .= "   ├─ کد: <code>{$order['coupon_code']}</code>\n";
-            $msg .= "   └─ مبلغ تخفیف: {$discount} تومان\n\n";
+            $msg .= "   └─ تخفیف: {$discount} تومان\n\n";
         }
 
         $msg .= "💰 <b>صورتحساب:</b>\n";
-        $msg .= "   ├─ مبلغ نهایی: <b>{$priceFa}</b>\n";
-        // v6.8.15: Show unique amount if enabled
-        if (!empty($order['unique_amount']) && $order['unique_amount'] != $order['amount']) {
-            $uniqueFa = number_format($order['unique_amount']) . ' تومان';
-            $msg .= "   ├─ 💎 مبلغ واریزی یکتا: <b>{$uniqueFa}</b> (برای تایید خودکار)\n";
-            $msg .= "   │   └─ ⚠️ لطفاً دقیقاً همین مبلغ را واریز کنید!\n";
+        // v6.8.18: Price is ONE-CLICK COPYABLE with <code> tag
+        if ($hasUnique) {
+            $baseFa = number_format($baseAmount) . ' تومان';
+            $msg .= "   ├─ مبلغ پایه: {$baseFa}\n";
+            $msg .= "   ├─ 💎 <b>مبلغ واریزی (یکتا):</b>\n";
+            $msg .= "   │   └─ <code>{$finalAmountRaw}</code> تومان (کپی با یک ضربه)\n";
+            $msg .= "   │       └─ ⚠️ لطفاً دقیقاً همین مبلغ را واریز کنید!\n";
+        } else {
+            $msg .= "   ├─ 💎 <b>مبلغ واریزی:</b> <code>{$finalAmountRaw}</code> تومان (کپی با یک ضربه)\n";
         }
         $msg .= "   ├─ کد رهگیری: <code>{$order['order_code']}</code>\n";
-        $msg .= "   ├─ تاریخ صدور: {$orderDate}\n";
-        $msg .= "   └─ انقضای اشتراک: {$expireJalali}\n\n";
+        $msg .= "   ├─ تاریخ: {$orderDate}\n";
+        $msg .= "   └─ انقضا: {$expireJalali}\n\n";
 
-        $msg .= "💡 <i>برای کپی هر کد، روی آن ضربه بزنید</i>\n";
-        if (!empty($order['unique_amount'])) {
-            $msg .= "🤖 <i>با واریز مبلغ یکتا، تایید خودکار در 1 دقیقه انجام می‌شود</i>\n";
+        $msg .= "💡 <i>برای کپی مبلغ، روی عدد ضربه بزنید</i>\n";
+        if ($hasUnique) {
+            $msg .= "🤖 <i>با واریز مبلغ یکتا، تایید خودکار در 1 دقیقه</i>\n";
         }
         $msg .= "👇 روش پرداخت را انتخاب کنید:";
 

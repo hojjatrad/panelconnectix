@@ -756,7 +756,13 @@ class TelegramBotController {
             $cardNumber = $ctx['card']['number'];
             $cardHolder = $ctx['card']['holder'];
             $cardSheba = $ctx['card']['shaba'];
-            $amountFa = number_format($order['amount']) . ' تومان';
+            // v6.8.18: Use unique_amount if exists as final payable
+            $baseAmt = (int)($order['amount'] ?? 0);
+            $uniqueAmt = (int)($order['unique_amount'] ?? 0);
+            $hasUnique = $uniqueAmt > 0 && $uniqueAmt != $baseAmt;
+            $payAmt = $hasUnique ? $uniqueAmt : $baseAmt;
+            $amountFa = number_format($payAmt) . ' تومان';
+            $amountRaw = (string)$payAmt;
 
             self::setSession($pdo, $fromId, 'awaiting_receipt', ['order_id' => $orderId]);
 
@@ -768,8 +774,14 @@ class TelegramBotController {
                 $msg .= "📌 <b>شماره شبا:</b>\n<code>{$cardSheba}</code>\n\n";
             }
 
-            $msg .= "💰 <b>مبلغ دقیق:</b> <b>{$amountFa}</b>\n"
-                 . "🔖 <b>کد رهگیری سفارش:</b> <code>{$order['order_code']}</code>\n\n"
+            if ($hasUnique) {
+                $msg .= "💰 <b>مبلغ پایه:</b> " . number_format($baseAmt) . " تومان\n";
+                $msg .= "💎 <b>مبلغ واریزی (یکتا - کپی با یک ضربه):</b>\n<code>{$amountRaw}</code> تومان\n";
+                $msg .= "⚠️ <b>لطفاً دقیقاً مبلغ یکتا را واریز کنید تا تایید خودکار شود!</b>\n";
+            } else {
+                $msg .= "💰 <b>مبلغ دقیق (کپی با یک ضربه):</b> <code>{$amountRaw}</code> تومان\n";
+            }
+            $msg .= "🔖 <b>کد رهگیری سفارش:</b> <code>{$order['order_code']}</code>\n\n"
                  . "⚠️ <b>دستورالعمل تحویل:</b>\n"
                  . "۱. مبلغ فوق را به شماره کارت بالا انتقال دهید.\n"
                  . "۲. سپس <b>عکس رسید فیش واریزی</b> یا <b>شماره پیگیری تراکنش</b> را همین‌جا ارسال فرمایید.\n\n"
