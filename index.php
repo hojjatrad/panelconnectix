@@ -681,6 +681,9 @@ $router->get('updater', [UpdateController::class, 'index']);
 $router->get('updater/check', [UpdateController::class, 'checkNow']);
 $router->get('updater/cloudflare', [UpdateController::class, 'cloudflare']);
 $router->get('settings/cloudflare', [UpdateController::class, 'cloudflare']);
+$router->get('settings/api-tokens', [ApiTokenController::class, 'index']);
+$router->post('settings/api-tokens/save', [ApiTokenController::class, 'save']);
+$router->post('settings/api-tokens/auto-direct', [ApiTokenController::class, 'autoDirect']);
 
 // Server Backups PRO v6.8.28
 $router->get('backups', [BackupController::class, 'index']);

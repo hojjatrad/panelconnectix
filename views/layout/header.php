@@ -408,6 +408,11 @@ if (!function_exists('isActiveRoute')) {
                         <i class="fa-brands fa-github w-4 text-center text-purple-400"></i>
                         <span>به‌روزرسانی پنل</span>
                     </a>
+                    <a href="<?= Helpers::url('settings/api-tokens') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('api-tokens', $currentUri) ? 'bg-amber-600/15 text-amber-300 font-bold border-r-2 border-amber-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
+                        <i class="fa-solid fa-key w-4 text-center text-amber-400"></i>
+                        <span>توکن API (خودکارسازی)</span>
+                        <span class="mr-auto text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded-full border border-amber-500/30">AUTO</span>
+                    </a>
                     <a href="<?= Helpers::url('settings/switch_root') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('switch_root', $currentUri) ? 'bg-teal-600/15 text-teal-300 font-bold border-r-2 border-teal-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
                         <i class="fa-solid fa-shuffle w-4 text-center text-cyan-400"></i>
                         <span>صفحه اصلی دامنه</span>
