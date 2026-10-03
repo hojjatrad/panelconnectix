@@ -551,6 +551,22 @@ class Database {
                 $pdo->exec("UPDATE server_nodes SET auto_import_plans = 0 WHERE auto_import_plans IS NULL");
             } catch (Throwable $e) {}
 
+            // v6.8.20 FIX: If plans table is empty (user purged), disable auto_import for ALL servers + set global kill switch
+            try {
+                $plansCount = (int)$pdo->query("SELECT COUNT(*) FROM plans")->fetchColumn();
+                if ($plansCount === 0) {
+                    $pdo->exec("UPDATE server_nodes SET auto_import_plans = 0");
+                    try {
+                        require_once __DIR__ . '/Setting.php';
+                        // Only set if not already explicitly enabled after purge - if empty, disable
+                        $current = Setting::get('auto_import_disabled', '');
+                        if ($current !== '0') { // if not explicitly re-enabled, disable
+                            Setting::set('auto_import_disabled', '1');
+                        }
+                    } catch (Throwable $e2) {}
+                }
+            } catch (Throwable $e) {}
+
             // Seed Default Categories if empty
             try {
                 $catCount = (int)$pdo->query("SELECT COUNT(*) FROM categories")->fetchColumn();

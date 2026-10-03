@@ -368,6 +368,14 @@ if (empty($category)) {
             }
         } catch (Throwable $e) {}
 
+        // v6.8.20: Global kill switch - when user deletes a plan, disable all auto-imports globally
+        try {
+            require_once __DIR__ . '/../core/Setting.php';
+            Setting::set('auto_import_disabled', '1');
+            Setting::set('auto_import_disabled_at', date('Y-m-d H:i:s'));
+            Setting::set('auto_import_disabled_reason', 'single_delete_'.$id);
+        } catch (Throwable $e) {}
+
         // Safely detach clients, orders, and reseller mappings before plan deletion
         $pdo->prepare("UPDATE clients SET plan_id = NULL WHERE plan_id = ?")->execute([$id]);
         $pdo->prepare("UPDATE bot_orders SET plan_id = NULL WHERE plan_id = ?")->execute([$id]);
@@ -375,7 +383,9 @@ if (empty($category)) {
         $pdo->prepare("DELETE FROM reserved_plans WHERE plan_id = ?")->execute([$id]);
 
         $pdo->prepare("DELETE FROM plans WHERE id = ?")->execute([$id]);
-        Helpers::flash('success', 'پلن حذف شد و ایمپورت خودکار سرور مربوطه غیرفعال شد تا دوباره برنگردد.');
+        // v6.8.20: Also disable auto_import for ALL servers on single delete to be extra safe
+        try { $pdo->exec("UPDATE server_nodes SET auto_import_plans = 0"); } catch (Throwable $e) {}
+        Helpers::flash('success', 'پلن حذف شد و ایمپورت خودکار برای همیشه غیرفعال شد تا دوباره برنگردد. اگر خواستید دوباره فعال کنید از تنظیمات → مدیریت پلن‌ها → فعال‌سازی ایمپورت استفاده کنید.');
         Helpers::redirect('plans');
     }
 
@@ -394,13 +404,59 @@ if (empty($category)) {
             $pdo->exec("UPDATE bot_orders SET plan_id = NULL");
             // v6.8.19 FIX: Disable auto_import_plans for all servers to prevent resurrection
             $pdo->exec("UPDATE server_nodes SET auto_import_plans = 0");
+            // v6.8.20: Global kill switch
+            try {
+                require_once __DIR__ . '/../core/Setting.php';
+                Setting::set('auto_import_disabled', '1');
+                Setting::set('auto_import_disabled_at', date('Y-m-d H:i:s'));
+                Setting::set('auto_import_disabled_reason', 'purge_all');
+                Setting::set('plans_purged_at', date('Y-m-d H:i:s'));
+            } catch (Throwable $e) {}
 
             if ($driver === 'mysql') $pdo->exec("SET FOREIGN_KEY_CHECKS=1");
             else $pdo->exec("PRAGMA foreign_keys = ON");
 
-            Helpers::flash('success', 'تمامی پلن‌ها به طور کامل پاکسازی شدند و ایمپورت خودکار غیرفعال شد تا دوباره برنگردند. اکنون می‌توانید پلن‌های اختصاصی خود را تعریف فرمایید.');
+            Helpers::flash('success', 'تمامی پلن‌ها پاک شدند و ایمپورت خودکار برای همیشه غیرفعال شد تا دیگر برنگردند. برای فعال‌سازی مجدد به تنظیمات → بانک → یا سرورها بروید.');
         } catch (Throwable $e) {
             Helpers::flash('error', 'خطا در پاکسازی پلن‌ها: ' . $e->getMessage());
+        }
+        Helpers::redirect('plans');
+    }
+
+    public function enableAutoImport(): void {
+        Auth::requireAdmin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن نامعتبر');
+            Helpers::redirect('plans');
+        }
+        $pdo = Database::getConnection();
+        try {
+            require_once __DIR__ . '/../core/Setting.php';
+            Setting::set('auto_import_disabled', '0');
+            Setting::set('auto_import_enabled_at', date('Y-m-d H:i:s'));
+            // Enable for all active seller servers
+            $pdo->exec("UPDATE server_nodes SET auto_import_plans = 1 WHERE driver = 'connectix_seller' AND is_active = 1");
+            Helpers::flash('success', '✅ ایمپورت خودکار دوباره فعال شد. حالا کرون هر 24 ساعت پلن‌های جدید را ایمپورت می‌کند. اگر نمی‌خواهید برگردند، دوباره تیک را خاموش کنید.');
+        } catch (Throwable $e) {
+            Helpers::flash('error', 'خطا: '.$e->getMessage());
+        }
+        Helpers::redirect('plans');
+    }
+
+    public function disableAutoImport(): void {
+        Auth::requireAdmin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن نامعتبر');
+            Helpers::redirect('plans');
+        }
+        $pdo = Database::getConnection();
+        try {
+            require_once __DIR__ . '/../core/Setting.php';
+            Setting::set('auto_import_disabled', '1');
+            $pdo->exec("UPDATE server_nodes SET auto_import_plans = 0");
+            Helpers::flash('success', '🚫 ایمپورت خودکار کاملاً غیرفعال شد. دیگر هیچ پلنی خودکار برنمی‌گردد.');
+        } catch (Throwable $e) {
+            Helpers::flash('error', 'خطا: '.$e->getMessage());
         }
         Helpers::redirect('plans');
     }

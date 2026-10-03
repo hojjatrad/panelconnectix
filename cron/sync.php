@@ -738,11 +738,16 @@ try {
 // 6e. Auto-import VIP plans daily for servers with auto_import_plans enabled
 try {
     require_once __DIR__ . '/../core/CategoryManager.php';
-    $lastVipImport = (int)Setting::get('last_cron_vip_import', '0');
-    if (time() - $lastVipImport >= 86400) { // once per 24h
-        Setting::set('last_cron_vip_import', (string)time());
-        // v6.8.19 FIX: Only auto-import if explicitly enabled (auto_import_plans=1), NOT NULL - prevents deleted plans from resurrecting
-        $vipServers = $pdo->query("SELECT * FROM server_nodes WHERE driver = 'connectix_seller' AND is_active = 1 AND auto_import_plans = 1")->fetchAll();
+    // v6.8.20 FIX: Global kill switch - if user purged plans, never auto-import again unless re-enabled
+    $autoImportDisabled = Setting::get('auto_import_disabled', '0');
+    if ($autoImportDisabled === '1') {
+        echo "[VIP Auto-Import] SKIPPED - auto_import_disabled=1 (user deleted plans, manual re-enable required)" . $eol;
+    } else {
+        $lastVipImport = (int)Setting::get('last_cron_vip_import', '0');
+        if (time() - $lastVipImport >= 86400) { // once per 24h
+            Setting::set('last_cron_vip_import', (string)time());
+            // v6.8.19 FIX: Only auto-import if explicitly enabled (auto_import_plans=1), NOT NULL - prevents deleted plans from resurrecting
+            $vipServers = $pdo->query("SELECT * FROM server_nodes WHERE driver = 'connectix_seller' AND is_active = 1 AND auto_import_plans = 1")->fetchAll();
         foreach ($vipServers as $vs) {
             try {
                 $driver = DriverFactory::create($vs);
@@ -782,6 +787,7 @@ try {
                 }
             } catch (Throwable $e) {
                 echo "[VIP Auto-Import Error] {$vs['name']}: " . $e->getMessage() . $eol;
+            }
             }
         }
     }

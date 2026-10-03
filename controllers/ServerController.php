@@ -97,6 +97,16 @@ class ServerController {
 
                 $isVip = !empty($_POST['is_vip']) ? 1 : 0;
         $autoImport = !empty($_POST['auto_import_plans']) ? 1 : 0;
+        // v6.8.20: Handle global kill switch - if disabled and user explicitly enables, re-enable; if disabled and not enabled, force 0
+        try {
+            require_once __DIR__ . '/../core/Setting.php';
+            $disabled = Setting::get('auto_import_disabled','0');
+            if ($autoImport === 1) {
+                Setting::set('auto_import_disabled', '0'); // User wants it, re-enable
+            } elseif ($disabled === '1') {
+                $autoImport = 0;
+            }
+        } catch (Throwable $e) {}
         $priceMultiplier = isset($_POST['price_multiplier']) ? floatval($_POST['price_multiplier']) : 1.0;
         $region = trim($_POST['region'] ?? '');
         if (!$isVip) {
@@ -164,6 +174,14 @@ class ServerController {
         $sellerCode = $autoDetected['seller_code'] ?? null;
         $stmt->execute([$name, $driver, $apiUrl, $username, $password, $token, $serverGroup, $categoryId, $subDomain, $maxClients, $configTemplate, $selectedInbounds, $isVip, $autoImport, $priceMultiplier, $region ?: ($autoDetected['region'] ?? null), $sellerCode]);
         $newServerId = (int)$pdo->lastInsertId();
+
+        // v6.8.20: Global kill switch - respect auto_import_disabled setting
+        try {
+            require_once __DIR__ . '/../core/Setting.php';
+            if (Setting::get('auto_import_disabled','0') === '1') {
+                $autoImport = 0; // Force disable if user purged plans
+            }
+        } catch (Throwable $e) {}
 
         // Auto import plans if requested
         $imported = 0;
@@ -285,6 +303,18 @@ class ServerController {
 
         $isVip = !empty($_POST['is_vip']) ? 1 : 0;
         $autoImport = !empty($_POST['auto_import_plans']) ? 1 : 0;
+        // v6.8.20: If user explicitly enables auto_import, re-enable global switch
+        try {
+            require_once __DIR__ . '/../core/Setting.php';
+            if ($autoImport === 1) {
+                Setting::set('auto_import_disabled', '0');
+            } else {
+                // If disabled globally, force 0
+                if (Setting::get('auto_import_disabled','0') === '1') {
+                    $autoImport = 0;
+                }
+            }
+        } catch (Throwable $e) {}
         if (!$isVip) {
             $lowerName = mb_strtolower($name, 'UTF-8');
             if (str_contains($lowerName, 'ویژه') || str_contains($lowerName, 'vip') || $driver === 'connectix_seller') {

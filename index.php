@@ -352,6 +352,10 @@ $router->post('plans/toggle-bot', [PlanController::class, 'toggleBot']);
 $router->post('plans/delete', [PlanController::class, 'delete']);
 $router->post('plans/purge-all', [PlanController::class, 'purgeAll']);
 $router->get('plans/purge-all', [PlanController::class, 'purgeAll']);
+$router->post('plans/enable-auto-import', [PlanController::class, 'enableAutoImport']);
+$router->get('plans/enable-auto-import', [PlanController::class, 'enableAutoImport']);
+$router->post('plans/disable-auto-import', [PlanController::class, 'disableAutoImport']);
+$router->get('plans/disable-auto-import', [PlanController::class, 'disableAutoImport']);
 
 // VIP Plans Mapping - Economic / ویژه / Iran Access
 $router->get('vip_plans', [VipPlanController::class, 'index']);

@@ -144,11 +144,28 @@ foreach ($customPlanCats as $idx => $custCat) {
             <p class="text-xs text-slate-400 mt-1">مدیریت قیمت پایه، قیمت همکاری، دسته‌بندی دوره‌ها، خوشه‌های سرور و وضعیت ربات تلگرام</p>
         </div>
 
-        <?php if (Auth::isAdmin()): ?>
-            <div class="flex items-center gap-2">
-                <a href="<?= Helpers::url('plans/purge-all') ?>" onclick="return confirm('⚠️ آیا از پاکسازی و حذف کامل تمامی پلن‌های موجود اطمینان دارید؟');" class="px-3 py-2 bg-rose-950/40 hover:bg-rose-900/50 text-rose-300 border border-rose-800/50 text-xs font-bold rounded-xl transition flex items-center gap-1.5" title="حذف تمام پلن‌ها جهت تعریف از ابتدا">
+        <?php if (Auth::isAdmin()): 
+            $autoImportDisabled = \Setting::get('auto_import_disabled','0');
+        ?>
+            <div class="flex items-center gap-2 flex-wrap">
+                <?php if ($autoImportDisabled === '1'): ?>
+                    <span class="px-3 py-2 bg-emerald-950/50 text-emerald-300 border border-emerald-800/50 text-[11px] font-bold rounded-xl flex items-center gap-1.5">
+                        <i class="fa-solid fa-shield-halved"></i> ایمپورت خودکار خاموش - پلن‌ها برنمی‌گردند
+                    </span>
+                    <a href="<?= Helpers::url('plans/enable-auto-import') ?>" onclick="return confirm('ایمپورت خودکار فعال شود؟ بعد از این پلن‌های حذف شده ممکن است دوباره برگردند.');" class="px-3 py-2 bg-amber-900/30 hover:bg-amber-900/50 text-amber-300 border border-amber-800/50 text-xs font-bold rounded-xl transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-power-off"></i> فعال‌سازی ایمپورت خودکار
+                    </a>
+                <?php else: ?>
+                    <span class="px-3 py-2 bg-amber-950/30 text-amber-300 border border-amber-800/30 text-[11px] font-bold rounded-xl flex items-center gap-1.5">
+                        <i class="fa-solid fa-arrows-rotate"></i> ایمپورت خودکار روشن
+                    </span>
+                    <a href="<?= Helpers::url('plans/disable-auto-import') ?>" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold rounded-xl transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-ban"></i> خاموش کردن ایمپورت
+                    </a>
+                <?php endif; ?>
+                <a href="<?= Helpers::url('plans/purge-all') ?>" onclick="return confirm('⚠️ آیا از پاکسازی و حذف کامل تمامی پلن‌های موجود اطمینان دارید؟ بعد از این ایمپورت خودکار خاموش می‌شود و دیگر برنمی‌گردند.');" class="px-3 py-2 bg-rose-950/40 hover:bg-rose-900/50 text-rose-300 border border-rose-800/50 text-xs font-bold rounded-xl transition flex items-center gap-1.5" title="حذف تمام پلن‌ها جهت تعریف از ابتدا">
                     <i class="fa-solid fa-trash-can"></i>
-                    <span>خام‌سازی پلن‌ها</span>
+                    <span>خام‌سازی پلن‌ها (ضد بازگشت)</span>
                 </a>
                 <a href="<?= Helpers::url('categories') ?>" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-purple-300 border border-slate-700 text-xs font-bold rounded-xl transition-all flex items-center gap-2 shadow-sm">
                     <i class="fa-solid fa-layer-group"></i>
