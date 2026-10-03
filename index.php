@@ -650,6 +650,11 @@ $router->post('updater/git-push', [UpdateController::class, 'gitPushAction']);
 $router->post('updater/webhook', [UpdateController::class, 'webhook']);
 $router->get('updater/webhook', [UpdateController::class, 'webhook']);
 
+// v6.8.13: Switch root - panel vs promo
+$router->get('switch_root', function() { require __DIR__ . '/switch_root.php'; });
+$router->post('switch_root', function() { require __DIR__ . '/switch_root.php'; });
+$router->get('settings/switch_root', function() { require __DIR__ . '/switch_root.php'; });
+
 // Public Subscription & Dynamic QR Landing Endpoint
 $router->get('sub/{token}', [SublinkControllerV2::class, 'show']);
 
