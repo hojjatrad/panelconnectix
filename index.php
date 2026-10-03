@@ -116,6 +116,18 @@ if (str_ends_with($requestPath, 'quick_update.php') || str_ends_with($requestPat
     exit;
 }
 
+// v6.8.30 Cloudflare repair tool
+if (str_ends_with($requestPath, 'repair_cloudflare.php') || str_ends_with($requestPath, '/repair_cloudflare') || $routeParam === 'repair_cloudflare.php' || $routeParam === 'repair_cloudflare') {
+    if (file_exists(__DIR__ . '/repair_cloudflare.php')) {
+        require_once __DIR__ . '/repair_cloudflare.php';
+    } elseif (file_exists(__DIR__ . '/connectix-panel/repair_cloudflare.php')) {
+        require_once __DIR__ . '/connectix-panel/repair_cloudflare.php';
+    } else {
+        echo "<h3 dir='rtl' style='font-family:sans-serif;color:#ef4444;text-align:center;margin-top:50px;'>فایل repair_cloudflare.php یافت نشد. لطفاً پنل را به v6.8.30 آپدیت کنید.</h3>";
+    }
+    exit;
+}
+
 // Intercept Telegram Webhook on ANY variation
 if (str_ends_with($requestPath, 'webhook.php') || str_ends_with($requestPath, '/webhook') 
     || $routeParam === 'webhook.php' || $routeParam === 'webhook' || $routeParam === 'telegram/webhook') {
