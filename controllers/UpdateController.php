@@ -63,9 +63,26 @@ class UpdateController {
     }
 
     public function ajaxApply(): void {
+        // v6.8.7 FIX: Bulletproof JSON - never output HTML before JSON
+        // Clear any previous output and disable error display
+        if (ob_get_level()) { ob_end_clean(); }
+        ob_start();
+        ini_set('display_errors', '0');
+        ini_set('display_startup_errors', '0');
+        error_reporting(0);
+        
+        // Ensure session path is correct before Auth check
+        $sp = __DIR__ . '/../data/sessions';
+        if (!is_dir($sp)) { @mkdir($sp, 0755, true); }
+        if (is_dir($sp) && is_writable($sp)) {
+            $cur = ini_get('session.save_path');
+            if (empty($cur) || strpos($cur, 'ea-php84') !== false || !@is_dir($cur) || !@is_writable($cur)) {
+                @ini_set('session.save_path', $sp);
+            }
+        }
+        
         Auth::requireAdmin();
         header('Content-Type: application/json; charset=utf-8');
-        // v6.8.4: Increase time limit and handle disk quota errors gracefully
         set_time_limit(300);
         ini_set('max_execution_time', '300');
         ini_set('memory_limit', '256M');
@@ -79,17 +96,16 @@ class UpdateController {
                 'error' => 'خطای سیستمی: ' . $e->getMessage() . ' (فایل: ' . basename($e->getFile()) . ':' . $e->getLine() . ')',
                 'details' => $e->getTraceAsString()
             ];
-            // Try emergency cleanup on failure
-            try {
-                Updater::emergencyDiskCleanup();
-            } catch (Throwable $e2) {}
+            try { Updater::emergencyDiskCleanup(); } catch (Throwable $e2) {}
         }
         $duration = round(microtime(true) - $startTime, 2);
 
         $result['duration'] = $duration . ' ثانیه';
         $result['finished_at'] = date('H:i:s (Y/m/d)');
-        // Ensure free space info is included
         $result['free_space_mb'] = round(disk_free_space(__DIR__ . '/..') / 1024 / 1024, 2);
+        
+        // Clean any stray output before JSON
+        if (ob_get_level()) { ob_end_clean(); }
         echo json_encode($result, JSON_UNESCAPED_UNICODE);
         exit;
     }

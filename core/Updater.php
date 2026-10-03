@@ -4,7 +4,7 @@ require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Setting.php';
 
 class Updater {
-    public const CURRENT_VERSION = '6.8.5'; // Fix disk quota + version naming - emergency cleanup
+    public const CURRENT_VERSION = '6.8.8'; // FIX JSON parse error - bulletproof updater ajax-apply display_errors=0 + ob_end_clean
 
     public static function getCurrentVersion(): string {
         $dbVer = Setting::get('current_version', '');
@@ -463,6 +463,13 @@ class Updater {
      * Download ZIP and perform 1-Click Update.
      */
     public static function applyUpdate(bool $notify = true): array {
+        // v6.8.7 FIX: Bulletproof - suppress all warnings that break JSON
+        $prevDisplay = ini_get('display_errors');
+        $prevReporting = error_reporting();
+        ini_set('display_errors', '0');
+        error_reporting(0);
+        if (ob_get_level()) { ob_start(); }
+        
         // CRITICAL v6.8.4: Emergency cleanup BEFORE any download to fix Disk quota exceeded
         $cleanup = self::emergencyDiskCleanup();
         
@@ -545,6 +552,9 @@ class Updater {
 
         if (!$zipData || $httpCode >= 400 || strlen($zipData) < 1000) {
             self::deleteDirectory($tmpDir);
+            if (ob_get_level()) { @ob_end_clean(); }
+            @ini_set('display_errors', $prevDisplay);
+            @error_reporting($prevReporting);
             return ['success' => false, 'error' => "خطا در دانلود فایل پکیج از گیت‌هاب (کد HTTP: {$httpCode})"];
         }
 
@@ -553,6 +563,9 @@ class Updater {
         $extractPath = $tmpDir . '/extracted';
         if (!self::extractZip($zipFile, $extractPath)) {
             self::deleteDirectory($tmpDir);
+            if (ob_get_level()) { @ob_end_clean(); }
+            @ini_set('display_errors', $prevDisplay);
+            @error_reporting($prevReporting);
             return ['success' => false, 'error' => 'فایل فشرده دانلود شده قابل استخراج نیست.'];
         }
 
@@ -572,10 +585,16 @@ class Updater {
         }
         if ($expectedVer !== '' && $pkgVer !== '' && version_compare($pkgVer, $expectedVer, '<')) {
             self::deleteDirectory($tmpDir);
+            if (ob_get_level()) { @ob_end_clean(); }
+            @ini_set('display_errors', $prevDisplay);
+            @error_reporting($prevReporting);
             return ['success' => false, 'error' => "فایل پکیج دریافت‌شده (نسخه {$pkgVer}) با انتظار ({$expectedVer}) مطابقت ندارد — اعمال نشد."];
         }
         if ($pkgVer !== '' && version_compare($pkgVer, $localVer, '<')) {
             self::deleteDirectory($tmpDir);
+            if (ob_get_level()) { @ob_end_clean(); }
+            @ini_set('display_errors', $prevDisplay);
+            @error_reporting($prevReporting);
             return ['success' => false, 'error' => "پکیج دریافت‌شده ({$pkgVer}) قدیمی‌تر از نسخه نصب‌شده ({$localVer}) است — اعمال نشد."];
         }
 
@@ -626,6 +645,11 @@ class Updater {
                 }
             }
         } catch (Throwable $e) {}
+
+        // v6.8.7: Restore + clean buffer to guarantee JSON output
+        if (ob_get_level()) { @ob_end_clean(); }
+        @ini_set('display_errors', $prevDisplay);
+        @error_reporting($prevReporting);
 
         return [
             'success' => true,
