@@ -801,6 +801,21 @@ class ClientController {
         $stmt->execute($clientIds);
         $clients = $stmt->fetchAll();
 
+        // v6.8.28 PRO: Auto backup before bulk delete
+        if (str_starts_with($action, 'delete')) {
+            try {
+                require_once __DIR__ . '/../core/ServerBackupManager.php';
+                $serverGroups = [];
+                foreach ($clients as $cl) { $serverGroups[$cl['server_id']] = true; }
+                foreach (array_keys($serverGroups) as $sid) {
+                    ServerBackupManager::autoBackupBeforeDelete((int)$sid, 'حذف گروهی '.$action.' ('.count($clients).' کلاینت)');
+                }
+                if (empty($serverGroups)) {
+                    ServerBackupManager::createBackup(0, 'clients', true, 'بکاپ قبل حذف گروهی '.$action);
+                }
+            } catch (Throwable $e) {}
+        }
+
         $count = 0;
         foreach ($clients as $c) {
             try {

@@ -491,6 +491,12 @@ class Database {
                 self::safeAddColumn($pdo, 'server_nodes', $c, $d);
             }
 
+            // v6.8.28 PRO: Server backups table
+            try {
+                require_once __DIR__ . '/ServerBackupManager.php';
+                ServerBackupManager::ensureTable();
+            } catch (Throwable $e) {}
+
             $planCols = [
                 'show_in_bot' => 'TINYINT(1) DEFAULT 1',
                 'category' => "VARCHAR(64) DEFAULT '۱ ماهه'",
