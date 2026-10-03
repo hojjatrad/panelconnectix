@@ -655,6 +655,8 @@ $router->post('ops/rotate-webhook-secret', [OpsController::class, 'rotateWebhook
 
 $router->get('updater', [UpdateController::class, 'index']);
 $router->get('updater/check', [UpdateController::class, 'checkNow']);
+$router->get('updater/cloudflare', [UpdateController::class, 'cloudflare']);
+$router->get('settings/cloudflare', [UpdateController::class, 'cloudflare']);
 $router->post('updater/apply', [UpdateController::class, 'apply']);
 $router->post('updater/ajax-apply', [UpdateController::class, 'ajaxApply']);
 $router->post('updater/settings', [UpdateController::class, 'saveSettings']);

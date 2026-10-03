@@ -96,9 +96,10 @@ class ServerController {
         }
 
                 $isVip = !empty($_POST['is_vip']) ? 1 : 0;
-        $autoImport = !empty($_POST['auto_import_plans']) ? 1 : 0;
-        $autoImportClients = !empty($_POST['auto_import_clients']) ? 1 : 0;
-        $autoImportCategories = !empty($_POST['auto_import_categories']) ? 1 : 0;
+        // v6.8.27: Default to 1 for full import when adding server (fix clients not imported)
+        $autoImport = isset($_POST['auto_import_plans']) ? (!empty($_POST['auto_import_plans']) ? 1 : 0) : 1;
+        $autoImportClients = isset($_POST['auto_import_clients']) ? (!empty($_POST['auto_import_clients']) ? 1 : 0) : 1;
+        $autoImportCategories = isset($_POST['auto_import_categories']) ? (!empty($_POST['auto_import_categories']) ? 1 : 0) : 1;
         // v6.8.20: Handle global kill switch - if disabled and user explicitly enables, re-enable; if disabled and not enabled, force 0
         try {
             require_once __DIR__ . '/../core/Setting.php';
@@ -264,27 +265,42 @@ class ServerController {
                     } catch (Throwable $e) { error_log("Plan import failed: ".$e->getMessage()); }
                 }
 
-                // 3. Import clients with exact sublink extraction (if enabled) - WORKS FOR ALL DRIVERS
-                if ($autoImportClients) {
-                    try {
+                // 3. Import clients with exact sublink extraction - ALWAYS try, log details (v6.8.27 fix)
+                $clientImportAttempted = false;
+                $clientImportError = '';
+                try {
+                    if ($autoImportClients) {
                         $syncResult = NodeSync::syncServer($pdo, $newServer);
+                        $clientImportAttempted = true;
                         $importedClients = $syncResult['added'] ?? 0;
                         $updatedClients = $syncResult['updated'] ?? 0;
+                        $clientErrors = $syncResult['errors'] ?? [];
                         if ($importedClients > 0 || $updatedClients > 0) {
                             $importDetails[] = "{$importedClients} کلاینت جدید + {$updatedClients} بروزرسانی (ساب‌لینک دقیق از سرور اصلی)";
+                        } else {
+                            if (!empty($clientErrors)) {
+                                $importDetails[] = "کلاینت: خطا - " . implode(' | ', array_slice($clientErrors,0,2));
+                                $clientImportError = implode(' | ', $clientErrors);
+                            } else {
+                                $importDetails[] = "کلاینت: 0 (سرور خالی یا لیست خالی)";
+                            }
                         }
-                        // Log
                         try { 
                             $pdo->prepare("INSERT INTO server_sync_logs (server_id, action, details, plans_imported) VALUES (?, 'full_import_on_add', ?, ?)")
-                                ->execute([$newServerId, "Full import: ".implode(', ', $importDetails), $imported]); 
+                                ->execute([$newServerId, "Full import: ".implode(', ', $importDetails)." | Errors: ".$clientImportError, $imported]); 
                         } catch (Throwable $e) {}
-                    } catch (Throwable $e) { error_log("Client sync failed: ".$e->getMessage()); }
-                } else {
-                    // Still log plans import if only plans
-                    if ($imported > 0) {
-                        try { $pdo->prepare("INSERT INTO server_sync_logs (server_id, action, details, plans_imported) VALUES (?, 'auto_import_on_add', ?, ?)")
-                            ->execute([$newServerId, "Auto imported on server add", $imported]); } catch (Throwable $e) {}
+                    } else {
+                        $importDetails[] = "کلاینت: غیرفعال (تیک خاموش)";
                     }
+                } catch (Throwable $e) { 
+                    error_log("Client sync failed: ".$e->getMessage());
+                    $clientImportError = $e->getMessage();
+                    $importDetails[] = "کلاینت: خطای سیستمی - " . $e->getMessage();
+                    try { $pdo->prepare("INSERT INTO server_sync_logs (server_id, action, details, plans_imported) VALUES (?, 'full_import_error', ?, ?)")->execute([$newServerId, "Client import error: ".$e->getMessage(), $imported]); } catch (Throwable $e2) {}
+                }
+                // Always log even if clients disabled
+                if (!$clientImportAttempted && $imported > 0) {
+                    try { $pdo->prepare("INSERT INTO server_sync_logs (server_id, action, details, plans_imported) VALUES (?, 'auto_import_on_add', ?, ?)")->execute([$newServerId, "Auto imported on server add", $imported]); } catch (Throwable $e) {}
                 }
             }
         } catch (Throwable $e) { error_log("Full auto import on add failed: " . $e->getMessage()); }

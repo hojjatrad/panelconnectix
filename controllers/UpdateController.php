@@ -332,4 +332,10 @@ class UpdateController {
         echo json_encode($res);
         exit;
     }
+
+    public function cloudflare(): void {
+        Auth::requireAdmin();
+        require_once __DIR__ . '/../core/Updater.php';
+        require __DIR__ . '/../views/settings/cloudflare.php';
+    }
 }
