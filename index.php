@@ -105,17 +105,6 @@ if (str_ends_with($requestPath, 'fix_now.php') || str_ends_with($requestPath, '/
     exit;
 }
 
-// v6.9.1 PRO MAX: Auto domain migration - runs on every request, ensures domain independence
-try {
-    require_once __DIR__ . '/core/DomainMigrationManager.php';
-    // Only run once per hour to avoid overhead
-    $lastMigrationCheck = (int)Setting::get('last_domain_migration_check', '0');
-    if (time() - $lastMigrationCheck > 3600) {
-        DomainMigrationManager::autoMigrateIfNeeded();
-        Setting::set('last_domain_migration_check', (string)time());
-    }
-} catch (Throwable $e) {}
-
 if (str_ends_with($requestPath, 'quick_update.php') || str_ends_with($requestPath, '/quick_update') || $routeParam === 'quick_update.php' || $routeParam === 'quick_update') {
     if (file_exists(__DIR__ . '/quick_update.php')) {
         require_once __DIR__ . '/quick_update.php';
@@ -216,6 +205,18 @@ try {
     if (trim((string)Setting::get('auto_update_brake_applied', '')) === '') {
         Setting::set('auto_apply_github_updates', '0');
         Setting::set('auto_update_brake_applied', '1:' . date('Y-m-d H:i:s'));
+    }
+} catch (Throwable $e) {}
+
+// v6.9.1 PRO MAX: Auto domain migration - runs after core loaded, ensures domain independence (hourly)
+try {
+    require_once __DIR__ . '/core/DomainMigrationManager.php';
+    if (class_exists('Setting') && class_exists('DomainMigrationManager')) {
+        $lastMigrationCheck = (int)Setting::get('last_domain_migration_check', '0');
+        if (time() - $lastMigrationCheck > 3600) {
+            DomainMigrationManager::autoMigrateIfNeeded();
+            Setting::set('last_domain_migration_check', (string)time());
+        }
     }
 } catch (Throwable $e) {}
 
@@ -429,6 +430,30 @@ $router->get('servers/sync', [ServerController::class, 'syncNow']);
 $router->post('servers/sync', [ServerController::class, 'syncNow']);
 $router->get('servers/health-check', [ServerController::class, 'checkHealth']);
 $router->post('servers/health-check', [ServerController::class, 'checkHealth']);
+
+// v6.9.0 PRO MAX: Live Monitoring + Sync Queue (anti-520) + Rotating Sublink Domains (anti-filter)
+$router->get('monitoring', [MonitorController::class, 'index']);
+$router->post('monitoring/check-now', [MonitorController::class, 'checkNow']);
+$router->post('monitoring/check-domains', [MonitorController::class, 'checkDomains']);
+$router->get('monitoring/server/{id}', [MonitorController::class, 'serverLogs']);
+$router->get('servers/{id}/sync-queue/status', [ServerController::class, 'syncQueueStatus']);
+$router->post('servers/{id}/sync-queue/process', [ServerController::class, 'syncQueueProcess']);
+// Backward compat for old view URLs
+$router->get('servers/queue/{id}/status', [ServerController::class, 'syncQueueStatus']);
+$router->post('monitoring/queue/{id}/process', [ServerController::class, 'syncQueueProcess']);
+$router->get('monitoring/queue/{id}/status', [ServerController::class, 'syncQueueStatus']);
+$router->get('settings/sublink-domains', [SublinkController::class, 'index']);
+$router->post('settings/sublink-domains/add', [SublinkController::class, 'add']);
+$router->post('settings/sublink-domains/store', [SublinkController::class, 'add']);
+$router->post('settings/sublink-domains/{id}/delete', [SublinkController::class, 'delete']);
+$router->post('settings/sublink-domains/{id}/toggle', [SublinkController::class, 'toggle']);
+$router->post('settings/sublink-domains/{id}/set-primary', [SublinkController::class, 'setPrimary']);
+$router->post('settings/sublink-domains/check', [SublinkController::class, 'check']);
+
+// v6.9.1 PRO MAX: Domain Migration & Independence
+$router->get('settings/domain-migration', [DomainMigrationController::class, 'index']);
+$router->post('settings/domain-migration/check', [DomainMigrationController::class, 'check']);
+$router->post('settings/domain-migration/migrate', [DomainMigrationController::class, 'migrate']);
 
 // Resellers Management (Admin only)
 $router->get('resellers', [ResellerController::class, 'index']);

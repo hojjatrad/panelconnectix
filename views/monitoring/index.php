@@ -154,7 +154,7 @@
                         <td class="p-3 font-mono text-[11px] text-slate-400"><?= htmlspecialchars($q['created_at']) ?></td>
                         <td class="p-3 text-center">
                             <?php if ($q['status'] === 'pending'): ?>
-                                <form method="POST" action="<?= Helpers::url('monitoring/queue/'.$q['id'].'/process') ?>" class="m-0 inline">
+                                <form method="POST" action="<?= Helpers::url('servers/'.$q['id'].'/sync-queue/process') ?>" class="m-0 inline">
                                     <?= Helpers::csrfField() ?>
                                     <button type="submit" class="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px]">اجرا</button>
                                 </form>
@@ -201,7 +201,7 @@
 
 <script>
 function checkQueueStatus(id) {
-    fetch('<?= Helpers::url('servers/queue/') ?>' + id + '/status')
+    fetch('<?= Helpers::url('servers/') ?>' + id + '/sync-queue/status')
         .then(r => r.json())
         .then(data => {
             if (data.progress !== undefined) {
