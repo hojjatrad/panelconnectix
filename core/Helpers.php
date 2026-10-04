@@ -345,13 +345,27 @@ class Helpers {
         exit;
     }
 
-    // v6.8.7 FIX: Bulletproof session handling - single source of truth
+    // v7.2.1 FIX: Bulletproof session handling - single source of truth - robust 0777
     private static function ensureSession(): void {
         $sp = __DIR__ . '/../data/sessions';
         $tp = __DIR__ . '/../data/tmp';
-        if (!is_dir($sp)) { @mkdir($sp, 0755, true); }
-        if (!is_dir($tp)) { @mkdir($tp, 0755, true); }
-        if (is_dir($sp) && is_writable($sp)) {
+        $cp = __DIR__ . '/../cache/ratelimit';
+        foreach ([$sp, $tp, $cp] as $d) {
+            if (!is_dir($d)) { @mkdir($d, 0777, true); }
+            @chmod($d, 0777);
+        }
+        $ht = "<IfModule mod_authz_core.c>\n    Require all denied\n</IfModule>\n<IfModule !mod_authz_core.c>\n    Order deny,allow\n    Deny from all\n</IfModule>\n";
+        if (!file_exists($sp.'/.htaccess')) @file_put_contents($sp.'/.htaccess', $ht);
+        
+        $bestPath = $sp;
+        if (!is_dir($sp) || !is_writable($sp)) {
+            $alts = [sys_get_temp_dir().'/connectix_sessions_'.md5(__DIR__), __DIR__.'/../cache/sessions', '/tmp/connectix_sess_'.md5(__DIR__)];
+            foreach ($alts as $alt) {
+                if (!is_dir($alt)) @mkdir($alt, 0777, true);
+                if (is_dir($alt) && is_writable($alt)) { $bestPath = $alt; break; }
+            }
+        }
+        if (is_dir($bestPath) && is_writable($bestPath)) {
             $cur = ini_get('session.save_path');
             $need = false;
             if (empty($cur)) $need = true;
@@ -359,7 +373,7 @@ class Helpers {
             elseif (!@is_dir($cur)) $need = true;
             elseif (!@is_writable($cur)) $need = true;
             elseif ($cur === '/tmp' || $cur === sys_get_temp_dir()) $need = true;
-            if ($need) { @ini_set('session.save_path', $sp); }
+            if ($need || $cur !== $bestPath) { @ini_set('session.save_path', $bestPath); }
         }
         if (session_status() === PHP_SESSION_NONE && !headers_sent()) {
             @session_start();

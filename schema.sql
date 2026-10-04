@@ -450,15 +450,15 @@ CREATE TABLE IF NOT EXISTS `wallet_logs` (
     INDEX `idx_wlog_tg` (`tg_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Seed Default Admin: admin / admin123
-INSERT INTO `users` (`id`, `username`, `password_hash`, `role`, `full_name`, `email`, `wallet_balance`, `api_token`) 
-VALUES (1, 'admin', '$2y$12$sv.pf5Nv93Qb/We3z2krfeknPA6rHrvwJhdiqqsqEl2wiA.qabqL.', 'admin', 'مدیر ارشد سامانه', 'admin@connectix.local', 0, 'admin_secret_token_123')
-ON DUPLICATE KEY UPDATE `username`=VALUES(`username`);
+-- Seed Default Admin: admin / admin123 - v7.2 FIX: Always update password and active status
+INSERT INTO `users` (`id`, `username`, `password_hash`, `role`, `full_name`, `email`, `wallet_balance`, `api_token`, `status`) 
+VALUES (1, 'admin', '$2y$12$sv.pf5Nv93Qb/We3z2krfeknPA6rHrvwJhdiqqsqEl2wiA.qabqL.', 'admin', 'مدیر ارشد سامانه', 'admin@connectix.local', 0, 'admin_secret_token_123', 'active')
+ON DUPLICATE KEY UPDATE `username`=VALUES(`username`), `password_hash`=VALUES(`password_hash`), `role`='admin', `status`='active';
 
--- Seed Default Reseller: novinvpn / 123456
-INSERT INTO `users` (`id`, `username`, `password_hash`, `role`, `full_name`, `email`, `wallet_balance`, `discount_percent`, `api_token`) 
-VALUES (2, 'novinvpn', '$2y$12$AgRRByaidiVfVF2WlssNUOo0FnUe8Oy14Ax.tNA0qJhB0791EPFWu', 'reseller', 'نوین وی‌پی‌ان (نماینده نمونه)', 'novin@example.com', 500000, 15, 'reseller_novin_token_456')
-ON DUPLICATE KEY UPDATE `username`=VALUES(`username`);
+-- Seed Default Reseller: novinvpn / 123456 - v7.2 FIX: Always active and reset 2FA
+INSERT INTO `users` (`id`, `username`, `password_hash`, `role`, `full_name`, `email`, `wallet_balance`, `discount_percent`, `api_token`, `status`) 
+VALUES (2, 'novinvpn', '$2y$12$AgRRByaidiVfVF2WlssNUOo0FnUe8Oy14Ax.tNA0qJhB0791EPFWu', 'reseller', 'نوین وی‌پی‌ان (نماینده نمونه)', 'novin@example.com', 500000, 15, 'reseller_novin_token_456', 'active')
+ON DUPLICATE KEY UPDATE `username`=VALUES(`username`), `password_hash`=VALUES(`password_hash`), `role`='reseller', `status`='active', `wallet_balance`=500000, `discount_percent`=15;
 
 -- Seed Default Branding
 INSERT INTO `branding_metadata` (`user_id`, `brand_name`, `theme_color`, `telegram_support`, `whatsapp_support`, `welcome_message`) VALUES

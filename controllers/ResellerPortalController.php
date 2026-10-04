@@ -857,6 +857,84 @@ class ResellerPortalController {
     }
 
     /**
+     * v7.2 ULTRA RESYNC: Reseller Monitoring LIVE (read-only)
+     */
+    public function monitoring(): void {
+        $resellerId = self::checkResellerAccess();
+        $pdo = Database::getConnection();
+        try {
+            require_once __DIR__ . '/../core/ServerMonitor.php';
+            require_once __DIR__ . '/../core/SublinkRotator.php';
+            $servers = $pdo->query("SELECT * FROM server_nodes WHERE is_active=1 ORDER BY health_status DESC, latency_ms ASC")->fetchAll(PDO::FETCH_ASSOC);
+            $serverStats = [];
+            foreach ($servers as $s) {
+                $st = [];
+                try { $st = \ServerMonitor::getUptimeStats((int)$s['id'], 24); } catch (Throwable $e) { $st = ['uptime_percent'=>100,'avg_latency'=>$s['latency_ms']??0]; }
+                $latest = [];
+                try { $latest = \ServerMonitor::getLatestStats((int)$s['id']); } catch (Throwable $e) {}
+                $serverStats[] = array_merge($s, $st, ['latest'=>$latest]);
+            }
+            $domains = \SublinkRotator::getActiveDomains();
+        } catch (Throwable $e) {
+            $serverStats = [];
+            $domains = [];
+        }
+        require __DIR__ . '/../views/reseller/monitoring.php';
+    }
+
+    /**
+     * v7.2 ULTRA RESYNC: Reseller Financial Dashboard (own transactions)
+     */
+    public function financial(): void {
+        $resellerId = self::checkResellerAccess();
+        $pdo = Database::getConnection();
+        $stmt = $pdo->prepare("SELECT * FROM users WHERE id=?");
+        $stmt->execute([$resellerId]);
+        $reseller = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        // Monthly aggregation for chart
+        try {
+            $monthly = $pdo->query("SELECT DATE_FORMAT(created_at, '%Y-%m') as ym, SUM(CASE WHEN amount>0 THEN amount ELSE 0 END) as income, SUM(CASE WHEN amount<0 THEN ABS(amount) ELSE 0 END) as spent FROM transactions WHERE user_id=$resellerId AND created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH) GROUP BY ym ORDER BY ym ASC")->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Throwable $e) { $monthly = []; }
+
+        try {
+            $recentTx = $pdo->prepare("SELECT * FROM transactions WHERE user_id=? ORDER BY id DESC LIMIT 20");
+            $recentTx->execute([$resellerId]);
+            $transactions = $recentTx->fetchAll(PDO::FETCH_ASSOC);
+            $totalIncome = (int)$pdo->query("SELECT COALESCE(SUM(amount),0) FROM transactions WHERE user_id=$resellerId AND amount>0")->fetchColumn();
+            $totalSpent = (int)$pdo->query("SELECT COALESCE(SUM(ABS(amount)),0) FROM transactions WHERE user_id=$resellerId AND amount<0")->fetchColumn();
+            $totalClients = (int)$pdo->query("SELECT COUNT(*) FROM clients WHERE reseller_id=$resellerId")->fetchColumn();
+            $activeClients = (int)$pdo->query("SELECT COUNT(*) FROM clients WHERE reseller_id=$resellerId AND status='active'")->fetchColumn();
+        } catch (Throwable $e) {
+            $transactions=[]; $totalIncome=0; $totalSpent=0; $totalClients=0; $activeClients=0;
+        }
+
+        $profit = (int)($totalSpent*0.45);
+        require __DIR__ . '/../views/reseller/financial.php';
+    }
+
+    /**
+     * v7.2 ULTRA RESYNC: Reseller Usage History (client usage logs)
+     */
+    public function usage(): void {
+        $resellerId = self::checkResellerAccess();
+        $pdo = Database::getConnection();
+        try {
+            $stmt = $pdo->prepare("SELECT c.username, c.traffic_used_bytes, c.traffic_limit_bytes, c.expire_at, c.status, s.name as server_name, p.title as plan_title FROM clients c LEFT JOIN server_nodes s ON s.id=c.server_id LEFT JOIN plans p ON p.id=c.plan_id WHERE c.reseller_id=? ORDER BY c.traffic_used_bytes DESC LIMIT 50");
+            $stmt->execute([$resellerId]);
+            $clients = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Throwable $e) { $clients=[]; }
+
+        try {
+            $logs = $pdo->prepare("SELECT cul.*, c.username FROM client_usage_logs cul LEFT JOIN clients c ON c.id=cul.client_id WHERE c.reseller_id=? ORDER BY cul.created_at DESC LIMIT 100");
+            $logs->execute([$resellerId]);
+            $usageLogs = $logs->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Throwable $e) { $usageLogs=[]; }
+
+        require __DIR__ . '/../views/reseller/usage.php';
+    }
+
+    /**
      * Reseller Portal - Export Monthly Invoice CSV
      */
     public function exportInvoiceCsv(): void {

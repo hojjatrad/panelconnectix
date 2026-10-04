@@ -568,6 +568,10 @@ $isWebhookSet = !empty($webhookInfo['result']['url'] ?? '');
                                 'reseller' => ['title' => '💼 اخذ نمایندگی', 'text' => $settings['btn_reseller_text'] ?? '💼 اخذ نمایندگی', 'enabled' => ($settings['btn_reseller_enabled'] ?? '1') === '1'],
                                 'panel_login' => ['title' => '🔐 ورود به پنل وب', 'text' => $settings['btn_panel_login_text'] ?? '🔐 ورود به پنل وب', 'enabled' => ($settings['btn_panel_login_enabled'] ?? '1') === '1'],
                                 'webapp' => ['title' => '🚀 مینی‌اپ تلگرام (Mini App)', 'text' => $settings['btn_webapp_text'] ?? '🚀 مینی‌اپ اختصاصی کانکتیکس (Mini App)', 'enabled' => ($settings['btn_webapp_enabled'] ?? '1') === '1'],
+                                'monitoring' => ['title' => '📊 وضعیت سرورها LIVE', 'text' => $settings['btn_monitoring_text'] ?? '📊 وضعیت سرورها LIVE', 'enabled' => ($settings['btn_monitoring_enabled'] ?? '1') === '1'],
+                                'financial' => ['title' => '💹 گزارش مالی', 'text' => $settings['btn_financial_text'] ?? '💹 گزارش مالی', 'enabled' => ($settings['btn_financial_enabled'] ?? '1') === '1'],
+                                'points' => ['title' => '🏆 امتیاز و جایزه', 'text' => $settings['btn_points_text'] ?? '🏆 امتیاز و جایزه', 'enabled' => ($settings['btn_points_enabled'] ?? '1') === '1'],
+                                'usage' => ['title' => '📈 مصرف و تاریخچه', 'text' => $settings['btn_usage_text'] ?? '📈 مصرف و تاریخچه', 'enabled' => ($settings['btn_usage_enabled'] ?? '1') === '1'],
                             ];
                             foreach ($botButtonsConfig as $bKey => $b):
                             ?>

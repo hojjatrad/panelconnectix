@@ -367,6 +367,19 @@ class TelegramBotController {
         if (Setting::get('btn_panel_login_enabled', '1') === '1') {
             $items[] = ['text' => Setting::get('btn_panel_login_text', '🔐 ورود به پنل وب'), 'callback_data' => 'menu_panel_credentials'];
         }
+        // v7.1 ULTRA: New features for reseller bot sync
+        if (Setting::get('btn_monitoring_enabled', '1') === '1') {
+            $items[] = ['text' => Setting::get('btn_monitoring_text', '📊 وضعیت سرورها LIVE'), 'callback_data' => 'menu_monitoring'];
+        }
+        if (Setting::get('btn_financial_enabled', '1') === '1') {
+            $items[] = ['text' => Setting::get('btn_financial_text', '💹 گزارش مالی'), 'callback_data' => 'menu_financial'];
+        }
+        if (Setting::get('btn_points_enabled', '1') === '1') {
+            $items[] = ['text' => Setting::get('btn_points_text', '🏆 امتیاز و جایزه'), 'callback_data' => 'menu_points'];
+        }
+        if (Setting::get('btn_usage_enabled', '1') === '1') {
+            $items[] = ['text' => Setting::get('btn_usage_text', '📈 مصرف و تاریخچه'), 'callback_data' => 'menu_usage'];
+        }
 
         // Pair items into 2-column rows
         for ($i = 0; $i < count($items); $i += 2) {
@@ -417,6 +430,15 @@ class TelegramBotController {
         }
         if (Setting::get('btn_panel_login_enabled', '1') === '1') {
             $items[] = ['text' => Setting::get('btn_panel_login_text', '🔐 ورود به پنل وب')];
+        }
+        if (Setting::get('btn_monitoring_enabled', '1') === '1') {
+            $items[] = ['text' => Setting::get('btn_monitoring_text', '📊 وضعیت سرورها LIVE')];
+        }
+        if (Setting::get('btn_financial_enabled', '1') === '1') {
+            $items[] = ['text' => Setting::get('btn_financial_text', '💹 گزارش مالی')];
+        }
+        if (Setting::get('btn_points_enabled', '1') === '1') {
+            $items[] = ['text' => Setting::get('btn_points_text', '🏆 امتیاز و جایزه')];
         }
 
         $rows = [];
@@ -623,6 +645,24 @@ class TelegramBotController {
             } else {
                 TelegramBot::sendMessage($msg, $chatId, $kb);
             }
+            return;
+        }
+
+        // v7.1 ULTRA: New menu handlers for reseller sync
+        if ($data === 'menu_monitoring') {
+            self::showMonitoringForUser($pdo, $chatId, $fromId, $messageId);
+            return;
+        }
+        if ($data === 'menu_financial') {
+            self::showFinancialForUser($pdo, $chatId, $fromId, $messageId);
+            return;
+        }
+        if ($data === 'menu_points') {
+            self::showPointsForUser($pdo, $chatId, $fromId, $messageId);
+            return;
+        }
+        if ($data === 'menu_usage') {
+            self::showUsageForUser($pdo, $chatId, $fromId, $messageId);
             return;
         }
 
@@ -3408,6 +3448,122 @@ class TelegramBotController {
         if (!$edited) {
             TelegramBot::sendMessage($msg, $chatId, $keyboard);
         }
+    }
+
+    /**
+     * v7.1 ULTRA: Show monitoring for user (reseller sync)
+     */
+    public static function showMonitoringForUser(PDO $pdo, string $chatId, string $fromId, ?int $messageId=null): void {
+        $ctx = self::getContext($pdo);
+        $botToken = $ctx['bot_token'];
+        try {
+            require_once __DIR__ . '/../core/ServerMonitor.php';
+            require_once __DIR__ . '/../core/SublinkRotator.php';
+            $servers = $pdo->query("SELECT * FROM server_nodes WHERE is_active=1 ORDER BY health_status DESC, latency_ms ASC LIMIT 10")->fetchAll(PDO::FETCH_ASSOC);
+            $domains = \SublinkRotator::getActiveDomains();
+            $msg = "📊 <b>وضعیت سرورها LIVE - ULTRA v7.1</b>\n\n";
+            foreach ($servers as $s) {
+                $icon = ($s['health_status']??'online')==='online' ? '🟢' : '🔴';
+                $msg .= "$icon <b>{$s['name']}</b> - {$s['driver']} - ".($s['latency_ms']??0)."ms - ".($s['health_status']??'online')."\n";
+            }
+            $msg .= "\n🌐 <b>دامنه‌های چرخشی ضد فیلتر:</b>\n";
+            foreach (array_slice($domains,0,5) as $d) {
+                $icon = ($d['health_status']==='online') ? '✅' : '❌';
+                $msg .= "$icon {$d['domain']} - {$d['latency_ms']}ms\n";
+            }
+            $msg .= "\n<i>آخرین بروزرسانی: ".date('Y-m-d H:i:s')."</i>";
+        } catch (Throwable $e) {
+            $msg = "⚠️ خطا در دریافت وضعیت سرورها: ".$e->getMessage();
+        }
+        $kb = ['inline_keyboard' => [[['text'=>'🔄 بروزرسانی','callback_data'=>'menu_monitoring'],['text'=>'🔙 منو','callback_data'=>'menu_main']]]];
+        if ($messageId) TelegramBot::editMessageText($msg, $chatId, $messageId, $kb, $botToken);
+        else TelegramBot::sendMessage($msg, $chatId, $kb, $botToken);
+    }
+
+    public static function showFinancialForUser(PDO $pdo, string $chatId, string $fromId, ?int $messageId=null): void {
+        $ctx = self::getContext($pdo);
+        $botToken = $ctx['bot_token'];
+        $resellerId = (int)($ctx['reseller_id']??1);
+        try {
+            $isAdmin = $resellerId===1;
+            $where = $isAdmin ? "1=1" : "user_id=$resellerId";
+            $totalIncome = (int)$pdo->query("SELECT COALESCE(SUM(amount),0) FROM transactions WHERE amount>0 AND $where")->fetchColumn();
+            $totalSpent = (int)$pdo->query("SELECT COALESCE(SUM(ABS(amount)),0) FROM transactions WHERE amount<0 AND $where")->fetchColumn();
+            $profit = (int)($totalSpent*0.45);
+            $activeClients = (int)$pdo->query("SELECT COUNT(*) FROM clients WHERE ".($isAdmin?"1=1":"reseller_id=$resellerId")." AND status='active'")->fetchColumn();
+            $msg = "💹 <b>گزارش مالی ULTRA v7.1</b>\n\n";
+            $msg .= "💰 کل درآمد: <b>".number_format($totalIncome)." تومان</b>\n";
+            $msg .= "💸 کل هزینه: <b>".number_format($totalSpent)." تومان</b>\n";
+            $msg .= "💎 سود تخمینی (45%): <b>".number_format($profit)." تومان</b>\n";
+            $msg .= "👥 کلاینت فعال: <b>$activeClients</b>\n";
+            $msg .= "\n<i>نمای کلی مالی شما - برای جزئیات بیشتر به پنل وب بروید: /financial</i>";
+        } catch (Throwable $e) {
+            $msg = "⚠️ خطا در گزارش مالی: ".$e->getMessage();
+        }
+        $kb = ['inline_keyboard' => [[['text'=>'📊 جزئیات در پنل','url'=>\Helpers::fullUrl('financial')],['text'=>'🔙 منو','callback_data'=>'menu_main']]]];
+        if ($messageId) TelegramBot::editMessageText($msg, $chatId, $messageId, $kb, $botToken);
+        else TelegramBot::sendMessage($msg, $chatId, $kb, $botToken);
+    }
+
+    public static function showPointsForUser(PDO $pdo, string $chatId, string $fromId, ?int $messageId=null): void {
+        $ctx = self::getContext($pdo);
+        $botToken = $ctx['bot_token'];
+        $resellerId = (int)($ctx['reseller_id']??1);
+        try {
+            require_once __DIR__ . '/ResellerPointsController.php';
+            $stmt = $pdo->prepare("SELECT * FROM reseller_points WHERE reseller_id=?");
+            $stmt->execute([$resellerId]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            $points = (int)($row['points']??0);
+            $levelInfo = \ResellerPointsController::calculateLevel($points);
+            $msg = "🏆 <b>امتیاز و وفاداری - ULTRA v7.1</b>\n\n";
+            $msg .= "{$levelInfo['badge']} سطح: <b>{$levelInfo['title']}</b>\n";
+            $msg .= "⭐ امتیاز: <b>".number_format($points)."</b>\n";
+            $msg .= "💰 تخفیف: <b>{$levelInfo['discount']}%</b> روی هر پلن\n";
+            $msg .= "📦 فروش کل: ".number_format((int)($row['total_sales']??0))." تومان\n";
+            $msg .= "👥 کلاینت: ".(int)($row['total_clients']??0)."\n\n";
+            if ($levelInfo['next'] !== 'حداکثر') {
+                $need = $levelInfo['next'] - $points;
+                $msg .= "🎯 تا سطح بعدی: <b>$need</b> امتیاز دیگر\n";
+            } else {
+                $msg .= "🎉 شما در بالاترین سطح الماس هستید! 💎\n";
+            }
+            $msg .= "\n<i>هر 10,000 تومان فروش = 1 امتیاز | هر کلاینت = 5 امتیاز</i>";
+        } catch (Throwable $e) {
+            $msg = "⚠️ خطا: ".$e->getMessage();
+        }
+        $kb = ['inline_keyboard' => [[['text'=>'🏆 جدول برترین‌ها','url'=>\Helpers::fullUrl('resellers/points')],['text'=>'🔙 منو','callback_data'=>'menu_main']]]];
+        if ($messageId) TelegramBot::editMessageText($msg, $chatId, $messageId, $kb, $botToken);
+        else TelegramBot::sendMessage($msg, $chatId, $kb, $botToken);
+    }
+
+    public static function showUsageForUser(PDO $pdo, string $chatId, string $fromId, ?int $messageId=null): void {
+        $ctx = self::getContext($pdo);
+        $botToken = $ctx['bot_token'];
+        try {
+            $stmt = $pdo->prepare("SELECT c.username, c.traffic_used_bytes, c.traffic_limit_bytes, c.expire_at, s.name as server_name FROM clients c LEFT JOIN server_nodes s ON s.id=c.server_id WHERE c.telegram_chat_id=? ORDER BY c.id DESC LIMIT 5");
+            $stmt->execute([$fromId]);
+            $clients = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            if (empty($clients)) {
+                $msg = "📈 <b>مصرف و تاریخچه</b>\n\nشما هنوز حسابی به ربات متصل نکرده‌اید. از منوی حساب‌های من، اکانت خود را متصل کنید.";
+            } else {
+                $msg = "📈 <b>مصرف و تاریخچه - ULTRA v7.1</b>\n\n";
+                foreach ($clients as $c) {
+                    $used = \Helpers::formatBytes((int)$c['traffic_used_bytes']);
+                    $total = \Helpers::formatBytes((int)$c['traffic_limit_bytes']);
+                    $pct = (int)$c['traffic_limit_bytes']>0 ? round((int)$c['traffic_used_bytes']/(int)$c['traffic_limit_bytes']*100) : 0;
+                    $rem = \Helpers::daysRemaining($c['expire_at']);
+                    $msg .= "👤 <code>{$c['username']}</code> - {$c['server_name']}\n";
+                    $msg .= "   📊 $used / $total ($pct%) | ⏳ $rem\n\n";
+                }
+                $msg .= "<i>برای نمودار 30 روزه به پنل وب بروید: /clients</i>";
+            }
+        } catch (Throwable $e) {
+            $msg = "⚠️ خطا: ".$e->getMessage();
+        }
+        $kb = ['inline_keyboard' => [[['text'=>'📊 حساب‌های من','callback_data'=>'menu_my_accounts'],['text'=>'🔙 منو','callback_data'=>'menu_main']]]];
+        if ($messageId) TelegramBot::editMessageText($msg, $chatId, $messageId, $kb, $botToken);
+        else TelegramBot::sendMessage($msg, $chatId, $kb, $botToken);
     }
 
     /**

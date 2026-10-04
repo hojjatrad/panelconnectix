@@ -1321,9 +1321,31 @@ SQL;
         $adminPass = password_hash('admin123', PASSWORD_BCRYPT);
         $stmt = $pdo->prepare("INSERT OR IGNORE INTO users (id, username, password_hash, role, full_name, email, wallet_balance, api_token) VALUES (1, 'admin', ?, 'admin', 'مدیر کل سیستم', 'admin@connectix.local', 0, 'admin_secret_token_123')");
         $stmt->execute([$adminPass]);
-
+        // v7.2 FIX: Ensure reseller novinvpn / 123456 always exists and active
+        try {
+            $resellerPass = password_hash('123456', PASSWORD_BCRYPT);
+            $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+            if ($driver === 'mysql') {
+                $pdo->prepare("INSERT INTO users (id, username, password_hash, role, full_name, email, wallet_balance, discount_percent, api_token, status) VALUES (2, 'novinvpn', ?, 'reseller', 'نوین وی‌پی‌ان (نماینده نمونه)', 'novin@example.com', 500000, 15, 'reseller_novin_token_456', 'active') ON DUPLICATE KEY UPDATE username=VALUES(username), role='reseller', status='active', two_factor_enabled=0, two_factor_secret=NULL")->execute([$resellerPass]);
+                // Also ensure password is correct if user exists but with wrong hash - force reset if requested via setting
+                // Check if existing password_verify fails, then update
+                $chk = $pdo->prepare("SELECT password_hash FROM users WHERE username='novinvpn' LIMIT 1");
+                $chk->execute();
+                $existingHash = $chk->fetchColumn();
+                if ($existingHash && !password_verify('123456', $existingHash)) {
+                    // Only auto-fix if setting allows or if it's clearly broken
+                    $pdo->prepare("UPDATE users SET password_hash=?, status='active', role='reseller', two_factor_enabled=0, two_factor_secret=NULL WHERE username='novinvpn'")->execute([$resellerPass]);
+                }
+            } else {
+                $stmt2 = $pdo->prepare("INSERT OR IGNORE INTO users (id, username, password_hash, role, full_name, email, wallet_balance, discount_percent, api_token, status) VALUES (2, 'novinvpn', ?, 'reseller', 'نوین وی‌پی‌ان (نماینده نمونه)', 'novin@example.com', 500000, 15, 'reseller_novin_token_456', 'active')");
+                $stmt2->execute([$resellerPass]);
+            }
+        } catch (Throwable $e) {}
         // Seed default Branding
         $pdo->exec("INSERT OR IGNORE INTO branding_metadata (user_id, brand_name, theme_color, telegram_support, whatsapp_support, welcome_message) VALUES (1, 'Connectix Panel', 'violet', '@Connectix_Admin', '+989000000000', 'به پنل مدیریت اختصاصی کانکتیکس خوش آمدید.')");
+        try {
+            $pdo->exec("INSERT OR IGNORE INTO branding_metadata (user_id, brand_name, theme_color, telegram_support, whatsapp_support, welcome_message) VALUES (2, 'نوین وی‌پی‌ان', 'violet', '@NovinVPN_Support', '+989123456789', 'به نوین وی‌پی‌ان خوش آمدید.')");
+        } catch (Throwable $e) {}
     }
 
     /**

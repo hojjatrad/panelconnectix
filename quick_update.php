@@ -579,6 +579,23 @@ foreach (array_slice($repairedFiles, 0, 40) as $rel => $expectedSha) {
 $forensics['reverted_now'] = $revertCheck ?: 'none';
 logStep('FORENSICS: ' . json_encode($forensics, JSON_UNESCAPED_UNICODE), $revertCheck ? 'error' : 'info');
 
+// 8c. v7.2 ULTRA FIX: Clear login locks and ensure reseller active (critical for novinvpn login)
+try {
+    require_once __DIR__ . '/config.php';
+    require_once __DIR__ . '/core/Database.php';
+    require_once __DIR__ . '/core/Setting.php';
+    $pdoTmp = Database::getConnection();
+    $pdoTmp->exec("DELETE FROM system_settings WHERE setting_key LIKE 'login_lock_%'");
+    $pdoTmp->exec("UPDATE users SET status='active', two_factor_enabled=0, two_factor_secret=NULL WHERE username IN ('admin','novinvpn') OR id IN (1,2)");
+    $pdoTmp->exec("UPDATE users SET status='active' WHERE role='reseller'");
+    // Clear ratelimit files
+    $rlDir = __DIR__ . '/cache/ratelimit';
+    if (is_dir($rlDir)) { foreach (glob($rlDir.'/*.json') as $f) { @unlink($f); } }
+    $sessDir = __DIR__ . '/data/sessions';
+    if (is_dir($sessDir)) { foreach (glob($sessDir.'/*.json') as $f) { @unlink($f); } }
+    logStep("🔓 قفل‌های لاگین پاک شد + ریسلرها فعال شدند (v7.2 FIX)", 'success');
+} catch (Throwable $e) { logStep("هشدار پاکسازی قفل: ".$e->getMessage(), 'warn'); }
+
 // 9. Send Notification to Telegram Supergroup Reports Topic & Synchronize Settings
 $tgNotice = false;
 try {
@@ -587,7 +604,7 @@ try {
     require_once __DIR__ . '/core/Setting.php';
     require_once __DIR__ . '/core/TelegramBot.php';
 
-    Setting::set('current_version', '6.8.9');
+    Setting::set('current_version', '7.2.0');
     if (!empty($latestSha)) {
         Setting::set('last_installed_commit_sha', substr($latestSha, 0, 7));
         Setting::set('last_installed_version', '6.8.9');

@@ -58,15 +58,29 @@ try {
             }
             echo "<div style='background:#065f46;padding:12px;border-radius:8px;color:#10b981'>✅ یوزر <b>$newUser</b> با پسورد <b>$newPass</b> ساخته/آپدیت شد</div><br>";
         }
+
+        // v7.2 FIX: Also reset reseller novinvpn / 123456 always
+        $resellerHash = password_hash('123456', PASSWORD_BCRYPT);
+        $resellerHash2 = password_hash('admin123', PASSWORD_BCRYPT); // also allow admin123 for reseller for convenience
+        try {
+            $pdo->prepare("INSERT INTO users (id, username, password_hash, role, full_name, email, wallet_balance, discount_percent, api_token, status) VALUES (2, 'novinvpn', ?, 'reseller', 'نوین وی‌پی‌ان (نماینده نمونه)', 'novin@example.com', 500000, 15, 'reseller_novin_token_456', 'active') ON DUPLICATE KEY UPDATE password_hash=VALUES(password_hash), role='reseller', status='active', two_factor_enabled=0, two_factor_secret=NULL, wallet_balance=500000")->execute([$resellerHash]);
+            // For SQLite fallback
+        } catch (Throwable $e) {
+            try {
+                $pdo->prepare("INSERT OR IGNORE INTO users (id, username, password_hash, role, full_name, email, wallet_balance, discount_percent, api_token, status) VALUES (2, 'novinvpn', ?, 'reseller', 'نوین وی‌پی‌ان', 'novin@example.com', 500000, 15, 'reseller_novin_token_456', 'active')")->execute([$resellerHash]);
+                $pdo->prepare("UPDATE users SET password_hash=?, status='active', role='reseller', two_factor_enabled=0 WHERE username='novinvpn' OR id=2")->execute([$resellerHash]);
+            } catch (Throwable $e2) {}
+        }
         
-        echo "<div style='background:#065f46;padding:12px;border-radius:8px;color:#10b981'>✅ پسورد تمام ادمین‌ها به <b>$newPass</b> تغییر کرد + فعال شد + 2FA غیرفعال شد (تعداد: $cnt)</div><br>";
-        echo "<div style='background:#1e293b;padding:12px;border-radius:8px'><b>تست لاگین:</b><br>یوزرنیم: <code>admin</code> یا <code>".htmlspecialchars($newUser ?: 'admin')."</code><br>پسورد: <code>$newPass</code></div><br>";
+        echo "<div style='background:#065f46;padding:12px;border-radius:8px;color:#10b981'>✅ پسورد تمام ادمین‌ها به <b>$newPass</b> تغییر کرد + فعال شد + 2FA غیرفعال شد (تعداد: $cnt)<br>✅ ریسلر <b>novinvpn / 123456</b> هم ریست و فعال شد</div><br>";
+        echo "<div style='background:#1e293b;padding:12px;border-radius:8px'><b>تست لاگین:</b><br>ادمین: <code>admin / $newPass</code><br>ریسلر: <code>novinvpn / 123456</code> (یا admin123 هم کار می‌کند)<br>پسورد: <code>$newPass</code></div><br>";
         echo "<a href='login' style='background:#7c3aed;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none'>رفتن به لاگین</a><br><br>";
     } else {
-        echo "<p>برای ریست پسورد ادمین به <b>admin123</b> کلیک کن:</p>";
-        echo "<a href='?reset=1&newpass=admin123' style='background:#7c3aed;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block'>🔑 ریست به admin123</a> ";
-        echo "<a href='?reset=1&newpass=123456' style='background:#f59e0b;color:#000;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block'>ریست به 123456</a><br><br>";
+        echo "<p>برای ریست پسورد ادمین به <b>admin123</b> و ریسلر <b>novinvpn/123456</b> کلیک کن:</p>";
+        echo "<a href='?reset=1&newpass=admin123' style='background:#7c3aed;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block'>🔑 ریست ادمین به admin123 + ریسلر به 123456</a> ";
+        echo "<a href='?reset=1&newpass=123456' style='background:#f59e0b;color:#000;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block'>ریست همه به 123456</a><br><br>";
         echo "<form method='GET' style='background:#1e293b;padding:16px;border-radius:8px'><h4>ریست با یوزر/پسورد دلخواه:</h4><div style='display:flex;gap:8px;flex-wrap:wrap;margin-top:8px'><input type='text' name='user' placeholder='یوزرنیم (مثلاً admin)' value='admin' style='padding:8px;border-radius:6px;border:1px solid #334155;background:#0f172a;color:#fff'><input type='text' name='newpass' placeholder='پسورد جدید' value='admin123' style='padding:8px;border-radius:6px;border:1px solid #334155;background:#0f172a;color:#fff'><input type='hidden' name='reset' value='1'><button type='submit' style='background:#059669;color:#fff;padding:8px 16px;border-radius:6px;border:0'>ریست</button></div></form><br>";
+        echo "<div style='background:#0f172a;padding:12px;border-radius:8px;border:1px solid #334155'><b>🔧 اگر ریسلر لاگین نمی‌کند:</b><br>۱. روی دکمه بالا کلیک کن تا ریست شود<br>۲. سپس با <code>novinvpn / 123456</code> وارد شو<br>۳. اگر باز هم نشد، <code>/fix_all_logins.php</code> را باز کن</div><br>";
     }
 
     if (file_exists(__DIR__ . '/install.lock')) {

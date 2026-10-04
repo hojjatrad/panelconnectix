@@ -316,6 +316,19 @@ if (!function_exists('isActiveRoute')) {
                             <i class="fa-solid fa-robot w-4 text-center text-violet-400"></i>
                             <span>دستیار هوشمند (شارژ)</span>
                         </a>
+                        <a href="<?= Helpers::url('reseller/monitoring') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('reseller/monitoring', $currentUri) ? 'bg-emerald-600/15 text-emerald-300 font-bold border-r-2 border-emerald-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
+                            <i class="fa-solid fa-heart-pulse w-4 text-center text-emerald-400"></i>
+                            <span>مانیتورینگ LIVE</span>
+                            <span class="mr-auto w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span>
+                        </a>
+                        <a href="<?= Helpers::url('reseller/financial') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('reseller/financial', $currentUri) ? 'bg-amber-600/15 text-amber-300 font-bold border-r-2 border-amber-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
+                            <i class="fa-solid fa-chart-line w-4 text-center text-amber-400"></i>
+                            <span>گزارش مالی ULTRA</span>
+                        </a>
+                        <a href="<?= Helpers::url('reseller/usage') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('reseller/usage', $currentUri) ? 'bg-cyan-600/15 text-cyan-300 font-bold border-r-2 border-cyan-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
+                            <i class="fa-solid fa-chart-area w-4 text-center text-cyan-400"></i>
+                            <span>مصرف و تاریخچه</span>
+                        </a>
                         <a href="<?= Helpers::url('reseller/points') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('reseller/points', $currentUri) ? 'bg-amber-600/15 text-amber-300 font-bold border-r-2 border-amber-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
                             <i class="fa-solid fa-trophy w-4 text-center text-amber-400"></i>
                             <span>امتیاز و جایزه من</span>
