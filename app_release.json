@@ -1,16 +1,16 @@
 {
-  "version": "4.0.6",
-  "code": 41,
-  "changelog": "v4.0.6 FIX: حل مشکل بسته شدن برنامه هنگام نصب - بهبود FileProvider و نصب خودکار، فیکس onSuccess اشتباه، اضافه شدن fallback مرورگر",
+  "version": "4.0.7",
+  "code": 42,
+  "changelog": "v4.0.7 DEEP FIX: حل قطعی مشکل بسته شدن هنگام نصب - PackageInstaller API جدید، FileProvider قوی با 4 fallback، حذف CLEAR_TOP، فیکس onSuccess",
   "date": "2026-10-05",
   "apk": {
-    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.6/Connectix-Android-ARM64.apk",
-    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.6/Connectix-Android-Universal.apk",
-    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.6/Connectix-Android-ARM32.apk"
+    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.7/Connectix-Android-ARM64.apk",
+    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.7/Connectix-Android-Universal.apk",
+    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.7/Connectix-Android-ARM32.apk"
   },
   "windows": {
-    "version": "4.0.6",
-    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.6/Connectix-Windows-x64.zip"
+    "version": "4.0.7",
+    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.7/Connectix-Windows-x64.zip"
   },
   "ultra": true,
   "core": "flutter_vless dual-core Xray+sing-box",

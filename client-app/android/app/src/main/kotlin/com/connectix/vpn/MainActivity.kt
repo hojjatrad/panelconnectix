@@ -6,6 +6,7 @@ import android.app.PendingIntent
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -16,6 +17,7 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
+import java.io.FileInputStream
 import java.util.ArrayList
 import java.util.HashMap
 import java.util.HashSet
@@ -144,12 +146,16 @@ class MainActivity: FlutterActivity() {
                 }
                 "getCacheDir" -> {
                     try {
-                        // Prefer external files dir for better FileProvider compatibility on Android 10+
-                        val extDir = context.getExternalFilesDir(null)
-                        val cacheDir = if (extDir != null && extDir.exists()) extDir else context.cacheDir
+                        // v4.0.7 FIX: Use internal cache dir for maximum compatibility
+                        // External files dir can fail on some devices with scoped storage
+                        val cacheDir = context.cacheDir
                         if (!cacheDir.exists()) {
                             cacheDir.mkdirs()
                         }
+                        // Also ensure external cache exists as fallback
+                        try {
+                            context.externalCacheDir?.mkdirs()
+                        } catch (_: Exception) {}
                         result.success(cacheDir.absolutePath)
                     } catch (e: Exception) {
                         try {
@@ -204,45 +210,82 @@ class MainActivity: FlutterActivity() {
                     if (filePath != null) {
                         val file = File(filePath)
                         if (file.exists() && file.length() > 1000000) {
+                            // v4.0.7 DEEP FIX: Try PackageInstaller API first (modern, robust, no FileProvider needed)
+                            // This is the recommended way for Android 5.0+ and works on Android 14+
                             try {
-                                // v4.0.6 FIX: Ensure file is readable for installer
+                                val packageInstaller = context.packageManager.packageInstaller
+                                val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                        setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
+                                    }
+                                }
+                                val sessionId = packageInstaller.createSession(params)
+                                val session = packageInstaller.openSession(sessionId)
+                                
+                                // Write APK to session
+                                FileInputStream(file).use { input ->
+                                    session.openWrite("package", 0, -1).use { output ->
+                                        val buffer = ByteArray(65536)
+                                        var bytesRead: Int
+                                        while (input.read(buffer).also { bytesRead = it } != -1) {
+                                            output.write(buffer, 0, bytesRead)
+                                        }
+                                        session.fsync(output)
+                                    }
+                                }
+                                
+                                // Create install intent
+                                val intent = Intent(context, MainActivity::class.java).apply {
+                                    action = "INSTALL_COMPLETE"
+                                }
+                                val pendingFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                                } else {
+                                    PendingIntent.FLAG_UPDATE_CURRENT
+                                }
+                                val pendingIntent = PendingIntent.getActivity(context, sessionId, intent, pendingFlags)
+                                val statusReceiver = pendingIntent.intentSender
+                                
+                                session.commit(statusReceiver)
+                                session.close()
+                                
+                                result.success(true)
+                                return@setMethodCallHandler
+                            } catch (e: Exception) {
+                                // PackageInstaller failed, fallback to Intent method
+                                // Log but continue to fallback
+                                android.util.Log.e("ConnectixInstaller", "PackageInstaller failed: ${e.message}", e)
+                            }
+                            
+                            // FALLBACK: Intent with FileProvider (legacy method)
+                            try {
                                 try {
                                     file.setReadable(true, false)
                                 } catch (_: Exception) {}
                                 
                                 val uri: Uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                                    // Try primary file, then fallback locations
                                     try {
                                         FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file)
                                     } catch (e1: Exception) {
                                         try {
-                                            // Fallback 1: external files dir
-                                            val extFile = File(context.getExternalFilesDir(null), "Connectix-Update.apk")
-                                            if (extFile.exists() && extFile.length() > 1000000) {
-                                                extFile.setReadable(true, false)
-                                                FileProvider.getUriForFile(context, context.packageName + ".fileprovider", extFile)
+                                            val cacheFile = File(context.cacheDir, "Connectix-Update.apk")
+                                            if (cacheFile.exists() && cacheFile.length() > 1000000) {
+                                                cacheFile.setReadable(true, false)
+                                                FileProvider.getUriForFile(context, context.packageName + ".fileprovider", cacheFile)
                                             } else {
                                                 throw e1
                                             }
                                         } catch (e2: Exception) {
                                             try {
-                                                // Fallback 2: cache dir
-                                                val cacheFile = File(context.cacheDir, "Connectix-Update.apk")
-                                                if (cacheFile.exists() && cacheFile.length() > 1000000) {
-                                                    cacheFile.setReadable(true, false)
-                                                    FileProvider.getUriForFile(context, context.packageName + ".fileprovider", cacheFile)
-                                                } else {
-                                                    throw e2
-                                                }
-                                            } catch (e3: Exception) {
-                                                // Fallback 3: external cache
                                                 val extCacheFile = File(context.externalCacheDir, "Connectix-Update.apk")
                                                 if (extCacheFile.exists() && extCacheFile.length() > 1000000) {
                                                     extCacheFile.setReadable(true, false)
                                                     FileProvider.getUriForFile(context, context.packageName + ".fileprovider", extCacheFile)
                                                 } else {
-                                                    throw Exception("FileProvider failed for all paths: ${e1.message} | ${e2.message} | ${e3.message} | filePath=$filePath len=${file.length()} exists=${file.exists()} readable=${file.canRead()}")
+                                                    throw Exception("FileProvider failed: ${e1.message} | ${e2.message} | file=$filePath len=${file.length()}")
                                                 }
+                                            } catch (e3: Exception) {
+                                                throw e3
                                             }
                                         }
                                     }
@@ -250,21 +293,14 @@ class MainActivity: FlutterActivity() {
                                     Uri.fromFile(file)
                                 }
                                 
-                                // v4.0.6 FIX: Use more compatible intent without CLEAR_TOP which was closing app
-                                // Try ACTION_INSTALL_PACKAGE first (more explicit), fallback to VIEW
                                 val intent = Intent(Intent.ACTION_VIEW).apply {
                                     setDataAndType(uri, "application/vnd.android.package-archive")
-                                    // FIX: Remove CLEAR_TOP which caused app to close without installer
-                                    // Use NEW_TASK + GRANT_READ + GRANT_WRITE for better compatibility
-                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or 
-                                            Intent.FLAG_GRANT_READ_URI_PERMISSION
-                                    // For Android 10+, also grant write permission
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
                                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                                         addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
                                     }
                                 }
 
-                                // Grant permission to all potential installer activities
                                 try {
                                     val resInfoList = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                         packageManager.queryIntentActivities(intent, PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY.toLong()))
@@ -280,22 +316,19 @@ class MainActivity: FlutterActivity() {
                                     }
                                 } catch (_: Exception) {}
 
-                                // v4.0.6 FIX: Start activity with chooser for better compatibility
-                                // Some OEMs (Xiaomi, Samsung) need chooser
                                 try {
                                     val chooser = Intent.createChooser(intent, "نصب بروزرسانی Connectix")
                                     chooser.flags = Intent.FLAG_ACTIVITY_NEW_TASK
                                     context.startActivity(chooser)
                                 } catch (e: Exception) {
-                                    // Fallback: direct start
                                     context.startActivity(intent)
                                 }
                                 result.success(true)
                             } catch (e: Exception) {
-                                result.error("INSTALL_ERROR", "v4.0.6: ${e.message} path=$filePath len=${file.length()} exists=${file.exists()} canRead=${file.canRead()} canWrite=${file.canWrite()} | ${e.stackTraceToString().take(500)}", null)
+                                result.error("INSTALL_ERROR", "v4.0.7 Intent fallback failed: ${e.message} path=$filePath len=${file.length()} exists=${file.exists()} canRead=${file.canRead()} | ${e.stackTraceToString().take(800)}", null)
                             }
                         } else {
-                            result.error("FILE_NOT_FOUND", "File does not exist or too small: $filePath len=${if (file.exists()) file.length() else 0} exists=${file.exists()}", null)
+                            result.error("FILE_NOT_FOUND", "File missing or too small: $filePath len=${if (file.exists()) file.length() else 0} exists=${file.exists()}", null)
                         }
                     } else {
                         result.error("INVALID_ARGUMENT", "filePath is null", null)
@@ -314,17 +347,13 @@ class MainActivity: FlutterActivity() {
                     try {
                         val rawList = call.argument<List<*>>("packages") ?: emptyList<Any>()
                         val candidateList = rawList.mapNotNull { it?.toString() }
-                        // v3.5.8 FIX: Filter to only installed packages to avoid NameNotFoundException and TransactionTooLarge
                         val pm = context.packageManager
                         val installed = ArrayList<String>()
                         for (pkg in candidateList) {
                             try {
-                                // Use getPackageInfo to check if installed; works on all API levels
                                 pm.getPackageInfo(pkg, 0)
                                 installed.add(pkg)
-                            } catch (_: Exception) {
-                                // Not installed, skip
-                            }
+                            } catch (_: Exception) {}
                         }
                         result.success(installed)
                     } catch (e: Exception) {
@@ -421,7 +450,7 @@ class MainActivity: FlutterActivity() {
                         try {
                             val usm = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
                             val end = System.currentTimeMillis()
-                            val begin = end - 1000 * 10 // last 10 seconds
+                            val begin = end - 1000 * 10
                             val stats = usm.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, begin, end)
                             var foregroundPkg: String? = null
                             var lastTime: Long = 0
@@ -435,7 +464,6 @@ class MainActivity: FlutterActivity() {
                                     } catch (_: Exception) {}
                                 }
                             }
-                            // Fallback: try queryEvents
                             if (foregroundPkg == null) {
                                 try {
                                     val events = usm.queryEvents(begin, end)

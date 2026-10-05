@@ -4,10 +4,10 @@
  */
 $manifest = $manifest ?? [];
 $appVersion = $manifest['version'] ?? '3.7.0';
-$apkUniversalUrl = $manifest['apk']['universal'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.6/Connectix-Android-Universal.apk';
-$apkArm64Url = $manifest['apk']['arm64'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.6/Connectix-Android-ARM64.apk';
-$apkArm32Url = $manifest['apk']['arm32'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.6/Connectix-Android-ARM32.apk';
-$windowsUrl = $manifest['windows']['url'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.6/Connectix-Windows-x64.zip';
+$apkUniversalUrl = $manifest['apk']['universal'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.7/Connectix-Android-Universal.apk';
+$apkArm64Url = $manifest['apk']['arm64'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.7/Connectix-Android-ARM64.apk';
+$apkArm32Url = $manifest['apk']['arm32'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.7/Connectix-Android-ARM32.apk';
+$windowsUrl = $manifest['windows']['url'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.7/Connectix-Windows-x64.zip';
 $iosSibappUrl = $manifest['ios']['sibapp'] ?? 'https://sibapp.com/applications/connectix-vpn';
 $iosAnardoniUrl = $manifest['ios']['anardoni'] ?? 'https://anardoni.com/applications/connectix-vpn';
 $iosTestFlightUrl = $manifest['ios']['testflight'] ?? 'https://testflight.apple.com/join/connectix';

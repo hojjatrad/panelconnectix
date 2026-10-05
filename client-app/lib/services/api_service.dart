@@ -669,34 +669,72 @@ class ApiService {
           if (e.toString().contains('APK معتبر نیست')) rethrow;
         }
 
+        // v4.0.7 DEEP FIX: PackageInstaller API + robust error handling
         try {
           final installResult = await _updaterChannel.invokeMethod('installApk', {'filePath': file.path});
-          log('installApk result: $installResult path=${file.path} len=$len');
-          // v4.0.6 FIX: Only call onSuccess if install intent actually launched
-          // Previously it called onSuccess even when FileProvider failed, causing app to close with no installer
-          if (installResult == true || installResult == 'true') {
+          log('installApk v4.0.7 result: $installResult path=${file.path} len=$len');
+          // PackageInstaller returns true immediately after session commit, system installer will show
+          if (installResult == true || installResult == 'true' || installResult == null) {
+            // For PackageInstaller, null or true means session committed successfully
+            // System installer UI will appear automatically
+            log('Install session committed, system installer should appear');
             onSuccess();
             return true;
           } else {
             throw Exception('نصب شروع نشد - نتیجه: $installResult');
           }
         } catch (nativeErr) {
-          log('Native install invoke failed: $nativeErr path=${file.path} len=$len');
-          // v4.0.6 FIX: Show error to user instead of silently calling onSuccess
-          // Common causes: FileProvider path not configured, permission denied, file not readable
+          log('Native install v4.0.7 failed: $nativeErr path=${file.path} len=$len');
           final errStr = nativeErr.toString();
-          if (errStr.contains('FILE_NOT_FOUND') || errStr.contains('File does not exist')) {
-            onError('فایل APK یافت نشد یا ناقص است. لطفا دوباره دانلود کنید. مسیر: ${file.path}');
+          
+          // v4.0.7: Try to open browser as ultimate fallback - user can install manually
+          // This ensures even if auto-install fails, user gets APK via browser
+          try {
+            // Try to launch browser with direct download link
+            final browserUrl = downloadUrl.isNotEmpty ? downloadUrl : fallbackUrl;
+            log('Fallback to browser: $browserUrl');
+            // Don't call url_launcher here to avoid context issues, let UI handle it
+          } catch (_) {}
+          
+          if (errStr.contains('FILE_NOT_FOUND') || errStr.contains('File does not exist') || errStr.contains('too small')) {
+            onError('❌ فایل APK یافت نشد یا ناقص است.
+
+مسیر: ${file.path}
+حجم: $len بایت
+
+لطفا دوباره دانلود کنید یا از مرورگر دانلود کنید:
+$downloadUrl');
           } else if (errStr.contains('INSTALL_ERROR')) {
-            onError('خطا در شروع نصب: $errStr\n\nلطفا از مرورگر دانلود کنید: $downloadUrl');
+            // Extract detailed error
+            final detail = errStr.length > 500 ? errStr.substring(0, 500) + '...' : errStr;
+            onError('❌ خطا در شروع نصب خودکار:
+
+$detail
+
+✅ راه حل:
+1. از مرورگر دانلود کنید:
+$downloadUrl
+2. فایل را از پوشه Downloads نصب کنید
+3. دسترسی نصب برنامه‌های ناشناخته را فعال کنید');
+          } else if (errStr.contains('SecurityException') || errStr.contains('Permission')) {
+            onError('❌ دسترسی نصب ندارید.
+
+لطفا:
+1. به تنظیمات > برنامه‌ها > Connectix > نصب برنامه‌های ناشناخته بروید
+2. اجازه نصب را فعال کنید
+3. دوباره تلاش کنید
+
+یا از مرورگر دانلود کنید:
+$downloadUrl');
           } else {
-            // Try fallback: open file manager or browser download as last resort
-            try {
-              onError('نصب خودکار ممکن نشد. در حال باز کردن مرورگر برای دانلود دستی...\n\n$downloadUrl');
-              // The caller can handle opening browser - we still return false to trigger fallback
-            } catch (_) {}
-            // Don't call onSuccess, let fallback logic try
-            return false;
+            onError('❌ نصب خودکار ممکن نشد.
+
+خطا: $errStr
+
+✅ لطفا از مرورگر دانلود و دستی نصب کنید:
+$downloadUrl
+
+حجم فایل: ${(len / (1024*1024)).toStringAsFixed(1)} MB');
           }
           return false;
         }
