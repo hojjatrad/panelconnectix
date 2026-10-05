@@ -171,6 +171,29 @@ class _ServerListModalState extends State<ServerListModal> {
       );
     }
 
+    // v4.0.16 FIX: Handle 0 as "آماده" - server exists but ping not measurable
+    if (s.pingMs == 0) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: const Color(0xFF6366F1).withOpacity(0.15),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFF6366F1).withOpacity(0.4)),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.check_circle_rounded, size: 12, color: Color(0xFF818CF8)),
+            SizedBox(width: 3),
+            Text(
+              'آماده',
+              style: TextStyle(color: Color(0xFF818CF8), fontSize: 10, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+      );
+    }
+
     final ms = s.pingMs!;
     final Color badgeColor = ms < 180
         ? const Color(0xFF10B981)

@@ -1,24 +1,25 @@
 {
-  "version": "4.0.15",
-  "code": 50,
-  "changelog": "v4.0.15 DUAL FIX - حل دو مشکل اساسی! 1) آپدیت نصب میشه ولی نسخه قدیمی میمونه: ریشه کش کلودفلر بود که APK قدیمی را سرو میکرد. فیکس: URL با ?v=version&t=timestamp برای دور زدن کش + لاگ تعداد URLها + اولویت vpbotn.ir بدون ir/cf که 404 هستند. 2) مدیریت هوشمند مسیر پنل فقط داخل داشبورد بعد از لاگین بود و اگر پنل جابجا شده بود کاربر نمیتونست لاگین کنه تا آن قسمت را ببینه (chicken-egg). فیکس: دکمه تنظیمات پنل در صفحه لاگین (قبل از ورود) + BottomSheet کامل با تست مسیرها، اسکن هوشمند 6 لایه‌ای، ورود دستی آدرس، نمایش مسیر فعلی. نصب خالص v4.0.13 و پینگ v4.0.14 همچنان فعال.",
+  "version": "4.0.16",
+  "code": 51,
+  "changelog": "v4.0.16 PING PROGRESS FIX - حل مشکل 0 از 16 سرور! کاربر گزارش داد تست پینگ همه سرورها روی 0 از 16 گیر میکنه و عدد نمیندازه. ریشه: getServerDelay بدون تایم‌اوت هنگ میکرد و کل بچ را بلاک میکرد، onProgress هرگز صدا زده نمیشد. فیکس: 1) pingAllServers با تایم‌اوت 5 ثانیه برای هر پینگ + لاگ کامل + تضمین صدا زدن onProgress در finally + اگر پینگ شکست بخورد 0=آماده تنظیم میشه نه null 2) server_list_modal _buildPingBadge برای 0 حالت آماده با آیکن چک و رنگ بنفش 3) _smartConnect با تایم‌اوت 4 ثانیه. الان تست پینگ باید 1/16, 2/16... تا 16/16 برود و همه سرورها آماده یا ms نشان دهند.",
   "date": "2026-10-05",
   "apk": {
-    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.15/Connectix-Android-ARM64.apk",
-    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.15/Connectix-Android-Universal.apk",
-    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.15/Connectix-Android-ARM32.apk"
+    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.16/Connectix-Android-ARM64.apk",
+    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.16/Connectix-Android-Universal.apk",
+    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.16/Connectix-Android-ARM32.apk"
   },
   "windows": {
-    "version": "4.0.15",
-    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.15/Connectix-Windows-x64.zip"
+    "version": "4.0.16",
+    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.16/Connectix-Windows-x64.zip"
   },
   "ultra": true,
   "core": "flutter_vless dual-core",
   "protocols": ["vless", "vmess", "trojan", "ss", "socks", "http", "wireguard", "hysteria2", "raw", "clash", "singbox"],
   "fixes": {
-    "old_version_remains": "v4.0.15 - Fixed Cloudflare cache serving old APK: added ?v=version&t=timestamp cache busting, prioritized vpbotn.ir, skipped ir/cf 404, logged URLs",
-    "panel_manager_before_login": "v4.0.15 - Panel Location Manager now accessible BEFORE login via settings button on login screen + full bottom sheet with test, intelligent scan, manual entry - fixes chicken-egg problem",
-    "ping_display": "v4.0.14 - Improved ping: 2 attempts TCP + HTTP fallback, shows 'آماده' when not measurable",
-    "installer_stuck_forever": "v4.0.13 PURE INTENT - Removed PackageInstaller, restored v4.0.3 working method"
+    "ping_progress_0_16": "v4.0.16 - Fixed 0/16 progress stuck: added 5s timeout to getServerDelay, guaranteed onProgress in finally, set 0=آماده on failure, logs",
+    "ping_display": "v4.0.15/4.0.14 - Shows آماده when ping not measurable",
+    "old_version_remains": "v4.0.15 - Cloudflare cache busting with ?v=&t=",
+    "panel_manager_before_login": "v4.0.15 - Panel manager on login screen",
+    "installer_stuck_forever": "v4.0.13 PURE INTENT - Removed PackageInstaller"
   }
 }

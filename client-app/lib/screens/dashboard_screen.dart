@@ -71,7 +71,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Map<String, dynamic>? _updateInfo;
   bool _isCheckingUpdate = false;
 
-  static const String currentAppVersion = '4.0.15';
+  static const String currentAppVersion = '4.0.16';
 
   // "Download over Wi-Fi only" for update packages
   bool _updateWifiOnly = false;
@@ -850,7 +850,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       if (s.configUri.isEmpty) continue;
       try {
         final parser = V2RayCompat.parseUniversal(s.configUri);
-        final delay = await _flutterV2ray.getServerDelay(config: parser.getFullConfiguration());
+        // v4.0.16: Add timeout to getServerDelay
+        final delay = await _flutterV2ray.getServerDelay(config: parser.getFullConfiguration()).timeout(const Duration(seconds: 4), onTimeout: () => -1);
         if (delay != null && delay > 0 && delay < lowestPing) {
           lowestPing = delay;
           bestServer = s;
