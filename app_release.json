@@ -1,16 +1,16 @@
 {
-  "version": "4.0.9",
-  "code": 44,
-  "changelog": "v4.0.9 PRO MAX - Panel Location Manager: استقلال کامل از مسیر پنل! اگر پنل از /contax به / یا هر مسیر دیگه منتقل بشه، اپ خودکار مسیر جدید رو کشف می‌کنه. 6 لایه هوشمند: آدرس ذخیره شده، Well-Known discovery، Panel-Location API، Old Path Redirector، Brute-force مسیرهای رایج، Remote Config + QR اسکن. هدر Canonical خودکار + مهاجرت بی‌صدا.",
+  "version": "4.0.10",
+  "code": 45,
+  "changelog": "v4.0.10 PRO MAX FIX - حل مشکل باز نشدن پنجره نصب در شیائومی/سامسونگ اندروید 14+! نصب دوگانه PackageInstaller + Intent، اعطای دسترسی به تمام نصاب‌ها (MIUI, Samsung)، کپی APK به حافظه خارجی، دکمه تلاش مجدد دستی، راهنمای فعال‌سازی نصب ناشناخته. اگر پنجره باز نشد، دکمه باز کردن دستی یا دانلود با مرورگر.",
   "date": "2026-10-05",
   "apk": {
-    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.9/Connectix-Android-ARM64.apk",
-    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.9/Connectix-Android-Universal.apk",
-    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.9/Connectix-Android-ARM32.apk"
+    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.10/Connectix-Android-ARM64.apk",
+    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.10/Connectix-Android-Universal.apk",
+    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.10/Connectix-Android-ARM32.apk"
   },
   "windows": {
-    "version": "4.0.9",
-    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.9/Connectix-Windows-x64.zip"
+    "version": "4.0.10",
+    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.10/Connectix-Windows-x64.zip"
   },
   "ultra": true,
   "core": "flutter_vless dual-core",
@@ -19,5 +19,9 @@
     "version": "v8.0",
     "features": ["well_known_discovery", "canonical_header", "old_path_redirector", "brute_force", "remote_config", "qr_fallback"],
     "endpoints": ["/.well-known/connectix.json", "/api/v1/app/panel-location", "/contax/panel_redirector.php"]
+  },
+  "installer_fix": {
+    "version": "v4.0.10",
+    "fixes": ["dual_intent_packageinstaller_plus_view", "grant_uri_to_all_installers", "external_files_dir_not_cache", "miui_samsung_specific_flags", "manual_retry_button", "browser_fallback"]
   }
 }

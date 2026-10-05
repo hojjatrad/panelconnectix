@@ -1096,12 +1096,17 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   },
                   onSuccess: () {
                     setModalState(() {
-                      statusText = 'دانلود کامل شد. پنجره نصاب اندروید فراخوانی گردید.';
+                      statusText = '✅ دانلود کامل شد. در حال باز کردن نصاب اندروید...\n\nاگر پنجره نصب باز نشد، دکمه زیر را بزنید یا از مرورگر دانلود کنید.';
                       downloadProgress = 1.0;
                     });
-                    Future.delayed(const Duration(milliseconds: 1400), () {
+                    // v4.0.10: Don't auto-close immediately, give time for installer UI to appear on MIUI/Samsung
+                    // Show manual fallback after 3 seconds if installer didn't appear
+                    Future.delayed(const Duration(milliseconds: 3500), () {
                       if (Navigator.canPop(bottomSheetContext)) {
-                        Navigator.pop(bottomSheetContext);
+                        // Keep modal open but update text to show manual options
+                        setModalState(() {
+                          statusText = '📲 نصاب فراخوانی شد. اگر پنجره نصب باز نشد:\n\n1️⃣ روی \"باز کردن نصاب دستی\" بزنید\n2️⃣ یا \"دانلود با مرورگر\" و از پوشه دانلود نصب کنید\n\n⚠️ در شیائومی: تنظیمات → حریم خصوصی → نصب ناشناخته → Connectix را فعال کنید';
+                        });
                       }
                     });
                   },
@@ -1216,10 +1221,74 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       ],
                     )
                   else
-                    const Text(
-                      'نصاب اندروید به صورت خودکار اجرا خواهد شد و نیازی به حذف برنامه قبلی نیست.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Color(0xFF64748B), fontSize: 11),
+                    Column(
+                      children: [
+                        const Text(
+                          'نصاب اندروید به صورت خودکار اجرا خواهد شد و نیازی به حذف برنامه قبلی نیست.\n\nاگر پنجره باز نشد، از دکمه‌های زیر استفاده کنید:',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Color(0xFF64748B), fontSize: 11),
+                        ),
+                        const SizedBox(height: 16),
+                        // v4.0.10: Manual fallback buttons
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () async {
+                                  // v4.0.10: Retry downloadAndInstall which will trigger dual-intent again
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('🔄 تلاش مجدد برای باز کردن نصاب... اگر باز هم باز نشد، با مرورگر دانلود کنید')),
+                                  );
+                                  // Re-trigger install from cache if exists
+                                  ApiService.downloadAndInstallApk(
+                                    downloadUrl: downloadUrl,
+                                    onProgress: (p, r, t) {},
+                                    onError: (e) async {
+                                      final uri = Uri.parse(downloadUrl);
+                                      if (await canLaunchUrl(uri)) {
+                                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                      }
+                                    },
+                                    onSuccess: () {},
+                                  );
+                                },
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: const Color(0xFF10B981),
+                                  side: const BorderSide(color: Color(0xFF10B981)),
+                                ),
+                                icon: const Icon(Icons.install_mobile_rounded, size: 16),
+                                label: const Text('باز کردن نصاب دستی', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: () async {
+                                  final uri = Uri.parse(downloadUrl);
+                                  if (await canLaunchUrl(uri)) {
+                                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                  }
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF6366F1),
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                ),
+                                icon: const Icon(Icons.open_in_browser_rounded, size: 16),
+                                label: const Text('دانلود با مرورگر', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        TextButton(
+                          onPressed: () {
+                            if (Navigator.canPop(bottomSheetContext)) {
+                              Navigator.pop(bottomSheetContext);
+                            }
+                          },
+                          child: const Text('بستن', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+                        ),
+                      ],
                     ),
                 ],
               ),

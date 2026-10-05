@@ -453,16 +453,52 @@ class _PreLoginUpdateDialogState extends State<_PreLoginUpdateDialog> {
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'برای ادامه، نصب را در پنجره‌ای که باز شد تأیید فرمایید.',
-                    style: TextStyle(color: Color(0xFF10B981), fontSize: 12),
+                    '✅ دانلود کامل شد. در حال باز کردن نصاب...\nاگر پنجره باز نشد، دکمه‌های زیر را بزنید.',
+                    style: TextStyle(color: Color(0xFF10B981), fontSize: 11, height: 1.4),
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              '⚠️ در شیائومی/سامسونگ: اگر پنجره باز نشد، تنظیمات → حریم خصوصی → نصب برنامه‌های ناشناخته → Connectix را فعال کنید',
+              style: TextStyle(color: Color(0xFFF59E0B), fontSize: 10, height: 1.4),
             ),
           ],
         ],
       ),
       actions: [
+        if (_installing) ...[
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('بستن', style: TextStyle(color: Color(0xFF94A3B8))),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              // v4.0.10: Retry install
+              setState(() {
+                _installing = false;
+                _downloading = true;
+                _progress = 0;
+              });
+              await ApiService.downloadAndInstallApk(
+                downloadUrl: widget.downloadUrl,
+                onProgress: (p, r, t) {
+                  if (mounted) setState(() {_progress = p; _receivedBytes = r; _totalBytes = t;});
+                },
+                onError: (e) {
+                  if (mounted) setState(() {_downloading = false; _failed = true; _errorMsg = e;});
+                },
+                onSuccess: () {
+                  if (mounted) setState(() {_downloading = false; _installing = true;});
+                },
+              );
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
+            icon: const Icon(Icons.install_mobile_rounded, size: 16),
+            label: const Text('تلاش مجدد نصب', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+          ),
+        ],
         if (!_downloading && !_installing)
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
