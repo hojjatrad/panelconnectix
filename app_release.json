@@ -1,18 +1,23 @@
 {
-  "version": "4.0.8",
-  "code": 43,
-  "changelog": "v4.0.8 ROOT FIX: مقایسه با نسخه سالم 4.0.3 - بازگرداندن منطق dual-intent با ALLOW_REPLACE، PackageInstaller بدون USER_ACTION_NOT_REQUIRED، FileProvider قوی، فیکس بسته شدن هنگام نصب",
+  "version": "4.0.9",
+  "code": 44,
+  "changelog": "v4.0.9 PRO MAX - Panel Location Manager: استقلال کامل از مسیر پنل! اگر پنل از /contax به / یا هر مسیر دیگه منتقل بشه، اپ خودکار مسیر جدید رو کشف می‌کنه. 6 لایه هوشمند: آدرس ذخیره شده، Well-Known discovery، Panel-Location API، Old Path Redirector، Brute-force مسیرهای رایج، Remote Config + QR اسکن. هدر Canonical خودکار + مهاجرت بی‌صدا.",
   "date": "2026-10-05",
   "apk": {
-    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.8/Connectix-Android-ARM64.apk",
-    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.8/Connectix-Android-Universal.apk",
-    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.8/Connectix-Android-ARM32.apk"
+    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.9/Connectix-Android-ARM64.apk",
+    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.9/Connectix-Android-Universal.apk",
+    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.9/Connectix-Android-ARM32.apk"
   },
   "windows": {
-    "version": "4.0.8",
-    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.8/Connectix-Windows-x64.zip"
+    "version": "4.0.9",
+    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.9/Connectix-Windows-x64.zip"
   },
   "ultra": true,
   "core": "flutter_vless dual-core",
-  "protocols": ["vless", "vmess", "trojan", "ss", "socks", "http", "wireguard", "hysteria2", "raw", "clash", "singbox"]
+  "protocols": ["vless", "vmess", "trojan", "ss", "socks", "http", "wireguard", "hysteria2", "raw", "clash", "singbox"],
+  "panel_location": {
+    "version": "v8.0",
+    "features": ["well_known_discovery", "canonical_header", "old_path_redirector", "brute_force", "remote_config", "qr_fallback"],
+    "endpoints": ["/.well-known/connectix.json", "/api/v1/app/panel-location", "/contax/panel_redirector.php"]
+  }
 }

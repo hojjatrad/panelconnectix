@@ -1040,6 +1040,98 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
     }
 
     /**
+     * v8.0 PRO MAX: Panel Location Discovery API
+     * GET /api/v1/app/panel-location
+     * No auth required - for smart app resolver
+     * Returns current panel canonical URL, fallbacks, etc.
+     */
+    public function panelLocation(): void {
+        try {
+            require_once __DIR__ . '/../core/PanelLocationManager.php';
+            
+            // Always emit canonical headers
+            PanelLocationManager::emitCanonicalHeaders();
+            
+            $data = PanelLocationManager::getPanelLocationData();
+            
+            // Add extra info for app
+            $data['resolver'] = [
+                'version' => 'v8.0',
+                'strategy' => 'well-known + canonical header + old path redirector + brute-force',
+                'well_known_url' => 'https://' . PanelLocationManager::getCurrentDomain() . '/.well-known/connectix.json',
+            ];
+            
+            header('Content-Type: application/json; charset=utf-8');
+            header('Access-Control-Allow-Origin: *');
+            header('Access-Control-Allow-Headers: *');
+            header('Cache-Control: no-cache, no-store, must-revalidate');
+            
+            echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        } catch (Throwable $e) {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode([
+                'success' => false,
+                'error' => $e->getMessage(),
+                'panel_url' => Helpers::fullUrl(''),
+                'api_url' => Helpers::fullUrl('api/v1/app'),
+                'timestamp' => time()
+            ], JSON_UNESCAPED_UNICODE);
+        }
+    }
+
+    /**
+     * v8.0: Well-Known endpoint
+     * GET /.well-known/connectix.json
+     */
+    public function wellKnown(): void {
+        try {
+            require_once __DIR__ . '/../core/PanelLocationManager.php';
+            PanelLocationManager::emitCanonicalHeaders();
+            
+            // Try to serve from file first (fastest)
+            $docRoot = $_SERVER['DOCUMENT_ROOT'] ?? dirname(__DIR__);
+            $wkFile = rtrim($docRoot, '/') . '/.well-known/connectix.json';
+            
+            if (file_exists($wkFile)) {
+                $content = @file_get_contents($wkFile);
+                $data = json_decode($content, true);
+                if (is_array($data) && !empty($data['panel_url'])) {
+                    // Check if still valid (not older than 1 hour or path still matches)
+                    $currentBase = PanelLocationManager::getCurrentBaseUrl();
+                    if ($data['panel_url'] !== $currentBase || (time() - ($data['timestamp'] ?? 0) > 3600)) {
+                        // Regenerate
+                        PanelLocationManager::ensureWellKnownFile();
+                        $content = @file_get_contents($wkFile);
+                    }
+                    
+                    header('Content-Type: application/json; charset=utf-8');
+                    header('Access-Control-Allow-Origin: *');
+                    header('X-Panel-Location-Manager: well-known file');
+                    echo $content;
+                    return;
+                }
+            }
+            
+            // Fallback: generate live
+            $data = PanelLocationManager::getPanelLocationData();
+            PanelLocationManager::ensureWellKnownFile();
+            
+            header('Content-Type: application/json; charset=utf-8');
+            header('Access-Control-Allow-Origin: *');
+            header('X-Panel-Location-Manager: live generated');
+            
+            echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+        } catch (Throwable $e) {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode([
+                'panel_url' => Helpers::fullUrl(''),
+                'api_url' => Helpers::fullUrl('api/v1/app'),
+                'error' => $e->getMessage()
+            ], JSON_UNESCAPED_UNICODE);
+        }
+    }
+
+    /**
      * Admin View: App API Documentation & Interactive Simulator
      */
     public function showAppApiDoc(): void {

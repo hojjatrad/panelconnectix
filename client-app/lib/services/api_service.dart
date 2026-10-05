@@ -11,16 +11,49 @@ import '../models/client_model.dart';
 import '../models/server_model.dart';
 
 class ApiService {
-  // 3.6.0-IR-CLOUDFLARE-FIX: Multi-endpoint failover for Iran
-  // Priority: ir.vpbotn.ir (Iran-optimized via Cloudflare) -> cf -> main -> api
+  // v8.0 PRO MAX: Intelligent Panel Location Resolver
+  // Layer 1: Saved working URL (fastest)
+  // Layer 2: Well-Known discovery (/.well-known/connectix.json)
+  // Layer 3: Panel-Location API (/api/v1/app/panel-location)
+  // Layer 4: Old path redirector (/contax -> new)
+  // Layer 5: Brute-force common paths
+  // Layer 6: Remote config from GitHub
+  
+  // Default fallback list (if nothing else works)
   static List<String> baseUrls = [
-    "https://ir.vpbotn.ir/contax",      // Priority 1: Iran-optimized (Cloudflare proxied, fastest from Iran)
-    "https://cf.vpbotn.ir/contax",      // Priority 2: Cloudflare backup
-    "https://vpbotn.ir/contax",         // Priority 3: Direct main domain (now also Cloudflare proxied)
-    "https://api.vpbotn.ir/contax",     // Priority 4: API subdomain backup
+    "https://ir.vpbotn.ir/contax",
+    "https://cf.vpbotn.ir/contax",
+    "https://vpbotn.ir/contax",
+    "https://api.vpbotn.ir/contax",
+    "https://ir.vpbotn.ir",
+    "https://vpbotn.ir",
+    "https://cf.vpbotn.ir",
   ];
   
   static String baseUrl = "https://ir.vpbotn.ir/contax";
+  
+  // Common panel paths to brute-force
+  static const List<String> commonPanelPaths = [
+    "/contax",
+    "",
+    "/panel",
+    "/admin",
+    "/app",
+    "/connectix",
+    "/myadmin",
+    "/cpanel",
+    "/manage",
+  ];
+  
+  // Known domains to try
+  static const List<String> knownDomains = [
+    "vpbotn.ir",
+    "ir.vpbotn.ir",
+    "cf.vpbotn.ir",
+    "api.vpbotn.ir",
+    "direct.vpbotn.ir",
+  ];
+  
   static const MethodChannel _updaterChannel = MethodChannel('com.connectix.vpn/updater');
 
   // ---------------- Diagnostic Log Ring Buffer ----------------
@@ -29,7 +62,7 @@ class ApiService {
   static void log(String msg) {
     try {
       _logLines.add('${DateTime.now().toIso8601String().substring(11, 19)} $msg');
-      if (_logLines.length > 80) {
+      if (_logLines.length > 100) {
         _logLines.removeAt(0);
       }
     } catch (_) {}
@@ -40,33 +73,355 @@ class ApiService {
   static final Connectivity _connectivity = Connectivity();
 
   // ----------------------------------------------------------
-  // 3.6.0: Smart init - loads last working URL first
+  // v8.0: Smart init with intelligent resolver
   static Future<void> initBaseUrl() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final savedWorking = prefs.getString('api_base_url_working') ?? '';
       final legacy = prefs.getString('api_base_url') ?? '';
+      final savedDomain = prefs.getString('panel_domain') ?? '';
       
-      if (savedWorking.isNotEmpty && baseUrls.contains(savedWorking)) {
-        // Move working URL to front
-        baseUrl = savedWorking;
-        baseUrls = [savedWorking, ...baseUrls.where((u) => u != savedWorking)];
-        log('initBaseUrl: using saved working $savedWorking');
-      } else if (legacy.isNotEmpty && baseUrls.contains(legacy)) {
-        baseUrl = legacy;
-      } else {
-        baseUrl = baseUrls[0];
+      log('v8.0 initBaseUrl start: savedWorking=$savedWorking savedDomain=$savedDomain');
+      
+      // 1. Try saved working URL first (fastest path)
+      if (savedWorking.isNotEmpty) {
+        if (await _testUrlWorks(savedWorking)) {
+          baseUrl = savedWorking;
+          log('initBaseUrl: saved working URL works: $savedWorking');
+          // Reorder list to prioritize it
+          baseUrls = [savedWorking, ...baseUrls.where((u) => u != savedWorking)];
+          await prefs.setString('api_base_url', baseUrl);
+          await prefs.setString('api_base_url_working', baseUrl);
+          return;
+        } else {
+          log('initBaseUrl: saved working URL FAILED, trying resolver...');
+        }
+      } else if (legacy.isNotEmpty) {
+        if (await _testUrlWorks(legacy)) {
+          baseUrl = legacy;
+          log('initBaseUrl: legacy URL works: $legacy');
+          baseUrls = [legacy, ...baseUrls.where((u) => u != legacy)];
+          await prefs.setString('api_base_url_working', baseUrl);
+          return;
+        }
       }
       
+      // 2. Try intelligent resolver (well-known + panel-location + brute-force)
+      final resolved = await resolvePanelLocation();
+      if (resolved != null && resolved.isNotEmpty) {
+        baseUrl = resolved;
+        baseUrls = [resolved, ...baseUrls.where((u) => u != resolved)];
+        await prefs.setString('api_base_url', baseUrl);
+        await prefs.setString('api_base_url_working', baseUrl);
+        log('initBaseUrl: resolver found working URL: $resolved');
+        return;
+      }
+      
+      // 3. Fallback to first default
+      baseUrl = baseUrls[0];
+      log('initBaseUrl: fallback to default: $baseUrl');
       await prefs.setString('api_base_url', baseUrl);
       await prefs.setString('api_base_url_working', baseUrl);
-    } catch (_) {
+    } catch (e) {
+      log('initBaseUrl error: $e');
       baseUrl = baseUrls[0];
     }
   }
 
+  // v8.0: Test if a URL works (quick ping)
+  static Future<bool> _testUrlWorks(String url) async {
+    try {
+      final testUrl = Uri.parse("$url/api/v1/app/panel-location");
+      final resp = await http.get(testUrl, headers: {'Accept': 'application/json'}).timeout(const Duration(seconds: 4));
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(resp.bodyBytes));
+        if (data['success'] == true || data['panel_url'] != null) {
+          // Check for canonical header
+          final canonical = resp.headers['x-panel-canonical'] ?? resp.headers['x-panel-location'];
+          if (canonical != null && canonical.isNotEmpty) {
+            log('_testUrlWorks: $url works, canonical: $canonical');
+            if (canonical != url) {
+              await _saveWorkingUrl(canonical);
+              return true;
+            }
+          }
+          return true;
+        }
+      }
+      // Also try check-update as fallback test
+      final testUrl2 = Uri.parse("$url/api/v1/app/check-update?platform=android");
+      final resp2 = await http.get(testUrl2, headers: {'Accept': 'application/json'}).timeout(const Duration(seconds: 3));
+      return resp2.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // v8.0 PRO MAX: Intelligent Panel Location Resolver - 6 Layers
+  static Future<String?> resolvePanelLocation() async {
+    log('v8.0 resolver: starting intelligent discovery...');
+    
+    // Layer 1: Try saved domain with well-known
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedDomain = prefs.getString('panel_domain') ?? 'vpbotn.ir';
+      
+      // Layer 2: Well-Known discovery
+      final wellKnownUrl = await _tryWellKnownDiscovery(savedDomain);
+      if (wellKnownUrl != null) {
+        log('resolver L2: well-known found: $wellKnownUrl');
+        if (await _testUrlWorks(wellKnownUrl)) {
+          return wellKnownUrl;
+        }
+      }
+      
+      // Try well-known for all known domains
+      for (final domain in knownDomains) {
+        if (domain == savedDomain) continue;
+        final wk = await _tryWellKnownDiscovery(domain);
+        if (wk != null && await _testUrlWorks(wk)) {
+          log('resolver L2b: well-known found via $domain: $wk');
+          return wk;
+        }
+      }
+    } catch (e) {
+      log('resolver L2 error: $e');
+    }
+    
+    // Layer 3: Try panel-location API on known URLs
+    try {
+      for (final base in baseUrls) {
+        final loc = await _tryPanelLocationApi(base);
+        if (loc != null && await _testUrlWorks(loc)) {
+          log('resolver L3: panel-location API found: $loc via $base');
+          return loc;
+        }
+      }
+    } catch (e) {
+      log('resolver L3 error: $e');
+    }
+    
+    // Layer 4: Try old path redirector (contax -> new)
+    try {
+      for (final domain in knownDomains) {
+        final oldPathUrl = "https://$domain/contax";
+        final loc = await _tryOldPathRedirector(oldPathUrl);
+        if (loc != null && await _testUrlWorks(loc)) {
+          log('resolver L4: old path redirector found: $loc via $oldPathUrl');
+          return loc;
+        }
+      }
+    } catch (e) {
+      log('resolver L4 error: $e');
+    }
+    
+    // Layer 5: Brute-force common paths (parallel)
+    try {
+      final bruteResult = await _bruteForceCommonPaths();
+      if (bruteResult != null) {
+        log('resolver L5: brute-force found: $bruteResult');
+        return bruteResult;
+      }
+    } catch (e) {
+      log('resolver L5 error: $e');
+    }
+    
+    // Layer 6: Remote config from GitHub
+    try {
+      final remote = await _tryRemoteConfig();
+      if (remote != null && await _testUrlWorks(remote)) {
+        log('resolver L6: remote config found: $remote');
+        return remote;
+      }
+    } catch (e) {
+      log('resolver L6 error: $e');
+    }
+    
+    log('resolver: all layers failed');
+    return null;
+  }
+
+  // Layer 2: Well-Known discovery
+  static Future<String?> _tryWellKnownDiscovery(String domain) async {
+    try {
+      final urls = [
+        "https://$domain/.well-known/connectix.json",
+        "https://$domain/well-known/connectix.json",
+      ];
+      
+      for (final url in urls) {
+        try {
+          final resp = await http.get(Uri.parse(url), headers: {'Accept': 'application/json'}).timeout(const Duration(seconds: 4));
+          if (resp.statusCode == 200) {
+            final data = jsonDecode(utf8.decode(resp.bodyBytes));
+            final panelUrl = (data['panel_url'] ?? data['api_url'] ?? '').toString();
+            if (panelUrl.isNotEmpty) {
+              // Clean api_url to base url
+              String base = panelUrl;
+              if (base.contains('/api/')) {
+                base = base.split('/api/')[0];
+              }
+              log('_tryWellKnownDiscovery: $url -> $base');
+              return base;
+            }
+          }
+        } catch (_) {
+          continue;
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  // Layer 3: Panel-Location API
+  static Future<String?> _tryPanelLocationApi(String base) async {
+    try {
+      final url = Uri.parse("$base/api/v1/app/panel-location");
+      final resp = await http.get(url, headers: {'Accept': 'application/json'}).timeout(const Duration(seconds: 4));
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(resp.bodyBytes));
+        if (data['success'] == true || data['panel_url'] != null) {
+          String panelUrl = (data['panel_url'] ?? data['api_url'] ?? '').toString();
+          if (panelUrl.isNotEmpty) {
+            if (panelUrl.contains('/api/')) {
+              panelUrl = panelUrl.split('/api/')[0];
+            }
+            return panelUrl;
+          }
+        }
+      }
+      
+      // Check for migration headers
+      final canonical = resp.headers['x-panel-canonical'] ?? resp.headers['x-panel-location'] ?? resp.headers['x-panel-base-url'];
+      if (canonical != null && canonical.isNotEmpty) {
+        String base2 = canonical;
+        if (base2.contains('/api/')) {
+          base2 = base2.split('/api/')[0];
+        }
+        log('_tryPanelLocationApi: canonical header $canonical from $base');
+        return base2;
+      }
+      
+      // Check for PANEL_MOVED error
+      try {
+        final data = jsonDecode(utf8.decode(resp.bodyBytes));
+        if (data['migrated'] == true || data['code'] == 'PANEL_MOVED') {
+          String newUrl = (data['new_url'] ?? data['panel_url'] ?? data['api_url'] ?? '').toString();
+          if (newUrl.isNotEmpty) {
+            if (newUrl.contains('/api/')) {
+              newUrl = newUrl.split('/api/')[0];
+            }
+            log('_tryPanelLocationApi: PANEL_MOVED detected, new: $newUrl');
+            return newUrl;
+          }
+        }
+      } catch (_) {}
+    } catch (_) {}
+    return null;
+  }
+
+  // Layer 4: Old path redirector
+  static Future<String?> _tryOldPathRedirector(String oldBase) async {
+    try {
+      final urls = [
+        "$oldBase/api/panel-location",
+        "$oldBase/api/v1/app/panel-location",
+        "$oldBase/panel_redirector.php?panel-location=1",
+      ];
+      
+      for (final url in urls) {
+        try {
+          final resp = await http.get(Uri.parse(url), headers: {'Accept': 'application/json'}).timeout(const Duration(seconds: 4));
+          if (resp.statusCode == 200) {
+            final data = jsonDecode(utf8.decode(resp.bodyBytes));
+            String newUrl = (data['new_url'] ?? data['panel_url'] ?? data['api_url'] ?? '').toString();
+            if (newUrl.isNotEmpty) {
+              if (newUrl.contains('/api/')) {
+                newUrl = newUrl.split('/api/')[0];
+              }
+              return newUrl;
+            }
+          }
+          // Check headers
+          final canonical = resp.headers['x-panel-canonical'] ?? resp.headers['x-panel-location'] ?? resp.headers['location'];
+          if (canonical != null && canonical.isNotEmpty && canonical.contains('http')) {
+            String base = canonical;
+            if (base.contains('/api/')) {
+              base = base.split('/api/')[0];
+            }
+            return base;
+          }
+        } catch (_) {
+          continue;
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  // Layer 5: Brute-force common paths
+  static Future<String?> _bruteForceCommonPaths() async {
+    try {
+      final List<Future<String?>> futures = [];
+      
+      for (final domain in knownDomains) {
+        for (final path in commonPanelPaths) {
+          final url = "https://$domain$path";
+          futures.add(_testAndReturnUrl(url));
+        }
+      }
+      
+      // Run in parallel with timeout
+      final results = await Future.wait(futures).timeout(const Duration(seconds: 10), onTimeout: () => <String?>[]);
+      
+      for (final result in results) {
+        if (result != null && result.isNotEmpty) {
+          return result;
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  static Future<String?> _testAndReturnUrl(String url) async {
+    try {
+      if (await _testUrlWorks(url)) {
+        return url;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  // Layer 6: Remote config from GitHub
+  static Future<String?> _tryRemoteConfig() async {
+    try {
+      final urls = [
+        "https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/panel_location.json",
+        "https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/.well-known/connectix.json",
+      ];
+      
+      for (final url in urls) {
+        try {
+          final resp = await http.get(Uri.parse(url), headers: {'Accept': 'application/json'}).timeout(const Duration(seconds: 5));
+          if (resp.statusCode == 200) {
+            final data = jsonDecode(utf8.decode(resp.bodyBytes));
+            String panelUrl = (data['panel_url'] ?? data['primary'] ?? '').toString();
+            if (panelUrl.isNotEmpty) {
+              if (panelUrl.contains('/api/')) {
+                panelUrl = panelUrl.split('/api/')[0];
+              }
+              return panelUrl;
+            }
+          }
+        } catch (_) {
+          continue;
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
   static List<String> getOrderedBaseUrls() {
-    // Returns baseUrls with current baseUrl first
     if (baseUrls.isEmpty) return [baseUrl];
     if (baseUrls.first == baseUrl) return baseUrls;
     return [baseUrl, ...baseUrls.where((u) => u != baseUrl)];
@@ -74,14 +429,71 @@ class ApiService {
 
   static Future<void> _saveWorkingUrl(String workingUrl) async {
     try {
-      baseUrl = workingUrl;
+      // Clean URL
+      String cleanUrl = workingUrl.trim();
+      if (cleanUrl.endsWith('/')) {
+        cleanUrl = cleanUrl.substring(0, cleanUrl.length - 1);
+      }
+      if (cleanUrl.contains('/api/')) {
+        cleanUrl = cleanUrl.split('/api/')[0];
+      }
+      
+      baseUrl = cleanUrl;
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('api_base_url_working', workingUrl);
-      await prefs.setString('api_base_url', workingUrl);
-      // Reorder list to prioritize working URL next time
-      baseUrls = [workingUrl, ...baseUrls.where((u) => u != workingUrl)];
-      log('Saved working URL: $workingUrl');
+      await prefs.setString('api_base_url_working', cleanUrl);
+      await prefs.setString('api_base_url', cleanUrl);
+      
+      // Extract domain for future well-known discovery
+      try {
+        final uri = Uri.parse(cleanUrl);
+        if (uri.host.isNotEmpty) {
+          await prefs.setString('panel_domain', uri.host);
+        }
+      } catch (_) {}
+      
+      baseUrls = [cleanUrl, ...baseUrls.where((u) => u != cleanUrl)];
+      log('Saved working URL: $cleanUrl');
     } catch (_) {}
+  }
+
+  // Check for canonical header in any response and auto-update
+  static Future<void> _checkAndUpdateFromHeaders(http.Response response) async {
+    try {
+      final canonical = response.headers['x-panel-canonical'] ?? 
+                       response.headers['x-panel-location'] ?? 
+                       response.headers['x-panel-base-url'] ??
+                       response.headers['x-panel-api-url'];
+      
+      if (canonical != null && canonical.isNotEmpty && canonical != baseUrl) {
+        String newBase = canonical;
+        if (newBase.contains('/api/')) {
+          newBase = newBase.split('/api/')[0];
+        }
+        if (newBase != baseUrl) {
+          log('Auto-update from header: $baseUrl -> $newBase');
+          await _saveWorkingUrl(newBase);
+        }
+      }
+    } catch (_) {}
+  }
+
+  // Check for migration in response body
+  static Future<String?> _checkForMigration(http.Response response) async {
+    try {
+      final data = jsonDecode(utf8.decode(response.bodyBytes));
+      if (data['migrated'] == true || data['code'] == 'PANEL_MOVED') {
+        String newUrl = (data['new_url'] ?? data['panel_url'] ?? data['api_url'] ?? data['redirect'] ?? '').toString();
+        if (newUrl.isNotEmpty) {
+          if (newUrl.contains('/api/')) {
+            newUrl = newUrl.split('/api/')[0];
+          }
+          log('Migration detected in body: $baseUrl -> $newUrl');
+          await _saveWorkingUrl(newUrl);
+          return newUrl;
+        }
+      }
+    } catch (_) {}
+    return null;
   }
 
   /**
@@ -138,10 +550,13 @@ class ApiService {
     return [];
   }
 
-  // 3.6.0: Login with multi-endpoint failover
+  // v8.0: Login with intelligent resolver + migration handling
   static Future<Map<String, dynamic>> login(String username, String password) async {
     final orderedUrls = getOrderedBaseUrls();
-    log('login start: trying ${orderedUrls.length} endpoints for user $username');
+    log('v8.0 login start: trying ${orderedUrls.length} endpoints for user $username');
+    
+    // First, try to resolve panel location if saved URL fails
+    bool triedResolver = false;
     
     for (int i = 0; i < orderedUrls.length; i++) {
       final currentBase = orderedUrls[i];
@@ -154,50 +569,30 @@ class ApiService {
           body: jsonEncode({'username': username, 'password': password}),
         ).timeout(const Duration(seconds: 12));
 
+        // Check for migration headers/body before parsing
+        await _checkAndUpdateFromHeaders(response);
+        final migratedUrl = await _checkForMigration(response);
+        if (migratedUrl != null && migratedUrl != currentBase) {
+          log('login: panel moved, retrying with new URL: $migratedUrl');
+          // Retry with new URL immediately
+          try {
+            final retryUrl = Uri.parse("$migratedUrl/api/v1/app/login");
+            final retryResp = await http.post(
+              retryUrl,
+              headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+              body: jsonEncode({'username': username, 'password': password}),
+            ).timeout(const Duration(seconds: 12));
+            final retryData = jsonDecode(utf8.decode(retryResp.bodyBytes));
+            if (retryData['success'] == true) {
+              return await _handleLoginSuccess(retryData, migratedUrl, username, password);
+            }
+          } catch (_) {}
+        }
+
         final data = jsonDecode(utf8.decode(response.bodyBytes));
         if (data['success'] == true) {
-          await _saveWorkingUrl(currentBase);
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setBool('is_logged_in', true);
-          await prefs.setString('auth_token', data['data']['auth_token'] ?? '');
-          await prefs.setString('saved_username', username);
-          await prefs.setString('saved_password', password);
-
-          if (data['data']['client'] != null) {
-            await prefs.setString('cached_client', jsonEncode(data['data']['client']));
-            if (data['data']['client']['sub_url'] != null) {
-              await prefs.setString('sub_url', data['data']['client']['sub_url'].toString());
-            }
-          }
-          if (data['data']['branding'] != null) {
-            await prefs.setString('cached_branding', jsonEncode(data['data']['branding']));
-          }
-
-          List<ServerModel> initialServers = [];
-          if (data['data']['servers'] != null && data['data']['servers'] is List) {
-            final List sList = data['data']['servers'];
-            final parsed = sList
-                .map((e) => ServerModel.fromJson(e))
-                .where((s) => !s.isInfoBanner && !s.configUri.contains('mock_pbk') && s.id != 'mci_reality_de')
-                .toList();
-            if (parsed.isNotEmpty) {
-              initialServers = parsed;
-            }
-          }
-
-          if (initialServers.isNotEmpty) {
-            await saveCachedServers(initialServers);
-          }
-
-          log('login SUCCESS via $currentBase');
-          return {
-            'success': true,
-            'client': ClientModel.fromJson(data['data']['client']),
-            'branding': BrandingModel.fromJson(data['data']['branding']),
-            'servers': initialServers,
-          };
+          return await _handleLoginSuccess(data, currentBase, username, password);
         } else {
-          // Username/password wrong - no need to try other endpoints
           log('login FAILED (auth) via $currentBase: ${data['error']}');
           return {
             'success': false,
@@ -206,14 +601,35 @@ class ApiService {
         }
       } catch (e) {
         log('login error via $currentBase: $e');
+        if (i == orderedUrls.length - 1 && !triedResolver) {
+          // Last endpoint failed, try resolver once
+          triedResolver = true;
+          log('login: all endpoints failed, trying intelligent resolver...');
+          final resolved = await resolvePanelLocation();
+          if (resolved != null && !orderedUrls.contains(resolved)) {
+            log('login: resolver found new URL: $resolved, retrying...');
+            try {
+              final url = Uri.parse("$resolved/api/v1/app/login");
+              final response = await http.post(
+                url,
+                headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+                body: jsonEncode({'username': username, 'password': password}),
+              ).timeout(const Duration(seconds: 12));
+              final data = jsonDecode(utf8.decode(response.bodyBytes));
+              if (data['success'] == true) {
+                return await _handleLoginSuccess(data, resolved, username, password);
+              }
+            } catch (e2) {
+              log('login retry via resolver failed: $e2');
+            }
+          }
+        }
         if (i == orderedUrls.length - 1) {
-          // Last endpoint failed
           if (e is TimeoutException) {
             return {'success': false, 'error': 'اتصال به سرور طول کشید. تمام سرورها تست شد. اینترنت خود را بررسی کنید.'};
           }
-          return {'success': false, 'error': 'خطا در برقراری ارتباط با سرور: $e\nتمام ${orderedUrls.length} آدرس تست شد.'};
+          return {'success': false, 'error': 'خطا در برقراری ارتباط با سرور: $e\nتمام ${orderedUrls.length} آدرس تست شد.\n\n💡 اگر پنل جابجا شده، از بخش تنظیمات "اسکن QR پنل" را امتحان کنید.'};
         }
-        // Try next endpoint
         await Future.delayed(Duration(milliseconds: 300));
         continue;
       }
@@ -221,8 +637,51 @@ class ApiService {
     return {'success': false, 'error': 'خطا در برقراری ارتباط با سرور'};
   }
 
+  static Future<Map<String, dynamic>> _handleLoginSuccess(Map<String, dynamic> data, String currentBase, String username, String password) async {
+    await _saveWorkingUrl(currentBase);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('is_logged_in', true);
+    await prefs.setString('auth_token', data['data']['auth_token'] ?? '');
+    await prefs.setString('saved_username', username);
+    await prefs.setString('saved_password', password);
+
+    if (data['data']['client'] != null) {
+      await prefs.setString('cached_client', jsonEncode(data['data']['client']));
+      if (data['data']['client']['sub_url'] != null) {
+        await prefs.setString('sub_url', data['data']['client']['sub_url'].toString());
+      }
+    }
+    if (data['data']['branding'] != null) {
+      await prefs.setString('cached_branding', jsonEncode(data['data']['branding']));
+    }
+
+    List<ServerModel> initialServers = [];
+    if (data['data']['servers'] != null && data['data']['servers'] is List) {
+      final List sList = data['data']['servers'];
+      final parsed = sList
+          .map((e) => ServerModel.fromJson(e))
+          .where((s) => !s.isInfoBanner && !s.configUri.contains('mock_pbk') && s.id != 'mci_reality_de')
+          .toList();
+      if (parsed.isNotEmpty) {
+        initialServers = parsed;
+      }
+    }
+
+    if (initialServers.isNotEmpty) {
+      await saveCachedServers(initialServers);
+    }
+
+    log('login SUCCESS via $currentBase');
+    return {
+      'success': true,
+      'client': ClientModel.fromJson(data['data']['client']),
+      'branding': BrandingModel.fromJson(data['data']['branding']),
+      'servers': initialServers,
+    };
+  }
+
   /**
-   * Universal Inbounds Delivery Engine with failover
+   * Universal Inbounds Delivery Engine with failover + migration handling
    */
   static Future<List<ServerModel>> getServers() async {
     try {
@@ -233,7 +692,6 @@ class ApiService {
       List<ServerModel> servers = [];
       final orderedUrls = getOrderedBaseUrls();
 
-      // 1. Primary: Try all baseUrls for configs API
       for (int i = 0; i < orderedUrls.length; i++) {
         final currentBase = orderedUrls[i];
         try {
@@ -246,6 +704,39 @@ class ApiService {
               'Accept': 'application/json'
             },
           ).timeout(const Duration(seconds: 12));
+          
+          await _checkAndUpdateFromHeaders(response);
+          final migrated = await _checkForMigration(response);
+          if (migrated != null) {
+            // Retry with new URL
+            try {
+              final retryUrl = Uri.parse("$migrated/api/v1/app/configs?auth_token=${Uri.encodeComponent(token)}");
+              final retryResp = await http.get(
+                retryUrl,
+                headers: {
+                  'Authorization': 'Bearer $token',
+                  'X-Auth-Token': token,
+                  'Accept': 'application/json'
+                },
+              ).timeout(const Duration(seconds: 12));
+              if (retryResp.statusCode == 200) {
+                final retryData = jsonDecode(utf8.decode(retryResp.bodyBytes));
+                if (retryData['success'] == true && retryData['data'] != null && retryData['data']['servers'] != null) {
+                  final List list = retryData['data']['servers'];
+                  final parsed = list
+                      .map((e) => ServerModel.fromJson(e))
+                      .where((s) => !s.isInfoBanner && !s.configUri.contains('mock_pbk') && s.id != 'mci_reality_de')
+                      .toList();
+                  if (parsed.isNotEmpty) {
+                    servers = parsed;
+                    await _saveWorkingUrl(migrated);
+                    break;
+                  }
+                }
+              }
+            } catch (_) {}
+          }
+          
           log('configs API try ${i+1}: base=$currentBase HTTP ${response.statusCode}');
           if (response.statusCode != 200) {
             final snippet = response.body.length > 200 ? response.body.substring(0, 200) : response.body;
@@ -264,7 +755,7 @@ class ApiService {
             if (parsed.isNotEmpty) {
               servers = parsed;
               await _saveWorkingUrl(currentBase);
-              break; // Success, no need to try more
+              break;
             } else {
               log('configs list empty after filtering — trying next');
             }
@@ -279,7 +770,6 @@ class ApiService {
         }
       }
 
-      // 2. Direct Node / Panel Sublink Auto-Resolver
       if (servers.isEmpty && subUrl.isNotEmpty) {
         try {
           log('sublink fallback: $subUrl');
@@ -287,7 +777,6 @@ class ApiService {
             Uri.parse(subUrl),
             headers: {'User-Agent': 'v2rayNG/1.8.5'},
           ).timeout(const Duration(seconds: 15));
-          log('sublink HTTP ${subResp.statusCode} (${subResp.body.length} bytes)');
 
           if (subResp.statusCode == 200 && subResp.body.isNotEmpty) {
             String decoded = subResp.body.trim();
@@ -309,14 +798,10 @@ class ApiService {
                 }
               }
             }
-            log('sublink parsed ${servers.length} servers');
           }
         } catch (e) {
-          log('Sublink direct resolver error: $e');
           debugPrint("Sublink direct resolver error: $e");
         }
-      } else if (servers.isEmpty) {
-        log('NO SERVERS: API failed/empty and sub_url is not saved');
       }
 
       if (servers.isNotEmpty) {
@@ -328,7 +813,6 @@ class ApiService {
       return servers;
     } catch (e) {
       log('getServers Top-level error: $e');
-      debugPrint("getServers Top-level error: $e");
       return await getCachedServers();
     }
   }
@@ -339,21 +823,17 @@ class ApiService {
       int port = 443;
       final lower = uriStr.toLowerCase().trim();
       
-      // Helper to extract host/port from generic URI
       Uri? _tryParse(String s) {
         try { return Uri.tryParse(s); } catch (_) { return null; }
       }
 
       if (lower.startsWith('vless://') || lower.startsWith('trojan://') || lower.startsWith('ss://') || lower.startsWith('socks://') || lower.startsWith('http://') || lower.startsWith('https://') || lower.startsWith('hysteria2://') || lower.startsWith('hy2://')) {
-        // Handle ss:// which might be base64
         String toParse = uriStr;
         if (lower.startsWith('ss://') && !uriStr.contains('@')) {
           try {
-            // ss://base64 (method:pass@host:port)
             final b64part = uriStr.substring(5).split('#')[0].split('?')[0];
             final decoded = utf8.decode(base64Decode(b64part));
             if (decoded.contains('@')) {
-              // Extract host:port from decoded
               final atIdx = decoded.lastIndexOf('@');
               final hp = decoded.substring(atIdx+1);
               if (hp.contains(':')) {
@@ -400,7 +880,6 @@ class ApiService {
           }
         } catch (_) {}
       } else if (uriStr.trim().startsWith('{')) {
-        // Raw JSON - try to extract address from first outbound
         try {
           final cfg = jsonDecode(uriStr) as Map<String, dynamic>;
           final out = (cfg['outbounds'] as List?)?.first as Map<String, dynamic>?;
@@ -479,6 +958,8 @@ class ApiService {
           },
         ).timeout(const Duration(seconds: 8));
 
+        await _checkAndUpdateFromHeaders(response);
+
         final data = jsonDecode(utf8.decode(response.bodyBytes));
         if (data['success'] == true && data['data'] != null) {
           await _saveWorkingUrl(currentBase);
@@ -512,6 +993,8 @@ class ApiService {
           },
         ).timeout(const Duration(seconds: 8));
 
+        await _checkAndUpdateFromHeaders(response);
+
         final data = jsonDecode(utf8.decode(response.bodyBytes));
         if (data['success'] == true && data['data']['announcements'] != null) {
           await _saveWorkingUrl(currentBase);
@@ -524,7 +1007,6 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>?> checkAppUpdate() async {
-    // 1. Primary: Try all baseUrls for check-update
     final orderedUrls = getOrderedBaseUrls();
     for (final currentBase in orderedUrls) {
       try {
@@ -540,6 +1022,8 @@ class ApiService {
             'Accept': 'application/json'
           },
         ).timeout(const Duration(seconds: 6));
+
+        await _checkAndUpdateFromHeaders(response);
 
         final data = jsonDecode(utf8.decode(response.bodyBytes));
         if (data['success'] == true && data['data'] != null) {
@@ -561,7 +1045,6 @@ class ApiService {
       } catch (_) {}
     }
 
-    // 2. Direct Fallback: GitHub (always accessible from Iran)
     try {
       final ghResp = await http.get(
         Uri.parse("https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/app_release.json"),
@@ -587,6 +1070,76 @@ class ApiService {
       }
     } catch (_) {}
 
+    return null;
+  }
+
+  // v8.0: Manual panel URL update via QR
+  static Future<bool> updatePanelUrlFromQr(String qrData) async {
+    try {
+      // QR can be: https://domain/path or connectix://panel?url=https://domain/path
+      String url = qrData.trim();
+      
+      if (url.startsWith('connectix://')) {
+        final uri = Uri.parse(url);
+        url = uri.queryParameters['url'] ?? uri.queryParameters['panel'] ?? '';
+      }
+      
+      if (url.isEmpty || !url.contains('http')) {
+        return false;
+      }
+      
+      // Clean
+      if (url.contains('/api/')) {
+        url = url.split('/api/')[0];
+      }
+      
+      if (await _testUrlWorks(url)) {
+        await _saveWorkingUrl(url);
+        log('QR update: panel URL updated to $url');
+        return true;
+      }
+      
+      // Try well-known discovery for domain from QR
+      try {
+        final uri = Uri.parse(url);
+        final domain = uri.host;
+        final wk = await _tryWellKnownDiscovery(domain);
+        if (wk != null && await _testUrlWorks(wk)) {
+          await _saveWorkingUrl(wk);
+          return true;
+        }
+      } catch (_) {}
+      
+      // Save anyway if looks valid
+      if (url.startsWith('http')) {
+        await _saveWorkingUrl(url);
+        return true;
+      }
+    } catch (e) {
+      log('QR update error: $e');
+    }
+    return false;
+  }
+
+  // v8.0: Get current panel location info
+  static Future<Map<String, dynamic>?> getPanelLocationInfo() async {
+    try {
+      final orderedUrls = getOrderedBaseUrls();
+      for (final base in orderedUrls) {
+        try {
+          final url = Uri.parse("$base/api/v1/app/panel-location");
+          final resp = await http.get(url, headers: {'Accept': 'application/json'}).timeout(const Duration(seconds: 5));
+          if (resp.statusCode == 200) {
+            final data = jsonDecode(utf8.decode(resp.bodyBytes));
+            if (data['success'] == true || data['panel_url'] != null) {
+              return Map<String, dynamic>.from(data);
+            }
+          }
+        } catch (_) {
+          continue;
+        }
+      }
+    } catch (_) {}
     return null;
   }
 
@@ -632,7 +1185,6 @@ class ApiService {
         }
 
         final total = response.contentLength > 0 ? response.contentLength : 0;
-        log('download start: $url total=$total status=${response.statusCode}');
 
         final sink = file.openWrite();
         int received = 0;
@@ -650,7 +1202,6 @@ class ApiService {
         await sink.close();
 
         final len = await file.length();
-        log('download finished: len=$len total=$total');
 
         if (!await file.exists()) {
           throw Exception('فایل ایجاد نشد');
@@ -669,34 +1220,19 @@ class ApiService {
           if (e.toString().contains('APK معتبر نیست')) rethrow;
         }
 
-        // v4.0.7 DEEP FIX: PackageInstaller API + robust error handling
         try {
           final installResult = await _updaterChannel.invokeMethod('installApk', {'filePath': file.path, 'allowSameVersion': true});
-          log('installApk v4.0.7 result: $installResult path=${file.path} len=$len');
-          // PackageInstaller returns true immediately after session commit, system installer will show
           if (installResult == true || installResult == 'true' || installResult == null) {
-            // For PackageInstaller, null or true means session committed successfully
-            // System installer UI will appear automatically
-            log('Install session committed, system installer should appear');
             onSuccess();
             return true;
           } else {
             throw Exception('نصب شروع نشد - نتیجه: $installResult');
           }
         } catch (nativeErr) {
-          log('Native install v4.0.7 failed: $nativeErr path=${file.path} len=$len');
           final errStr = nativeErr.toString();
-          
-          // v4.0.7: Try to open browser as ultimate fallback
-          try {
-            final browserUrl = url;
-            log('Fallback to browser: $browserUrl');
-          } catch (_) {}
-          
           if (errStr.contains('FILE_NOT_FOUND') || errStr.contains('File does not exist') || errStr.contains('too small')) {
             onError('❌ فایل APK یافت نشد. مسیر: ${file.path} حجم: $len بایت. لطفا دوباره دانلود کنید: $downloadUrl');
           } else if (errStr.contains('INSTALL_ERROR')) {
-            // Extract detailed error
             final detail = errStr.length > 500 ? errStr.substring(0, 500) + '...' : errStr;
             onError('❌ خطا در نصب: $detail - از مرورگر دانلود کنید: $downloadUrl');
           } else if (errStr.contains('SecurityException') || errStr.contains('Permission')) {
@@ -707,7 +1243,6 @@ class ApiService {
           return false;
         }
       } catch (e) {
-        log('attemptDownload error for $url: $e');
         if (!isFallback) {
           return false;
         } else {
@@ -742,17 +1277,13 @@ class ApiService {
           fallbackUrl = downloadUrl.replaceAll('ARM64', 'Universal').replaceAll('arm64-v8a', 'Universal');
         }
         if (fallbackUrl.isNotEmpty && fallbackUrl != downloadUrl) {
-          log('Retrying download with fallback: $fallbackUrl');
           final fallbackOk = await attemptDownload(fallbackUrl, isFallback: true);
           if (fallbackOk) return;
         }
-      } catch (e) {
-        log('Fallback retry error: $e');
-      }
+      } catch (_) {}
 
       onError('فایل دانلود شده ناقص است. لطفا با اینترنت پایدارتر دوباره تلاش کنید یا از مرورگر دانلود کنید.');
     } catch (e) {
-      log('downloadAndInstallApk top-level error: $e');
       onError('خطا در دانلود یا نصب: $e');
     }
   }
@@ -824,6 +1355,8 @@ class ApiService {
           },
           body: jsonEncode(body),
         ).timeout(const Duration(seconds: 20));
+
+        await _checkAndUpdateFromHeaders(resp);
 
         final data = jsonDecode(utf8.decode(resp.bodyBytes));
         if (data['success'] == true) {

@@ -4,7 +4,7 @@ require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Setting.php';
 
 class Updater {
-    public const CURRENT_VERSION = '7.2.5'; // Domain Independence - auto migration, seed sublink_domains, 100% domain-free
+    public const CURRENT_VERSION = '7.3.0'; // v8.0 Panel Location Manager - Path Independence, Well-Known discovery, Smart Resolver, QR fallback
 
     public static function getCurrentVersion(): string {
         $dbVer = Setting::get('current_version', '');

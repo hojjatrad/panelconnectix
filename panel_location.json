@@ -1,0 +1,33 @@
+{
+  "panel_url": "https://vpbotn.ir/contax",
+  "api_url": "https://vpbotn.ir/contax/api/v1/app",
+  "domain": "vpbotn.ir",
+  "path": "/contax",
+  "version": "7.3.0",
+  "version_full": "Connectix v7.3.0",
+  "updated_at": "2026-10-05T12:30:00Z",
+  "timestamp": 1728130000,
+  "endpoints": {
+    "login": "https://vpbotn.ir/contax/api/v1/app/login",
+    "configs": "https://vpbotn.ir/contax/api/v1/app/configs",
+    "profile": "https://vpbotn.ir/contax/api/v1/app/profile",
+    "check_update": "https://vpbotn.ir/contax/api/v1/app/check-update",
+    "panel_location": "https://vpbotn.ir/contax/api/v1/app/panel-location",
+    "well_known": "https://vpbotn.ir/.well-known/connectix.json"
+  },
+  "fallbacks": [
+    "https://ir.vpbotn.ir/contax",
+    "https://cf.vpbotn.ir/contax",
+    "https://vpbotn.ir/contax",
+    "https://api.vpbotn.ir/contax",
+    "https://direct.vpbotn.ir/contax",
+    "https://vpbotn.ir",
+    "https://ir.vpbotn.ir"
+  ],
+  "old_paths": ["/contax", "", "/panel", "/admin"],
+  "resolver": {
+    "version": "v8.0",
+    "strategy": "well-known + canonical header + old path redirector + brute-force + remote config + QR",
+    "layers": 6
+  }
+}

@@ -220,6 +220,26 @@ try {
     }
 } catch (Throwable $e) {}
 
+// v8.0 PRO MAX: Panel Location Manager - Path independence + auto discovery (hourly + on every API request)
+try {
+    require_once __DIR__ . '/core/PanelLocationManager.php';
+    if (class_exists('Setting') && class_exists('PanelLocationManager')) {
+        // Always emit canonical headers (for app auto-update)
+        PanelLocationManager::emitCanonicalHeaders();
+        
+        $lastPathCheck = (int)Setting::get('last_panel_location_check', '0');
+        $isApiRequest = str_contains($_SERVER['REQUEST_URI'] ?? '', '/api/') || isset($_GET['route']) && str_starts_with($_GET['route'], 'api/');
+        
+        // Check hourly, or immediately on API requests (for fast migration detection)
+        if (time() - $lastPathCheck > 3600 || $isApiRequest) {
+            PanelLocationManager::autoMigrateIfNeeded();
+            if (!$isApiRequest) {
+                Setting::set('last_panel_location_check', (string)time());
+            }
+        }
+    }
+} catch (Throwable $e) {}
+
 // 3. Load All Controllers Safely
 $expectedControllers = [
     'AuthController', 'DashboardController', 'ClientController', 'PlanController',
@@ -454,6 +474,11 @@ $router->post('settings/sublink-domains/check', [SublinkController::class, 'chec
 $router->get('settings/domain-migration', [DomainMigrationController::class, 'index']);
 $router->post('settings/domain-migration/check', [DomainMigrationController::class, 'check']);
 $router->post('settings/domain-migration/migrate', [DomainMigrationController::class, 'migrate']);
+
+// v8.0 PRO MAX: Panel Location Manager - Path Independence
+$router->get('settings/panel-location', [PanelLocationController::class, 'index']);
+$router->post('settings/panel-location/check', [PanelLocationController::class, 'check']);
+$router->post('settings/panel-location/regenerate', [PanelLocationController::class, 'regenerate']);
 
 // Resellers Management (Admin only)
 $router->get('resellers', [ResellerController::class, 'index']);
@@ -790,6 +815,13 @@ $router->get('api/v1/app/announcements', [ApiControllerV2::class, 'appAnnounceme
 $router->post('api/v1/app/feedback', [ApiControllerV2::class, 'appFeedback']);
 $router->get('api/v1/app/check-update', [ApiControllerV2::class, 'checkAppUpdate']);
 $router->post('api/v1/app/check-update', [ApiControllerV2::class, 'checkAppUpdate']);
+
+// v8.0 PRO MAX: Panel Location Discovery - No auth required, for smart app resolver
+$router->get('api/v1/app/panel-location', [ApiControllerV2::class, 'panelLocation']);
+$router->post('api/v1/app/panel-location', [ApiControllerV2::class, 'panelLocation']);
+$router->get('api/panel-location', [ApiControllerV2::class, 'panelLocation']);
+$router->get('.well-known/connectix.json', [ApiControllerV2::class, 'wellKnown']);
+$router->get('well-known/connectix.json', [ApiControllerV2::class, 'wellKnown']);
 
 // Dispatch Request with graceful error protection
 try {
