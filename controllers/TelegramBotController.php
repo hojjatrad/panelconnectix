@@ -3245,9 +3245,9 @@ class TelegramBotController {
             $manifest = @json_decode(file_get_contents($manifestPath), true) ?: [];
         }
         $appVersion = $manifest['version'] ?? '3.7.0';
-        $apkUniversalUrl = $manifest['apk']['universal'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.7.0/Connectix-Android-Universal.apk';
-        $apkArm64Url = $manifest['apk']['arm64'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.7.0/Connectix-Android-ARM64.apk';
-        $windowsUrl = $manifest['windows']['url'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v3.7.0/Connectix-Windows-x64.zip';
+        $apkUniversalUrl = $manifest['apk']['universal'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.5/Connectix-Android-Universal.apk';
+        $apkArm64Url = $manifest['apk']['arm64'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.5/Connectix-Android-ARM64.apk';
+        $windowsUrl = $manifest['windows']['url'] ?? 'https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.5/Connectix-Windows-x64.zip';
 
         $platforms = [
             'android' => ['title' => '🤖 اندروید (Android)', 'header' => '🤖 نرم‌افزارهای اندروید'],

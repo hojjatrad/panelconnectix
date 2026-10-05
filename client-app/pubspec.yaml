@@ -1,7 +1,7 @@
 name: connectix_vpn
 description: Connectix Professional Multiplatform VPN Client - ULTRA Dual-Core Xray + sing-box (VLESS Reality/Vision, VMess, Trojan, SS, SOCKS, HTTP, WireGuard, Raw JSON)
 publish_to: 'none'
-version: 3.7.0+39
+version: 4.0.5+40
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
