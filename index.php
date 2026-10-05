@@ -116,6 +116,15 @@ if (str_ends_with($requestPath, 'quick_update.php') || str_ends_with($requestPat
     exit;
 }
 
+if (str_ends_with($requestPath, 'update_to_4.0.18.php') || str_ends_with($requestPath, '/update_to_4.0.18') || $routeParam === 'update_to_4.0.18.php' || $routeParam === 'update_to_4.0.18') {
+    if (file_exists(__DIR__ . '/update_to_4.0.18.php')) {
+        require_once __DIR__ . '/update_to_4.0.18.php';
+    } elseif (file_exists(__DIR__ . '/connectix-panel/update_to_4.0.18.php')) {
+        require_once __DIR__ . '/connectix-panel/update_to_4.0.18.php';
+    }
+    exit;
+}
+
 // v6.8.32 Auto fix all
 if (str_ends_with($requestPath, 'auto_fix_all.php') || str_ends_with($requestPath, '/auto_fix_all') || $routeParam === 'auto_fix_all.php' || $routeParam === 'auto_fix_all') {
     if (file_exists(__DIR__ . '/auto_fix_all.php')) {

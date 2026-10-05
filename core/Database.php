@@ -1168,6 +1168,23 @@ class Database {
                 }
             } catch (Throwable $e) {}
 
+            // v4.0.18 PROXY FREE - Auto update app_latest_version if outdated
+            try {
+                require_once __DIR__ . '/Setting.php';
+                $currentVer = Setting::get('app_latest_version', '');
+                // If version is older than 4.0.18, auto-update to 4.0.18
+                if ($currentVer === '' || version_compare($currentVer, '4.0.18', '<')) {
+                    Setting::set('app_latest_version', '4.0.18');
+                    Setting::set('app_update_title', 'Connectix v4.0.18 PROXY FREE 🔒');
+                    Setting::set('app_update_enabled', '1');
+                    $pb = 'https://vpbotn.ir';
+                    if (empty(Setting::get('app_download_url','')) || str_contains(Setting::get('app_download_url',''), '4.0.17')) {
+                        Setting::set('app_download_url', $pb . '/Connectix-ARM64-v8a.apk?v=4.0.18&t=' . time());
+                        Setting::set('app_universal_url', $pb . '/Connectix-Universal.apk?v=4.0.18&t=' . time());
+                    }
+                }
+            } catch (Throwable $e) {}
+
             // Performance: Create indexes for fast lookups (Phase 2)
             try {
                 $indexes = [

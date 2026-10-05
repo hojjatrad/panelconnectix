@@ -597,12 +597,45 @@ try {
 } catch (Throwable $e) { logStep("هشدار پاکسازی قفل: ".$e->getMessage(), 'warn'); }
 
 // 9. Send Notification to Telegram Supergroup Reports Topic & Synchronize Settings
+// v4.0.18 PROXY FREE - Auto update app version to latest from app_release.json or dashboard
 $tgNotice = false;
 try {
     require_once __DIR__ . '/config.php';
     require_once __DIR__ . '/core/Database.php';
     require_once __DIR__ . '/core/Setting.php';
     require_once __DIR__ . '/core/TelegramBot.php';
+
+    // Auto-detect latest app version from dashboard_screen.dart or app_release.json
+    $latestAppVersion = '4.0.18';
+    try {
+        $dartFile = __DIR__ . '/client-app/lib/screens/dashboard_screen.dart';
+        if (file_exists($dartFile)) {
+            $dartContent = file_get_contents($dartFile);
+            if (preg_match("/currentAppVersion\s*=\s*'([\d\.]+)'/", $dartContent, $m)) {
+                $latestAppVersion = $m[1];
+            }
+        }
+        $releaseJson = __DIR__ . '/app_release.json';
+        if (file_exists($releaseJson)) {
+            $rj = json_decode(file_get_contents($releaseJson), true);
+            if (!empty($rj['version'])) {
+                $latestAppVersion = $rj['version'];
+            }
+        }
+    } catch (Throwable $e) {}
+
+    // v4.0.18: Force update app_latest_version to latest
+    $currentAppVer = Setting::get('app_latest_version', '');
+    if ($currentAppVer !== $latestAppVersion) {
+        Setting::set('app_latest_version', $latestAppVersion);
+        Setting::set('app_update_title', "Connectix v{$latestAppVersion} PROXY FREE 🔒");
+        Setting::set('app_update_changelog', "🔒 پروکسی رایگان برای تمام مشتری‌های VPN!\n\n• SOCKS5 رایگان برای تلگرام\n• HTTP برای مرورگر\n• MTProto اختصاصی تلگرام\n• پروکسی محلی 127.0.0.1:10808/10809 برای TV\n• صفحه پروکسی جدید با کپی، QR، آموزش\n• فیکس دائمی کش نسخه قدیمی");
+        Setting::set('app_update_enabled', '1');
+        $panelBase = 'https://vpbotn.ir';
+        Setting::set('app_download_url', $panelBase . '/Connectix-ARM64-v8a.apk?v=' . $latestAppVersion . '&t=' . time());
+        Setting::set('app_universal_url', $panelBase . '/Connectix-Universal.apk?v=' . $latestAppVersion . '&t=' . time());
+        logStep("✅ نسخه اپ به {$latestAppVersion} PROXY FREE آپدیت شد", 'success');
+    }
 
     Setting::set('current_version', '7.2.0');
     if (!empty($latestSha)) {
