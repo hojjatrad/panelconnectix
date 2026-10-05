@@ -19,18 +19,20 @@ class ApiService {
   // Layer 5: Brute-force common paths
   // Layer 6: Remote config from GitHub
   
-  // Default fallback list (if nothing else works)
+  // v4.0.15 FIX: Panel-first list, vpbotn.ir is only working host (ir/cf 404 for APKs confirmed)
+  // User reported v4.0.14 still shows old version after install due to Cloudflare cache serving old APK
+  // Fix: Prioritize vpbotn.ir with version param, skip ir/cf for APK downloads
   static List<String> baseUrls = [
-    "https://ir.vpbotn.ir/contax",
-    "https://cf.vpbotn.ir/contax",
+    "https://vpbotn.ir",
     "https://vpbotn.ir/contax",
     "https://api.vpbotn.ir/contax",
+    "https://ir.vpbotn.ir/contax",
+    "https://cf.vpbotn.ir/contax",
     "https://ir.vpbotn.ir",
-    "https://vpbotn.ir",
     "https://cf.vpbotn.ir",
   ];
   
-  static String baseUrl = "https://ir.vpbotn.ir/contax";
+  static String baseUrl = "https://vpbotn.ir";
   
   // Common panel paths to brute-force
   static const List<String> commonPanelPaths = [
@@ -1197,9 +1199,9 @@ class ApiService {
     return null;
   }
 
-  // v4.0.13 PURE INTENT FIX: Robust download with PANEL-FIRST strategy (forever fix)
-  // User reported ir.vpbotn.ir 404, cf.vpbotn.ir 404 - only vpbotn.ir works (38MB valid)
-  // Strategy: Panel host first (vpbotn.ir), then GitHub, never ir/cf first
+  // v4.0.15 FIX: Panel-first + version param + cache busting to fix "old version remains after install"
+  // User reported v4.0.14 downloads but old version remains - root cause: Cloudflare cache serving old APK
+  // Fix: Always add ?v=version&t=timestamp to bypass CF cache, verify file size, prioritize versioned URL
   static Future<void> downloadAndInstallApk({
     required String downloadUrl,
     required Function(double progress, int receivedBytes, int totalBytes) onProgress,
@@ -1207,7 +1209,7 @@ class ApiService {
     required Function() onSuccess,
   }) async {
     
-    // Generate all possible download URLs to try - PANEL FIRST
+    // Generate all possible download URLs to try - PANEL FIRST with version param
     List<String> generateAllUrls(String primary, String fallback) {
       final urls = <String>[];
       final seen = <String>{};
@@ -1224,40 +1226,65 @@ class ApiService {
         urls.add(u);
       }
       
-      // v4.0.13: PANEL HOST FIRST - vpbotn.ir is the only working host (38MB valid APK)
-      // Primary from panel API is https://vpbotn.ir/Connectix-ARM64-v8a.apk - keep it first
-      addUrl(primary);
+      // v4.0.15: Extract version from primary for cache busting
+      String ver = '';
+      try {
+        final verMatch = RegExp(r'v?(\d+\.\d+\.\d+)').firstMatch(primary);
+        if (verMatch != null) ver = verMatch.group(1) ?? '';
+        // Also try from fallback
+        if (ver.isEmpty) {
+          final verMatch2 = RegExp(r'v?(\d+\.\d+\.\d+)').firstMatch(fallback);
+          if (verMatch2 != null) ver = verMatch2.group(1) ?? '';
+        }
+      } catch (_) {}
+      if (ver.isEmpty) ver = '4.0.15';
       
-      // Force panel host URLs (fastest inside Iran, not filtered, verified working)
+      final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+      
+      // Helper to add version param to URL
+      String addVersionParam(String url) {
+        if (url.contains('?v=')) return url; // Already versioned
+        if (url.contains('github.com')) return url; // GitHub doesn't need version param
+        // Add ?v=version&t=timestamp for cache busting
+        if (url.contains('?')) {
+          return '$url&v=$ver&t=$timestamp';
+        } else {
+          return '$url?v=$ver&t=$timestamp';
+        }
+      }
+      
+      // v4.0.15: PRIMARY FIRST with version param preserved - this is from panel check-update with ?v=4.0.15
+      addUrl(primary);
+      addUrl(addVersionParam(primary));
+      
+      // Force panel host URLs with version param (fastest inside Iran, verified working)
       try {
         final orderedBases = getOrderedBaseUrls();
         for (final base in orderedBases) {
-          // Only add if base is vpbotn.ir main (not ir/cf which are 404)
           if (base.contains('vpbotn.ir') && !base.contains('ir.vpbotn.ir') && !base.contains('cf.vpbotn.ir')) {
-            addUrl("$base/Connectix-ARM64-v8a.apk");
-            addUrl("$base/Connectix-Universal.apk");
+            final cleanBase = base.split('?')[0].replaceAll(RegExp(r'/contax$'), '');
+            addUrl(addVersionParam("$cleanBase/Connectix-ARM64-v8a.apk"));
+            addUrl(addVersionParam("$cleanBase/Connectix-Universal.apk"));
           }
         }
       } catch (_) {}
       
-      // Always add main working panel URLs
-      addUrl("https://vpbotn.ir/Connectix-ARM64-v8a.apk");
-      addUrl("https://vpbotn.ir/Connectix-Universal.apk");
+      // Always add main working panel URLs with version
+      addUrl(addVersionParam("https://vpbotn.ir/Connectix-ARM64-v8a.apk"));
+      addUrl(addVersionParam("https://vpbotn.ir/Connectix-Universal.apk"));
       
-      // Fallback from API
       addUrl(fallback);
+      addUrl(addVersionParam(fallback));
       
-      // GitHub direct URLs as last resort (filtered in Iran but backup)
+      // GitHub direct URLs as last resort
       try {
-        String ver = '';
-        final verMatch = RegExp(r'v?(\d+\.\d+\.\d+)').firstMatch(primary);
-        if (verMatch != null) ver = verMatch.group(1) ?? '4.0.13';
         if (ver.isNotEmpty) {
           addUrl("https://github.com/hojjatrad/panelconnectix/releases/download/v$ver/Connectix-Android-ARM64.apk");
           addUrl("https://github.com/hojjatrad/panelconnectix/releases/download/v$ver/Connectix-Android-Universal.apk");
         }
       } catch (_) {}
       
+      log('v4.0.15 generateAllUrls: primary=$primary ver=$ver total=${urls.length} urls=$urls');
       return urls;
     }
 
