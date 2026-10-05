@@ -1143,13 +1143,162 @@ class ApiService {
     return null;
   }
 
+  // v4.0.11 PRO MAX FIX: Robust download with multiple fallbacks for Iran
   static Future<void> downloadAndInstallApk({
     required String downloadUrl,
     required Function(double progress, int receivedBytes, int totalBytes) onProgress,
     required Function(String error) onError,
     required Function() onSuccess,
   }) async {
-    Future<bool> attemptDownload(String url, {bool isFallback = false}) async {
+    
+    // Generate all possible download URLs to try
+    List<String> generateAllUrls(String primary, String fallback) {
+      final urls = <String>[];
+      final seen = <String>{};
+      
+      void addUrl(String u) {
+        if (u.isEmpty || !u.startsWith('http')) return;
+        if (seen.contains(u)) return;
+        seen.add(u);
+        urls.add(u);
+      }
+      
+      // Primary first
+      addUrl(primary);
+      addUrl(fallback);
+      
+      // Try panel host mirrored URLs (fastest inside Iran, not filtered)
+      try {
+        final orderedBases = getOrderedBaseUrls();
+        for (final base in orderedBases) {
+          // Extract version from primary URL if possible
+          String ver = '';
+          final verMatch = RegExp(r'v?(\d+\.\d+\.\d+)').firstMatch(primary);
+          if (verMatch != null) ver = verMatch.group(1) ?? '';
+          
+          // Panel host URLs (these are mirrored by AppApkMirror)
+          addUrl("$base/Connectix-ARM64-v8a.apk");
+          addUrl("$base/Connectix-Universal.apk");
+          addUrl("$base/Connectix-Android-ARM64.apk");
+        }
+      } catch (_) {}
+      
+      // GitHub direct URLs as last resort
+      try {
+        String ver = '';
+        final verMatch = RegExp(r'v?(\d+\.\d+\.\d+)').firstMatch(primary);
+        if (verMatch != null) ver = verMatch.group(1) ?? '4.0.10';
+        if (ver.isNotEmpty) {
+          addUrl("https://github.com/hojjatrad/panelconnectix/releases/download/v$ver/Connectix-Android-ARM64.apk");
+          addUrl("https://github.com/hojjatrad/panelconnectix/releases/download/v$ver/Connectix-Android-Universal.apk");
+          addUrl("https://github.com/hojjatrad/panelconnectix/releases/download/v$ver/Connectix-ARM64-v8a.apk");
+        }
+      } catch (_) {}
+      
+      // Also try ir.vpbotn.ir direct
+      addUrl("https://ir.vpbotn.ir/Connectix-ARM64-v8a.apk");
+      addUrl("https://vpbotn.ir/Connectix-ARM64-v8a.apk");
+      addUrl("https://cf.vpbotn.ir/Connectix-ARM64-v8a.apk");
+      
+      return urls;
+    }
+
+    Future<bool> attemptDownloadWithHttp(String url) async {
+      // Method 1: Try with http package (more reliable for redirects)
+      try {
+        log('download attempt (http pkg): $url');
+        String? cacheDirPath;
+        try {
+          cacheDirPath = await _updaterChannel.invokeMethod<String>('getCacheDir');
+        } catch (_) {}
+        if (cacheDirPath == null || cacheDirPath.isEmpty) {
+          cacheDirPath = "/data/user/0/com.connectix.vpn/cache";
+        }
+        final dir = Directory(cacheDirPath);
+        if (!await dir.exists()) await dir.create(recursive: true);
+        final file = File('$cacheDirPath/Connectix-Update.apk');
+        if (await file.exists()) {
+          try { await file.delete(); } catch (_) {}
+        }
+
+        final response = await http.get(
+          Uri.parse(url),
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Mobile) Connectix',
+            'Accept': '*/*',
+            'Cache-Control': 'no-cache',
+          },
+        ).timeout(const Duration(minutes: 3));
+
+        if (response.statusCode >= 400) {
+          log('http pkg download HTTP ${response.statusCode} for $url');
+          // Check if it's HTML error page
+          final bodyStr = utf8.decode(response.bodyBytes, allowMalformed: true);
+          if (bodyStr.length < 5000 && (bodyStr.contains('<html') || bodyStr.contains('404') || bodyStr.contains('403'))) {
+            log('http pkg got HTML error page (${bodyStr.length} bytes) for $url');
+            throw Exception('خطای سرور: ${response.statusCode} - صفحه خطا دریافت شد');
+          }
+          throw Exception('کد خطا: ${response.statusCode}');
+        }
+
+        if (response.bodyBytes.length < 1000000) {
+          final bodyStr = utf8.decode(response.bodyBytes, allowMalformed: true);
+          if (bodyStr.contains('<html') || bodyStr.contains('<!DOCTYPE')) {
+            log('http pkg got HTML (${response.bodyBytes.length} bytes) instead of APK for $url: ${bodyStr.substring(0, 200)}');
+            throw Exception('فایل HTML دریافت شد به جای APK (احتمالا فیلترینگ یا خطای سرور) - حجم: ${response.bodyBytes.length}');
+          }
+          throw Exception('فایل ناقص است (حجم ${response.bodyBytes.length} بایت) از $url');
+        }
+
+        await file.writeAsBytes(response.bodyBytes);
+        final len = await file.length();
+        
+        // Validate APK header PK
+        try {
+          final raf = await file.open();
+          final header = await raf.read(4);
+          await raf.close();
+          if (header.length < 2 || header[0] != 0x50 || header[1] != 0x4B) {
+            final firstBytes = String.fromCharCodes(header);
+            log('http pkg invalid APK header: $firstBytes for $url len=$len');
+            throw Exception('فایل APK معتبر نیست (هدر: $firstBytes) - ممکن است صفحه خطا باشد');
+          }
+        } catch (e) {
+          if (e.toString().contains('APK معتبر نیست') || e.toString().contains('صفحه خطا')) rethrow;
+        }
+
+        log('http pkg download success: $url len=$len');
+        onProgress(1.0, len, len);
+        
+        // Try install
+        try {
+          final installResult = await _updaterChannel.invokeMethod('installApk', {'filePath': file.path, 'allowSameVersion': true});
+          if (installResult == true || installResult == 'true' || installResult == null) {
+            onSuccess();
+            return true;
+          } else {
+            throw Exception('نصب شروع نشد: $installResult');
+          }
+        } catch (nativeErr) {
+          final errStr = nativeErr.toString();
+          if (errStr.contains('FILE_NOT_FOUND')) {
+            onError('❌ فایل یافت نشد: ${file.path} - $url\nحجم: ${(len/1024/1024).toStringAsFixed(1)} MB\nاز مرورگر دانلود کنید');
+          } else if (errStr.contains('INSTALL_ERROR')) {
+            final detail = errStr.length > 400 ? errStr.substring(0, 400) : errStr;
+            onError('❌ خطای نصب: $detail\nاز مرورگر: $url');
+          } else {
+            onError('❌ نصب نشد: $errStr\nحجم: ${(len/1024/1024).toStringAsFixed(1)} MB\nمرورگر: $url');
+          }
+          return false;
+        }
+      } catch (e) {
+        log('http pkg download failed for $url: $e');
+        return false;
+      }
+    }
+
+    Future<bool> attemptDownloadWithHttpClient(String url) async {
+      // Method 2: HttpClient with streaming (original method, for large files)
       String? cacheDirPath;
       try {
         cacheDirPath = await _updaterChannel.invokeMethod<String>('getCacheDir');
@@ -1158,33 +1307,34 @@ class ApiService {
         cacheDirPath = "/data/user/0/com.connectix.vpn/cache";
       }
       final dir = Directory(cacheDirPath);
-      if (!await dir.exists()) {
-        await dir.create(recursive: true);
-      }
+      if (!await dir.exists()) await dir.create(recursive: true);
       final file = File('$cacheDirPath/Connectix-Update.apk');
       if (await file.exists()) {
         try { await file.delete(); } catch (_) {}
       }
 
       final httpClient = HttpClient();
-      httpClient.connectionTimeout = const Duration(seconds: 20);
-      httpClient.idleTimeout = const Duration(seconds: 20);
+      httpClient.connectionTimeout = const Duration(seconds: 25);
+      httpClient.idleTimeout = const Duration(seconds: 25);
       httpClient.autoUncompress = false;
       try {
+        log('download attempt (HttpClient): $url');
         final uri = Uri.parse(url);
         final request = await httpClient.getUrl(uri);
-        request.headers.set(HttpHeaders.userAgentHeader, 'Mozilla/5.0 (Linux; Android 10; Mobile) Connectix');
+        request.headers.set(HttpHeaders.userAgentHeader, 'Mozilla/5.0 (Linux; Android 10; Mobile) Connectix v4.0.11');
         request.headers.set(HttpHeaders.acceptHeader, '*/*');
+        request.headers.set(HttpHeaders.cacheControlHeader, 'no-cache');
         request.followRedirects = true;
         request.maxRedirects = 5;
         final response = await request.close().timeout(const Duration(minutes: 6));
 
         if (response.statusCode >= 400) {
-          log('download HTTP ${response.statusCode} for $url');
-          throw Exception('کد خطا: ${response.statusCode}');
+          log('HttpClient download HTTP ${response.statusCode} for $url');
+          throw Exception('کد خطا: ${response.statusCode} از $url');
         }
 
         final total = response.contentLength > 0 ? response.contentLength : 0;
+        log('HttpClient start: $url total=$total status=${response.statusCode}');
 
         final sink = file.openWrite();
         int received = 0;
@@ -1194,7 +1344,7 @@ class ApiService {
           if (total > 0) {
             onProgress((received / total).clamp(0.0, 1.0), received, total);
           } else {
-            final fakeProgress = (received / (30 * 1024 * 1024)).clamp(0.0, 0.95);
+            final fakeProgress = (received / (40 * 1024 * 1024)).clamp(0.0, 0.95);
             onProgress(fakeProgress, received, 0);
           }
         }
@@ -1202,22 +1352,28 @@ class ApiService {
         await sink.close();
 
         final len = await file.length();
+        log('HttpClient finished: $url len=$len total=$total');
 
-        if (!await file.exists()) {
-          throw Exception('فایل ایجاد نشد');
-        }
+        if (!await file.exists()) throw Exception('فایل ایجاد نشد: $url');
         if (len < 1000000) {
-          throw Exception('فایل ناقص است (حجم ${len} بایت)');
+          // Check if HTML
+          try {
+            final firstKb = await file.openRead(0, 1024).transform(utf8.decoder).join();
+            if (firstKb.contains('<html') || firstKb.contains('<!DOCTYPE')) {
+              throw Exception('فایل HTML دریافت شد (${len} بایت) از $url - احتمال فیلترینگ:\n${firstKb.substring(0, 200)}');
+            }
+          } catch (_) {}
+          throw Exception('فایل ناقص است (حجم ${len} بایت) از $url - اینترنت ناپایدار');
         }
         try {
           final raf = await file.open();
           final header = await raf.read(4);
           await raf.close();
           if (header.length < 2 || header[0] != 0x50 || header[1] != 0x4B) {
-            throw Exception('فایل دانلود شده APK معتبر نیست');
+            throw Exception('APK معتبر نیست از $url - هدر اشتباه');
           }
         } catch (e) {
-          if (e.toString().contains('APK معتبر نیست')) rethrow;
+          if (e.toString().contains('معتبر نیست') || e.toString().contains('HTML') || e.toString().contains('ناقص')) rethrow;
         }
 
         try {
@@ -1226,29 +1382,16 @@ class ApiService {
             onSuccess();
             return true;
           } else {
-            throw Exception('نصب شروع نشد - نتیجه: $installResult');
+            throw Exception('نصب شروع نشد: $installResult');
           }
         } catch (nativeErr) {
           final errStr = nativeErr.toString();
-          if (errStr.contains('FILE_NOT_FOUND') || errStr.contains('File does not exist') || errStr.contains('too small')) {
-            onError('❌ فایل APK یافت نشد. مسیر: ${file.path} حجم: $len بایت. لطفا دوباره دانلود کنید: $downloadUrl');
-          } else if (errStr.contains('INSTALL_ERROR')) {
-            final detail = errStr.length > 500 ? errStr.substring(0, 500) + '...' : errStr;
-            onError('❌ خطا در نصب: $detail - از مرورگر دانلود کنید: $downloadUrl');
-          } else if (errStr.contains('SecurityException') || errStr.contains('Permission')) {
-            onError('❌ دسترسی نصب ندارید. تنظیمات > برنامه‌ها > Connectix > نصب ناشناخته را فعال کنید. یا از مرورگر: $downloadUrl');
-          } else {
-            onError('❌ نصب خودکار نشد: $errStr - از مرورگر دانلود کنید: $downloadUrl - حجم: ${(len / (1024*1024)).toStringAsFixed(1)} MB');
-          }
+          onError('❌ نصب نشد: $errStr\nفایل: $url\nحجم: ${(len/1024/1024).toStringAsFixed(1)} MB\nراهنما: تنظیمات → نصب ناشناخته → فعال');
           return false;
         }
       } catch (e) {
-        if (!isFallback) {
-          return false;
-        } else {
-          onError('خطا در دانلود: $e');
-          return false;
-        }
+        log('HttpClient failed for $url: $e');
+        return false;
       } finally {
         try { httpClient.close(force: true); } catch (_) {}
       }
@@ -1259,32 +1402,51 @@ class ApiService {
         final canInstall = await _updaterChannel.invokeMethod<bool>('canInstallPackages') ?? true;
         if (!canInstall) {
           await _updaterChannel.invokeMethod('openInstallPermissionSettings');
-          onError('دسترسی «نصب برنامه‌های ناشناخته» را در صفحه تنظیمات فعال کرده و دوباره دکمه را لمس فرمایید.');
+          onError('دسترسی «نصب برنامه‌های ناشناخته» را فعال کنید:\nتنظیمات → حریم خصوصی → نصب ناشناخته → Connectix را فعال کنید\n\nسپس دوباره تلاش کنید.');
           return;
         }
       } catch (_) {}
 
-      final primaryOk = await attemptDownload(downloadUrl, isFallback: false);
-      if (primaryOk) return;
-
+      String fallbackUrl = '';
       try {
-        String fallbackUrl = '';
-        try {
-          final updateData = await checkAppUpdate();
-          fallbackUrl = (updateData?['fallback_url'] ?? '').toString();
-        } catch (_) {}
-        if (fallbackUrl.isEmpty || fallbackUrl == downloadUrl) {
-          fallbackUrl = downloadUrl.replaceAll('ARM64', 'Universal').replaceAll('arm64-v8a', 'Universal');
-        }
-        if (fallbackUrl.isNotEmpty && fallbackUrl != downloadUrl) {
-          final fallbackOk = await attemptDownload(fallbackUrl, isFallback: true);
-          if (fallbackOk) return;
-        }
+        final updateData = await checkAppUpdate();
+        fallbackUrl = (updateData?['fallback_url'] ?? '').toString();
       } catch (_) {}
 
-      onError('فایل دانلود شده ناقص است. لطفا با اینترنت پایدارتر دوباره تلاش کنید یا از مرورگر دانلود کنید.');
+      final allUrls = generateAllUrls(downloadUrl, fallbackUrl);
+      log('v4.0.11 download: trying ${allUrls.length} URLs: $allUrls');
+
+      // Try each URL with http package first (fast), then HttpClient (streaming)
+      for (int i = 0; i < allUrls.length; i++) {
+        final url = allUrls[i];
+        log('v4.0.11 trying ${i+1}/${allUrls.length}: $url');
+        
+        // Try http package first (better for small/medium files, handles redirects)
+        bool ok = await attemptDownloadWithHttp(url);
+        if (ok) return;
+        
+        // If http package failed, try HttpClient streaming (better for large files)
+        ok = await attemptDownloadWithHttpClient(url);
+        if (ok) return;
+        
+        // Small delay before next URL
+        await Future.delayed(Duration(milliseconds: 500));
+      }
+
+      // All URLs failed
+      onError('❌ تمام ${allUrls.length} لینک دانلود شکست خورد.\n\n'
+          '🔍 دلایل احتمالی:\n'
+          '• فیلترینگ گیت‌هاب در ایران (همراه اول/ایرانسل)\n'
+          '• اینترنت ناپایدار\n'
+          '• فضای ذخیره‌سازی پر\n\n'
+          '✅ راه حل:\n'
+          '1. با WiFi امتحان کنید (نه دیتا)\n'
+          '2. فیلترشکن را خاموش کنید و دوباره امتحان کنید\n'
+          '3. روی \"دانلود با مرورگر\" بزنید و از پوشه دانلود نصب کنید\n\n'
+          'لینک مستقیم:\n$downloadUrl');
     } catch (e) {
-      onError('خطا در دانلود یا نصب: $e');
+      log('downloadAndInstallApk top-level error: $e');
+      onError('❌ خطای کلی: $e\n\nاز مرورگر دانلود کنید:\n$downloadUrl');
     }
   }
 
