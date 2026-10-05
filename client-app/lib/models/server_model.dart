@@ -68,6 +68,7 @@ class ServerModel {
   String get pingDisplay {
     if (pingMs == null) return '--';
     if (pingMs! < 0) return 'خطا';
+    if (pingMs == 0) return 'آماده'; // v4.0.14: server exists but ping not measurable, show as ready
     return '$pingMs ms';
   }
 

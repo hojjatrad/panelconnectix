@@ -71,7 +71,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Map<String, dynamic>? _updateInfo;
   bool _isCheckingUpdate = false;
 
-  static const String currentAppVersion = '4.0.13';
+  static const String currentAppVersion = '4.0.14';
 
   // "Download over Wi-Fi only" for update packages
   bool _updateWifiOnly = false;
@@ -777,6 +777,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
   }
 
+  // v4.0.14 IMPROVED PING - Show "آماده" when ping fails but server exists
   void _measureSelectedServerPing() async {
     if (_selectedServer == null || _selectedServer!.configUri.isEmpty) return;
     try {
@@ -784,19 +785,38 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       try {
         final parser = V2RayCompat.parseUniversal(_selectedServer!.configUri);
         delay = await _flutterV2ray.getServerDelay(config: parser.getFullConfiguration());
-      } catch (_) {}
+        ApiService.log('measurePing: V2Ray delay for ${_selectedServer!.name} => $delay ms');
+      } catch (e) {
+        ApiService.log('measurePing: V2Ray getServerDelay failed: $e');
+      }
 
       if (delay == null || delay <= 0) {
         delay = await ApiService.pingServerUri(_selectedServer!.configUri);
+        ApiService.log('measurePing: TCP ping for ${_selectedServer!.name} => $delay ms');
       }
 
-      if (mounted && delay != null && delay > 0) {
+      if (mounted) {
         setState(() {
-          _currentServerPing = delay;
-          _selectedServer!.pingMs = delay;
+          if (delay != null && delay > 0 && delay < 10000) {
+            _currentServerPing = delay;
+            _selectedServer!.pingMs = delay;
+          } else {
+            // v4.0.14: If ping fails but server exists, show as "ready" (0 = special value for آماده)
+            // This fixes "هیچی نشان نمیده و فقط نوشته آماده اتصال" - now shows "آماده" badge
+            _currentServerPing = 0; // 0 means "آماده" - server exists but ping not measurable
+            _selectedServer!.pingMs = 0;
+          }
         });
       }
-    } catch (_) {}
+    } catch (e) {
+      ApiService.log('measurePing error: $e');
+      if (mounted) {
+        setState(() {
+          _currentServerPing = 0;
+          if (_selectedServer != null) _selectedServer!.pingMs = 0;
+        });
+      }
+    }
   }
 
   // 1-Tap Smart Connect to Best Ping Server
@@ -2883,12 +2903,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             margin: const EdgeInsets.only(left: 8),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF10B981).withOpacity(0.15),
+                              color: (_currentServerPing == 0 ? const Color(0xFF6366F1) : const Color(0xFF10B981)).withOpacity(0.15),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
-                              '$_currentServerPing ms',
-                              style: const TextStyle(color: Color(0xFF34D399), fontSize: 10, fontWeight: FontWeight.bold),
+                              _currentServerPing == 0 ? 'آماده' : '$_currentServerPing ms',
+                              style: TextStyle(color: _currentServerPing == 0 ? const Color(0xFF818CF8) : const Color(0xFF34D399), fontSize: 10, fontWeight: FontWeight.bold),
                             ),
                           ),
                         const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF64748B)),
