@@ -1,22 +1,23 @@
 {
-  "version": "4.0.11",
-  "code": 46,
-  "changelog": "v4.0.11 PRO MAX FIX - حل مشکل فایل ناقص و دانلود نشدن! دانلود مقاوم با 10+ لینک جایگزین (پنل هاست، ir.vpbotn.ir، GitHub)، تشخیص خودکار HTML به جای APK، پیام خطای دقیق با راهنما، تلاش با http و HttpClient، WiFi پیشنهادی، مرورگر fallback. + فیکس پنجره نصب شیائومی/سامسونگ از v4.0.10 + استقلال مسیر پنل v8.0",
+  "version": "4.0.12",
+  "code": 47,
+  "changelog": "v4.0.12 PRO MAX FUNDAMENTAL FIX - حل اساسی مشکل گیر کردن روی 'برای ادامه نصب را در پنجره تایید کنید'! ریشه: PackageInstaller روی MIUI/Samsung بلاک میشه. فیکس: استراتژی هوشمند بر اساس برند گوشی - شیائومی/سامسونگ اول Intent (ACTION_INSTALL_PACKAGE + VIEW + Chooser) بعد PackageInstaller، پیکسل برعکس. اعطای دسترسی به 9 نصاب (MIUI, Samsung, Google)، فایل FileProvider با نام یکتا، کپی به external files، متدهای جدید openApkFile و openFileManager برای تلاش مجدد دستی. اگر پنجره باز نشد، 3 دکمه: تلاش مجدد، باز کردن پوشه، دانلود با مرورگر + راهنمای فعال‌سازی نصب ناشناخته.",
   "date": "2026-10-05",
   "apk": {
-    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.11/Connectix-Android-ARM64.apk",
-    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.11/Connectix-Android-Universal.apk",
-    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.11/Connectix-Android-ARM32.apk"
+    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.12/Connectix-Android-ARM64.apk",
+    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.12/Connectix-Android-Universal.apk",
+    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.12/Connectix-Android-ARM32.apk"
   },
   "windows": {
-    "version": "4.0.11",
-    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.11/Connectix-Windows-x64.zip"
+    "version": "4.0.12",
+    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.12/Connectix-Windows-x64.zip"
   },
   "ultra": true,
   "core": "flutter_vless dual-core",
   "protocols": ["vless", "vmess", "trojan", "ss", "socks", "http", "wireguard", "hysteria2", "raw", "clash", "singbox"],
   "fixes": {
-    "incomplete_file": "v4.0.11 - robust download with 10+ URLs, panel host first, GitHub last, HTML detection",
+    "installer_stuck": "v4.0.12 - FUNDAMENTAL: brand-aware strategy, Intent first on MIUI/Samsung, PackageInstaller first on Pixel, 9 installers granted, chooser fallback",
+    "incomplete_file": "v4.0.11 - robust download with 10+ URLs, panel host first, HTML detection",
     "installer_window": "v4.0.10 - dual intent + grant to all installers + external dir",
     "panel_path": "v4.0.9 - Panel Location Manager v8.0"
   }

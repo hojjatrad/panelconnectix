@@ -1235,11 +1235,23 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             Expanded(
                               child: OutlinedButton.icon(
                                 onPressed: () async {
-                                  // v4.0.10: Retry downloadAndInstall which will trigger dual-intent again
+                                  // v4.0.12: Try openApkFile directly (fundamental fix)
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('🔄 تلاش مجدد برای باز کردن نصاب... اگر باز هم باز نشد، با مرورگر دانلود کنید')),
+                                    const SnackBar(content: Text('🔄 تلاش مجدد نصب با روش جدید v4.0.12...'), duration: Duration(seconds: 2)),
                                   );
-                                  // Re-trigger install from cache if exists
+                                  try {
+                                    final apkPath = await ApiService.getApkFilePath();
+                                    if (apkPath != null && apkPath.isNotEmpty) {
+                                      final opened = await ApiService.openApkFile(apkPath);
+                                      if (opened) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('✅ نصاب باز شد - لطفا تایید کنید')),
+                                        );
+                                        return;
+                                      }
+                                    }
+                                  } catch (_) {}
+                                  // Fallback: re-trigger downloadAndInstall
                                   ApiService.downloadAndInstallApk(
                                     downloadUrl: downloadUrl,
                                     onProgress: (p, r, t) {},
@@ -1257,10 +1269,36 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                   side: const BorderSide(color: Color(0xFF10B981)),
                                 ),
                                 icon: const Icon(Icons.install_mobile_rounded, size: 16),
-                                label: const Text('باز کردن نصاب دستی', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                label: const Text('نصاب دستی v4.0.12', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                               ),
                             ),
-                            const SizedBox(width: 10),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () async {
+                                  try {
+                                    final apkPath = await ApiService.getApkFilePath();
+                                    if (apkPath != null && apkPath.isNotEmpty) {
+                                      await ApiService.openFileManager(apkPath);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('📁 پوشه باز شد - روی APK بزنید تا نصب شود')),
+                                      );
+                                      return;
+                                    }
+                                  } catch (_) {}
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('📁 فایل در پوشه دانلود/Connectix ذخیره شده')),
+                                  );
+                                },
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: const Color(0xFFF59E0B),
+                                  side: const BorderSide(color: Color(0xFFF59E0B)),
+                                ),
+                                icon: const Icon(Icons.folder_open_rounded, size: 14),
+                                label: const Text('پوشه', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
                             Expanded(
                               child: ElevatedButton.icon(
                                 onPressed: () async {
@@ -1273,8 +1311,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                   backgroundColor: const Color(0xFF6366F1),
                                   padding: const EdgeInsets.symmetric(vertical: 10),
                                 ),
-                                icon: const Icon(Icons.open_in_browser_rounded, size: 16),
-                                label: const Text('دانلود با مرورگر', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                icon: const Icon(Icons.open_in_browser_rounded, size: 14),
+                                label: const Text('مرورگر', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                               ),
                             ),
                           ],

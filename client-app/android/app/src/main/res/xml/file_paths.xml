@@ -1,12 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Working v4.0.3 paths -->
-    <external-path name="external_files" path="."/>
-    <cache-path name="cache" path="."/>
-    <external-cache-path name="external_cache" path="."/>
-    <external-files-path name="external_files" path="."/>
-    <files-path name="files" path="."/>
-    <!-- v4.0.8 additions for robustness -->
-    <external-files-path name="external_files2" path="Android/data/com.connectix.vpn/files/"/>
-    <root-path name="root" path="."/>
+    <!-- v4.0.12 PRO MAX FIX: Unique names, no duplicates, only necessary paths -->
+    <external-files-path name="connectix_external_files" path="." />
+    <external-path name="connectix_external_path" path="." />
+    <cache-path name="connectix_cache" path="." />
+    <external-cache-path name="connectix_external_cache" path="." />
+    <files-path name="connectix_files" path="." />
 </paths>

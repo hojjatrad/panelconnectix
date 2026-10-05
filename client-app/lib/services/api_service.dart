@@ -1450,6 +1450,40 @@ class ApiService {
     }
   }
 
+  // v4.0.12 PRO MAX: New methods for robust installer fallback
+  static Future<String?> getApkFilePath() async {
+    try {
+      final path = await _updaterChannel.invokeMethod<String>('getApkFilePath');
+      log('getApkFilePath: $path');
+      return path;
+    } catch (e) {
+      log('getApkFilePath error: $e');
+      return null;
+    }
+  }
+
+  static Future<bool> openApkFile(String filePath) async {
+    try {
+      log('openApkFile: $filePath');
+      final result = await _updaterChannel.invokeMethod<bool>('openApkFile', {'filePath': filePath});
+      return result ?? false;
+    } catch (e) {
+      log('openApkFile error: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> openFileManager(String filePath) async {
+    try {
+      log('openFileManager: $filePath');
+      final result = await _updaterChannel.invokeMethod<bool>('openFileManager', {'filePath': filePath});
+      return result ?? false;
+    } catch (e) {
+      log('openFileManager error: $e');
+      return false;
+    }
+  }
+
   static Future<void> openHotspotSettings() async {
     try {
       await _updaterChannel.invokeMethod('openHotspotSettings');
