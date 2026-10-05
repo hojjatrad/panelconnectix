@@ -697,44 +697,15 @@ class ApiService {
           } catch (_) {}
           
           if (errStr.contains('FILE_NOT_FOUND') || errStr.contains('File does not exist') || errStr.contains('too small')) {
-            onError('❌ فایل APK یافت نشد یا ناقص است.
-
-مسیر: ${file.path}
-حجم: $len بایت
-
-لطفا دوباره دانلود کنید یا از مرورگر دانلود کنید:
-$downloadUrl');
+            onError('❌ فایل APK یافت نشد. مسیر: ${file.path} حجم: $len بایت. لطفا دوباره دانلود کنید: $downloadUrl');
           } else if (errStr.contains('INSTALL_ERROR')) {
             // Extract detailed error
             final detail = errStr.length > 500 ? errStr.substring(0, 500) + '...' : errStr;
-            onError('❌ خطا در شروع نصب خودکار:
-
-$detail
-
-✅ راه حل:
-1. از مرورگر دانلود کنید:
-$downloadUrl
-2. فایل را از پوشه Downloads نصب کنید
-3. دسترسی نصب برنامه‌های ناشناخته را فعال کنید');
+            onError('❌ خطا در نصب: $detail - از مرورگر دانلود کنید: $downloadUrl');
           } else if (errStr.contains('SecurityException') || errStr.contains('Permission')) {
-            onError('❌ دسترسی نصب ندارید.
-
-لطفا:
-1. به تنظیمات > برنامه‌ها > Connectix > نصب برنامه‌های ناشناخته بروید
-2. اجازه نصب را فعال کنید
-3. دوباره تلاش کنید
-
-یا از مرورگر دانلود کنید:
-$downloadUrl');
+            onError('❌ دسترسی نصب ندارید. تنظیمات > برنامه‌ها > Connectix > نصب ناشناخته را فعال کنید. یا از مرورگر: $downloadUrl');
           } else {
-            onError('❌ نصب خودکار ممکن نشد.
-
-خطا: $errStr
-
-✅ لطفا از مرورگر دانلود و دستی نصب کنید:
-$downloadUrl
-
-حجم فایل: ${(len / (1024*1024)).toStringAsFixed(1)} MB');
+            onError('❌ نصب خودکار نشد: $errStr - از مرورگر دانلود کنید: $downloadUrl - حجم: ${(len / (1024*1024)).toStringAsFixed(1)} MB');
           }
           return false;
         }
