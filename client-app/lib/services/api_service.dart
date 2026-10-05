@@ -687,13 +687,10 @@ class ApiService {
           log('Native install v4.0.7 failed: $nativeErr path=${file.path} len=$len');
           final errStr = nativeErr.toString();
           
-          // v4.0.7: Try to open browser as ultimate fallback - user can install manually
-          // This ensures even if auto-install fails, user gets APK via browser
+          // v4.0.7: Try to open browser as ultimate fallback
           try {
-            // Try to launch browser with direct download link
-            final browserUrl = downloadUrl.isNotEmpty ? downloadUrl : fallbackUrl;
+            final browserUrl = url;
             log('Fallback to browser: $browserUrl');
-            // Don't call url_launcher here to avoid context issues, let UI handle it
           } catch (_) {}
           
           if (errStr.contains('FILE_NOT_FOUND') || errStr.contains('File does not exist') || errStr.contains('too small')) {
