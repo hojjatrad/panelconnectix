@@ -1,15 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- v4.0.6 FIX: Add all possible paths for robust FileProvider -->
-    <external-path name="external" path="." />
-    <external-cache-path name="external_cache" path="." />
-    <external-cache-path name="external_cache_files" path="."/>
-    <cache-path name="cache" path="." />
-    <cache-path name="cache_files" path="."/>
-    <files-path name="files" path="." />
-    <files-path name="internal_files" path="."/>
-    <external-files-path name="external_files" path="." />
-    <external-files-path name="external_files2" path="Android/data/com.connectix.vpn/files/" />
-    <!-- Root path as last resort for Android 10+ -->
-    <root-path name="root" path="." />
+    <!-- Working v4.0.3 paths -->
+    <external-path name="external_files" path="."/>
+    <cache-path name="cache" path="."/>
+    <external-cache-path name="external_cache" path="."/>
+    <external-files-path name="external_files" path="."/>
+    <files-path name="files" path="."/>
+    <!-- v4.0.8 additions for robustness -->
+    <external-files-path name="external_files2" path="Android/data/com.connectix.vpn/files/"/>
+    <root-path name="root" path="."/>
 </paths>

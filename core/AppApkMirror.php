@@ -59,7 +59,7 @@ class AppApkMirror {
             );
             if (!is_array($release) || empty($release['assets'])) {
                 $release = Updater::githubRequest(
-                    "https://api.github.com/repos/{$repo}/releases/tags/v4.0.7",
+                    "https://api.github.com/repos/{$repo}/releases/tags/v4.0.8",
                     $token
                 );
             }

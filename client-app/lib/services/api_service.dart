@@ -671,7 +671,7 @@ class ApiService {
 
         // v4.0.7 DEEP FIX: PackageInstaller API + robust error handling
         try {
-          final installResult = await _updaterChannel.invokeMethod('installApk', {'filePath': file.path});
+          final installResult = await _updaterChannel.invokeMethod('installApk', {'filePath': file.path, 'allowSameVersion': true});
           log('installApk v4.0.7 result: $installResult path=${file.path} len=$len');
           // PackageInstaller returns true immediately after session commit, system installer will show
           if (installResult == true || installResult == 'true' || installResult == null) {

@@ -1,18 +1,18 @@
 {
-  "version": "4.0.7",
-  "code": 42,
-  "changelog": "v4.0.7 DEEP FIX: حل قطعی مشکل بسته شدن هنگام نصب - PackageInstaller API جدید، FileProvider قوی با 4 fallback، حذف CLEAR_TOP، فیکس onSuccess",
+  "version": "4.0.8",
+  "code": 43,
+  "changelog": "v4.0.8 ROOT FIX: مقایسه با نسخه سالم 4.0.3 - بازگرداندن منطق dual-intent با ALLOW_REPLACE، PackageInstaller بدون USER_ACTION_NOT_REQUIRED، FileProvider قوی، فیکس بسته شدن هنگام نصب",
   "date": "2026-10-05",
   "apk": {
-    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.7/Connectix-Android-ARM64.apk",
-    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.7/Connectix-Android-Universal.apk",
-    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.7/Connectix-Android-ARM32.apk"
+    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.8/Connectix-Android-ARM64.apk",
+    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.8/Connectix-Android-Universal.apk",
+    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.8/Connectix-Android-ARM32.apk"
   },
   "windows": {
-    "version": "4.0.7",
-    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.7/Connectix-Windows-x64.zip"
+    "version": "4.0.8",
+    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.8/Connectix-Windows-x64.zip"
   },
   "ultra": true,
-  "core": "flutter_vless dual-core Xray+sing-box",
+  "core": "flutter_vless dual-core",
   "protocols": ["vless", "vmess", "trojan", "ss", "socks", "http", "wireguard", "hysteria2", "raw", "clash", "singbox"]
 }
