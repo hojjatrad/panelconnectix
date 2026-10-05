@@ -1,30 +1,18 @@
 {
-  "version": "4.0.5",
-  "code": 40,
-  "changelog": "ULTRA Dual-Core v4.0.5: flutter_vless with full protocol support (VLESS Reality/Vision, VMess, Trojan, SS, SOCKS, HTTP, WireGuard, Hysteria2, Raw JSON, Clash YAML, sing-box JSON) - compileSdk 36, AGP 9.1 - Fix update notification for 4.0.3 users",
+  "version": "4.0.6",
+  "code": 41,
+  "changelog": "v4.0.6 FIX: حل مشکل بسته شدن برنامه هنگام نصب - بهبود FileProvider و نصب خودکار، فیکس onSuccess اشتباه، اضافه شدن fallback مرورگر",
   "date": "2026-10-05",
   "apk": {
-    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.5/Connectix-Android-ARM64.apk",
-    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.5/Connectix-Android-Universal.apk",
-    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.5/Connectix-Android-ARM32.apk"
+    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.6/Connectix-Android-ARM64.apk",
+    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.6/Connectix-Android-Universal.apk",
+    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.6/Connectix-Android-ARM32.apk"
   },
   "windows": {
-    "version": "4.0.5",
-    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.5/Connectix-Windows-x64.zip"
+    "version": "4.0.6",
+    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.6/Connectix-Windows-x64.zip"
   },
   "ultra": true,
   "core": "flutter_vless dual-core Xray+sing-box",
-  "protocols": [
-    "vless",
-    "vmess",
-    "trojan",
-    "ss",
-    "socks",
-    "http",
-    "wireguard",
-    "hysteria2",
-    "raw",
-    "clash",
-    "singbox"
-  ]
+  "protocols": ["vless", "vmess", "trojan", "ss", "socks", "http", "wireguard", "hysteria2", "raw", "clash", "singbox"]
 }

@@ -671,12 +671,35 @@ class ApiService {
 
         try {
           final installResult = await _updaterChannel.invokeMethod('installApk', {'filePath': file.path});
-          log('installApk result: $installResult path=${file.path}');
+          log('installApk result: $installResult path=${file.path} len=$len');
+          // v4.0.6 FIX: Only call onSuccess if install intent actually launched
+          // Previously it called onSuccess even when FileProvider failed, causing app to close with no installer
+          if (installResult == true || installResult == 'true') {
+            onSuccess();
+            return true;
+          } else {
+            throw Exception('نصب شروع نشد - نتیجه: $installResult');
+          }
         } catch (nativeErr) {
-          log('Native install invoke failed: $nativeErr');
+          log('Native install invoke failed: $nativeErr path=${file.path} len=$len');
+          // v4.0.6 FIX: Show error to user instead of silently calling onSuccess
+          // Common causes: FileProvider path not configured, permission denied, file not readable
+          final errStr = nativeErr.toString();
+          if (errStr.contains('FILE_NOT_FOUND') || errStr.contains('File does not exist')) {
+            onError('فایل APK یافت نشد یا ناقص است. لطفا دوباره دانلود کنید. مسیر: ${file.path}');
+          } else if (errStr.contains('INSTALL_ERROR')) {
+            onError('خطا در شروع نصب: $errStr\n\nلطفا از مرورگر دانلود کنید: $downloadUrl');
+          } else {
+            // Try fallback: open file manager or browser download as last resort
+            try {
+              onError('نصب خودکار ممکن نشد. در حال باز کردن مرورگر برای دانلود دستی...\n\n$downloadUrl');
+              // The caller can handle opening browser - we still return false to trigger fallback
+            } catch (_) {}
+            // Don't call onSuccess, let fallback logic try
+            return false;
+          }
+          return false;
         }
-        onSuccess();
-        return true;
       } catch (e) {
         log('attemptDownload error for $url: $e');
         if (!isFallback) {

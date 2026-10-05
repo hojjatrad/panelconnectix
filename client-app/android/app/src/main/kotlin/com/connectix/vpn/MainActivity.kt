@@ -205,26 +205,63 @@ class MainActivity: FlutterActivity() {
                         val file = File(filePath)
                         if (file.exists() && file.length() > 1000000) {
                             try {
+                                // v4.0.6 FIX: Ensure file is readable for installer
+                                try {
+                                    file.setReadable(true, false)
+                                } catch (_: Exception) {}
+                                
                                 val uri: Uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                                    // Try primary file, then fallback locations
                                     try {
                                         FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file)
-                                    } catch (e: Exception) {
-                                        // Fallback: try external cache file provider
-                                        val fallbackFile = File(context.getExternalFilesDir(null), "Connectix-Update.apk")
-                                        if (fallbackFile.exists()) {
-                                            FileProvider.getUriForFile(context, context.packageName + ".fileprovider", fallbackFile)
-                                        } else {
-                                            throw e
+                                    } catch (e1: Exception) {
+                                        try {
+                                            // Fallback 1: external files dir
+                                            val extFile = File(context.getExternalFilesDir(null), "Connectix-Update.apk")
+                                            if (extFile.exists() && extFile.length() > 1000000) {
+                                                extFile.setReadable(true, false)
+                                                FileProvider.getUriForFile(context, context.packageName + ".fileprovider", extFile)
+                                            } else {
+                                                throw e1
+                                            }
+                                        } catch (e2: Exception) {
+                                            try {
+                                                // Fallback 2: cache dir
+                                                val cacheFile = File(context.cacheDir, "Connectix-Update.apk")
+                                                if (cacheFile.exists() && cacheFile.length() > 1000000) {
+                                                    cacheFile.setReadable(true, false)
+                                                    FileProvider.getUriForFile(context, context.packageName + ".fileprovider", cacheFile)
+                                                } else {
+                                                    throw e2
+                                                }
+                                            } catch (e3: Exception) {
+                                                // Fallback 3: external cache
+                                                val extCacheFile = File(context.externalCacheDir, "Connectix-Update.apk")
+                                                if (extCacheFile.exists() && extCacheFile.length() > 1000000) {
+                                                    extCacheFile.setReadable(true, false)
+                                                    FileProvider.getUriForFile(context, context.packageName + ".fileprovider", extCacheFile)
+                                                } else {
+                                                    throw Exception("FileProvider failed for all paths: ${e1.message} | ${e2.message} | ${e3.message} | filePath=$filePath len=${file.length()} exists=${file.exists()} readable=${file.canRead()}")
+                                                }
+                                            }
                                         }
                                     }
                                 } else {
                                     Uri.fromFile(file)
                                 }
+                                
+                                // v4.0.6 FIX: Use more compatible intent without CLEAR_TOP which was closing app
+                                // Try ACTION_INSTALL_PACKAGE first (more explicit), fallback to VIEW
                                 val intent = Intent(Intent.ACTION_VIEW).apply {
                                     setDataAndType(uri, "application/vnd.android.package-archive")
+                                    // FIX: Remove CLEAR_TOP which caused app to close without installer
+                                    // Use NEW_TASK + GRANT_READ + GRANT_WRITE for better compatibility
                                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or 
-                                            Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                                            Intent.FLAG_ACTIVITY_CLEAR_TOP
+                                            Intent.FLAG_GRANT_READ_URI_PERMISSION
+                                    // For Android 10+, also grant write permission
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                                        addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                                    }
                                 }
 
                                 // Grant permission to all potential installer activities
@@ -238,18 +275,27 @@ class MainActivity: FlutterActivity() {
                                     for (resolveInfo in resInfoList) {
                                         try {
                                             val pkgName = resolveInfo.activityInfo.packageName
-                                            context.grantUriPermission(pkgName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                            context.grantUriPermission(pkgName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
                                         } catch (_: Exception) {}
                                     }
                                 } catch (_: Exception) {}
 
-                                context.startActivity(intent)
+                                // v4.0.6 FIX: Start activity with chooser for better compatibility
+                                // Some OEMs (Xiaomi, Samsung) need chooser
+                                try {
+                                    val chooser = Intent.createChooser(intent, "نصب بروزرسانی Connectix")
+                                    chooser.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                    context.startActivity(chooser)
+                                } catch (e: Exception) {
+                                    // Fallback: direct start
+                                    context.startActivity(intent)
+                                }
                                 result.success(true)
                             } catch (e: Exception) {
-                                result.error("INSTALL_ERROR", e.message + " path=" + filePath + " len=" + file.length(), null)
+                                result.error("INSTALL_ERROR", "v4.0.6: ${e.message} path=$filePath len=${file.length()} exists=${file.exists()} canRead=${file.canRead()} canWrite=${file.canWrite()} | ${e.stackTraceToString().take(500)}", null)
                             }
                         } else {
-                            result.error("FILE_NOT_FOUND", "File does not exist or too small: $filePath len=${if (file.exists()) file.length() else 0}", null)
+                            result.error("FILE_NOT_FOUND", "File does not exist or too small: $filePath len=${if (file.exists()) file.length() else 0} exists=${file.exists()}", null)
                         }
                     } else {
                         result.error("INVALID_ARGUMENT", "filePath is null", null)

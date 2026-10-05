@@ -147,7 +147,7 @@ class AppGuideController {
             $stmtIns->execute([
                 'android',
                 '🚀 Connectix Android (اپلیکیشن اختصاصی - پیشنهادی)',
-                'https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.5/Connectix-Android-Universal.apk',
+                'https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.6/Connectix-Android-Universal.apk',
                 '',
                 'نرم‌افزار رسمی و اختصاصی با ورود آسان تنها با نام کاربری و پسورد، بدون نیاز به کانفیگ دستی و تست خودکار پینگ',
                 0
@@ -155,7 +155,7 @@ class AppGuideController {
             $stmtIns->execute([
                 'windows',
                 '🚀 Connectix Windows (نرم‌افزار اختصاصی ویندوز - پیشنهادی)',
-                'https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.5/Connectix-Windows-x64.zip',
+                'https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.6/Connectix-Windows-x64.zip',
                 '',
                 'کلاینت اختصاصی ویندوز با تونل کل ترافیک سیستم (VPN Mode) و اتصال ۱ کلیک فوق‌العاده سریع',
                 0
