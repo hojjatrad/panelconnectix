@@ -1,0 +1,42 @@
+name: connectix_vpn
+description: Connectix Professional Multiplatform VPN Client - ULTRA Dual-Core Xray + sing-box (VLESS Reality/Vision, VMess, Trojan, SS, SOCKS, HTTP, WireGuard, Raw JSON)
+publish_to: 'none'
+version: 3.7.0+39
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  http: ^1.1.0
+  shared_preferences: ^2.2.0
+  flutter_vless: ^1.1.6
+  url_launcher: ^6.1.14
+  percent_indicator: ^4.2.3
+  connectivity_plus: ^6.0.3
+  path_provider: ^2.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/fonts/
+
+  fonts:
+    - family: Vazirmatn
+      fonts:
+        - asset: assets/fonts/Vazirmatn-Regular.ttf
+        - asset: assets/fonts/Vazirmatn-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Vazirmatn-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Vazirmatn-Bold.ttf
+          weight: 700
