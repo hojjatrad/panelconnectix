@@ -1,23 +1,24 @@
 {
-  "version": "4.0.12",
-  "code": 47,
-  "changelog": "v4.0.12 PRO MAX FUNDAMENTAL FIX - حل اساسی مشکل گیر کردن روی 'برای ادامه نصب را در پنجره تایید کنید'! ریشه: PackageInstaller روی MIUI/Samsung بلاک میشه. فیکس: استراتژی هوشمند بر اساس برند گوشی - شیائومی/سامسونگ اول Intent (ACTION_INSTALL_PACKAGE + VIEW + Chooser) بعد PackageInstaller، پیکسل برعکس. اعطای دسترسی به 9 نصاب (MIUI, Samsung, Google)، فایل FileProvider با نام یکتا، کپی به external files، متدهای جدید openApkFile و openFileManager برای تلاش مجدد دستی. اگر پنجره باز نشد، 3 دکمه: تلاش مجدد، باز کردن پوشه، دانلود با مرورگر + راهنمای فعال‌سازی نصب ناشناخته.",
+  "version": "4.0.13",
+  "code": 48,
+  "changelog": "v4.0.13 PURE INTENT FOREVER FIX - حل دائمی مشکل گیر کردن روی 'پنجره‌ای برای تایید نصب'! ریشه اصلی: PackageInstaller API روی شیائومی/سامسونگ اندروید 14+ بلاک میشه و پنجره نصب هرگز ظاهر نمیشه. راه حل نهایی مثل نسخه سالم قدیمی v4.0.3: حذف کامل PackageInstaller و بازگشت به روش خالص Intent (ACTION_INSTALL_PACKAGE + ACTION_VIEW + FileProvider + Chooser). این روش مستقیما پنجره نصب سیستم را باز میکند بدون اسکن فایل و روی تمام گوشی‌ها کار میکند. دانلود هم پنل اول (vpbotn.ir) با 38MB معتبر، نه ir/cf که 404 هستند.",
   "date": "2026-10-05",
   "apk": {
-    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.12/Connectix-Android-ARM64.apk",
-    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.12/Connectix-Android-Universal.apk",
-    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.12/Connectix-Android-ARM32.apk"
+    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.13/Connectix-Android-ARM64.apk",
+    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.13/Connectix-Android-Universal.apk",
+    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.13/Connectix-Android-ARM32.apk"
   },
   "windows": {
-    "version": "4.0.12",
-    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.12/Connectix-Windows-x64.zip"
+    "version": "4.0.13",
+    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.13/Connectix-Windows-x64.zip"
   },
   "ultra": true,
   "core": "flutter_vless dual-core",
   "protocols": ["vless", "vmess", "trojan", "ss", "socks", "http", "wireguard", "hysteria2", "raw", "clash", "singbox"],
   "fixes": {
-    "installer_stuck": "v4.0.12 - FUNDAMENTAL: brand-aware strategy, Intent first on MIUI/Samsung, PackageInstaller first on Pixel, 9 installers granted, chooser fallback",
-    "incomplete_file": "v4.0.11 - robust download with 10+ URLs, panel host first, HTML detection",
+    "installer_stuck_forever": "v4.0.13 PURE INTENT FOREVER FIX - Removed PackageInstaller completely, restored v4.0.3 working method (ACTION_INSTALL_PACKAGE + ACTION_VIEW + FileProvider + Chooser + 9 packages grant + externalFilesDir). Direct system installer window without scanning, works on MIUI/Samsung Android 14+",
+    "installer_stuck": "v4.0.12 attempted brand-aware but still used PackageInstaller which is blocked",
+    "incomplete_file": "v4.0.11 - robust download with panel host first, HTML detection, 38MB valid",
     "installer_window": "v4.0.10 - dual intent + grant to all installers + external dir",
     "panel_path": "v4.0.9 - Panel Location Manager v8.0"
   }

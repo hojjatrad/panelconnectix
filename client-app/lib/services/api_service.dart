@@ -1031,15 +1031,29 @@ class ApiService {
           final map = Map<String, dynamic>.from(data['data']);
           final latestVer = (map['latest_version'] ?? '').toString();
           final serverUrl = (map['download_url'] ?? '').toString();
+          final universalUrl = (map['universal_url'] ?? '').toString();
           final dynamicGhArm64 = "https://github.com/hojjatrad/panelconnectix/releases/download/v$latestVer/Connectix-Android-ARM64.apk";
           final dynamicGhUniversal = "https://github.com/hojjatrad/panelconnectix/releases/download/v$latestVer/Connectix-Android-Universal.apk";
 
-          map['download_url'] = (serverUrl.isNotEmpty && serverUrl.startsWith('http'))
-              ? serverUrl
-              : dynamicGhArm64;
-          map['fallback_url'] = (map['universal_url'] != null && map['universal_url'].toString().startsWith('http'))
-              ? map['universal_url'].toString()
-              : dynamicGhUniversal;
+          // v4.0.13: Ensure panel host URL is used (vpbotn.ir works, ir/cf 404)
+          String finalDownload = serverUrl;
+          if (finalDownload.isEmpty || !finalDownload.startsWith('http') || finalDownload.contains('ir.vpbotn.ir/Connectix') || finalDownload.contains('cf.vpbotn.ir/Connectix')) {
+            // If serverUrl is broken 404, use panel host directly
+            finalDownload = "https://vpbotn.ir/Connectix-ARM64-v8a.apk";
+            if (serverUrl.isNotEmpty && serverUrl.startsWith('http') && serverUrl.contains('vpbotn.ir') && !serverUrl.contains('ir.vpbotn.ir') && !serverUrl.contains('cf.vpbotn.ir')) {
+              finalDownload = serverUrl;
+            } else if (serverUrl.isNotEmpty && serverUrl.startsWith('http') && !serverUrl.contains('vpbotn.ir')) {
+              finalDownload = serverUrl; // GitHub or other
+            }
+          }
+          // Fallback to panel universal
+          String finalFallback = universalUrl;
+          if (finalFallback.isEmpty || !finalFallback.startsWith('http') || finalFallback.contains('ir.vpbotn.ir/Connectix') || finalFallback.contains('cf.vpbotn.ir/Connectix')) {
+            finalFallback = "https://vpbotn.ir/Connectix-Universal.apk";
+          }
+
+          map['download_url'] = finalDownload.isNotEmpty ? finalDownload : dynamicGhArm64;
+          map['fallback_url'] = finalFallback.isNotEmpty ? finalFallback : dynamicGhUniversal;
           return map;
         }
       } catch (_) {}
@@ -1143,7 +1157,9 @@ class ApiService {
     return null;
   }
 
-  // v4.0.11 PRO MAX FIX: Robust download with multiple fallbacks for Iran
+  // v4.0.13 PURE INTENT FIX: Robust download with PANEL-FIRST strategy (forever fix)
+  // User reported ir.vpbotn.ir 404, cf.vpbotn.ir 404 - only vpbotn.ir works (38MB valid)
+  // Strategy: Panel host first (vpbotn.ir), then GitHub, never ir/cf first
   static Future<void> downloadAndInstallApk({
     required String downloadUrl,
     required Function(double progress, int receivedBytes, int totalBytes) onProgress,
@@ -1151,7 +1167,7 @@ class ApiService {
     required Function() onSuccess,
   }) async {
     
-    // Generate all possible download URLs to try
+    // Generate all possible download URLs to try - PANEL FIRST
     List<String> generateAllUrls(String primary, String fallback) {
       final urls = <String>[];
       final seen = <String>{};
@@ -1159,46 +1175,48 @@ class ApiService {
       void addUrl(String u) {
         if (u.isEmpty || !u.startsWith('http')) return;
         if (seen.contains(u)) return;
+        // Skip known broken subdomains (404 confirmed)
+        if (u.contains('ir.vpbotn.ir/Connectix') || u.contains('cf.vpbotn.ir/Connectix')) {
+          log('generateAllUrls SKIP broken 404 url: $u');
+          return;
+        }
         seen.add(u);
         urls.add(u);
       }
       
-      // Primary first
+      // v4.0.13: PANEL HOST FIRST - vpbotn.ir is the only working host (38MB valid APK)
+      // Primary from panel API is https://vpbotn.ir/Connectix-ARM64-v8a.apk - keep it first
       addUrl(primary);
-      addUrl(fallback);
       
-      // Try panel host mirrored URLs (fastest inside Iran, not filtered)
+      // Force panel host URLs (fastest inside Iran, not filtered, verified working)
       try {
         final orderedBases = getOrderedBaseUrls();
         for (final base in orderedBases) {
-          // Extract version from primary URL if possible
-          String ver = '';
-          final verMatch = RegExp(r'v?(\d+\.\d+\.\d+)').firstMatch(primary);
-          if (verMatch != null) ver = verMatch.group(1) ?? '';
-          
-          // Panel host URLs (these are mirrored by AppApkMirror)
-          addUrl("$base/Connectix-ARM64-v8a.apk");
-          addUrl("$base/Connectix-Universal.apk");
-          addUrl("$base/Connectix-Android-ARM64.apk");
+          // Only add if base is vpbotn.ir main (not ir/cf which are 404)
+          if (base.contains('vpbotn.ir') && !base.contains('ir.vpbotn.ir') && !base.contains('cf.vpbotn.ir')) {
+            addUrl("$base/Connectix-ARM64-v8a.apk");
+            addUrl("$base/Connectix-Universal.apk");
+          }
         }
       } catch (_) {}
       
-      // GitHub direct URLs as last resort
+      // Always add main working panel URLs
+      addUrl("https://vpbotn.ir/Connectix-ARM64-v8a.apk");
+      addUrl("https://vpbotn.ir/Connectix-Universal.apk");
+      
+      // Fallback from API
+      addUrl(fallback);
+      
+      // GitHub direct URLs as last resort (filtered in Iran but backup)
       try {
         String ver = '';
         final verMatch = RegExp(r'v?(\d+\.\d+\.\d+)').firstMatch(primary);
-        if (verMatch != null) ver = verMatch.group(1) ?? '4.0.10';
+        if (verMatch != null) ver = verMatch.group(1) ?? '4.0.13';
         if (ver.isNotEmpty) {
           addUrl("https://github.com/hojjatrad/panelconnectix/releases/download/v$ver/Connectix-Android-ARM64.apk");
           addUrl("https://github.com/hojjatrad/panelconnectix/releases/download/v$ver/Connectix-Android-Universal.apk");
-          addUrl("https://github.com/hojjatrad/panelconnectix/releases/download/v$ver/Connectix-ARM64-v8a.apk");
         }
       } catch (_) {}
-      
-      // Also try ir.vpbotn.ir direct
-      addUrl("https://ir.vpbotn.ir/Connectix-ARM64-v8a.apk");
-      addUrl("https://vpbotn.ir/Connectix-ARM64-v8a.apk");
-      addUrl("https://cf.vpbotn.ir/Connectix-ARM64-v8a.apk");
       
       return urls;
     }

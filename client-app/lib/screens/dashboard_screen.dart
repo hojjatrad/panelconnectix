@@ -71,7 +71,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Map<String, dynamic>? _updateInfo;
   bool _isCheckingUpdate = false;
 
-  static const String currentAppVersion = '4.0.8';
+  static const String currentAppVersion = '4.0.13';
 
   // "Download over Wi-Fi only" for update packages
   bool _updateWifiOnly = false;
@@ -1105,7 +1105,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       if (Navigator.canPop(bottomSheetContext)) {
                         // Keep modal open but update text to show manual options
                         setModalState(() {
-                          statusText = '📲 نصاب فراخوانی شد. اگر پنجره نصب باز نشد:\n\n1️⃣ روی \"باز کردن نصاب دستی\" بزنید\n2️⃣ یا \"دانلود با مرورگر\" و از پوشه دانلود نصب کنید\n\n⚠️ در شیائومی: تنظیمات → حریم خصوصی → نصب ناشناخته → Connectix را فعال کنید';
+                          statusText = '📲 نصاب خالص v4.0.13 فراخوانی شد (مثل نسخه قدیمی سالم) - پنجره نصب سیستم باید الان باز شود.\n\nاگر باز نشد:\n1️⃣ روی "نصاب خالص v4.0.13" بزنید\n2️⃣ یا "مرورگر" و از پوشه دانلود نصب کنید\n\n⚠️ شیائومی/سامسونگ: تنظیمات → حریم خصوصی → نصب ناشناخته → Connectix را فعال کنید\n\n✅ این روش بدون اسکن فایل و مستقیم است.';
                         });
                       }
                     });
@@ -1235,9 +1235,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             Expanded(
                               child: OutlinedButton.icon(
                                 onPressed: () async {
-                                  // v4.0.12: Try openApkFile directly (fundamental fix)
+                                  // v4.0.13 PURE INTENT FOREVER FIX
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('🔄 تلاش مجدد نصب با روش جدید v4.0.12...'), duration: Duration(seconds: 2)),
+                                    const SnackBar(content: Text('🔄 تلاش مجدد نصب با روش خالص v4.0.13 (مثل نسخه قدیمی سالم)...'), duration: Duration(seconds: 2)),
                                   );
                                   try {
                                     final apkPath = await ApiService.getApkFilePath();
@@ -1269,7 +1269,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                   side: const BorderSide(color: Color(0xFF10B981)),
                                 ),
                                 icon: const Icon(Icons.install_mobile_rounded, size: 16),
-                                label: const Text('نصاب دستی v4.0.12', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                label: const Text('نصاب خالص v4.0.13', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                               ),
                             ),
                             const SizedBox(width: 8),

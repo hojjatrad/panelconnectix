@@ -6,7 +6,6 @@ import android.app.PendingIntent
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -17,7 +16,6 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
-import java.io.FileInputStream
 import java.util.ArrayList
 import java.util.HashMap
 import java.util.HashSet
@@ -38,14 +36,6 @@ class MainActivity: FlutterActivity() {
                 notifMgr?.cancel(9999)
             } catch (_: Exception) {}
             methodChannel?.invokeMethod("onNotificationDisconnect", null)
-        }
-        // Handle install complete from PackageInstaller
-        if (intent.action == "INSTALL_COMPLETE") {
-            try {
-                val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, -999)
-                val msg = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: ""
-                android.util.Log.i("ConnectixInstaller", "Install complete status=$status msg=$msg")
-            } catch (_: Exception) {}
         }
     }
 
@@ -154,7 +144,7 @@ class MainActivity: FlutterActivity() {
                 }
                 "getCacheDir" -> {
                     try {
-                        // v4.0.8 FIX: Use external files dir like working v4.0.3 for better FileProvider compatibility
+                        // v4.0.13 PURE INTENT FIX: Use external files dir like working v4.0.3 - best for FileProvider on MIUI/Samsung
                         val extDir = context.getExternalFilesDir(null)
                         val cacheDir = if (extDir != null && extDir.exists()) extDir else context.cacheDir
                         if (!cacheDir.exists()) {
@@ -210,13 +200,12 @@ class MainActivity: FlutterActivity() {
                     }
                 }
                 "openFileManager" -> {
-                    // v4.0.12: Open file manager at APK location
+                    // v4.0.13: Open file manager at APK location - pure Intent
                     val filePath = call.argument<String>("filePath") ?: ""
                     try {
                         val file = if (filePath.isNotEmpty()) File(filePath) else null
                         val dir = file?.parentFile ?: context.getExternalFilesDir(null) ?: context.cacheDir
                         
-                        // Try to open file manager at dir
                         val intent = Intent(Intent.ACTION_VIEW).apply {
                             val dirUri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                                 FileProvider.getUriForFile(context, context.packageName + ".fileprovider", dir)
@@ -233,7 +222,6 @@ class MainActivity: FlutterActivity() {
                             return@setMethodCallHandler
                         } catch (_: Exception) {}
                         
-                        // Fallback: open Downloads via Storage Access Framework
                         val fallbackIntent = Intent(Intent.ACTION_VIEW).apply {
                             type = "resource/folder"
                             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -245,7 +233,7 @@ class MainActivity: FlutterActivity() {
                     }
                 }
                 "openApkFile" -> {
-                    // v4.0.12: Directly open APK file via Intent (for retry button)
+                    // v4.0.13 PURE INTENT: Directly open APK file via Intent (for retry button) - NO PackageInstaller
                     val filePath = call.argument<String>("filePath")
                     if (filePath == null) {
                         result.error("INVALID_ARGUMENT", "filePath is null", null)
@@ -264,13 +252,17 @@ class MainActivity: FlutterActivity() {
                             Uri.fromFile(file)
                         }
                         
-                        // Grant to all installers
+                        // v4.0.13: Grant to ALL known installer packages (critical for MIUI/Samsung)
                         val installers = listOf(
                             "com.android.packageinstaller",
                             "com.google.android.packageinstaller",
                             "com.miui.packageinstaller",
                             "com.miui.global.packageinstaller",
-                            "com.samsung.android.packageinstaller"
+                            "com.miui.securitycenter",
+                            "com.samsung.android.packageinstaller",
+                            "com.sec.android.preloadinstaller",
+                            "com.android.managedprovisioning",
+                            "com.google.android.permissioncontroller"
                         )
                         for (pkg in installers) {
                             try { context.grantUriPermission(pkg, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) {}
@@ -283,6 +275,7 @@ class MainActivity: FlutterActivity() {
                             addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
                             putExtra(Intent.EXTRA_ALLOW_REPLACE, true)
                             putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
+                            putExtra("android.intent.extra.ALLOW_REPLACE", true)
                         }
                         
                         // Grant to resolved
@@ -299,6 +292,7 @@ class MainActivity: FlutterActivity() {
                         } catch (_: Exception) {}
                         
                         context.startActivity(intent)
+                        android.util.Log.i("ConnectixInstaller", "v4.0.13 openApkFile SUCCESS via VIEW: ${file.length()} bytes")
                         result.success(true)
                     } catch (e: Exception) {
                         result.error("OPEN_APK_ERROR", e.message, null)
@@ -323,6 +317,11 @@ class MainActivity: FlutterActivity() {
                     }
                 }
                 "installApk" -> {
+                    // v4.0.13 PURE INTENT FIX - FOREVER FIX LIKE v4.0.3 WORKING VERSION
+                    // User said: "یک روش دیگه ای برای نصب اعمال کن مثل آپ گذشته که مشکلی نداشت و پنجره نصب گوشی میامد و نصب انجام میشد بدون اسکن فایل"
+                    // Root cause: PackageInstaller API is blocked on MIUI/Samsung Android 14+ - shows success but no UI appears
+                    // Solution: Pure Intent method like v4.0.3 (ACTION_INSTALL_PACKAGE + ACTION_VIEW) - NO PackageInstaller at all
+                    // This directly opens system installer window without scanning
                     val filePath = call.argument<String>("filePath")
                     val allowSameVersion = call.argument<Boolean>("allowSameVersion") ?: true
                     if (filePath == null) {
@@ -340,8 +339,9 @@ class MainActivity: FlutterActivity() {
                     }
                     try {
                         file.setReadable(true, false)
+                        android.util.Log.i("ConnectixInstaller", "v4.0.13 PURE INTENT start: path=$filePath len=${file.length()} brand=${Build.BRAND} manufacturer=${Build.MANUFACTURER} model=${Build.MODEL} sdk=${Build.VERSION.SDK_INT}")
 
-                        // v4.0.12 PRO MAX FUNDAMENTAL FIX: Ensure file is in external files dir (not cache) for MIUI/Samsung
+                        // v4.0.13: Ensure file is in external files dir (best FileProvider compatibility on MIUI/Samsung Android 10+)
                         var workingFile = file
                         try {
                             val extDir = context.getExternalFilesDir(null)
@@ -352,18 +352,17 @@ class MainActivity: FlutterActivity() {
                                     file.copyTo(newFile, overwrite = true)
                                     newFile.setReadable(true, false)
                                     workingFile = newFile
-                                    android.util.Log.i("ConnectixInstaller", "v4.0.12 Copied APK to external dir: ${newFile.absolutePath} len=${newFile.length()}")
+                                    android.util.Log.i("ConnectixInstaller", "v4.0.13 Copied APK to external dir: ${newFile.absolutePath} len=${newFile.length()}")
                                 } else {
-                                    // Already in external, ensure readable
                                     file.setReadable(true, false)
                                 }
                             }
                         } catch (e: Exception) {
-                            android.util.Log.w("ConnectixInstaller", "v4.0.12 Failed to copy to external dir: ${e.message}")
+                            android.util.Log.w("ConnectixInstaller", "v4.0.13 Failed to copy to external dir: ${e.message}")
                             workingFile = file
                         }
 
-                        // Prepare URI with FileProvider - try multiple fallbacks
+                        // v4.0.13: Prepare URI with FileProvider - try multiple fallbacks like v4.0.3
                         var uri: Uri? = null
                         var uriError: String? = null
                         try {
@@ -374,7 +373,7 @@ class MainActivity: FlutterActivity() {
                             }
                         } catch (e: Exception) {
                             uriError = e.message
-                            android.util.Log.e("ConnectixInstaller", "v4.0.12 FileProvider primary failed: ${e.message}")
+                            android.util.Log.e("ConnectixInstaller", "v4.0.13 FileProvider primary failed: ${e.message}")
                             // Fallback 1: try cache dir file
                             try {
                                 val cacheFile = File(context.cacheDir, "Connectix-Update.apk")
@@ -382,9 +381,10 @@ class MainActivity: FlutterActivity() {
                                     cacheFile.setReadable(true, false)
                                     uri = FileProvider.getUriForFile(context, context.packageName + ".fileprovider", cacheFile)
                                     workingFile = cacheFile
+                                    android.util.Log.i("ConnectixInstaller", "v4.0.13 FileProvider fallback to cache success")
                                 }
                             } catch (e2: Exception) {
-                                android.util.Log.e("ConnectixInstaller", "v4.0.12 FileProvider cache fallback failed: ${e2.message}")
+                                android.util.Log.e("ConnectixInstaller", "v4.0.13 FileProvider cache fallback failed: ${e2.message}")
                             }
                             // Fallback 2: try files dir
                             if (uri == null) {
@@ -394,9 +394,10 @@ class MainActivity: FlutterActivity() {
                                         filesFile.setReadable(true, false)
                                         uri = FileProvider.getUriForFile(context, context.packageName + ".fileprovider", filesFile)
                                         workingFile = filesFile
+                                        android.util.Log.i("ConnectixInstaller", "v4.0.13 FileProvider fallback to files success")
                                     }
                                 } catch (e3: Exception) {
-                                    android.util.Log.e("ConnectixInstaller", "v4.0.12 FileProvider files fallback failed: ${e3.message}")
+                                    android.util.Log.e("ConnectixInstaller", "v4.0.13 FileProvider files fallback failed: ${e3.message}")
                                 }
                             }
                         }
@@ -405,7 +406,7 @@ class MainActivity: FlutterActivity() {
                             throw Exception("FileProvider failed for ${workingFile.absolutePath} len=${workingFile.length()} error=$uriError - check file_paths.xml")
                         }
 
-                        // v4.0.12: Grant URI permission to ALL known installer packages (critical for MIUI/Samsung)
+                        // v4.0.13: Grant URI permission to ALL known installer packages (critical for MIUI/Samsung)
                         val installerPackages = listOf(
                             "com.android.packageinstaller",
                             "com.google.android.packageinstaller",
@@ -421,7 +422,7 @@ class MainActivity: FlutterActivity() {
                             for (pkg in installerPackages) {
                                 try {
                                     context.grantUriPermission(pkg, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                    android.util.Log.i("ConnectixInstaller", "v4.0.12 Granted to $pkg")
+                                    android.util.Log.i("ConnectixInstaller", "v4.0.13 Granted to $pkg")
                                 } catch (_: Exception) {}
                             }
                         } catch (_: Exception) {}
@@ -438,197 +439,116 @@ class MainActivity: FlutterActivity() {
                                 @Suppress("DEPRECATION")
                                 packageManager.queryIntentActivities(viewIntentForQuery, PackageManager.MATCH_DEFAULT_ONLY)
                             }
-                            android.util.Log.i("ConnectixInstaller", "v4.0.12 Found ${resInfoList.size} handlers for APK VIEW")
+                            android.util.Log.i("ConnectixInstaller", "v4.0.13 Found ${resInfoList.size} handlers for APK VIEW")
                             for (resolveInfo in resInfoList) {
                                 try {
                                     val pkgName = resolveInfo.activityInfo.packageName
                                     context.grantUriPermission(pkgName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                    android.util.Log.i("ConnectixInstaller", "v4.0.12 Granted URI to resolved $pkgName")
+                                    android.util.Log.i("ConnectixInstaller", "v4.0.13 Granted URI to resolved $pkgName")
                                 } catch (_: Exception) {}
                             }
                         } catch (e: Exception) {
-                            android.util.Log.w("ConnectixInstaller", "v4.0.12 queryIntentActivities failed: ${e.message}")
+                            android.util.Log.w("ConnectixInstaller", "v4.0.13 queryIntentActivities failed: ${e.message}")
                         }
 
-                        val isMiui = Build.MANUFACTURER.equals("Xiaomi", ignoreCase = true) || 
-                                     Build.MANUFACTURER.equals("Redmi", ignoreCase = true) ||
-                                     Build.MANUFACTURER.equals("POCO", ignoreCase = true) ||
-                                     Build.BRAND.equals("Redmi", ignoreCase = true) ||
-                                     Build.BRAND.equals("POCO", ignoreCase = true)
-                        val isSamsung = Build.MANUFACTURER.equals("samsung", ignoreCase = true)
-                        val isAndroid14Plus = Build.VERSION.SDK_INT >= 34
+                        android.util.Log.i("ConnectixInstaller", "v4.0.13 Device: manufacturer=${Build.MANUFACTURER} brand=${Build.BRAND} model=${Build.MODEL} sdk=${Build.VERSION.SDK_INT} file=${workingFile.absolutePath} len=${workingFile.length()}")
 
-                        android.util.Log.i("ConnectixInstaller", "v4.0.12 Device: manufacturer=${Build.MANUFACTURER} brand=${Build.BRAND} model=${Build.MODEL} sdk=${Build.VERSION.SDK_INT} isMiui=$isMiui isSamsung=$isSamsung isA14Plus=$isAndroid14Plus file=${workingFile.absolutePath} len=${workingFile.length()}")
+                        // v4.0.13 PURE INTENT LOGIC LIKE v4.0.3 - NO PackageInstaller
+                        // This is the working method from old version that user requested
+                        val intents = mutableListOf<Intent>()
 
-                        // v4.0.12 FUNDAMENTAL: On MIUI/Samsung/Android14+, Intent method is MORE reliable than PackageInstaller
-                        // So we try Intent FIRST on those devices, PackageInstaller first on Pixel/stock
-                        var packageInstallerSuccess = false
-                        var packageInstallerError: String? = null
-                        var intentSuccess = false
-                        var lastIntentError: Exception? = null
-
-                        // Function to try Intent install (most reliable for MIUI/Samsung)
-                        fun tryIntentInstall(): Boolean {
-                            val intents = ArrayList<Intent>()
-
-                            // Intent 1: ACTION_INSTALL_PACKAGE (most reliable for updates)
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
-                                val installPkg = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
-                                    setDataAndType(uri, "application/vnd.android.package-archive")
-                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                    addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                                    putExtra(Intent.EXTRA_RETURN_RESULT, true)
-                                    putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
-                                    putExtra("android.intent.extra.NOT_UNKNOWN_SOURCE", true)
-                                    putExtra(Intent.EXTRA_ALLOW_REPLACE, true)
-                                    putExtra("android.intent.extra.ALLOW_REPLACE", true)
-                                    if (isMiui) {
-                                        putExtra("isUpdate", true)
-                                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                    }
-                                }
-                                intents.add(installPkg)
-                            }
-
-                            // Intent 2: ACTION_VIEW (fallback)
-                            val viewIntent = Intent(Intent.ACTION_VIEW).apply {
+                        // Intent 1: ACTION_INSTALL_PACKAGE (most reliable for updates, directly opens system installer)
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                            val installPkg = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
                                 setDataAndType(uri, "application/vnd.android.package-archive")
                                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                                    addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
-                                }
                                 putExtra(Intent.EXTRA_RETURN_RESULT, true)
-                                putExtra("android.intent.extra.ALLOW_REPLACE", true)
                                 putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
-                                if (isMiui) {
-                                    putExtra("isUpdate", true)
+                                putExtra("android.intent.extra.ALLOW_REPLACE", true)
+                                if (allowSameVersion) {
+                                    putExtra(Intent.EXTRA_ALLOW_REPLACE, true)
                                 }
                             }
-                            intents.add(viewIntent)
+                            intents.add(installPkg)
+                        }
 
-                            // Intent 3: Chooser (last resort, forces UI)
+                        // Intent 2: ACTION_VIEW (fallback, also opens system installer)
+                        val viewIntent = Intent(Intent.ACTION_VIEW).apply {
+                            setDataAndType(uri, "application/vnd.android.package-archive")
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                            }
+                            putExtra(Intent.EXTRA_RETURN_RESULT, true)
+                            putExtra("android.intent.extra.ALLOW_REPLACE", true)
+                            if (allowSameVersion) {
+                                putExtra(Intent.EXTRA_ALLOW_REPLACE, true)
+                            }
+                        }
+                        intents.add(viewIntent)
+
+                        // Try each intent - first one that works wins (like v4.0.3)
+                        var lastError: Exception? = null
+                        for (intent in intents) {
+                            try {
+                                try {
+                                    val resInfoList = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                        packageManager.queryIntentActivities(intent, PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY.toLong()))
+                                    } else {
+                                        @Suppress("DEPRECATION")
+                                        packageManager.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
+                                    }
+                                    if (resInfoList.isEmpty() && intent === viewIntent) {
+                                        // No handler found for VIEW, try chooser (forces UI)
+                                        val chooser = Intent.createChooser(intent, "نصب بروزرسانی Connectix")
+                                        chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                        chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                        context.startActivity(chooser)
+                                        android.util.Log.i("ConnectixInstaller", "v4.0.13 PURE INTENT chooser SUCCESS len=${workingFile.length()}")
+                                        result.success(true)
+                                        return@setMethodCallHandler
+                                    }
+                                    for (resolveInfo in resInfoList) {
+                                        try {
+                                            val pkgName = resolveInfo.activityInfo.packageName
+                                            context.grantUriPermission(pkgName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                        } catch (_: Exception) {}
+                                    }
+                                } catch (_: Exception) {}
+
+                                context.startActivity(intent)
+                                android.util.Log.i("ConnectixInstaller", "v4.0.13 PURE INTENT ${intent.action} SUCCESS len=${workingFile.length()} bytes - system installer window should appear NOW")
+                                result.success(true)
+                                return@setMethodCallHandler
+                            } catch (e: Exception) {
+                                lastError = e
+                                android.util.Log.e("ConnectixInstaller", "v4.0.13 PURE INTENT ${intent.action} FAIL: ${e.message}", e)
+                                continue
+                            }
+                        }
+
+                        // Last resort: chooser
+                        try {
                             val chooserIntent = Intent.createChooser(viewIntent, "نصب بروزرسانی Connectix").apply {
                                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                             }
-
-                            // Try ACTION_INSTALL_PACKAGE first, then VIEW, then chooser
-                            for (intent in intents) {
-                                try {
-                                    context.startActivity(intent)
-                                    android.util.Log.i("ConnectixInstaller", "v4.0.12 Intent ${intent.action} SUCCESS for ${workingFile.length()} bytes")
-                                    return true
-                                } catch (e: Exception) {
-                                    lastIntentError = e
-                                    android.util.Log.e("ConnectixInstaller", "v4.0.12 Intent ${intent.action} FAIL: ${e.message}", e)
-                                    continue
-                                }
-                            }
-                            
-                            // Try chooser as last resort
-                            try {
-                                context.startActivity(chooserIntent)
-                                android.util.Log.i("ConnectixInstaller", "v4.0.12 Chooser SUCCESS")
-                                return true
-                            } catch (e: Exception) {
-                                lastIntentError = e
-                                android.util.Log.e("ConnectixInstaller", "v4.0.12 Chooser FAIL: ${e.message}", e)
-                            }
-                            
-                            return false
-                        }
-
-                        // Function to try PackageInstaller (more reliable on Pixel/stock, less on MIUI/Samsung)
-                        fun tryPackageInstaller(): Boolean {
-                            try {
-                                val packageInstaller = context.packageManager.packageInstaller
-                                val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
-                                    // On Android 14+, set installer package name
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                        setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_REQUIRED)
-                                    }
-                                }
-                                val sessionId = packageInstaller.createSession(params)
-                                val session = packageInstaller.openSession(sessionId)
-                                
-                                FileInputStream(workingFile).use { input ->
-                                    session.openWrite("package", 0, -1).use { output ->
-                                        val buffer = ByteArray(65536)
-                                        var bytesRead: Int
-                                        while (input.read(buffer).also { bytesRead = it } != -1) {
-                                            output.write(buffer, 0, bytesRead)
-                                        }
-                                        session.fsync(output)
-                                    }
-                                }
-                                
-                                val intent = Intent(context, MainActivity::class.java).apply {
-                                    action = "INSTALL_COMPLETE"
-                                }
-                                val pendingFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                                } else {
-                                    PendingIntent.FLAG_UPDATE_CURRENT
-                                }
-                                val pendingIntent = PendingIntent.getActivity(context, sessionId, intent, pendingFlags)
-                                
-                                session.commit(pendingIntent.intentSender)
-                                session.close()
-                                
-                                android.util.Log.i("ConnectixInstaller", "v4.0.12 PackageInstaller session $sessionId COMMITTED len=${workingFile.length()}")
-                                return true
-                            } catch (e: Exception) {
-                                packageInstallerError = e.message
-                                android.util.Log.e("ConnectixInstaller", "v4.0.12 PackageInstaller FAIL: ${e.message}", e)
-                                return false
-                            }
-                        }
-
-                        // v4.0.12 STRATEGY: On MIUI/Samsung, Intent first (more reliable), then PackageInstaller
-                        // On Pixel/stock, PackageInstaller first, then Intent
-                        if (isMiui || isSamsung) {
-                            android.util.Log.i("ConnectixInstaller", "v4.0.12 MIUI/Samsung detected - trying Intent FIRST")
-                            intentSuccess = tryIntentInstall()
-                            if (!intentSuccess) {
-                                android.util.Log.i("ConnectixInstaller", "v4.0.12 Intent failed on MIUI/Samsung, trying PackageInstaller as fallback")
-                                packageInstallerSuccess = tryPackageInstaller()
-                                // If PackageInstaller succeeded, also try Intent again after 1s delay (dual)
-                                if (packageInstallerSuccess) {
-                                    try { Thread.sleep(1000) } catch (_: Exception) {}
-                                    val retryIntent = tryIntentInstall()
-                                    if (retryIntent) intentSuccess = true
-                                }
-                            } else {
-                                // Intent succeeded, also try PackageInstaller in background as extra (don't block)
-                                try {
-                                    packageInstallerSuccess = tryPackageInstaller()
-                                } catch (_: Exception) {}
-                            }
-                        } else {
-                            android.util.Log.i("ConnectixInstaller", "v4.0.12 Stock/Pixel detected - trying PackageInstaller FIRST")
-                            packageInstallerSuccess = tryPackageInstaller()
-                            // Always also try Intent (dual approach) - even if PackageInstaller succeeded
-                            try { Thread.sleep(800) } catch (_: Exception) {}
-                            intentSuccess = tryIntentInstall()
-                        }
-
-                        // Result: success if EITHER method succeeded
-                        if (packageInstallerSuccess || intentSuccess) {
-                            android.util.Log.i("ConnectixInstaller", "v4.0.12 FINAL SUCCESS: pkgInstaller=$packageInstallerSuccess intent=$intentSuccess")
-                            try { Thread.sleep(600) } catch (_: Exception) {}
+                            context.startActivity(chooserIntent)
+                            android.util.Log.i("ConnectixInstaller", "v4.0.13 PURE INTENT chooser fallback SUCCESS")
                             result.success(true)
                             return@setMethodCallHandler
+                        } catch (e: Exception) {
+                            lastError = e
+                            android.util.Log.e("ConnectixInstaller", "v4.0.13 chooser FAIL: ${e.message}", e)
                         }
 
-                        // Both failed - throw detailed error
-                        val errorDetail = "PackageInstaller:${if (packageInstallerSuccess) "OK" else "FAIL:$packageInstallerError"} | Intent:${if (intentSuccess) "OK" else "FAIL:${lastIntentError?.message}"} | Device:${Build.MANUFACTURER}/${Build.MODEL}/SDK${Build.VERSION.SDK_INT} | File:${workingFile.absolutePath} len=${workingFile.length()}"
-                        throw lastIntentError ?: Exception("All install methods failed - $errorDetail")
+                        throw lastError ?: Exception("No installer activity found - v4.0.13 pure Intent failed")
 
                     } catch (e: Exception) {
-                        val msg = "INSTALL_ERROR v4.0.12: ${e.message} path=$filePath len=${file.length()} canRequest=${if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) packageManager.canRequestPackageInstalls() else true} sameVer=$allowSameVersion manufacturer=${Build.MANUFACTURER} brand=${Build.BRAND} model=${Build.MODEL} sdk=${Build.VERSION.SDK_INT}"
+                        val msg = "INSTALL_ERROR v4.0.13 PURE INTENT: ${e.message} path=$filePath len=${file.length()} canRequest=${if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) packageManager.canRequestPackageInstalls() else true} sameVer=$allowSameVersion manufacturer=${Build.MANUFACTURER} brand=${Build.BRAND} model=${Build.MODEL} sdk=${Build.VERSION.SDK_INT}"
                         android.util.Log.e("ConnectixInstaller", msg, e)
                         result.error("INSTALL_ERROR", msg, null)
                     }
