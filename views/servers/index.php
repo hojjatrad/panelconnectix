@@ -182,19 +182,18 @@ require __DIR__ . '/../layout/header.php';
                         <i class="fa-solid fa-pen-to-square"></i>
                     </button>
 
-                    <?php if (($s['client_count'] ?? 0) == 0): ?>
-                        <form method="POST" action="<?= Helpers::url('servers/delete') ?>" class="m-0" onsubmit="return confirm('آیا از حذف این سرور اطمینان دارید؟');">
+                    <?php 
+                    $cc = (int)($s['client_count'] ?? 0);
+                    $serverName = htmlspecialchars($s['name'], ENT_QUOTES);
+                    ?>
+                        <form method="POST" action="<?= Helpers::url('servers/delete') ?>" class="m-0" onsubmit="return confirmDeleteServer('<?= $serverName ?>', <?= $cc ?>, <?= $s['id'] ?>);">
                             <?= Helpers::csrfField() ?>
                             <input type="hidden" name="id" value="<?= $s['id'] ?>">
-                            <button type="submit" title="حذف سرور" class="p-1.5 bg-slate-800 hover:bg-rose-900/50 text-rose-400 rounded-lg text-xs border border-slate-700 hover:border-rose-700 transition-colors">
+                            <button type="submit" title="<?= $cc > 0 ? 'حذف سرور با ' . $cc . ' کلاینت - اخطار!' : 'حذف سرور' ?>" class="p-1.5 <?= $cc > 0 ? 'bg-rose-900/40 hover:bg-rose-800 text-rose-300 border-rose-700/50 animate-pulse' : 'bg-slate-800 hover:bg-rose-900/50 text-rose-400 border-slate-700 hover:border-rose-700' ?> rounded-lg text-xs border transition-colors">
                                 <i class="fa-solid fa-trash-can"></i>
+                                <?php if ($cc > 0): ?><span class="ml-1 font-bold"><?= $cc ?></span><?php endif; ?>
                             </button>
                         </form>
-                    <?php else: ?>
-                        <button disabled title="برای حذف سرور ابتدا کلاینت‌های آن را منتقل کنید" class="p-1.5 bg-slate-800/40 text-slate-600 rounded-lg text-xs border border-slate-800 cursor-not-allowed">
-                            <i class="fa-solid fa-trash-can"></i>
-                        </button>
-                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -563,6 +562,37 @@ require __DIR__ . '/../layout/header.php';
         if (!entries.length) return url;
         const qs = entries.map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v)).join('&');
         return url + (url.includes('?') ? '&' : '?') + qs;
+    }
+
+    // v4.0.8 FIX: Enable manual deletion of any server with warning
+    function confirmDeleteServer(serverName, clientCount, serverId) {
+        if (clientCount > 0) {
+            const warning = `⚠️ اخطار بسیار مهم - حذف سرور فعال!\n\n` +
+                `شما در حال حذف سرور "${serverName}" هستید که دارای ${clientCount} کلاینت فعال است!\n\n` +
+                `📌 عواقب حذف:\n` +
+                `• ${clientCount} کلاینت متصل به این سرور حذف خواهند شد\n` +
+                `• سفارشات و رزروهای مرتبط پاک می‌شوند\n` +
+                `• پلن‌های مرتبط آزاد می‌شوند (server_id = NULL)\n` +
+                `• این عمل غیرقابل بازگشت است!\n\n` +
+                `💡 پیشنهاد: ابتدا کلاینت‌ها را به سرور دیگر منتقل کنید (دکمه مهاجرت دسته‌جمعی)\n\n` +
+                `آیا واقعا می‌خواهید سرور "${serverName}" با ${clientCount} کلاینت را حذف کنید؟\n\n` +
+                `برای تایید، کلمه "حذف" را تایپ کنید:`;
+
+            // Double confirmation for servers with clients
+            const firstConfirm = confirm(warning + `\n\n⚠️ مرحله 1 از 2: آیا مطمئن هستید؟`);
+            if (!firstConfirm) return false;
+
+            const typed = prompt(`⚠️ مرحله 2 از 2 - تایید نهایی:\n\nبرای حذف سرور "${serverName}" با ${clientCount} کلاینت، لطفا کلمه "حذف" را دقیقا تایپ کنید:`);
+            if (typed !== 'حذف') {
+                alert('❌ حذف لغو شد. کلمه تایید اشتباه بود.');
+                return false;
+            }
+
+            const finalConfirm = confirm(`🚨 آخرین اخطار!\n\nسرور "${serverName}" با ${clientCount} کلاینت برای همیشه حذف خواهد شد!\n\nآیا کاملا مطمئن هستید؟`);
+            return finalConfirm;
+        } else {
+            return confirm(`🗑️ حذف سرور "${serverName}"\n\nآیا از حذف این سرور اطمینان دارید؟\nاین عمل غیرقابل بازگشت است.`);
+        }
     }
 
     function openNewServerModal() {
