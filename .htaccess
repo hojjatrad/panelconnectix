@@ -21,6 +21,7 @@
 </IfModule>
 
 # v6.8.26 Cloudflare 520 fix - bypass cache for heavy endpoints
+# v4.0.17 FOREVER FIX: APK files must NEVER be cached by Cloudflare - always fresh
 <IfModule mod_headers.c>
     <FilesMatch "(quick_update|repair|cron)\.php$">
         Header set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
@@ -29,6 +30,20 @@
         Header set CDN-Cache-Control "no-store"
         Header set Cloudflare-CDN-Cache-Control "no-store"
     </FilesMatch>
+    <FilesMatch "\.apk$">
+        Header set Cache-Control "no-store, no-cache, must-revalidate, max-age=0, no-transform"
+        Header set Pragma "no-cache"
+        Header set Expires "0"
+        Header set cf-cache-status "BYPASS"
+        Header set CDN-Cache-Control "no-store"
+        Header set Cloudflare-CDN-Cache-Control "no-store, max-age=0"
+        Header set X-Content-Type-Options "nosniff"
+    </FilesMatch>
+</IfModule>
+
+# v4.0.17 FOREVER FIX: Also set expires for APK to 0
+<IfModule mod_expires.c>
+    ExpiresByType application/vnd.android.package-archive "access plus 0 seconds"
 </IfModule>
 
 # S7: Protect sensitive directories - deny direct access to core, cache, data

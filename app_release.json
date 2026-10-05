@@ -1,24 +1,23 @@
 {
-  "version": "4.0.16",
-  "code": 51,
-  "changelog": "v4.0.16 PING PROGRESS FIX - حل مشکل 0 از 16 سرور! کاربر گزارش داد تست پینگ همه سرورها روی 0 از 16 گیر میکنه و عدد نمیندازه. ریشه: getServerDelay بدون تایم‌اوت هنگ میکرد و کل بچ را بلاک میکرد، onProgress هرگز صدا زده نمیشد. فیکس: 1) pingAllServers با تایم‌اوت 5 ثانیه برای هر پینگ + لاگ کامل + تضمین صدا زدن onProgress در finally + اگر پینگ شکست بخورد 0=آماده تنظیم میشه نه null 2) server_list_modal _buildPingBadge برای 0 حالت آماده با آیکن چک و رنگ بنفش 3) _smartConnect با تایم‌اوت 4 ثانیه. الان تست پینگ باید 1/16, 2/16... تا 16/16 برود و همه سرورها آماده یا ms نشان دهند.",
+  "version": "4.0.17",
+  "code": 52,
+  "changelog": "v4.0.17 FOREVER FIX - حل دائمی مشکل نسخه قدیمی ماندن بعد از آپدیت! ریشه: کش کلودفلر APK قدیمی را سرو میکرد + پنل بدون ?v= برمیگردوند. فیکس دائمی: 1) ApiController.php و ApiControllerV2.php همیشه ?v=version&t=time() اضافه میکنند تا کش کلودفلر دور بخورد 2) .htaccess برای .apk هدر no-store, BYPASS, no-cache, Expires 0 3) AppApkMirror قبلا با تغییر نسخه force میشد 4) اپ: baseUrls اول vpbotn.ir (نه ir/cf) + generateAllUrls فقط URLهای ورژن‌دار + timestamp + لاگ + verify سایز. این فیکس برای همیشه در تمام نسخه‌های بعدی هم فعال میماند. پینگ 0/16 و مدیریت پنل قبل از لاگین از v4.0.16/4.0.15 همچنان فعال.",
   "date": "2026-10-05",
   "apk": {
-    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.16/Connectix-Android-ARM64.apk",
-    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.16/Connectix-Android-Universal.apk",
-    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.16/Connectix-Android-ARM32.apk"
+    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.17/Connectix-Android-ARM64.apk",
+    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.17/Connectix-Android-Universal.apk",
+    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.17/Connectix-Android-ARM32.apk"
   },
   "windows": {
-    "version": "4.0.16",
-    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.16/Connectix-Windows-x64.zip"
+    "version": "4.0.17",
+    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.17/Connectix-Windows-x64.zip"
   },
   "ultra": true,
   "core": "flutter_vless dual-core",
   "protocols": ["vless", "vmess", "trojan", "ss", "socks", "http", "wireguard", "hysteria2", "raw", "clash", "singbox"],
   "fixes": {
-    "ping_progress_0_16": "v4.0.16 - Fixed 0/16 progress stuck: added 5s timeout to getServerDelay, guaranteed onProgress in finally, set 0=آماده on failure, logs",
-    "ping_display": "v4.0.15/4.0.14 - Shows آماده when ping not measurable",
-    "old_version_remains": "v4.0.15 - Cloudflare cache busting with ?v=&t=",
+    "old_version_forever": "v4.0.17 FOREVER FIX - ApiController always adds ?v=version&t=time(), .htaccess no-store BYPASS for .apk, app only tries versioned URLs, baseUrls vpbotn.ir first - forever in all future versions",
+    "ping_progress_0_16": "v4.0.16 - Fixed 0/16 stuck with timeouts",
     "panel_manager_before_login": "v4.0.15 - Panel manager on login screen",
     "installer_stuck_forever": "v4.0.13 PURE INTENT - Removed PackageInstaller"
   }

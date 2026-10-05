@@ -779,18 +779,30 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
         $hasMirroredUniversal = is_file($mirroredUniversal) && filesize($mirroredUniversal) > 1024*1024;
         $isGithubUrl = fn($u) => str_contains($u, 'github.com') || str_contains($u, 'githubusercontent.com');
 
+        // v4.0.17 FOREVER FIX: Always add ?v=version to bypass Cloudflare cache
+        // User reported: update downloads but old version remains - root cause: CF cache serving old APK without version param
+        // Forever fix: Panel URLs must ALWAYS have ?v=latest to bypass CF cache
+        $versionParam = $latest !== '' ? '?v=' . urlencode($latest) . '&t=' . time() : '?t=' . time();
+        
         if ($downloadUrl === '' || ($isGithubUrl($downloadUrl) && $hasMirroredArm64)) {
-            $downloadUrl = $hasMirroredArm64 ? $panelBase . '/Connectix-ARM64-v8a.apk' : "https://github.com/{$repo}/releases/download/v{$latest}/Connectix-Android-ARM64.apk";
+            $downloadUrl = $hasMirroredArm64 ? $panelBase . '/Connectix-ARM64-v8a.apk' . $versionParam : "https://github.com/{$repo}/releases/download/v{$latest}/Connectix-Android-ARM64.apk";
         }
         if ($universalUrl === '' || ($isGithubUrl($universalUrl) && $hasMirroredUniversal)) {
-            $universalUrl = $hasMirroredUniversal ? $panelBase . '/Connectix-Universal.apk' : "https://github.com/{$repo}/releases/download/v{$latest}/Connectix-Android-Universal.apk";
+            $universalUrl = $hasMirroredUniversal ? $panelBase . '/Connectix-Universal.apk' . $versionParam : "https://github.com/{$repo}/releases/download/v{$latest}/Connectix-Android-Universal.apk";
         }
-        // Override GitHub URLs if mirrored exists (Iran compatibility)
+        // Override GitHub URLs if mirrored exists (Iran compatibility) - WITH version param for CF bypass
         if ($hasMirroredArm64 && $isGithubUrl($downloadUrl)) {
-            $downloadUrl = $panelBase . '/Connectix-ARM64-v8a.apk';
+            $downloadUrl = $panelBase . '/Connectix-ARM64-v8a.apk' . $versionParam;
         }
         if ($hasMirroredUniversal && $isGithubUrl($universalUrl)) {
-            $universalUrl = $panelBase . '/Connectix-Universal.apk';
+            $universalUrl = $panelBase . '/Connectix-Universal.apk' . $versionParam;
+        }
+        // v4.0.17 FOREVER FIX: If downloadUrl is panel host without version param, add it
+        if (str_contains($downloadUrl, 'vpbotn.ir/Connectix') && !str_contains($downloadUrl, '?v=')) {
+            $downloadUrl .= (str_contains($downloadUrl, '?') ? '&' : '?') . 'v=' . urlencode($latest) . '&t=' . time();
+        }
+        if (str_contains($universalUrl, 'vpbotn.ir/Connectix') && !str_contains($universalUrl, '?v=')) {
+            $universalUrl .= (str_contains($universalUrl, '?') ? '&' : '?') . 'v=' . urlencode($latest) . '&t=' . time();
         }
         $title       = trim(Setting::get('app_update_title', '')) ?: "Connectix v{$latest}";
         $changelog   = trim(Setting::get('app_update_changelog', '')) ?: "• نگارش جدید سامانه منتشر شد.";
