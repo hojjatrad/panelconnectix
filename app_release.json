@@ -1,0 +1,30 @@
+{
+  "version": "3.7.0",
+  "code": 39,
+  "changelog": "ULTRA Dual-Core: flutter_vless with full protocol support (VLESS Reality/Vision, VMess, Trojan, SS, SOCKS, HTTP, WireGuard, Hysteria2, Raw JSON, Clash YAML, sing-box JSON) - compileSdk 36, AGP 9.1",
+  "date": "2026-10-05",
+  "apk": {
+    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v3.7.0/Connectix-Android-ARM64.apk",
+    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v3.7.0/Connectix-Android-Universal.apk",
+    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v3.7.0/Connectix-Android-ARM32.apk"
+  },
+  "windows": {
+    "version": "3.7.0",
+    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v3.7.0/Connectix-Windows-x64.zip"
+  },
+  "ultra": true,
+  "core": "flutter_vless dual-core Xray+sing-box",
+  "protocols": [
+    "vless",
+    "vmess",
+    "trojan",
+    "ss",
+    "socks",
+    "http",
+    "wireguard",
+    "hysteria2",
+    "raw",
+    "clash",
+    "singbox"
+  ]
+}
