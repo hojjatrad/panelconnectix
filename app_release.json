@@ -1,21 +1,22 @@
 {
-  "version": "4.0.17",
-  "code": 52,
-  "changelog": "v4.0.17 FOREVER FIX - حل دائمی مشکل نسخه قدیمی ماندن بعد از آپدیت! ریشه: کش کلودفلر APK قدیمی را سرو میکرد + پنل بدون ?v= برمیگردوند. فیکس دائمی: 1) ApiController.php و ApiControllerV2.php همیشه ?v=version&t=time() اضافه میکنند تا کش کلودفلر دور بخورد 2) .htaccess برای .apk هدر no-store, BYPASS, no-cache, Expires 0 3) AppApkMirror قبلا با تغییر نسخه force میشد 4) اپ: baseUrls اول vpbotn.ir (نه ir/cf) + generateAllUrls فقط URLهای ورژن‌دار + timestamp + لاگ + verify سایز. این فیکس برای همیشه در تمام نسخه‌های بعدی هم فعال میماند. پینگ 0/16 و مدیریت پنل قبل از لاگین از v4.0.16/4.0.15 همچنان فعال.",
+  "version": "4.0.18",
+  "code": 53,
+  "changelog": "v4.0.18 PROXY FREE - پروکسی رایگان برای تمام مشتری‌های VPN! 🔒 تلگرام و سایر برنامه‌ها بدون نیاز به VPN کامل. ویژگی‌ها: 1) پروکسی SOCKS5 رایگان برای تلگرام (socks5://username:password@host:1080) 2) پروکسی HTTP برای مرورگر و سایر برنامه‌ها 3) MTProto اختصاصی تلگرام با لینک مستقیم t.me/proxy 4) پروکسی محلی 127.0.0.1:10808/10809 برای اشتراک با TV و کنسول 5) صفحه پروکسی جدید با کپی، QR، آموزش کامل تلگرام. تمام پروکسی‌ها از سرورهای موجود Xray استفاده می‌کنند و برای مشتری‌های VPN رایگان است. آماده برای v4.0.19 پلن فروش پروکسی جداگانه. فیکس دائمی کش نسخه قدیمی همچنان فعال.",
   "date": "2026-10-05",
   "apk": {
-    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.17/Connectix-Android-ARM64.apk",
-    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.17/Connectix-Android-Universal.apk",
-    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.17/Connectix-Android-ARM32.apk"
+    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.18/Connectix-Android-ARM64.apk",
+    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.18/Connectix-Android-Universal.apk",
+    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.18/Connectix-Android-ARM32.apk"
   },
   "windows": {
-    "version": "4.0.17",
-    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.17/Connectix-Windows-x64.zip"
+    "version": "4.0.18",
+    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.18/Connectix-Windows-x64.zip"
   },
   "ultra": true,
   "core": "flutter_vless dual-core",
-  "protocols": ["vless", "vmess", "trojan", "ss", "socks", "http", "wireguard", "hysteria2", "raw", "clash", "singbox"],
+  "protocols": ["vless", "vmess", "trojan", "ss", "socks", "http", "wireguard", "hysteria2", "raw", "clash", "singbox", "mtproto"],
   "fixes": {
+    "proxy_free": "v4.0.18 PROXY FREE - Free SOCKS5/HTTP/MTProto proxy for all VPN customers using existing Xray nodes, for Telegram and other apps",
     "old_version_forever": "v4.0.17 FOREVER FIX - ApiController always adds ?v=version&t=time(), .htaccess no-store BYPASS for .apk, app only tries versioned URLs, baseUrls vpbotn.ir first - forever in all future versions",
     "ping_progress_0_16": "v4.0.16 - Fixed 0/16 stuck with timeouts",
     "panel_manager_before_login": "v4.0.15 - Panel manager on login screen",

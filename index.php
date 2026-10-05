@@ -823,6 +823,11 @@ $router->get('api/panel-location', [ApiControllerV2::class, 'panelLocation']);
 $router->get('.well-known/connectix.json', [ApiControllerV2::class, 'wellKnown']);
 $router->get('well-known/connectix.json', [ApiControllerV2::class, 'wellKnown']);
 
+// v4.0.18 PROXY: Proxy configs for Telegram and other apps - Free for VPN + Sellable
+$router->get('api/v1/app/proxies', [ProxyController::class, 'appProxies']);
+$router->post('api/v1/app/proxies', [ProxyController::class, 'appProxies']);
+$router->get('proxies', [ProxyController::class, 'adminProxies']);
+
 // Dispatch Request with graceful error protection
 try {
     $router->dispatch();

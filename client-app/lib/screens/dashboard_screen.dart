@@ -15,6 +15,7 @@ import 'login_screen.dart';
 import 'server_list_modal.dart';
 import 'bypass_apps_screen.dart';
 import 'advanced_settings_screen.dart';
+import 'proxy_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final ClientModel client;
@@ -71,7 +72,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Map<String, dynamic>? _updateInfo;
   bool _isCheckingUpdate = false;
 
-  static const String currentAppVersion = '4.0.17';
+  static const String currentAppVersion = '4.0.18';
 
   // "Download over Wi-Fi only" for update packages
   bool _updateWifiOnly = false;
@@ -2634,6 +2635,29 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     ),
                   ),
                   const SizedBox(width: 10),
+                  // Proxy Button - v4.0.18 NEW
+                  InkWell(
+                    onTap: () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const ProxyScreen()));
+                    },
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E293B),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        children: const [
+                          Icon(Icons.security_rounded, color: Color(0xFF38BDF8), size: 18),
+                          SizedBox(width: 6),
+                          Text('پروکسی', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 12, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
                   // Hotspot & Proxy Sharing Modal Trigger
                   InkWell(
                     onTap: _openHotspotProxySharingSheet,
@@ -2649,7 +2673,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         children: const [
                           Icon(Icons.wifi_tethering_rounded, color: Color(0xFF34D399), size: 18),
                           SizedBox(width: 6),
-                          Text('اشتراک با TV', style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 12)),
+                          Text('TV', style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 12)),
                         ],
                       ),
                     ),

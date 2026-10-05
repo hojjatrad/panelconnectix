@@ -64,6 +64,8 @@ class PlanController {
         $ipLimit = max(0, (int)($_POST['ip_limit'] ?? 0));
         $showInBot = isset($_POST['show_in_bot']) ? 1 : 0;
         $isFree = isset($_POST['is_free']) ? 1 : 0;
+        $isProxyOnly = isset($_POST['is_proxy_only']) ? 1 : 0;
+        $proxyType = trim($_POST['proxy_type'] ?? 'all'); // all, socks5, http, mtproto
 
         if (empty($title) || $traffic <= 0 || $days <= 0) {
             Helpers::flash('error', 'لطفاً مقادیر عنوان، حجم و روز را معتبر وارد کنید.');
@@ -162,6 +164,8 @@ if (empty($category)) {
         if (isset($availableCols['vip_group_id'])) $data['vip_group_id'] = $vipGroupId ?: null;
         if (isset($availableCols['vip_group_name'])) $data['vip_group_name'] = $vipGroupName ?: null;
         if (isset($availableCols['vip_plan_title'])) $data['vip_plan_title'] = $vipPlanTitle ?: null;
+        if (isset($availableCols['is_proxy_only'])) $data['is_proxy_only'] = $isProxyOnly;
+        if (isset($availableCols['proxy_type'])) $data['proxy_type'] = $proxyType;
 
         $fields = array_keys($data);
         $placeholders = array_fill(0, count($fields), '?');
@@ -200,6 +204,8 @@ if (empty($category)) {
         $ipLimit = max(0, (int)($_POST['ip_limit'] ?? 0));
         $showInBot = isset($_POST['show_in_bot']) ? 1 : 0;
         $isFree = isset($_POST['is_free']) ? 1 : 0;
+        $isProxyOnly = isset($_POST['is_proxy_only']) ? 1 : 0;
+        $proxyType = trim($_POST['proxy_type'] ?? 'all');
 
         if ($id <= 0 || empty($title) || $traffic <= 0 || $days <= 0) {
             Helpers::flash('error', 'اطلاعات ارسالی پلن ناقص است.');
@@ -298,6 +304,8 @@ if (empty($category)) {
         if (isset($availableCols['vip_group_id'])) $data['vip_group_id'] = $vipGroupId ?: null;
         if (isset($availableCols['vip_group_name'])) $data['vip_group_name'] = $vipGroupName ?: null;
         if (isset($availableCols['vip_plan_title'])) $data['vip_plan_title'] = $vipPlanTitle ?: null;
+        if (isset($availableCols['is_proxy_only'])) $data['is_proxy_only'] = $isProxyOnly;
+        if (isset($availableCols['proxy_type'])) $data['proxy_type'] = $proxyType;
 
         $setParts = [];
         $values = [];

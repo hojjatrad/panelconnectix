@@ -246,6 +246,11 @@ foreach ($customPlanCats as $idx => $custCat) {
                                     تست رایگان
                                 </span>
                             <?php endif; ?>
+                            <?php if (!empty($p['is_proxy_only'])): ?>
+                                <span class="bg-cyan-500/20 text-cyan-300 text-[10px] font-bold px-2 py-0.5 rounded border border-cyan-500/30">
+                                    🔒 فقط پروکسی
+                                </span>
+                            <?php endif; ?>
                             
                             <!-- Bot Visibility Badge -->
                             <span class="text-[9px] font-bold px-2 py-0.5 rounded border <?= $showInBot ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-slate-800 text-slate-500 border-slate-700' ?>" title="وضعیت نمایش در ربات تلگرام">
@@ -506,6 +511,22 @@ foreach ($customPlanCats as $idx => $custCat) {
                     <input type="checkbox" name="is_free" id="new_is_free" value="1" class="rounded bg-slate-800 border-slate-700 text-purple-600 focus:ring-0">
                     <label for="new_is_free" class="text-slate-300">پلن تست رایگان (بدون هزینه)</label>
                 </div>
+
+                <div class="flex items-center gap-2 p-2 bg-cyan-950/30 border border-cyan-800/30 rounded-xl">
+                    <input type="checkbox" name="is_proxy_only" id="new_is_proxy_only" value="1" class="rounded bg-slate-800 border-slate-700 text-cyan-600 focus:ring-0" onchange="document.getElementById('new_proxy_type_wrap').style.display=this.checked?'block':'none'">
+                    <label for="new_is_proxy_only" class="text-cyan-200 font-semibold text-xs cursor-pointer">
+                        🔒 پلن فقط پروکسی (برای تلگرام و سایر برنامه‌ها - ارزان‌تر از VPN)
+                    </label>
+                </div>
+                <div id="new_proxy_type_wrap" style="display:none" class="pr-6">
+                    <label class="block text-slate-400 mb-1 text-[11px]">نوع پروکسی</label>
+                    <select name="proxy_type" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2 text-white text-xs">
+                        <option value="all">همه (SOCKS5 + HTTP + MTProto)</option>
+                        <option value="socks5">فقط SOCKS5 (تلگرام)</option>
+                        <option value="http">فقط HTTP (مرورگر)</option>
+                        <option value="mtproto">فقط MTProto (تلگرام)</option>
+                    </select>
+                </div>
             </div>
 
             <button type="submit" class="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs transition-all shadow-md mt-2">
@@ -662,6 +683,22 @@ foreach ($customPlanCats as $idx => $custCat) {
                     <input type="checkbox" name="is_free" id="edit_is_free" value="1" class="rounded bg-slate-800 border-slate-700 text-purple-600 focus:ring-0">
                     <label for="edit_is_free" class="text-slate-300">پلن تست رایگان (بدون هزینه)</label>
                 </div>
+
+                <div class="flex items-center gap-2 p-2 bg-cyan-950/30 border border-cyan-800/30 rounded-xl">
+                    <input type="checkbox" name="is_proxy_only" id="edit_is_proxy_only" value="1" class="rounded bg-slate-800 border-slate-700 text-cyan-600 focus:ring-0" onchange="document.getElementById('edit_proxy_type_wrap').style.display=this.checked?'block':'none'">
+                    <label for="edit_is_proxy_only" class="text-cyan-200 font-semibold text-xs cursor-pointer">
+                        🔒 پلن فقط پروکسی (ارزان‌تر از VPN)
+                    </label>
+                </div>
+                <div id="edit_proxy_type_wrap" style="display:none" class="pr-6">
+                    <label class="block text-slate-400 mb-1 text-[11px]">نوع پروکسی</label>
+                    <select name="proxy_type" id="edit_proxy_type" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2 text-white text-xs">
+                        <option value="all">همه (SOCKS5 + HTTP + MTProto)</option>
+                        <option value="socks5">فقط SOCKS5</option>
+                        <option value="http">فقط HTTP</option>
+                        <option value="mtproto">فقط MTProto</option>
+                    </select>
+                </div>
             </div>
 
             <button type="submit" class="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs transition-all shadow-md mt-2">
@@ -763,6 +800,9 @@ foreach ($customPlanCats as $idx => $custCat) {
         document.getElementById('edit_show_in_bot').checked = (parseInt(p.show_in_bot ?? 1) === 1);
         document.getElementById('edit_is_free').checked = (parseInt(p.is_free ?? 0) === 1);
         document.getElementById('edit_start_on_first_use').checked = (parseInt(p.start_on_first_use ?? 0) === 1);
+        document.getElementById('edit_is_proxy_only').checked = (parseInt(p.is_proxy_only ?? 0) === 1);
+        if (document.getElementById('edit_proxy_type')) document.getElementById('edit_proxy_type').value = p.proxy_type || 'all';
+        document.getElementById('edit_proxy_type_wrap').style.display = (parseInt(p.is_proxy_only ?? 0) === 1) ? 'block' : 'none';
 
         const modal = document.getElementById('editPlanModal');
         modal.classList.remove('hidden');

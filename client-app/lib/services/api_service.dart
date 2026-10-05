@@ -1169,6 +1169,40 @@ class ApiService {
     return null;
   }
 
+  // v4.0.18 PROXY: Get proxies for Telegram and other apps
+  static Future<Map<String, dynamic>?> getProxies() async {
+    final orderedUrls = getOrderedBaseUrls();
+    for (final currentBase in orderedUrls) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('auth_token') ?? '';
+        if (token.isEmpty) return null;
+
+        final url = Uri.parse("$currentBase/api/v1/app/proxies?auth_token=${Uri.encodeComponent(token)}");
+        final response = await http.get(
+          url,
+          headers: {
+            'Authorization': 'Bearer $token',
+            'X-Auth-Token': token,
+            'Accept': 'application/json'
+          },
+        ).timeout(const Duration(seconds: 8));
+
+        await _checkAndUpdateFromHeaders(response);
+
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        if (data['success'] == true && data['data'] != null) {
+          await _saveWorkingUrl(currentBase);
+          log('getProxies SUCCESS via $currentBase');
+          return Map<String, dynamic>.from(data['data']);
+        }
+      } catch (e) {
+        log('getProxies error via $currentBase: $e');
+      }
+    }
+    return null;
+  }
+
   // v8.0: Manual panel URL update via QR
   static Future<bool> updatePanelUrlFromQr(String qrData) async {
     try {

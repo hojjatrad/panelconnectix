@@ -648,6 +648,41 @@ class Database {
                     INDEX idx_usage_date (recorded_at)
                 )");
             } catch (Throwable $e) {}
+            // v4.0.18 PROXY: proxy configs and proxy-only plans support
+            try {
+                $pdo->exec("CREATE TABLE IF NOT EXISTS proxy_configs (
+                    id $autoInc,
+                    server_id INT NOT NULL,
+                    type VARCHAR(32) DEFAULT 'socks5',
+                    host VARCHAR(255) NOT NULL,
+                    port INT NOT NULL,
+                    username VARCHAR(128) NULL,
+                    password VARCHAR(128) NULL,
+                    secret VARCHAR(255) NULL,
+                    is_active TINYINT(1) DEFAULT 1,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_proxy_server (server_id),
+                    INDEX idx_proxy_type (type)
+                )");
+            } catch (Throwable $e) {}
+            try {
+                $pdo->exec("CREATE TABLE IF NOT EXISTS proxy_clients (
+                    id $autoInc,
+                    client_id INT NULL,
+                    reseller_id INT NOT NULL DEFAULT 1,
+                    server_id INT NOT NULL,
+                    type VARCHAR(32) DEFAULT 'socks5',
+                    username VARCHAR(128) NOT NULL,
+                    password VARCHAR(128) NOT NULL,
+                    secret VARCHAR(255) NULL,
+                    expire_at DATETIME NULL,
+                    is_active TINYINT(1) DEFAULT 1,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_pclient_client (client_id),
+                    INDEX idx_pclient_reseller (reseller_id)
+                )");
+            } catch (Throwable $e) {}
 
 
             $planCols = [
@@ -1113,6 +1148,16 @@ class Database {
             self::safeAddColumn($pdo, 'bot_orders', 'reseller_plan_id', 'INT NULL');
             self::safeAddColumn($pdo, 'bot_orders', 'custom_traffic_gb', 'FLOAT DEFAULT 0');
             self::safeAddColumn($pdo, 'bot_orders', 'custom_duration_days', 'INT DEFAULT 0');
+            // v4.0.18 PROXY: proxy-only plans
+            self::safeAddColumn($pdo, 'plans', 'is_proxy_only', 'TINYINT(1) DEFAULT 0');
+            self::safeAddColumn($pdo, 'plans', 'proxy_type', 'VARCHAR(32) DEFAULT NULL');
+            self::safeAddColumn($pdo, 'clients', 'is_proxy_only', 'TINYINT(1) DEFAULT 0');
+            self::safeAddColumn($pdo, 'clients', 'proxy_type', 'VARCHAR(32) DEFAULT NULL');
+            self::safeAddColumn($pdo, 'server_nodes', 'socks_port', 'INT DEFAULT 1080');
+            self::safeAddColumn($pdo, 'server_nodes', 'http_port', 'INT DEFAULT 8080');
+            self::safeAddColumn($pdo, 'server_nodes', 'mtproto_port', 'INT DEFAULT 443');
+            self::safeAddColumn($pdo, 'server_nodes', 'mtproto_secret', 'VARCHAR(255) DEFAULT NULL');
+            self::safeAddColumn($pdo, 'server_nodes', 'proxy_enabled', 'TINYINT(1) DEFAULT 0');
 
             // Ensure Default Referral Codes for users
             try {
