@@ -913,6 +913,8 @@ $router->get('well-known/connectix.json', [ApiControllerV2::class, 'wellKnown'])
 $router->get('api/v1/app/proxies', [ProxyController::class, 'appProxies']);
 $router->post('api/v1/app/proxies', [ProxyController::class, 'appProxies']);
 $router->get('proxies', [ProxyController::class, 'adminProxies']);
+$router->get('clients/{id}/proxies', [ProxyController::class, 'adminClientProxies']);
+$router->get('api/v1/admin/client-proxies', [ProxyController::class, 'adminClientProxies']);
 
 // Dispatch Request with graceful error protection
 try {

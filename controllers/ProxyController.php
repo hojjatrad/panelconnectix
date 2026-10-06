@@ -276,6 +276,157 @@ class ProxyController {
     }
     
     /**
+     * Build proxies array for a given client + node (reusable for admin and app)
+     */
+    private static function buildProxiesForClient(array $client, array $node): array {
+        $host = $node['host'] ?? $node['sub_domain'] ?? '';
+        if ($host === '' && !empty($node['api_url'])) {
+            $parsed = parse_url($node['api_url']);
+            $host = $parsed['host'] ?? '';
+        }
+        if ($host === '') { $host = $node['name'] ?? 'proxy.example.com'; }
+        $host = trim(str_replace(['http://','https://'], '', $host));
+        $host = explode(':', $host)[0];
+        $host = explode('/', $host)[0];
+
+        $username = $client['username'];
+        $password = $client['password'] ?? $client['uuid'] ?? '';
+        if (empty($password) || strlen($password) < 4) {
+            $password = substr(md5($client['username'] . $client['uuid']), 0, 12);
+        }
+
+        $socksPort = (int)($node['socks_port'] ?? 1080);
+        $httpPort = (int)($node['http_port'] ?? 8080);
+        $mtprotoPort = (int)($node['mtproto_port'] ?? 443);
+        if ($socksPort <= 0) $socksPort = 1080;
+        if ($httpPort <= 0) $httpPort = 8080;
+        if ($mtprotoPort <= 0) $mtprotoPort = 443;
+
+        $mtprotoSecretFull = $node['mtproto_secret'] ?? '';
+        if (empty($mtprotoSecretFull)) {
+            $mtprotoSecretFull = 'ee' . substr(md5($client['uuid'] . $host), 0, 32) . '00000000000000000000000000000000';
+        }
+        $mtprotoSecret = $mtprotoSecretFull;
+        $mtprotoSecretShort = substr(md5($client['uuid']), 0, 32);
+        if (str_starts_with($mtprotoSecret, 'ee')) {
+            $mtprotoSecretShort = substr($mtprotoSecret, 2, 32);
+        }
+
+        // Check proxy-only
+        $isProxyOnly = false;
+        if (!empty($client['is_proxy_only']) && (int)$client['is_proxy_only'] === 1) $isProxyOnly = true;
+        if (!empty($client['plan_is_proxy_only']) && (int)$client['plan_is_proxy_only'] === 1) $isProxyOnly = true;
+
+        return [
+            'client' => [
+                'username' => $client['username'],
+                'is_proxy_only' => $isProxyOnly,
+                'plan_title' => $client['plan_title'] ?? '',
+                'server_name' => $node['name'],
+                'server_host' => $host,
+            ],
+            'dedicated' => [
+                'socks' => [
+                    'host' => $host,
+                    'port' => $socksPort,
+                    'username' => $username,
+                    'password' => $password,
+                    'url' => "socks5://{$username}:{$password}@{$host}:{$socksPort}",
+                    'type' => 'socks5',
+                ],
+                'http' => [
+                    'host' => $host,
+                    'port' => $httpPort,
+                    'username' => $username,
+                    'password' => $password,
+                    'url' => "http://{$username}:{$password}@{$host}:{$httpPort}",
+                    'type' => 'http',
+                ],
+            ],
+            'mtproto' => [
+                'host' => $host,
+                'port' => $mtprotoPort,
+                'secret' => $mtprotoSecret,
+                'secret_short' => $mtprotoSecretShort,
+                'url' => "https://t.me/proxy?server={$host}&port={$mtprotoPort}&secret={$mtprotoSecret}",
+                'tg_url' => "tg://proxy?server={$host}&port={$mtprotoPort}&secret={$mtprotoSecret}",
+                'type' => 'mtproto',
+            ],
+            'local' => [
+                'socks' => ['host'=>'127.0.0.1','port'=>10808,'url'=>'socks5://127.0.0.1:10808','type'=>'socks5'],
+                'http' => ['host'=>'127.0.0.1','port'=>10809,'url'=>'http://127.0.0.1:10809','type'=>'http'],
+            ]
+        ];
+    }
+
+    /**
+     * Admin endpoint: GET /clients/{id}/proxies - returns proxy links for a specific client (admin/reseller owner)
+     */
+    public function adminClientProxies(): void {
+        require_once __DIR__ . '/../core/Auth.php';
+        Auth::requireLogin();
+        $pdo = Database::getConnection();
+        $userId = Auth::id();
+        $isAdmin = Auth::isAdmin();
+
+        // Get client ID from route param or query
+        $id = 0;
+        if (isset($_GET['id'])) $id = (int)$_GET['id'];
+        elseif (isset($_GET['client_id'])) $id = (int)$_GET['client_id'];
+        else {
+            // Try to parse from URI: /clients/123/proxies
+            $uri = $_SERVER['REQUEST_URI'] ?? '';
+            if (preg_match('#/clients/(\d+)/proxies#', $uri, $m)) $id = (int)$m[1];
+        }
+
+        if ($id <= 0) {
+            self::jsonError('شناسه کلاینت نامعتبر', 400);
+        }
+
+        $where = $isAdmin ? "c.id = $id" : "c.id = $id AND c.reseller_id = $userId";
+        $stmt = $pdo->query("SELECT c.*, s.*, p.title as plan_title, p.is_proxy_only as plan_is_proxy_only, s.name as server_name FROM clients c LEFT JOIN server_nodes s ON c.server_id = s.id LEFT JOIN plans p ON c.plan_id = p.id WHERE $where LIMIT 1");
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            self::jsonError('کلاینت یافت نشد یا دسترسی ندارید', 404);
+        }
+
+        // Build node array
+        $node = [
+            'name' => $row['server_name'] ?? $row['name'] ?? 'Server',
+            'host' => $row['host'] ?? $row['sub_domain'] ?? '',
+            'api_url' => $row['api_url'] ?? '',
+            'sub_domain' => $row['sub_domain'] ?? '',
+            'socks_port' => $row['socks_port'] ?? 1080,
+            'http_port' => $row['http_port'] ?? 8080,
+            'mtproto_port' => $row['mtproto_port'] ?? 443,
+            'mtproto_secret' => $row['mtproto_secret'] ?? '',
+        ];
+
+        $client = [
+            'username' => $row['username'],
+            'password' => $row['password'],
+            'uuid' => $row['uuid'],
+            'is_proxy_only' => $row['is_proxy_only'] ?? 0,
+            'plan_is_proxy_only' => $row['plan_is_proxy_only'] ?? 0,
+            'plan_title' => $row['plan_title'] ?? '',
+        ];
+
+        $proxies = self::buildProxiesForClient($client, $node);
+
+        // Add sub link for convenience
+        require_once __DIR__ . '/../core/Helpers.php';
+        $subUrl = Helpers::subUrl($row['sub_token']);
+
+        self::jsonSuccess([
+            'client_id' => $row['id'],
+            'username' => $row['username'],
+            'customer_name' => $row['customer_name'] ?? '',
+            'sub_url' => $subUrl,
+            'proxies' => $proxies
+        ], 'پروکسی‌ها');
+    }
+
+    /**
      * Admin endpoint to list all proxy configs
      */
     public function adminProxies(): void {
@@ -284,7 +435,7 @@ class ProxyController {
         
         $pdo = Database::getConnection();
         $proxies = $pdo->query("
-            SELECT c.username, c.status, s.name as server_name, s.api_url, s.sub_domain, p.title as plan_title
+            SELECT c.id, c.username, c.status, s.name as server_name, s.api_url, s.sub_domain, p.title as plan_title
             FROM clients c
             JOIN server_nodes s ON c.server_id = s.id
             LEFT JOIN plans p ON c.plan_id = p.id
@@ -292,7 +443,7 @@ class ProxyController {
             ORDER BY c.id DESC LIMIT 100
         ")->fetchAll(PDO::FETCH_ASSOC);
         
-        // v4.0.19 FIX: Use direct require, Helpers::view() doesn't exist
+        // v4.0.20 FIX: Use direct require, Helpers::view() doesn't exist
         require __DIR__ . '/../views/proxies/index.php';
     }
 }

@@ -198,19 +198,28 @@ if(preg_match('/(\d+)\s*روز/', $daysRemText, $m)){
 <?php if(!empty($c['reserved_id'])): ?><div class="mt-2"><span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-[10px] font-bold"><i class="fa-solid fa-sparkles text-[9px]"></i>رزرو: <?= $c['reserved_gb'] ?>GB</span></div>
 <?php else: ?><button type="button" onclick="openReserveModal(<?= $c['id'] ?>,'<?= htmlspecialchars($c['username']) ?>')" class="mt-2 text-[10px] text-slate-500 hover:text-cyan-400 flex items-center gap-1 transition"><i class="fa-solid fa-plus text-[8px]"></i>رزرو پلن</button><?php endif; ?>
 </td>
-<!-- Actions - with Copy Delivery button -->
+<!-- Actions - with Copy Delivery + Proxy buttons v4.0.21 -->
 <td class="p-3.5 text-center">
-<div class="flex items-center justify-center gap-1 flex-wrap max-w-[180px] mx-auto">
-<!-- Copy Delivery: username + password + sublink together -->
+<div class="flex items-center justify-center gap-1 flex-wrap max-w-[220px] mx-auto">
+<!-- Copy Delivery: username + password + sublink + proxies -->
 <button type="button" 
         data-username="<?= htmlspecialchars($c['username'],ENT_QUOTES) ?>"
         data-password="<?= htmlspecialchars($c['password'],ENT_QUOTES) ?>"
         data-sub="<?= htmlspecialchars($subUrl,ENT_QUOTES) ?>"
         data-customer="<?= htmlspecialchars($c['customer_name'] ?? '',ENT_QUOTES) ?>"
         data-plan="<?= htmlspecialchars($c['plan_title'] ?? '',ENT_QUOTES) ?>"
+        data-id="<?= $c['id'] ?>"
         onclick="copyDelivery(this)"
-        class="w-8 h-8 flex items-center justify-center bg-gradient-to-br from-emerald-600/30 to-teal-600/30 hover:from-emerald-600/50 hover:to-teal-600/50 text-emerald-300 hover:text-emerald-200 rounded-xl border border-emerald-700/40 transition group/btn shadow-sm" title="کپی یوزر + پسورد + ساب لینک برای ارسال به مشتری">
+        class="w-8 h-8 flex items-center justify-center bg-gradient-to-br from-emerald-600/30 to-teal-600/30 hover:from-emerald-600/50 hover:to-teal-600/50 text-emerald-300 hover:text-emerald-200 rounded-xl border border-emerald-700/40 transition group/btn shadow-sm" title="کپی کامل برای مشتری (یوزر+پسورد+ساب+پروکسی)">
     <i class="fa-solid fa-share-nodes text-[12px] group-hover/btn:scale-110 transition"></i>
+</button>
+<!-- Proxy Button NEW v4.0.21 -->
+<button type="button" 
+        data-id="<?= $c['id'] ?>"
+        data-username="<?= htmlspecialchars($c['username'],ENT_QUOTES) ?>"
+        onclick="openProxyModal(this.getAttribute('data-id'), this.getAttribute('data-username'))"
+        class="w-8 h-8 flex items-center justify-center bg-gradient-to-br from-cyan-600/30 to-blue-600/30 hover:from-cyan-600/50 hover:to-blue-600/50 text-cyan-300 hover:text-cyan-100 rounded-xl border border-cyan-700/40 transition group/btn shadow-sm" title="پروکسی‌ها - کپی لینک جدا">
+    <i class="fa-solid fa-shield-halved text-[12px] group-hover/btn:scale-110 transition"></i>
 </button>
 <button type="button" onclick="openInspectModal(<?= $c['id'] ?>,'<?= htmlspecialchars($c['username']) ?>','<?= $subUrl ?>')" class="w-8 h-8 flex items-center justify-center bg-slate-800 hover:bg-purple-900/40 text-purple-300 hover:text-purple-200 rounded-xl border border-slate-700 hover:border-purple-700/40 transition group/btn" title="QR و ساب‌لینک"><i class="fa-solid fa-qrcode text-[12px] group-hover/btn:scale-110 transition"></i></button>
 <button type="button" data-copy="<?= htmlspecialchars($subUrl,ENT_QUOTES) ?>" onclick="copyToClipboard(this.getAttribute('data-copy'),this)" class="w-8 h-8 flex items-center justify-center bg-slate-800 hover:bg-cyan-900/40 text-cyan-300 hover:text-cyan-200 rounded-xl border border-slate-700 hover:border-cyan-700/40 transition group/btn" title="کپی ساب"><i class="fa-solid fa-link text-[12px] group-hover/btn:scale-110 transition"></i></button>
@@ -310,6 +319,77 @@ if (file_exists($modalsPath)) {
 
 <div id="reserveModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50"><div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-6 relative"><button onclick="closeReserveModal()" class="absolute top-4 left-4 text-slate-400"><i class="fa-solid fa-xmark"></i></button><h3 class="font-bold text-white mb-4">رزرو پلن <span id="reserveUsername" class="font-mono text-cyan-400"></span></h3><form action="<?= Helpers::url('clients/reserve') ?>" method="POST" class="space-y-3 text-xs"><?= Helpers::csrfField() ?><input type="hidden" name="client_id" id="reserveClientId"><select name="plan_id" required class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white"><?php foreach($plans as $p): ?><option value="<?= $p['id'] ?>"><?= htmlspecialchars($p['title']) ?></option><?php endforeach; ?></select><button type="submit" class="w-full py-2.5 bg-cyan-600 text-white font-bold rounded-xl">ثبت رزرو</button></form></div></div>
 
+<!-- PROXY MODAL v4.0.21 NEW -->
+<div id="proxyModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4 z-[60]">
+    <div class="bg-slate-900 border border-cyan-800/30 rounded-2xl max-w-xl w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+        <button onclick="closeProxyModal()" class="absolute top-4 left-4 text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+        <div class="flex items-center gap-3 mb-5">
+            <div class="w-10 h-10 rounded-xl bg-cyan-600/20 text-cyan-400 flex items-center justify-center"><i class="fa-solid fa-shield-halved"></i></div>
+            <div>
+                <h3 class="text-base font-bold text-white">پروکسی‌های <span id="proxyModalUsername" class="font-mono text-cyan-400">user</span></h3>
+                <p class="text-[11px] text-slate-400">لینک جدا برای کپی و ارسال به مشتری - رایگان برای VPN</p>
+            </div>
+        </div>
+        <div id="proxyModalLoading" class="py-8 text-center text-slate-400 text-xs"><i class="fa-solid fa-spinner fa-spin ml-2"></i>در حال دریافت پروکسی‌ها...</div>
+        <div id="proxyModalContent" class="hidden space-y-3">
+            <!-- SOCKS -->
+            <div class="bg-slate-950 border border-slate-800 rounded-xl p-3">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-bold text-white flex items-center gap-2"><i class="fa-solid fa-shield text-purple-400"></i> SOCKS5 اختصاصی</span>
+                    <span class="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300">بدون VPN</span>
+                </div>
+                <div class="flex gap-2">
+                    <input type="text" id="proxySocksUrl" readonly class="flex-1 bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-[11px] text-cyan-300 font-mono text-left" dir="ltr">
+                    <button onclick="copyToClipboard(document.getElementById('proxySocksUrl').value,this)" class="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold"><i class="fa-solid fa-copy"></i> کپی</button>
+                </div>
+                <div class="grid grid-cols-2 gap-2 mt-2 text-[10px] text-slate-400">
+                    <div>هاست: <span id="proxySocksHost" class="text-white font-mono">-</span></div>
+                    <div>پورت: <span id="proxySocksPort" class="text-white">-</span></div>
+                    <div>یوزر: <span id="proxySocksUser" class="text-white font-mono">-</span></div>
+                    <div>پسورد: <span id="proxySocksPass" class="text-white font-mono">-</span></div>
+                </div>
+            </div>
+            <!-- HTTP -->
+            <div class="bg-slate-950 border border-slate-800 rounded-xl p-3">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-bold text-white flex items-center gap-2"><i class="fa-solid fa-globe text-amber-400"></i> HTTP اختصاصی</span>
+                    <span class="text-[9px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300">مرورگر</span>
+                </div>
+                <div class="flex gap-2">
+                    <input type="text" id="proxyHttpUrl" readonly class="flex-1 bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-[11px] text-amber-300 font-mono text-left" dir="ltr">
+                    <button onclick="copyToClipboard(document.getElementById('proxyHttpUrl').value,this)" class="px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold"><i class="fa-solid fa-copy"></i> کپی</button>
+                </div>
+            </div>
+            <!-- MTProto -->
+            <div class="bg-slate-950 border border-cyan-800/30 rounded-xl p-3">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-bold text-white flex items-center gap-2"><i class="fa-brands fa-telegram text-cyan-400"></i> MTProto تلگرام</span>
+                    <span class="text-[9px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300">مخصوص تلگرام</span>
+                </div>
+                <div class="flex gap-2 mb-2">
+                    <input type="text" id="proxyMtprotoUrl" readonly class="flex-1 bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-[11px] text-cyan-300 font-mono text-left" dir="ltr">
+                    <button onclick="copyToClipboard(document.getElementById('proxyMtprotoUrl').value,this)" class="px-3 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-xs font-bold"><i class="fa-solid fa-copy"></i> کپی</button>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="if(document.getElementById('proxyMtprotoUrl').value){window.open(document.getElementById('proxyMtprotoUrl').value,'_blank')}" class="flex-1 py-2 bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/30 rounded-lg text-xs font-bold"><i class="fa-brands fa-telegram ml-1"></i> باز کردن در تلگرام</button>
+                    <button onclick="copyToClipboard(document.getElementById('proxyMtprotoTgUrl').value,this)" class="px-3 py-2 bg-slate-800 text-slate-300 rounded-lg text-xs">tg://</button>
+                    <input type="hidden" id="proxyMtprotoTgUrl">
+                </div>
+                <div class="mt-2 text-[10px] text-slate-500">Secret: <span id="proxyMtprotoSecret" class="font-mono text-slate-300">-</span> <button onclick="copyToClipboard(document.getElementById('proxyMtprotoSecret').textContent,this)" class="text-cyan-400 hover:underline mr-1">کپی</button></div>
+            </div>
+            <!-- Sub + Delivery -->
+            <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-3 space-y-2">
+                <div class="text-[11px] font-bold text-white">📦 ارسال کامل به مشتری:</div>
+                <div class="flex gap-2">
+                    <input type="text" id="proxySubUrl" readonly class="flex-1 bg-slate-800 border border-slate-700 rounded-lg p-2 text-[10px] text-slate-300 font-mono" dir="ltr">
+                    <button onclick="copyToClipboard(document.getElementById('proxySubUrl').value,this)" class="px-3 py-2 bg-slate-700 text-white rounded-lg text-xs">کپی ساب</button>
+                </div>
+                <button onclick="copyProxyDelivery()" class="w-full py-2.5 bg-gradient-to-r from-cyan-600 to-violet-600 text-white font-bold rounded-xl text-xs"><i class="fa-solid fa-share-nodes ml-1"></i> کپی متن کامل (ساب + پروکسی) برای مشتری</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 function toggleSelectAll(m){document.querySelectorAll('.client-check').forEach(cb=>cb.checked=m.checked);}
 function togglePwd(el){
@@ -319,12 +399,47 @@ function togglePwd(el){
     if(span.textContent==='••••••'){ span.textContent=real; el.innerHTML='<i class="fa-solid fa-eye-slash text-[10px]"></i>'; }
     else { span.textContent='••••••'; el.innerHTML='<i class="fa-solid fa-eye text-[10px]"></i>'; }
 }
+let currentProxyData = null;
+
 function copyDelivery(btn){
     const username = btn.getAttribute('data-username') || '';
     const password = btn.getAttribute('data-password') || '';
     const sub = btn.getAttribute('data-sub') || '';
     const customer = btn.getAttribute('data-customer') || '';
     const plan = btn.getAttribute('data-plan') || '';
+    const clientId = btn.getAttribute('data-id') || '';
+    
+    // Try to fetch proxies quickly for delivery
+    if(clientId){
+        fetch('<?= Helpers::url('api/v1/admin/client-proxies') ?>?id='+clientId)
+        .then(r=>r.json())
+        .then(data=>{
+            if(data.success && data.data && data.data.proxies){
+                const p = data.data.proxies;
+                let text = '';
+                if(customer) text += `👤 نام مشتری: ${customer}\n`;
+                text += `👤 نام کاربری: ${username}\n`;
+                text += `🔑 رمز عبور: ${password}\n`;
+                if(plan) text += `📦 پلن: ${plan}\n`;
+                text += `🔗 لینک سابسکریپشن:\n${sub}\n\n`;
+                text += `🛡️ پروکسی‌ها (رایگان):\n`;
+                if(p.dedicated && p.dedicated.socks) text += `• SOCKS5: ${p.dedicated.socks.url}\n`;
+                if(p.dedicated && p.dedicated.http) text += `• HTTP: ${p.dedicated.http.url}\n`;
+                if(p.mtproto) text += `• MTProto تلگرام: ${p.mtproto.url}\n`;
+                text += `\n📱 آموزش اتصال:\n1. لینک ساب را در Hiddify/V2rayNG وارد کنید\n2. برای تلگرام روی لینک MTProto بزنید\n3. یا SOCKS5 را در تلگرام ست کنید\n\n`;
+                text += `🤖 ربات: @${window.location.hostname}bot`;
+                doCopyDeliveryText(text, btn);
+            } else {
+                doCopyDeliverySimple(username,password,sub,customer,plan,btn);
+            }
+        }).catch(()=>{
+            doCopyDeliverySimple(username,password,sub,customer,plan,btn);
+        });
+    } else {
+        doCopyDeliverySimple(username,password,sub,customer,plan,btn);
+    }
+}
+function doCopyDeliverySimple(username,password,sub,customer,plan,btn){
     let text = '';
     if(customer) text += `👤 نام مشتری: ${customer}\n`;
     text += `👤 نام کاربری: ${username}\n`;
@@ -333,14 +448,15 @@ function copyDelivery(btn){
     text += `🔗 لینک سابسکریپشن:\n${sub}\n\n`;
     text += `📱 آموزش اتصال:\n1. لینک بالا را کپی کنید\n2. در اپلیکیشن Hiddify / V2rayNG گزینه Import from Clipboard را بزنید\n3. متصل شوید\n\n`;
     text += `🤖 ربات: @${window.location.hostname}bot`;
-    
+    doCopyDeliveryText(text, btn);
+}
+function doCopyDeliveryText(text, btn){
     navigator.clipboard.writeText(text).then(()=>{
         const orig = btn.innerHTML;
         btn.innerHTML = '<i class="fa-solid fa-check text-[12px]"></i>';
         btn.classList.add('bg-emerald-600','text-white');
         setTimeout(()=>{ btn.innerHTML=orig; btn.classList.remove('bg-emerald-600','text-white'); }, 2000);
     }).catch(()=>{
-        // Fallback
         const ta=document.createElement('textarea');
         ta.value=text;
         document.body.appendChild(ta);
@@ -348,6 +464,60 @@ function copyDelivery(btn){
         document.execCommand('copy');
         document.body.removeChild(ta);
         alert('✅ کپی شد:\n\n'+text);
+    });
+}
+function openProxyModal(clientId, username){
+    document.getElementById('proxyModalUsername').innerText = username || clientId;
+    document.getElementById('proxyModalLoading').classList.remove('hidden');
+    document.getElementById('proxyModalContent').classList.add('hidden');
+    const m=document.getElementById('proxyModal'); m.classList.remove('hidden'); m.classList.add('flex');
+    
+    fetch('<?= Helpers::url('api/v1/admin/client-proxies') ?>?id='+clientId)
+    .then(r=>r.json())
+    .then(data=>{
+        document.getElementById('proxyModalLoading').classList.add('hidden');
+        if(!data.success){
+            document.getElementById('proxyModalLoading').innerHTML = '<span class="text-rose-400">❌ '+ (data.error || 'خطا') +'</span>';
+            document.getElementById('proxyModalLoading').classList.remove('hidden');
+            return;
+        }
+        const d = data.data;
+        const p = d.proxies;
+        currentProxyData = d;
+        
+        document.getElementById('proxySocksUrl').value = p.dedicated?.socks?.url || '';
+        document.getElementById('proxySocksHost').innerText = p.dedicated?.socks?.host || '-';
+        document.getElementById('proxySocksPort').innerText = p.dedicated?.socks?.port || '-';
+        document.getElementById('proxySocksUser').innerText = p.dedicated?.socks?.username || '-';
+        document.getElementById('proxySocksPass').innerText = p.dedicated?.socks?.password || '-';
+        
+        document.getElementById('proxyHttpUrl').value = p.dedicated?.http?.url || '';
+        
+        document.getElementById('proxyMtprotoUrl').value = p.mtproto?.url || '';
+        document.getElementById('proxyMtprotoTgUrl').value = p.mtproto?.tg_url || '';
+        document.getElementById('proxyMtprotoSecret').innerText = p.mtproto?.secret_short || p.mtproto?.secret || '-';
+        
+        document.getElementById('proxySubUrl').value = d.sub_url || '';
+        
+        document.getElementById('proxyModalContent').classList.remove('hidden');
+    }).catch(e=>{
+        document.getElementById('proxyModalLoading').innerHTML = '<span class="text-rose-400">❌ خطا: '+e.message+'</span>';
+    });
+}
+function closeProxyModal(){ const m=document.getElementById('proxyModal'); m.classList.remove('flex'); m.classList.add('hidden'); }
+function copyProxyDelivery(){
+    if(!currentProxyData){ alert('داده پروکسی موجود نیست'); return; }
+    const d = currentProxyData;
+    const p = d.proxies;
+    let text = `👤 یوزر: ${d.username}\n`;
+    if(d.customer_name) text += `👤 نام: ${d.customer_name}\n`;
+    text += `🔗 ساب لینک:\n${d.sub_url}\n\n`;
+    text += `🛡️ پروکسی SOCKS5 (بدون VPN):\n${p.dedicated?.socks?.url || ''}\n\n`;
+    text += `🌐 پروکسی HTTP (مرورگر):\n${p.dedicated?.http?.url || ''}\n\n`;
+    text += `✈️ MTProto تلگرام:\n${p.mtproto?.url || ''}\n\n`;
+    text += `📱 آموزش:\n- برای تلگرام: روی لینک MTProto بزنید یا SOCKS5 را دستی ست کنید (Server: ${p.dedicated?.socks?.host} Port: ${p.dedicated?.socks?.port})\n- برای مرورگر: HTTP پروکسی را ست کنید\n`;
+    navigator.clipboard.writeText(text).then(()=>{
+        alert('✅ متن کامل پروکسی + ساب کپی شد!');
     });
 }
 function openInspectModal(id,username,subUrl){
