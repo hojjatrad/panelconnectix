@@ -1273,17 +1273,32 @@ class ApiService {
     return null;
   }
 
-  // v4.0.15 FIX: Panel-first + version param + cache busting to fix "old version remains after install"
-  // User reported v4.0.14 downloads but old version remains - root cause: Cloudflare cache serving old APK
-  // Fix: Always add ?v=version&t=timestamp to bypass CF cache, verify file size, prioritize versioned URL
+  // v4.0.19 FOREVER LAW - Deep verification + version check + multi-source retry + anti-jump
+  // User reported: "برنامه آپ هنگام نصب میپره و نصب نمیشه و نسخه جدیدی نمیاد"
+  // Root causes:
+  // 1. Panel serves old APK content even with ?v= param (mirrored file stale on host)
+  // 2. App downloads old APK and installs it, so version remains old
+  // 3. Installer jumps because APK invalid or same version or corrupted
+  // FOREVER LAWS (must always be applied in future versions):
+  // LAW 1: Panel must NEVER serve old APK (auto-delete stale files in Database.php + ApiController)
+  // LAW 2: App must verify APK versionName after download via PackageManager.getPackageArchiveInfo
+  // LAW 3: If downloaded version != expected, try next URL automatically (no manual retry needed)
+  // LAW 4: Clear old files before download (cache + external)
+  // LAW 5: ?v=version&t=time&s=random for ALL cache bypass (Cloudflare, CDN, browser)
+  // LAW 6: Always try GitHub as fallback even if panel file exists (GitHub is source of truth)
+  // LAW 7: Verify PK header + size > 10MB + versionName + log everything
+  // LAW 8: Use externalFilesDir for FileProvider (best for MIUI/Samsung) + grant to 9 installers
+  // LAW 9: Pure Intent (ACTION_INSTALL_PACKAGE + VIEW + Chooser) - NO PackageInstaller API
+  // LAW 10: Show detailed error with file path, size, version, and browser fallback
   static Future<void> downloadAndInstallApk({
+
     required String downloadUrl,
     required Function(double progress, int receivedBytes, int totalBytes) onProgress,
     required Function(String error) onError,
     required Function() onSuccess,
   }) async {
     
-    // Generate all possible download URLs to try - PANEL FIRST with version param
+    // v4.0.19 FOREVER LAW: Generate all URLs with deep cache busting + GitHub fallback
     List<String> generateAllUrls(String primary, String fallback) {
       final urls = <String>[];
       final seen = <String>{};
@@ -1291,37 +1306,42 @@ class ApiService {
       void addUrl(String u) {
         if (u.isEmpty || !u.startsWith('http')) return;
         if (seen.contains(u)) return;
-        // Skip known broken subdomains (404 confirmed)
         if (u.contains('ir.vpbotn.ir/Connectix') || u.contains('cf.vpbotn.ir/Connectix')) {
-          log('generateAllUrls SKIP broken 404 url: $u');
+          log('v4.0.19 SKIP broken 404 url: $u');
           return;
         }
         seen.add(u);
         urls.add(u);
       }
       
-      // v4.0.15: Extract version from primary for cache busting
+      // v4.0.19: Extract version with deep parse
       String ver = '';
       try {
         final verMatch = RegExp(r'v?(\d+\.\d+\.\d+)').firstMatch(primary);
         if (verMatch != null) ver = verMatch.group(1) ?? '';
-        // Also try from fallback
         if (ver.isEmpty) {
           final verMatch2 = RegExp(r'v?(\d+\.\d+\.\d+)').firstMatch(fallback);
           if (verMatch2 != null) ver = verMatch2.group(1) ?? '';
         }
+        if (ver.isEmpty) ver = '4.0.19';
       } catch (_) {}
-      if (ver.isEmpty) ver = '4.0.15';
+      if (ver.isEmpty) ver = '4.0.19';
       
       final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+      final random = (DateTime.now().millisecondsSinceEpoch % 9000 + 1000).toString();
       
-      // Helper to add version param to URL
       String addVersionParam(String url) {
-        if (url.contains('?v=')) return url; // Already versioned
-        if (url.contains('github.com')) return url; // GitHub doesn't need version param
-        // Add ?v=version&t=timestamp for cache busting
+        if (url.contains('github.com')) {
+          // GitHub: add cache buster too
+          if (url.contains('?')) return '$url&t=$timestamp&s=$random';
+          return '$url?t=$timestamp&s=$random';
+        }
+        if (url.contains('?v=')) {
+          if (!url.contains('&t=')) return '$url&t=$timestamp&s=$random';
+          return url;
+        }
         if (url.contains('?')) {
-          return '$url&v=$ver&t=$timestamp';
+          return '$url&v=$ver&t=$timestamp&s=$random';
         } else {
           return '$url?v=$ver&t=$timestamp';
         }
@@ -1358,7 +1378,7 @@ class ApiService {
         }
       } catch (_) {}
       
-      log('v4.0.15 generateAllUrls: primary=$primary ver=$ver total=${urls.length} urls=$urls');
+      log('v4.0.19 FOREVER LAW generateAllUrls: primary=$primary ver=$ver total=${urls.length} urls=$urls');
       return urls;
     }
 
@@ -1428,6 +1448,36 @@ class ApiService {
 
         log('http pkg download success: $url len=$len');
         onProgress(1.0, len, len);
+        
+        // v4.0.19 FOREVER LAW: Verify APK versionName via native PackageManager
+        try {
+          final apkVersion = await _updaterChannel.invokeMethod<String>('getApkVersionName', {'filePath': file.path});
+          log('v4.0.19 APK version check: expected contains $ver, got $apkVersion from $url');
+          if (apkVersion != null && apkVersion.isNotEmpty) {
+            // If expected version is in URL but APK version is different and older, it's stale
+            if (ver.isNotEmpty && !apkVersion.contains(ver)) {
+              // Check if apkVersion is older than expected
+              try {
+                final expectedParts = ver.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+                final actualParts = apkVersion.replaceAll(RegExp(r'[^\d.]'), '').split('.').map((e) => int.tryParse(e) ?? 0).toList();
+                bool isOlder = false;
+                for (int i = 0; i < 3; i++) {
+                  final exp = i < expectedParts.length ? expectedParts[i] : 0;
+                  final act = i < actualParts.length ? actualParts[i] : 0;
+                  if (act < exp) { isOlder = true; break; }
+                  if (act > exp) break;
+                }
+                if (isOlder) {
+                  log('v4.0.19 STALE APK DETECTED: expected $ver but got $apkVersion from $url - trying next URL');
+                  try { await file.delete(); } catch (_) {}
+                  return false; // Try next URL
+                }
+              } catch (_) {}
+            }
+          }
+        } catch (e) {
+          log('v4.0.19 APK version check failed (non-fatal): $e');
+        }
         
         // Try install
         try {
@@ -1533,6 +1583,32 @@ class ApiService {
           }
         } catch (e) {
           if (e.toString().contains('معتبر نیست') || e.toString().contains('HTML') || e.toString().contains('ناقص')) rethrow;
+        }
+
+        // v4.0.19 FOREVER LAW: Verify APK versionName
+        try {
+          final apkVersion = await _updaterChannel.invokeMethod<String>('getApkVersionName', {'filePath': file.path});
+          log('v4.0.19 HttpClient APK version check: expected $ver, got $apkVersion from $url');
+          if (apkVersion != null && apkVersion.isNotEmpty && ver.isNotEmpty && !apkVersion.contains(ver)) {
+            try {
+              final expectedParts = ver.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+              final actualParts = apkVersion.replaceAll(RegExp(r'[^\d.]'), '').split('.').map((e) => int.tryParse(e) ?? 0).toList();
+              bool isOlder = false;
+              for (int i = 0; i < 3; i++) {
+                final exp = i < expectedParts.length ? expectedParts[i] : 0;
+                final act = i < actualParts.length ? actualParts[i] : 0;
+                if (act < exp) { isOlder = true; break; }
+                if (act > exp) break;
+              }
+              if (isOlder) {
+                log('v4.0.19 STALE APK DETECTED HttpClient: expected $ver but got $apkVersion - next URL');
+                try { await file.delete(); } catch (_) {}
+                return false;
+              }
+            } catch (_) {}
+          }
+        } catch (e) {
+          log('v4.0.19 APK version check failed (non-fatal): $e');
         }
 
         try {

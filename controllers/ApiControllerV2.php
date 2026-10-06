@@ -873,19 +873,31 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
         $downloadUrl = trim(Setting::get('app_download_url', ''));
         $universalUrl= trim(Setting::get('app_universal_url', ''));
 
-        // FIX 2026-10-02: Prefer PANEL-HOST mirrored APKs over GitHub
-        // GitHub is filtered in Iran for some ISPs (MCI etc) — causes "some phones update, some not"
-        // Panel host https://vpbotn.ir/contax/Connectix-*.apk works for ALL Iranian operators
-        $panelBase = rtrim(Helpers::fullUrl(''), '/'); // e.g. https://vpbotn.ir/contax
+        // v4.0.19 FOREVER LAW - Comprehensive APK freshness guarantee (same as ApiController)
+        $panelBase = rtrim(Helpers::fullUrl(''), '/');
         $mirroredArm64 = __DIR__ . '/../Connectix-ARM64-v8a.apk';
         $mirroredUniversal = __DIR__ . '/../Connectix-Universal.apk';
-        $hasMirroredArm64 = is_file($mirroredArm64) && filesize($mirroredArm64) > 1024*1024;
-        $hasMirroredUniversal = is_file($mirroredUniversal) && filesize($mirroredUniversal) > 1024*1024;
+        $mirroredArm64Size = is_file($mirroredArm64) ? filesize($mirroredArm64) : 0;
+        $mirroredUniversalSize = is_file($mirroredUniversal) ? filesize($mirroredUniversal) : 0;
+        $hasMirroredArm64 = $mirroredArm64Size > 1024*1024;
+        $hasMirroredUniversal = $mirroredUniversalSize > 1024*1024;
 
-        // v4.0.17 FOREVER FIX: Always add ?v=version to bypass Cloudflare cache
-        $versionParam = $latest !== '' ? '?v=' . urlencode($latest) . '&t=' . time() : '?t=' . time();
+        $versionUpdatedAt = Setting::get('app_version_updated_at', '');
+        $versionUpdatedTime = $versionUpdatedAt ? strtotime($versionUpdatedAt) : 0;
+        $arm64Mtime = is_file($mirroredArm64) ? filemtime($mirroredArm64) : 0;
+        $universalMtime = is_file($mirroredUniversal) ? filemtime($mirroredUniversal) : 0;
+        
+        if ($hasMirroredArm64 && $versionUpdatedTime > 0 && $arm64Mtime < $versionUpdatedTime) {
+            @unlink($mirroredArm64);
+            $hasMirroredArm64 = false;
+        }
+        if ($hasMirroredUniversal && $versionUpdatedTime > 0 && $universalMtime < $versionUpdatedTime) {
+            @unlink($mirroredUniversal);
+            $hasMirroredUniversal = false;
+        }
 
-        // If setting is empty OR points to GitHub but we have mirrored file, use mirrored WITH version param
+        $versionParam = $latest !== '' ? '?v=' . urlencode($latest) . '&t=' . time() . '&s=' . rand(1000,9999) : '?t=' . time() . '&s=' . rand(1000,9999);
+
         $isGithubUrl = fn($u) => str_contains($u, 'github.com') || str_contains($u, 'githubusercontent.com');
         if ($downloadUrl === '' || ($isGithubUrl($downloadUrl) && $hasMirroredArm64)) {
             if ($hasMirroredArm64) {
@@ -901,20 +913,21 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
                 $universalUrl = "https://github.com/{$repo}/releases/download/v{$latest}/Connectix-Android-Universal.apk";
             }
         }
-        // Extra safety: if mirrored files exist but settings still GitHub, override to panel host WITH version param
         if ($hasMirroredArm64 && $isGithubUrl($downloadUrl)) {
             $downloadUrl = $panelBase . '/Connectix-ARM64-v8a.apk' . $versionParam;
         }
         if ($hasMirroredUniversal && $isGithubUrl($universalUrl)) {
             $universalUrl = $panelBase . '/Connectix-Universal.apk' . $versionParam;
         }
-        // v4.0.17 FOREVER FIX: If panel host without version param, add it
         if (str_contains($downloadUrl, 'vpbotn.ir/Connectix') && !str_contains($downloadUrl, '?v=')) {
-            $downloadUrl .= (str_contains($downloadUrl, '?') ? '&' : '?') . 'v=' . urlencode($latest) . '&t=' . time();
+            $downloadUrl .= (str_contains($downloadUrl, '?') ? '&' : '?') . 'v=' . urlencode($latest) . '&t=' . time() . '&s=' . rand(1000,9999);
         }
         if (str_contains($universalUrl, 'vpbotn.ir/Connectix') && !str_contains($universalUrl, '?v=')) {
-            $universalUrl .= (str_contains($universalUrl, '?') ? '&' : '?') . 'v=' . urlencode($latest) . '&t=' . time();
+            $universalUrl .= (str_contains($universalUrl, '?') ? '&' : '?') . 'v=' . urlencode($latest) . '&t=' . time() . '&s=' . rand(1000,9999);
         }
+        
+        $githubArm64 = "https://github.com/{$repo}/releases/download/v{$latest}/Connectix-Android-ARM64.apk";
+        $githubUniversal = "https://github.com/{$repo}/releases/download/v{$latest}/Connectix-Android-Universal.apk";
         $title       = trim(Setting::get('app_update_title', '')) ?: "Connectix v{$latest}";
         $changelog   = trim(Setting::get('app_update_changelog', '')) ?: "• نگارش جدید سامانه منتشر شد.";
         $enabled     = trim(Setting::get('app_update_enabled', '1'));
@@ -940,7 +953,12 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
             'changelog' => $changelog,
             'download_url' => $downloadUrl,
             'universal_url' => $universalUrl,
-            'release_date' => date('Y-m-d')
+            'fallback_url' => $githubUniversal,
+            'github_arm64' => $githubArm64,
+            'github_universal' => $githubUniversal,
+            'release_date' => date('Y-m-d'),
+            'version_code' => (int)Setting::get('app_version_code', '54'),
+            'cache_buster' => time()
         ], 'نگارش جدید سامانه آماده دریافت است.');
     }
 

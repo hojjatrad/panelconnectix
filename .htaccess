@@ -20,30 +20,44 @@
     FileETag None
 </IfModule>
 
-# v6.8.26 Cloudflare 520 fix - bypass cache for heavy endpoints
-# v4.0.17 FOREVER FIX: APK files must NEVER be cached by Cloudflare - always fresh
+# v4.0.19 FOREVER LAW - APK and updater must NEVER be cached - 10 laws
+# LAW 1: Panel never serves old APK (auto-delete stale in Database.php)
+# LAW 5: ?v=&t=&s= for all cache bypass
+# LAW 6: GitHub always as fallback
+# LAW 7: quick_update auto-downloads fresh APKs
+# This .htaccess ensures Cloudflare, CDN, browser NEVER cache APKs
 <IfModule mod_headers.c>
-    <FilesMatch "(quick_update|repair|cron)\.php$">
-        Header set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
-        Header set Pragma "no-cache"
-        Header set cf-cache-status "BYPASS"
-        Header set CDN-Cache-Control "no-store"
-        Header set Cloudflare-CDN-Cache-Control "no-store"
-    </FilesMatch>
-    <FilesMatch "\.apk$">
+    <FilesMatch "(quick_update|repair|cron|update_to_|update_apks).php$">
         Header set Cache-Control "no-store, no-cache, must-revalidate, max-age=0, no-transform"
         Header set Pragma "no-cache"
         Header set Expires "0"
         Header set cf-cache-status "BYPASS"
         Header set CDN-Cache-Control "no-store"
         Header set Cloudflare-CDN-Cache-Control "no-store, max-age=0"
+        Header set X-Accel-Buffering "no"
+    </FilesMatch>
+    <FilesMatch "\.apk$">
+        Header set Cache-Control "no-store, no-cache, must-revalidate, max-age=0, no-transform, private"
+        Header set Pragma "no-cache"
+        Header set Expires "0"
+        Header set cf-cache-status "BYPASS"
+        Header set CDN-Cache-Control "no-store, max-age=0"
+        Header set Cloudflare-CDN-Cache-Control "no-store, max-age=0"
         Header set X-Content-Type-Options "nosniff"
+        Header set X-Accel-Buffering "no"
+        Header set Vary "Accept-Encoding"
+    </FilesMatch>
+    <FilesMatch "app_release\.json$">
+        Header set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
+        Header set cf-cache-status "BYPASS"
+        Header set CDN-Cache-Control "no-store"
     </FilesMatch>
 </IfModule>
 
-# v4.0.17 FOREVER FIX: Also set expires for APK to 0
 <IfModule mod_expires.c>
+    ExpiresActive On
     ExpiresByType application/vnd.android.package-archive "access plus 0 seconds"
+    ExpiresByType application/json "access plus 0 seconds"
 </IfModule>
 
 # S7: Protect sensitive directories - deny direct access to core, cache, data

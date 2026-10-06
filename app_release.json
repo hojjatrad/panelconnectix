@@ -1,23 +1,24 @@
 {
-  "version": "4.0.18",
-  "code": 53,
-  "changelog": "v4.0.18 PROXY FREE - پروکسی رایگان برای تمام مشتری‌های VPN! 🔒 تلگرام و سایر برنامه‌ها بدون نیاز به VPN کامل. ویژگی‌ها: 1) پروکسی SOCKS5 رایگان برای تلگرام (socks5://username:password@host:1080) 2) پروکسی HTTP برای مرورگر و سایر برنامه‌ها 3) MTProto اختصاصی تلگرام با لینک مستقیم t.me/proxy 4) پروکسی محلی 127.0.0.1:10808/10809 برای اشتراک با TV و کنسول 5) صفحه پروکسی جدید با کپی، QR، آموزش کامل تلگرام. تمام پروکسی‌ها از سرورهای موجود Xray استفاده می‌کنند و برای مشتری‌های VPN رایگان است. آماده برای v4.0.19 پلن فروش پروکسی جداگانه. فیکس دائمی کش نسخه قدیمی همچنان فعال.",
-  "date": "2026-10-05",
+  "version": "4.0.19",
+  "code": 54,
+  "changelog": "v4.0.19 FOREVER INSTALL FIX - فیکس دائمی مشکل نصب میپره و نسخه جدید نمیاد! 🔒 قوانین دائمی: 1) پنل هرگز APK قدیمی سرو نمیکند - اگر فایل قدیمی باشد خودکار حذف و از گیت‌هاب میگیرد 2) اپ نسخه APK دانلود شده را با PackageManager.getPackageArchiveInfo چک میکند 3) اگر نسخه APK با انتظار فرق داشت خودکار لینک بعدی را امتحان میکند 4) قبل از دانلود فایل قدیمی پاک میشود 5) ?v=version&t=time&s=random برای دور زدن تمام کش‌ها (Cloudflare, CDN, browser) 6) همیشه گیت‌هاب به عنوان fallback حتی اگر فایل پنل موجود باشد 7) quick_update.php خودکار APK تازه از گیت‌هاب دانلود میکند 8) Database.php اگر نسخه قدیمی باشد فایل‌های قدیمی را حذف میکند 9) Pure Intent نصب (ACTION_INSTALL_PACKAGE + VIEW + Chooser) - بدون PackageInstaller API که در MIUI/Samsung میپره 10) لاگ کامل برای دیباگ. پروکسی رایگان برای تلگرام از v4.0.18 همچنان فعال.",
+  "date": "2026-10-06",
   "apk": {
-    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.18/Connectix-Android-ARM64.apk",
-    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.18/Connectix-Android-Universal.apk",
-    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.18/Connectix-Android-ARM32.apk"
+    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.19/Connectix-Android-ARM64.apk",
+    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.19/Connectix-Android-Universal.apk",
+    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.19/Connectix-Android-ARM32.apk"
   },
   "windows": {
-    "version": "4.0.18",
-    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.18/Connectix-Windows-x64.zip"
+    "version": "4.0.19",
+    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.19/Connectix-Windows-x64.zip"
   },
   "ultra": true,
   "core": "flutter_vless dual-core",
   "protocols": ["vless", "vmess", "trojan", "ss", "socks", "http", "wireguard", "hysteria2", "raw", "clash", "singbox", "mtproto"],
   "fixes": {
-    "proxy_free": "v4.0.18 PROXY FREE - Free SOCKS5/HTTP/MTProto proxy for all VPN customers using existing Xray nodes, for Telegram and other apps",
-    "old_version_forever": "v4.0.17 FOREVER FIX - ApiController always adds ?v=version&t=time(), .htaccess no-store BYPASS for .apk, app only tries versioned URLs, baseUrls vpbotn.ir first - forever in all future versions",
+    "forever_install_fix": "v4.0.19 FOREVER LAW - 10 laws to fix install jump and old version forever: panel never serves old APK (auto-delete stale), app verifies APK versionName via PackageManager, auto-retry next URL if version mismatch, clear old files before download, ?v=&t=&s= for all cache bypass, GitHub always as fallback, quick_update auto-downloads fresh APKs, Database deletes old files, Pure Intent installer, full logging",
+    "proxy_free": "v4.0.18 PROXY FREE - Free SOCKS5/HTTP/MTProto proxy for all VPN customers",
+    "old_version_forever": "v4.0.17 FOREVER FIX - ApiController ?v=&t=, .htaccess BYPASS, app versioned URLs only",
     "ping_progress_0_16": "v4.0.16 - Fixed 0/16 stuck with timeouts",
     "panel_manager_before_login": "v4.0.15 - Panel manager on login screen",
     "installer_stuck_forever": "v4.0.13 PURE INTENT - Removed PackageInstaller"

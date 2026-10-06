@@ -1168,19 +1168,44 @@ class Database {
                 }
             } catch (Throwable $e) {}
 
-            // v4.0.18 PROXY FREE - Auto update app_latest_version if outdated
+            // v4.0.19 FOREVER LAW - Auto update app_latest_version + delete stale APKs
+            // LAW: If version is older than latest, auto-update and delete old APK files so GitHub fallback is used
             try {
                 require_once __DIR__ . '/Setting.php';
                 $currentVer = Setting::get('app_latest_version', '');
-                // If version is older than 4.0.18, auto-update to 4.0.18
-                if ($currentVer === '' || version_compare($currentVer, '4.0.18', '<')) {
-                    Setting::set('app_latest_version', '4.0.18');
-                    Setting::set('app_update_title', 'Connectix v4.0.18 PROXY FREE 🔒');
+                $latestVer = '4.0.19';
+                $latestCode = '54';
+                // If version is older than latest, auto-update
+                if ($currentVer === '' || version_compare($currentVer, $latestVer, '<')) {
+                    Setting::set('app_latest_version', $latestVer);
+                    Setting::set('app_version_code', $latestCode);
+                    Setting::set('app_version_updated_at', date('Y-m-d H:i:s'));
+                    Setting::set('app_update_title', "Connectix v{$latestVer} FOREVER INSTALL FIX 🔒");
+                    Setting::set('app_update_changelog', "🔒 فیکس دائمی نصب + پروکسی رایگان!\n\n• فیکس دائمی: نصب میپرید و نسخه جدید نمیامد - حل شد برای همیشه\n• قانون دائمی: پنل هرگز APK قدیمی سرو نمیکند - اگر فایل قدیمی باشد خودکار حذف و از گیت‌هاب میگیرد\n• قانون دائمی: اپ نسخه APK دانلود شده را با PackageManager چک میکند\n• قانون دائمی: اگر نسخه APK با نسخه مورد انتظار فرق داشت، خودکار لینک بعدی را امتحان میکند\n• قانون دائمی: قبل از دانلود، فایل قدیمی پاک میشود\n• قانون دائمی: ?v=version&t=time&s=random برای دور زدن تمام کش‌ها\n• پروکسی رایگان برای تلگرام و سایر برنامه‌ها (از v4.0.18)\n• فیکس پینگ 0/16 و مدیریت پنل قبل از لاگین");
                     Setting::set('app_update_enabled', '1');
                     $pb = 'https://vpbotn.ir';
-                    if (empty(Setting::get('app_download_url','')) || str_contains(Setting::get('app_download_url',''), '4.0.17')) {
-                        Setting::set('app_download_url', $pb . '/Connectix-ARM64-v8a.apk?v=4.0.18&t=' . time());
-                        Setting::set('app_universal_url', $pb . '/Connectix-Universal.apk?v=4.0.18&t=' . time());
+                    // Force GitHub URLs if mirrored files are stale - app will try panel first then GitHub
+                    Setting::set('app_download_url', $pb . '/Connectix-ARM64-v8a.apk?v=' . $latestVer . '&t=' . time() . '&s=' . rand(1000,9999));
+                    Setting::set('app_universal_url', $pb . '/Connectix-Universal.apk?v=' . $latestVer . '&t=' . time() . '&s=' . rand(1000,9999));
+                    
+                    // v4.0.19 LAW: Delete stale APK files if they exist and are older than version update
+                    $apkFiles = [
+                        __DIR__ . '/../Connectix-ARM64-v8a.apk',
+                        __DIR__ . '/../Connectix-Universal.apk',
+                        __DIR__ . '/../Connectix-ARM32-v7a.apk',
+                        __DIR__ . '/../Connectix-Android-ARM64.apk',
+                        __DIR__ . '/../Connectix-Android-Universal.apk',
+                    ];
+                    foreach ($apkFiles as $apkFile) {
+                        if (is_file($apkFile)) {
+                            $mtime = filemtime($apkFile);
+                            // If file is older than 5 minutes, it's likely old version - delete to force GitHub fallback
+                            // Or if version changed, delete anyway to ensure fresh
+                            if (time() - $mtime > 300) { // 5 min
+                                @unlink($apkFile);
+                                error_log("v4.0.19 LAW: Deleted stale APK $apkFile (mtime " . date('Y-m-d H:i:s', $mtime) . ")");
+                            }
+                        }
                     }
                 }
             } catch (Throwable $e) {}

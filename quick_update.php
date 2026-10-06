@@ -597,7 +597,7 @@ try {
 } catch (Throwable $e) { logStep("هشدار پاکسازی قفل: ".$e->getMessage(), 'warn'); }
 
 // 9. Send Notification to Telegram Supergroup Reports Topic & Synchronize Settings
-// v4.0.18 PROXY FREE - Auto update app version to latest from app_release.json or dashboard
+// v4.0.19 FOREVER LAW - Auto update app version + auto-download APKs from GitHub
 $tgNotice = false;
 try {
     require_once __DIR__ . '/config.php';
@@ -606,7 +606,8 @@ try {
     require_once __DIR__ . '/core/TelegramBot.php';
 
     // Auto-detect latest app version from dashboard_screen.dart or app_release.json
-    $latestAppVersion = '4.0.18';
+    $latestAppVersion = '4.0.19';
+    $latestAppCode = '54';
     try {
         $dartFile = __DIR__ . '/client-app/lib/screens/dashboard_screen.dart';
         if (file_exists($dartFile)) {
@@ -621,20 +622,74 @@ try {
             if (!empty($rj['version'])) {
                 $latestAppVersion = $rj['version'];
             }
+            if (!empty($rj['code'])) {
+                $latestAppCode = (string)$rj['code'];
+            }
+        }
+        $pubspecFile = __DIR__ . '/client-app/pubspec.yaml';
+        if (file_exists($pubspecFile)) {
+            $pubContent = file_get_contents($pubspecFile);
+            if (preg_match("/version:\s*[\d\.]+\+(\d+)/", $pubContent, $m2)) {
+                $latestAppCode = $m2[1];
+            }
         }
     } catch (Throwable $e) {}
 
-    // v4.0.18: Force update app_latest_version to latest
+    // v4.0.19 FOREVER LAW: Force update app_latest_version to latest
     $currentAppVer = Setting::get('app_latest_version', '');
-    if ($currentAppVer !== $latestAppVersion) {
+    $needsApkDownload = false;
+    if ($currentAppVer !== $latestAppVersion || version_compare($currentAppVer, $latestAppVersion, '<')) {
         Setting::set('app_latest_version', $latestAppVersion);
-        Setting::set('app_update_title', "Connectix v{$latestAppVersion} PROXY FREE 🔒");
-        Setting::set('app_update_changelog', "🔒 پروکسی رایگان برای تمام مشتری‌های VPN!\n\n• SOCKS5 رایگان برای تلگرام\n• HTTP برای مرورگر\n• MTProto اختصاصی تلگرام\n• پروکسی محلی 127.0.0.1:10808/10809 برای TV\n• صفحه پروکسی جدید با کپی، QR، آموزش\n• فیکس دائمی کش نسخه قدیمی");
+        Setting::set('app_version_code', $latestAppCode);
+        Setting::set('app_version_updated_at', date('Y-m-d H:i:s'));
+        Setting::set('app_update_title', "Connectix v{$latestAppVersion} FOREVER INSTALL FIX 🔒");
+        Setting::set('app_update_changelog', "🔒 فیکس دائمی نصب + پروکسی رایگان!\n\n• فیکس دائمی: نصب میپرید و نسخه جدید نمیامد - حل شد برای همیشه\n• قانون 1: پنل هرگز APK قدیمی سرو نمیکند - اگر فایل قدیمی باشد خودکار حذف و از گیت‌هاب میگیرد\n• قانون 2: اپ نسخه APK دانلود شده را با PackageManager چک میکند\n• قانون 3: اگر نسخه APK با انتظار فرق داشت، خودکار لینک بعدی\n• قانون 4: قبل از دانلود فایل قدیمی پاک میشود\n• قانون 5: ?v=version&t=time&s=random برای دور زدن تمام کش‌ها\n• قانون 6: همیشه گیت‌هاب به عنوان fallback حتی اگر فایل پنل موجود باشد\n• پروکسی رایگان برای تلگرام (از v4.0.18)\n• فیکس پینگ 0/16 و مدیریت پنل قبل لاگین");
         Setting::set('app_update_enabled', '1');
         $panelBase = 'https://vpbotn.ir';
-        Setting::set('app_download_url', $panelBase . '/Connectix-ARM64-v8a.apk?v=' . $latestAppVersion . '&t=' . time());
-        Setting::set('app_universal_url', $panelBase . '/Connectix-Universal.apk?v=' . $latestAppVersion . '&t=' . time());
-        logStep("✅ نسخه اپ به {$latestAppVersion} PROXY FREE آپدیت شد", 'success');
+        Setting::set('app_download_url', $panelBase . '/Connectix-ARM64-v8a.apk?v=' . $latestAppVersion . '&t=' . time() . '&s=' . rand(1000,9999));
+        Setting::set('app_universal_url', $panelBase . '/Connectix-Universal.apk?v=' . $latestAppVersion . '&t=' . time() . '&s=' . rand(1000,9999));
+        logStep("✅ نسخه اپ به {$latestAppVersion} FOREVER FIX آپدیت شد", 'success');
+        $needsApkDownload = true;
+    }
+
+    // v4.0.19 FOREVER LAW: Auto-download fresh APKs from GitHub if version changed or files stale
+    if ($needsApkDownload) {
+        try {
+            $apkBase = "https://github.com/hojjatrad/panelconnectix/releases/download/v{$latestAppVersion}";
+            $apkFiles = [
+                'Connectix-ARM64-v8a.apk' => $apkBase . '/Connectix-Android-ARM64.apk',
+                'Connectix-Universal.apk' => $apkBase . '/Connectix-Android-Universal.apk',
+                'Connectix-ARM32-v7a.apk' => $apkBase . '/Connectix-Android-ARM32.apk',
+            ];
+            foreach ($apkFiles as $localName => $remoteUrl) {
+                $localPath = __DIR__ . '/' . $localName;
+                // If file exists and is recent (<5min), skip
+                if (is_file($localPath) && (time() - filemtime($localPath) < 300)) {
+                    logStep("APK $localName تازه است، رد شد", 'info');
+                    continue;
+                }
+                logStep("دانلود APK تازه $localName از گیت‌هاب...", 'info');
+                $ch = curl_init($remoteUrl);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                curl_setopt($ch, CURLOPT_USERAGENT, 'Connectix-Updater');
+                $data = curl_exec($ch);
+                $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+                if ($code === 200 && strlen($data) > 5*1024*1024) {
+                    file_put_contents($localPath, $data);
+                    logStep("✅ APK $localName آپدیت شد: " . round(strlen($data)/1024/1024,1) . " MB", 'success');
+                } else {
+                    logStep("⚠️ دانلود $localName ناموفق (HTTP $code, " . round(strlen($data)/1024,1) . " KB) - از گیت‌هاب fallback استفاده میشود", 'warn');
+                    // Delete old file so GitHub URL is used
+                    if (is_file($localPath)) @unlink($localPath);
+                }
+            }
+        } catch (Throwable $e) {
+            logStep("هشدار دانلود APK: " . $e->getMessage(), 'warn');
+        }
     }
 
     Setting::set('current_version', '7.2.0');

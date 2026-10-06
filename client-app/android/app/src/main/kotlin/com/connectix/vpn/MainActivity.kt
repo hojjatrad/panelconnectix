@@ -579,6 +579,31 @@ class MainActivity: FlutterActivity() {
                         result.success(emptyList<String>())
                     }
                 }
+                "getApkVersionName" -> {
+                    // v4.0.19 FOREVER LAW: Get versionName from downloaded APK to verify it's not stale
+                    val filePath = call.argument<String>("filePath") ?: ""
+                    try {
+                        val file = File(filePath)
+                        if (!file.exists()) {
+                            result.success("")
+                            return@setMethodCallHandler
+                        }
+                        val pm = context.packageManager
+                        val info = pm.getPackageArchiveInfo(filePath, 0)
+                        val versionName = info?.versionName ?: ""
+                        val versionCode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                            info?.longVersionCode?.toString() ?: ""
+                        } else {
+                            @Suppress("DEPRECATION")
+                            info?.versionCode?.toString() ?: ""
+                        }
+                        android.util.Log.i("ConnectixInstaller", "v4.0.19 getApkVersionName: $filePath -> $versionName ($versionCode) len=${file.length()}")
+                        result.success(versionName)
+                    } catch (e: Exception) {
+                        android.util.Log.e("ConnectixInstaller", "v4.0.19 getApkVersionName failed: ${e.message}")
+                        result.success("")
+                    }
+                }
                 "getAllInstalledApps" -> {
                     Thread {
                         try {

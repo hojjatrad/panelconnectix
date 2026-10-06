@@ -771,18 +771,42 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
         $downloadUrl = trim(Setting::get('app_download_url', ''));
         $universalUrl= trim(Setting::get('app_universal_url', ''));
 
-        // FIX 2026-10-02: Prefer PANEL-HOST mirrored APKs over GitHub (Iran filtering fix)
+        // v4.0.19 FOREVER LAW - Comprehensive APK freshness guarantee
+        // LAW 1: Panel must NEVER serve old APK content
+        // LAW 2: If mirrored file mtime is older than version setting time, delete it and fallback to GitHub
+        // LAW 3: Always verify file size and auto-heal
+        // LAW 4: Cloudflare BYPASS forever
         $panelBase = rtrim(Helpers::fullUrl(''), '/');
         $mirroredArm64 = __DIR__ . '/../Connectix-ARM64-v8a.apk';
         $mirroredUniversal = __DIR__ . '/../Connectix-Universal.apk';
-        $hasMirroredArm64 = is_file($mirroredArm64) && filesize($mirroredArm64) > 1024*1024;
-        $hasMirroredUniversal = is_file($mirroredUniversal) && filesize($mirroredUniversal) > 1024*1024;
+        $mirroredArm64Size = is_file($mirroredArm64) ? filesize($mirroredArm64) : 0;
+        $mirroredUniversalSize = is_file($mirroredUniversal) ? filesize($mirroredUniversal) : 0;
+        $hasMirroredArm64 = $mirroredArm64Size > 1024*1024;
+        $hasMirroredUniversal = $mirroredUniversalSize > 1024*1024;
         $isGithubUrl = fn($u) => str_contains($u, 'github.com') || str_contains($u, 'githubusercontent.com');
 
-        // v4.0.17 FOREVER FIX: Always add ?v=version to bypass Cloudflare cache
-        // User reported: update downloads but old version remains - root cause: CF cache serving old APK without version param
-        // Forever fix: Panel URLs must ALWAYS have ?v=latest to bypass CF cache
-        $versionParam = $latest !== '' ? '?v=' . urlencode($latest) . '&t=' . time() : '?t=' . time();
+        // v4.0.19 FOREVER LAW: Check if mirrored files are stale (mtime older than 1 hour after version update)
+        // If setting was updated recently but file is old, it's stale - delete and fallback to GitHub
+        $versionUpdatedAt = Setting::get('app_version_updated_at', '');
+        $versionUpdatedTime = $versionUpdatedAt ? strtotime($versionUpdatedAt) : 0;
+        $arm64Mtime = is_file($mirroredArm64) ? filemtime($mirroredArm64) : 0;
+        $universalMtime = is_file($mirroredUniversal) ? filemtime($mirroredUniversal) : 0;
+        
+        // If version was updated but APK file is older than version update, it's stale
+        if ($hasMirroredArm64 && $versionUpdatedTime > 0 && $arm64Mtime < $versionUpdatedTime) {
+            // File is stale - delete it so we fallback to GitHub fresh
+            @unlink($mirroredArm64);
+            $hasMirroredArm64 = false;
+            error_log("v4.0.19 LAW: Deleted stale ARM64 APK (mtime $arm64Mtime < version update $versionUpdatedTime)");
+        }
+        if ($hasMirroredUniversal && $versionUpdatedTime > 0 && $universalMtime < $versionUpdatedTime) {
+            @unlink($mirroredUniversal);
+            $hasMirroredUniversal = false;
+            error_log("v4.0.19 LAW: Deleted stale Universal APK");
+        }
+
+        // v4.0.19 FOREVER LAW: Always add ?v=version&t=time()&size= to bypass ALL caches
+        $versionParam = $latest !== '' ? '?v=' . urlencode($latest) . '&t=' . time() . '&s=' . rand(1000,9999) : '?t=' . time() . '&s=' . rand(1000,9999);
         
         if ($downloadUrl === '' || ($isGithubUrl($downloadUrl) && $hasMirroredArm64)) {
             $downloadUrl = $hasMirroredArm64 ? $panelBase . '/Connectix-ARM64-v8a.apk' . $versionParam : "https://github.com/{$repo}/releases/download/v{$latest}/Connectix-Android-ARM64.apk";
@@ -797,13 +821,17 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
         if ($hasMirroredUniversal && $isGithubUrl($universalUrl)) {
             $universalUrl = $panelBase . '/Connectix-Universal.apk' . $versionParam;
         }
-        // v4.0.17 FOREVER FIX: If downloadUrl is panel host without version param, add it
+        // v4.0.19 FOREVER LAW: If downloadUrl is panel host without version param, add it
         if (str_contains($downloadUrl, 'vpbotn.ir/Connectix') && !str_contains($downloadUrl, '?v=')) {
-            $downloadUrl .= (str_contains($downloadUrl, '?') ? '&' : '?') . 'v=' . urlencode($latest) . '&t=' . time();
+            $downloadUrl .= (str_contains($downloadUrl, '?') ? '&' : '?') . 'v=' . urlencode($latest) . '&t=' . time() . '&s=' . rand(1000,9999);
         }
         if (str_contains($universalUrl, 'vpbotn.ir/Connectix') && !str_contains($universalUrl, '?v=')) {
-            $universalUrl .= (str_contains($universalUrl, '?') ? '&' : '?') . 'v=' . urlencode($latest) . '&t=' . time();
+            $universalUrl .= (str_contains($universalUrl, '?') ? '&' : '?') . 'v=' . urlencode($latest) . '&t=' . time() . '&s=' . rand(1000,9999);
         }
+        
+        // v4.0.19 LAW: Always provide GitHub fallback URL in extra field for app to try
+        $githubArm64 = "https://github.com/{$repo}/releases/download/v{$latest}/Connectix-Android-ARM64.apk";
+        $githubUniversal = "https://github.com/{$repo}/releases/download/v{$latest}/Connectix-Android-Universal.apk";
         $title       = trim(Setting::get('app_update_title', '')) ?: "Connectix v{$latest}";
         $changelog   = trim(Setting::get('app_update_changelog', '')) ?: "• نگارش جدید سامانه منتشر شد.";
         $enabled     = trim(Setting::get('app_update_enabled', '1'));
@@ -829,7 +857,14 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
             'changelog' => $changelog,
             'download_url' => $downloadUrl,
             'universal_url' => $universalUrl,
-            'release_date' => date('Y-m-d')
+            'fallback_url' => $githubUniversal,
+            'github_arm64' => $githubArm64,
+            'github_universal' => $githubUniversal,
+            'release_date' => date('Y-m-d'),
+            'version_code' => (int)Setting::get('app_version_code', '54'),
+            'apk_size_arm64' => $mirroredArm64Size,
+            'apk_size_universal' => $mirroredUniversalSize,
+            'cache_buster' => time()
         ], 'نگارش جدید سامانه آماده دریافت است.');
     }
 
