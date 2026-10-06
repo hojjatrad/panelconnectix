@@ -7,7 +7,7 @@ plugins {
 android {
     namespace = "com.connectix.vpn"
     compileSdk = 34
-    ndkVersion = "27.0.12077973"
+    ndkVersion = "26.3.11579264"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
