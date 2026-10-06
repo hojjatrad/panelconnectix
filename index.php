@@ -143,6 +143,13 @@ if (str_ends_with($requestPath, 'update_apks_to_4.0.19.php') || str_ends_with($r
     exit;
 }
 
+if (str_ends_with($requestPath, 'full_fix_without_github.php') || $routeParam === 'full_fix_without_github.php' || $routeParam === 'full_fix_without_github') {
+    if (file_exists(__DIR__ . '/full_fix_without_github.php')) {
+        require_once __DIR__ . '/full_fix_without_github.php';
+    }
+    exit;
+}
+
 if (str_ends_with($requestPath, 'browser_update.php') || $routeParam === 'browser_update.php' || $routeParam === 'browser_update') {
     if (file_exists(__DIR__ . '/browser_update.php')) {
         require_once __DIR__ . '/browser_update.php';
