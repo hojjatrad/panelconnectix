@@ -628,10 +628,8 @@ class MainActivity: FlutterActivity() {
                         var intentSuccess = false
                         for (intent in intents) {
                             try {
-                                // If Session API already succeeded, delay Intent a bit to avoid double UI, but still try as backup
                                 if (sessionSuccess) {
-                                    android.util.Log.i("ConnectixInstaller", "v4.0.22 Session already success, trying Intent backup after 300ms: ${intent.action}")
-                                    Thread.sleep(300)
+                                    android.util.Log.i("ConnectixInstaller", "v4.0.23 Session already success, trying Intent backup: ${intent.action}")
                                 }
                                 context.startActivity(intent)
                                 android.util.Log.i("ConnectixInstaller", "v4.0.22 Intent ${intent.action} SUCCESS len=${finalWorkingFile.length()} - installer window should appear")

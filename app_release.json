@@ -1,26 +1,27 @@
 {
-  "version": "4.0.22",
-  "code": 55,
-  "changelog": "v4.0.22 DEEP FORENSIC FIX - فیکس عمیق نصب + پروکسی محلی هات‌اسپات! 🔧 نصب: پنجره میومد و سریع بسته میشد و بدون اسکن نصب کن نمیومد - حل شد! 12 قانون جدید: 1) کپی APK به 3 جا (external files + cache + Downloads عمومی) برای Play Protect، 2) PackageInstaller Session API به عنوان روش اصلی (اندروید 14+)، 3) Intent با FileProvider + persistable permission به عنوان fallback، 4) Chooser با عنوان 'بدون اسکن نصب کن'، 5) باز کردن فایل منیجر در Downloads اگر نصب شکست خورد، 6) Downloads عمومی باعث میشه دیالوگ Play Protect 'نصب بدون اسکن' بیاد، 7) لاگ کامل برای دیباگ. پروکسی محلی: وقتی VPN وصله، 127.0.0.1:10808 برای همین گوشی + 0.0.0.0:10809 برای هات‌اسپات TV/کنسول/ویندوز (192.168.43.1:10809) - فیکس شد! پروکسی جدا قابل کپی از v4.0.21 همچنان فعال.",
+  "version": "4.0.23",
+  "code": 56,
+  "changelog": "v4.0.23 WHITE SCREEN FIX - فیکس صفحه سفید پس از نصب! 🔧 مشکل: بعد از نصب APK صفحه سفید میومد و اپ بالا نمیومد. علت: 1) compileSdk 36 ناپایدار، برگشت به 34، 2) ApiService.initBaseUrl() قبل از runApp بدون timeout باعث hang سفید، حالا runApp فوری + initBaseUrl در پس‌زمینه با timeout 8s، 3) SplashScreen checkSavedSession بدون timeout، حالا timeout 5s + fallback به Login، 4) AndroidManifest InitializationProvider removal حذف شد (باعث کرش پلاگین‌ها)، 5) ConnectixApplication getExternalFilesDir null-safe، 6) MainActivity Thread.sleep حذف شد. نصب عمیق v4.0.22 همچنان فعال (Downloads + Session API + بدون اسکن). پروکسی هات‌اسپات 0.0.0.0:10809 همچنان فعال.",
   "date": "2026-10-06",
   "apk": {
-    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.22/Connectix-Android-ARM64.apk",
-    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.22/Connectix-Android-Universal.apk",
-    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.22/Connectix-Android-ARM32.apk"
+    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.23/Connectix-Android-ARM64.apk",
+    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.23/Connectix-Android-Universal.apk",
+    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.23/Connectix-Android-ARM32.apk"
   },
   "windows": {
-    "version": "4.0.22",
-    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.22/Connectix-Windows-x64.zip"
+    "version": "4.0.23",
+    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.23/Connectix-Windows-x64.zip"
   },
   "ultra": true,
   "core": "flutter_vless dual-core",
   "protocols": ["vless", "vmess", "trojan", "ss", "socks", "http", "wireguard", "hysteria2", "raw", "clash", "singbox", "mtproto"],
   "fixes": {
-    "deep_install_fix_v4_0_22": "v4.0.22 DEEP FORENSIC - 12 laws: copy APK to 3 locations (external+cache+Downloads public) for Play Protect 'Install without scanning', PackageInstaller Session API primary for Android 14+, Intent with persistable permission fallback, Chooser with 'بدون اسکن نصب کن' title, open file manager at Downloads if fail, full logging - fixes 'پنجره میاد بالا میزنم نصب سریع بسته میشه و بدون اسکن نمیاد'",
-    "local_proxy_hotspot_v4_0_22": "v4.0.22 LOCAL PROXY HOTSPOT FIX - When VPN connected, app creates local SOCKS 127.0.0.1:10808 for same device + HTTP 0.0.0.0:10809 for hotspot sharing (TV, console, Windows via 192.168.43.1:10809) - fixed by injecting inbounds in dashboard_screen.dart",
-    "proxy_copy_separate_v4_0_21": "v4.0.21 PROXY COPY SEPARATE - Proxy button per client with separate copy for SOCKS/HTTP/MTProto + full delivery copy includes proxies",
-    "proxy_500_cache_v4_0_20": "v4.0.20 FIX: Proxy 500 Helpers::view + Cloudflare cache admin/reseller with no-store headers",
-    "forever_install_fix": "v4.0.19 FOREVER LAW - 10 laws to fix install jump and old version forever",
-    "proxy_free": "v4.0.18 PROXY FREE - Free SOCKS5/HTTP/MTProto proxy for all VPN customers"
+    "white_screen_fix_v4_0_23": "v4.0.23 WHITE SCREEN DEEP FIX - 6 root causes: compileSdk 36->34 stable, runApp immediate before initBaseUrl with 8s timeout (was await before runApp causing white), SplashScreen 5s timeout fallback to Login, remove InitializationProvider removal (plugin crash), ConnectixApplication dir null-safe, remove Thread.sleep(300) on main thread - fixes 'وقتی نصب میشه اجرا میکنی صفحه سفید میشه آپ بالا نمیاد'",
+    "deep_install_fix_v4_0_22": "v4.0.22 DEEP FORENSIC - 12 laws: copy APK to 3 locations for Play Protect 'Install without scanning', Session API primary, Intent fallback, Chooser 'بدون اسکن نصب کن', file manager fallback, full logging",
+    "local_proxy_hotspot_v4_0_22": "v4.0.22 LOCAL PROXY HOTSPOT FIX - SOCKS 127.0.0.1:10808 + HTTP 0.0.0.0:10809 for hotspot TV/console/Windows via 192.168.43.1:10809",
+    "proxy_copy_separate_v4_0_21": "v4.0.21 PROXY COPY SEPARATE - Proxy button per client with separate copy",
+    "proxy_500_cache_v4_0_20": "v4.0.20 FIX: Proxy 500 + Cloudflare cache",
+    "forever_install_fix": "v4.0.19 FOREVER LAW - 10 laws to fix install",
+    "proxy_free": "v4.0.18 PROXY FREE - Free SOCKS5/HTTP/MTProto"
   }
 }

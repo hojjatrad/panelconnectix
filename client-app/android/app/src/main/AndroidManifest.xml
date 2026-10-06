@@ -26,10 +26,8 @@
         android:label="Connectix VPN"
         android:name=".ConnectixApplication"
         android:icon="@mipmap/ic_launcher"
-       
+        android:requestLegacyExternalStorage="true"
         android:usesCleartextTraffic="true">
-        <provider android:name="androidx.startup.InitializationProvider"
-            tools:node="remove" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

@@ -30,7 +30,17 @@ class ConnectixApplication : Application() {
 
     private fun writeCrashReport(thread: Thread, throwable: Throwable) {
         try {
-            val dir = getExternalFilesDir(null) ?: filesDir
+            // v4.0.23 FIX: Robust dir handling to prevent NPE causing white screen
+            var dir: File? = null
+            try { dir = getExternalFilesDir(null) } catch (_: Exception) {}
+            if (dir == null) {
+                try { dir = filesDir } catch (_: Exception) {}
+            }
+            if (dir == null) {
+                try { dir = cacheDir } catch (_: Exception) {}
+            }
+            if (dir == null) return
+            try { if (!dir.exists()) dir.mkdirs() } catch (_: Exception) {}
             val file = File(dir, "connectix_last_crash.txt")
             val time = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
             val sb = StringBuilder()

@@ -62,11 +62,18 @@ void main() async {
     return true; // handled — the crash screen takes over instead of dying
   };
 
+  // v4.0.23 FIX: White screen root cause - initBaseUrl network hang before runApp
+  // Previously awaited initBaseUrl without timeout, if network slow DNS fail, app stayed white forever
+  // Now: runApp immediately, initBaseUrl in background with timeout
+  runApp(const ConnectixApp());
   runZonedGuarded(() async {
     try {
-      await ApiService.initBaseUrl();
-    } catch (_) {}
-    runApp(const ConnectixApp());
+      await ApiService.initBaseUrl().timeout(const Duration(seconds: 8));
+    } catch (_) {
+      try {
+        await ApiService.initBaseUrl().timeout(const Duration(seconds: 5));
+      } catch (_) {}
+    }
   }, (error, stack) {
     _captureCrash('ZoneError', error, stack);
   });
@@ -496,26 +503,34 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   void _checkSavedSessionAndNavigate() async {
-    // Brief animation delay for visual smoothness
-    await Future.delayed(const Duration(milliseconds: 350));
-
-    final session = await ApiService.checkSavedSession();
-    if (!mounted) return;
-
-    if (session != null) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => DashboardScreen(
-            client: session['client'],
-            branding: session['branding'],
-            initialServers: session['servers'] is List<ServerModel> && (session['servers'] as List<ServerModel>).isNotEmpty
-                ? (session['servers'] as List<ServerModel>)
-                : null,
+    // v4.0.23 FIX: Prevent white screen hang - add timeout and try-catch, always navigate
+    try {
+      await Future.delayed(const Duration(milliseconds: 350));
+      final session = await ApiService.checkSavedSession().timeout(const Duration(seconds: 5), onTimeout: () => null);
+      if (!mounted) return;
+      if (session != null) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => DashboardScreen(
+              client: session['client'],
+              branding: session['branding'],
+              initialServers: session['servers'] is List<ServerModel> && (session['servers'] as List<ServerModel>).isNotEmpty
+                  ? (session['servers'] as List<ServerModel>)
+                  : null,
+            ),
           ),
-        ),
-      );
-    } else {
+        );
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+        );
+      }
+    } catch (e, st) {
+      try { _captureCrash('SplashError', e, st); } catch (_) {}
+      if (!mounted) return;
+      // Fallback to login on any error to avoid white screen
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const LoginScreen()),
