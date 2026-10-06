@@ -1297,6 +1297,13 @@ class ApiService {
     required Function(String error) onError,
     required Function() onSuccess,
   }) async {
+    // v4.0.19 FOREVER: extract version for stale check (outer scope)
+    String expectedVer = '';
+    try {
+      final m = RegExp(r'v?(\d+\.\d+\.\d+)').firstMatch(downloadUrl);
+      if (m != null) expectedVer = m.group(1) ?? '';
+    } catch (_) {}
+    if (expectedVer.isEmpty) expectedVer = '4.0.19';
     
     // v4.0.19 FOREVER LAW: Generate all URLs with deep cache busting + GitHub fallback
     List<String> generateAllUrls(String primary, String fallback) {
@@ -1452,13 +1459,13 @@ class ApiService {
         // v4.0.19 FOREVER LAW: Verify APK versionName via native PackageManager
         try {
           final apkVersion = await _updaterChannel.invokeMethod<String>('getApkVersionName', {'filePath': file.path});
-          log('v4.0.19 APK version check: expected contains $ver, got $apkVersion from $url');
+          log('v4.0.19 APK version check: expected contains $expectedVer, got $apkVersion from $url');
           if (apkVersion != null && apkVersion.isNotEmpty) {
             // If expected version is in URL but APK version is different and older, it's stale
-            if (ver.isNotEmpty && !apkVersion.contains(ver)) {
+            if (expectedVer.isNotEmpty && !apkVersion.contains(expectedVer)) {
               // Check if apkVersion is older than expected
               try {
-                final expectedParts = ver.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+                final expectedParts = expectedVer.split('.').map((e) => int.tryParse(e) ?? 0).toList();
                 final actualParts = apkVersion.replaceAll(RegExp(r'[^\d.]'), '').split('.').map((e) => int.tryParse(e) ?? 0).toList();
                 bool isOlder = false;
                 for (int i = 0; i < 3; i++) {
@@ -1468,7 +1475,7 @@ class ApiService {
                   if (act > exp) break;
                 }
                 if (isOlder) {
-                  log('v4.0.19 STALE APK DETECTED: expected $ver but got $apkVersion from $url - trying next URL');
+                  log('v4.0.19 STALE APK DETECTED: expected $expectedVer but got $apkVersion from $url - trying next URL');
                   try { await file.delete(); } catch (_) {}
                   return false; // Try next URL
                 }
@@ -1588,10 +1595,10 @@ class ApiService {
         // v4.0.19 FOREVER LAW: Verify APK versionName
         try {
           final apkVersion = await _updaterChannel.invokeMethod<String>('getApkVersionName', {'filePath': file.path});
-          log('v4.0.19 HttpClient APK version check: expected $ver, got $apkVersion from $url');
-          if (apkVersion != null && apkVersion.isNotEmpty && ver.isNotEmpty && !apkVersion.contains(ver)) {
+          log('v4.0.19 HttpClient APK version check: expected $expectedVer, got $apkVersion from $url');
+          if (apkVersion != null && apkVersion.isNotEmpty && expectedVer.isNotEmpty && !apkVersion.contains(expectedVer)) {
             try {
-              final expectedParts = ver.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+              final expectedParts = expectedVer.split('.').map((e) => int.tryParse(e) ?? 0).toList();
               final actualParts = apkVersion.replaceAll(RegExp(r'[^\d.]'), '').split('.').map((e) => int.tryParse(e) ?? 0).toList();
               bool isOlder = false;
               for (int i = 0; i < 3; i++) {
@@ -1601,7 +1608,7 @@ class ApiService {
                 if (act > exp) break;
               }
               if (isOlder) {
-                log('v4.0.19 STALE APK DETECTED HttpClient: expected $ver but got $apkVersion - next URL');
+                log('v4.0.19 STALE APK DETECTED HttpClient: expected $expectedVer but got $apkVersion - next URL');
                 try { await file.delete(); } catch (_) {}
                 return false;
               }
