@@ -47,10 +47,10 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
-}
 
-kotlinOptions {
-    jvmTarget = "17"
+    kotlinOptions {
+        jvmTarget = "17"
+    }
 }
 
 flutter {
