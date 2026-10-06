@@ -72,7 +72,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Map<String, dynamic>? _updateInfo;
   bool _isCheckingUpdate = false;
 
-  static const String currentAppVersion = '4.0.19';
+  static const String currentAppVersion = '4.0.22';
 
   // "Download over Wi-Fi only" for update packages
   bool _updateWifiOnly = false;
@@ -1508,6 +1508,80 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           });
           routing['rules'] = rules;
           configMap['routing'] = routing;
+          // v4.0.22 FIX: Inject local proxy inbounds for hotspot sharing (TV, console, Windows)
+          // When VPN connected, app creates local SOCKS 10808 and HTTP 10809
+          // For hotspot, need HTTP proxy listening on 0.0.0.0:10809 so other devices can connect via 192.168.43.1:10809
+          try {
+            final inbounds = (configMap['inbounds'] as List<dynamic>?) != null
+                ? List<dynamic>.from(configMap['inbounds'] as List<dynamic>)
+                : <dynamic>[];
+            
+            // Check if HTTP inbound on 10809 already exists
+            bool hasHttp10809 = false;
+            bool hasSocks10808 = false;
+            for (final ib in inbounds) {
+              try {
+                final m = ib as Map<String, dynamic>;
+                final port = m['port'] as int? ?? 0;
+                final protocol = m['protocol'] as String? ?? '';
+                if (port == 10809 && protocol == 'http') hasHttp10809 = true;
+                if (port == 10808 && protocol == 'socks') hasSocks10808 = true;
+              } catch (_) {}
+            }
+            
+            // Add SOCKS 10808 if missing (for Telegram local proxy)
+            if (!hasSocks10808) {
+              inbounds.add({
+                'tag': 'socks-local-10808',
+                'listen': '127.0.0.1',
+                'port': 10808,
+                'protocol': 'socks',
+                'settings': {'auth': 'noauth', 'udp': true, 'ip': '127.0.0.1'},
+                'sniffing': {'enabled': true, 'destOverride': ['http', 'tls']},
+              });
+            }
+            
+            // Add HTTP 10809 on 0.0.0.0 for hotspot sharing (TV, console, Windows) - CRITICAL for user request
+            if (!hasHttp10809) {
+              inbounds.add({
+                'tag': 'http-local-10809',
+                'listen': '0.0.0.0',
+                'port': 10809,
+                'protocol': 'http',
+                'settings': {'allowTransparent': false},
+                'sniffing': {'enabled': true, 'destOverride': ['http', 'tls']},
+              });
+              ApiService.log('v4.0.22 LOCAL PROXY FIX: Added HTTP inbound 0.0.0.0:10809 for hotspot sharing');
+            }
+            
+            // Also add SOCKS on 0.0.0.0:10808 for hotspot SOCKS sharing (optional)
+            bool hasSocks0000 = false;
+            for (final ib in inbounds) {
+              try {
+                final m = ib as Map<String, dynamic>;
+                if ((m['port'] as int? ?? 0) == 10808 && (m['listen'] as String? ?? '') == '0.0.0.0' && (m['protocol'] as String? ?? '') == 'socks') {
+                  hasSocks0000 = true;
+                }
+              } catch (_) {}
+            }
+            if (!hasSocks0000) {
+              inbounds.add({
+                'tag': 'socks-hotspot-10808',
+                'listen': '0.0.0.0',
+                'port': 10808,
+                'protocol': 'socks',
+                'settings': {'auth': 'noauth', 'udp': true, 'ip': '0.0.0.0'},
+                'sniffing': {'enabled': true, 'destOverride': ['http', 'tls']},
+              });
+              ApiService.log('v4.0.22 LOCAL PROXY FIX: Added SOCKS inbound 0.0.0.0:10808 for hotspot');
+            }
+            
+            configMap['inbounds'] = inbounds;
+            ApiService.log('v4.0.22 LOCAL PROXY: inbounds count=${inbounds.length} hasHttp10809=$hasHttp10809 hasSocks10808=$hasSocks10808');
+          } catch (e) {
+            ApiService.log('v4.0.22 LOCAL PROXY inject failed: $e');
+          }
+          
           final encoded = jsonEncode(configMap);
           jsonDecode(encoded); // validate JSON
           safeFinalConfig = encoded;
@@ -1519,6 +1593,46 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         }
       }
       finalConfig = safeFinalConfig;
+
+      // v4.0.22 FIX: Ensure local proxy inbounds are injected even if split tunneling disabled (for hotspot sharing)
+      if (!Platform.isAndroid || !_splitTunnelingEnabled) {
+        try {
+          final Map<String, dynamic> cfgMap = jsonDecode(finalConfig);
+          final inbounds = (cfgMap['inbounds'] as List<dynamic>?) != null
+              ? List<dynamic>.from(cfgMap['inbounds'] as List<dynamic>)
+              : <dynamic>[];
+          
+          bool hasHttp10809 = false;
+          for (final ib in inbounds) {
+            try {
+              final m = ib as Map<String, dynamic>;
+              if ((m['port'] as int? ?? 0) == 10809 && (m['protocol'] as String? ?? '') == 'http') hasHttp10809 = true;
+            } catch (_) {}
+          }
+          if (!hasHttp10809) {
+            inbounds.add({
+              'tag': 'http-local-10809',
+              'listen': '0.0.0.0',
+              'port': 10809,
+              'protocol': 'http',
+              'settings': {'allowTransparent': false},
+              'sniffing': {'enabled': true, 'destOverride': ['http', 'tls']},
+            });
+            inbounds.add({
+              'tag': 'socks-hotspot-10808',
+              'listen': '0.0.0.0',
+              'port': 10808,
+              'protocol': 'socks',
+              'settings': {'auth': 'noauth', 'udp': true, 'ip': '0.0.0.0'},
+            });
+            cfgMap['inbounds'] = inbounds;
+            finalConfig = jsonEncode(cfgMap);
+            ApiService.log('v4.0.22 LOCAL PROXY FIX (no split): Added 10809 and 10808 on 0.0.0.0');
+          }
+        } catch (e) {
+          ApiService.log('v4.0.22 LOCAL PROXY inject (no split) failed: $e');
+        }
+      }
 
       // v3.5.8: Robust start with fallback - if safe config fails, retry with original config and no bypass
       bool started = false;
