@@ -252,13 +252,30 @@ if ($latestSha !== '') {
 }
 
 $zipUrls = [];
+// v4.0.20 IRAN FIX: Add proxy URLs for Iran filter bypass
+$iranProxies = [
+    'https://ghfast.top/',
+    'https://gh-proxy.com/',
+    'https://mirror.ghproxy.com/',
+    'https://gh.api.99988866.xyz/',
+    'https://ghproxy.net/',
+];
 if (!empty($latestSha)) {
     $zipUrls[] = "https://codeload.github.com/{$repo}/zip/{$latestSha}";
     $zipUrls[] = "https://github.com/{$repo}/archive/{$latestSha}.zip";
+    // Iran proxies for SHA zip
+    foreach ($iranProxies as $proxy) {
+        $zipUrls[] = $proxy . "https://github.com/{$repo}/archive/{$latestSha}.zip";
+    }
 }
 $zipUrls[] = "https://codeload.github.com/{$repo}/zip/refs/heads/main?t={$cacheBuster}";
 $zipUrls[] = "https://api.github.com/repos/{$repo}/zipball/main?t={$cacheBuster}";
 $zipUrls[] = "https://github.com/{$repo}/archive/refs/heads/main.zip?t={$cacheBuster}";
+// Iran proxies for main branch
+foreach ($iranProxies as $proxy) {
+    $zipUrls[] = $proxy . "https://github.com/{$repo}/archive/refs/heads/main.zip?t={$cacheBuster}";
+    $zipUrls[] = $proxy . "https://codeload.github.com/{$repo}/zip/refs/heads/main?t={$cacheBuster}";
+}
 
 $zipData = false;
 $usedUrl = '';

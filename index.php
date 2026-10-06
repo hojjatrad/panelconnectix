@@ -46,6 +46,22 @@ if (session_status() === PHP_SESSION_NONE && !headers_sent()) {
     @session_start();
 }
 
+// v4.0.19 FOREVER LAW: Prevent Cloudflare caching of role-specific HTML (admin vs reseller)
+// Without this, Cloudflare caches reseller version and shows to admin (Ctrl+F5 fixes because bypasses cache)
+if (!headers_sent()) {
+    $isApiOrApk = str_contains($_SERVER['REQUEST_URI'] ?? '', '/api/') || str_contains($_SERVER['REQUEST_URI'] ?? '', '.apk') || str_contains($_SERVER['REQUEST_URI'] ?? '', '/assets/');
+    if (!$isApiOrApk) {
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0, no-transform, private');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+        header('cf-cache-status: BYPASS');
+        header('CDN-Cache-Control: no-store, max-age=0');
+        header('Cloudflare-CDN-Cache-Control: no-store, max-age=0');
+        header('X-Accel-Buffering: no');
+        header('Vary: Cookie, Accept-Encoding');
+    }
+}
+
 // v3.5.8 SAFE: Heavy nested folder relocation DISABLED on every request for performance
 // Original code caused 2-3s delay on every page load (RecursiveIteratorIterator)
 // Now only runs if explicitly enabled via data/enable_heavy_bootstrap flag or ?force_bootstrap=1

@@ -292,7 +292,7 @@ class ProxyController {
             ORDER BY c.id DESC LIMIT 100
         ")->fetchAll(PDO::FETCH_ASSOC);
         
-        require_once __DIR__ . '/../core/Helpers.php';
-        Helpers::view('proxies/index', ['proxies' => $proxies]);
+        // v4.0.19 FIX: Use direct require, Helpers::view() doesn't exist
+        require __DIR__ . '/../views/proxies/index.php';
     }
 }
