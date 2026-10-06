@@ -155,10 +155,11 @@ jobs:
     name: Build Windows App (Xray core) - ULTRA
     runs-on: windows-latest
     needs: build-android
+    if: false  # TEMP disabled: VS2019 generator missing on windows-latest, Android is priority for v4.0.19
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ultra-dualcore-test
+          ref: main
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
