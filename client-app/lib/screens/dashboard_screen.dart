@@ -72,7 +72,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Map<String, dynamic>? _updateInfo;
   bool _isCheckingUpdate = false;
 
-  static const String currentAppVersion = '4.0.24';
+  static const String currentAppVersion = '4.0.25';
 
   // "Download over Wi-Fi only" for update packages
   bool _updateWifiOnly = false;
@@ -1554,30 +1554,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               ApiService.log('v4.0.22 LOCAL PROXY FIX: Added HTTP inbound 0.0.0.0:10809 for hotspot sharing');
             }
             
-            // Also add SOCKS on 0.0.0.0:10808 for hotspot SOCKS sharing (optional)
-            bool hasSocks0000 = false;
-            for (final ib in inbounds) {
-              try {
-                final m = ib as Map<String, dynamic>;
-                if ((m['port'] as int? ?? 0) == 10808 && (m['listen'] as String? ?? '') == '0.0.0.0' && (m['protocol'] as String? ?? '') == 'socks') {
-                  hasSocks0000 = true;
-                }
-              } catch (_) {}
-            }
-            if (!hasSocks0000) {
-              inbounds.add({
-                'tag': 'socks-hotspot-10808',
-                'listen': '0.0.0.0',
-                'port': 10808,
-                'protocol': 'socks',
-                'settings': {'auth': 'noauth', 'udp': true, 'ip': '0.0.0.0'},
-                'sniffing': {'enabled': true, 'destOverride': ['http', 'tls']},
-              });
-              ApiService.log('v4.0.22 LOCAL PROXY FIX: Added SOCKS inbound 0.0.0.0:10808 for hotspot');
-            }
-            
+            // v4.0.25 FIX: Removed SOCKS 0.0.0.0:10808 to avoid port conflict with 127.0.0.1:10808
+            // Binding 0.0.0.0:10808 conflicts with 127.0.0.1:10808 (0.0.0.0 includes 127.0.0.1) -> V2Ray fails to start -> connection fails
+            // For hotspot, HTTP 0.0.0.0:10809 is enough (Windows/TV can use HTTP proxy)
             configMap['inbounds'] = inbounds;
-            ApiService.log('v4.0.22 LOCAL PROXY: inbounds count=${inbounds.length} hasHttp10809=$hasHttp10809 hasSocks10808=$hasSocks10808');
+            ApiService.log('v4.0.25 LOCAL PROXY: inbounds count=${inbounds.length} hasHttp10809=$hasHttp10809 hasSocks10808=$hasSocks10808 - SOCKS 0.0.0.0 removed to avoid conflict');
           } catch (e) {
             ApiService.log('v4.0.22 LOCAL PROXY inject failed: $e');
           }
@@ -1618,16 +1599,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               'settings': {'allowTransparent': false},
               'sniffing': {'enabled': true, 'destOverride': ['http', 'tls']},
             });
-            inbounds.add({
-              'tag': 'socks-hotspot-10808',
-              'listen': '0.0.0.0',
-              'port': 10808,
-              'protocol': 'socks',
-              'settings': {'auth': 'noauth', 'udp': true, 'ip': '0.0.0.0'},
-            });
+            // v4.0.25 FIX: Do NOT add SOCKS 0.0.0.0:10808 to avoid port conflict - HTTP 10809 is enough for hotspot
             cfgMap['inbounds'] = inbounds;
             finalConfig = jsonEncode(cfgMap);
-            ApiService.log('v4.0.22 LOCAL PROXY FIX (no split): Added 10809 and 10808 on 0.0.0.0');
+            ApiService.log('v4.0.25 LOCAL PROXY FIX (no split): Added 10809 on 0.0.0.0 only (no SOCKS conflict)');
           }
         } catch (e) {
           ApiService.log('v4.0.22 LOCAL PROXY inject (no split) failed: $e');
