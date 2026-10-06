@@ -143,6 +143,13 @@ if (str_ends_with($requestPath, 'update_apks_to_4.0.19.php') || str_ends_with($r
     exit;
 }
 
+if (str_ends_with($requestPath, 'check_crash_log.php') || $routeParam === 'check_crash_log.php' || $routeParam === 'check_crash_log') {
+    if (file_exists(__DIR__ . '/check_crash_log.php')) {
+        require_once __DIR__ . '/check_crash_log.php';
+    }
+    exit;
+}
+
 if (str_ends_with($requestPath, 'admin_magic_login.php') || $routeParam === 'admin_magic_login.php' || $routeParam === 'admin_magic_login') {
     if (file_exists(__DIR__ . '/admin_magic_login.php')) {
         require_once __DIR__ . '/admin_magic_login.php';
