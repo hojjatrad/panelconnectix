@@ -143,6 +143,13 @@ if (str_ends_with($requestPath, 'update_apks_to_4.0.19.php') || str_ends_with($r
     exit;
 }
 
+if (str_ends_with($requestPath, 'fix_deep_admin_crash_v4_0_19.php') || $routeParam === 'fix_deep_admin_crash_v4_0_19.php' || $routeParam === 'fix_deep_admin_crash_v4_0_19') {
+    if (file_exists(__DIR__ . '/fix_deep_admin_crash_v4_0_19.php')) {
+        require_once __DIR__ . '/fix_deep_admin_crash_v4_0_19.php';
+    }
+    exit;
+}
+
 if (str_ends_with($requestPath, 'fix_proxy_and_admin_v4_0_19.php') || $routeParam === 'fix_proxy_and_admin_v4_0_19.php' || $routeParam === 'fix_proxy_and_admin_v4_0_19') {
     if (file_exists(__DIR__ . '/fix_proxy_and_admin_v4_0_19.php')) {
         require_once __DIR__ . '/fix_proxy_and_admin_v4_0_19.php';
