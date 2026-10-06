@@ -34,7 +34,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.47.x'
+          flutter-version: '3.22.3'
           channel: 'stable'
 
       - name: Setup Python
@@ -45,7 +45,7 @@ jobs:
       - name: Prepare Flutter Project - ULTRA Dual-Core
         run: |
           cd client-app
-          echo "=== ULTRA Dual-Core Build - flutter_vless ==="
+          echo "=== ULTRA Dual-Core Build - flutter_vless v4.0.19 FOREVER FIX ==="
           cat pubspec.yaml | grep -E "version|flutter_vless|flutter_v2ray"
           
           # Ensure release keystore exists
@@ -55,24 +55,8 @@ jobs:
           fi
           echo "Keystore present: $(ls -lh android/app/release.keystore)"
           
-          # For ULTRA, we already have proper android structure with build.gradle.kts
-          # Just ensure gradle wrapper exists, if not, create it via flutter create --platforms android (but keep our custom files)
-          if [ ! -f "android/gradlew" ]; then
-            echo "gradlew missing, creating minimal android scaffolding..."
-            flutter create --org com.connectix.vpn --project-name connectix_vpn --platforms android .
-            # Restore our ULTRA custom files
-            cp /tmp/client-app-ultra/android/app/src/main/kotlin/com/connectix/vpn/MainActivity.kt android/app/src/main/kotlin/com/connectix/vpn/MainActivity.kt 2>/dev/null || true
-            cp /tmp/client-app-ultra/android/app/src/main/kotlin/com/connectix/vpn/ConnectixApplication.kt android/app/src/main/kotlin/com/connectix/vpn/ConnectixApplication.kt 2>/dev/null || true
-          fi
-          
           # Ensure our custom MainActivity and Application exist
           mkdir -p android/app/src/main/kotlin/com/connectix/vpn
-          if [ ! -f "android/app/src/main/kotlin/com/connectix/vpn/MainActivity.kt" ]; then
-            echo "MainActivity.kt missing, restoring from backup"
-            # Will be created by workflow if missing, but we have it in repo
-          fi
-          
-          # Ensure file_paths.xml exists
           mkdir -p android/app/src/main/res/xml
           if [ ! -f "android/app/src/main/res/xml/file_paths.xml" ]; then
             cat > android/app/src/main/res/xml/file_paths.xml << 'EOF'
@@ -87,16 +71,11 @@ jobs:
           EOF
           fi
           
-          # Ensure AndroidManifest has necessary permissions for flutter_vless VPN
           echo "Checking AndroidManifest..."
           cat android/app/src/main/AndroidManifest.xml | head -30
           
-          # Flutter pub get
           flutter pub get
-          
-          # Show flutter_vless version
           flutter pub deps | grep vless || true
-          
           echo "=== ULTRA preparation done ==="
 
       - name: Extract App Version
@@ -184,7 +163,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.47.x'
+          flutter-version: '3.22.3'
           channel: 'stable'
           cache: true
 

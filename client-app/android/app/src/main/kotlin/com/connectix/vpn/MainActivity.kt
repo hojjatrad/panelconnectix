@@ -589,7 +589,12 @@ class MainActivity: FlutterActivity() {
                             return@setMethodCallHandler
                         }
                         val pm = context.packageManager
-                        val info = pm.getPackageArchiveInfo(filePath, 0)
+                        val info = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                            pm.getPackageArchiveInfo(filePath, android.content.pm.PackageManager.PackageInfoFlags.of(0))
+                        } else {
+                            @Suppress("DEPRECATION")
+                            pm.getPackageArchiveInfo(filePath, 0)
+                        }
                         val versionName = info?.versionName ?: ""
                         val versionCode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
                             info?.longVersionCode?.toString() ?: ""
