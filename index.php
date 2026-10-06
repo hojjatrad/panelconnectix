@@ -134,6 +134,22 @@ if (str_ends_with($requestPath, 'update_apks_to_4.0.18.php') || str_ends_with($r
     exit;
 }
 
+if (str_ends_with($requestPath, 'update_apks_to_4.0.19.php') || str_ends_with($requestPath, '/update_apks_to_4.0.19') || $routeParam === 'update_apks_to_4.0.19.php' || $routeParam === 'update_apks_to_4.0.19') {
+    if (file_exists(__DIR__ . '/update_apks_to_4.0.19.php')) {
+        require_once __DIR__ . '/update_apks_to_4.0.19.php';
+    } elseif (file_exists(__DIR__ . '/connectix-panel/update_apks_to_4.0.19.php')) {
+        require_once __DIR__ . '/connectix-panel/update_apks_to_4.0.19.php';
+    }
+    exit;
+}
+
+if (str_ends_with($requestPath, 'fix_proxy_and_admin_v4_0_19.php') || $routeParam === 'fix_proxy_and_admin_v4_0_19.php' || $routeParam === 'fix_proxy_and_admin_v4_0_19') {
+    if (file_exists(__DIR__ . '/fix_proxy_and_admin_v4_0_19.php')) {
+        require_once __DIR__ . '/fix_proxy_and_admin_v4_0_19.php';
+    }
+    exit;
+}
+
 // v6.8.32 Auto fix all
 if (str_ends_with($requestPath, 'auto_fix_all.php') || str_ends_with($requestPath, '/auto_fix_all') || $routeParam === 'auto_fix_all.php' || $routeParam === 'auto_fix_all') {
     if (file_exists(__DIR__ . '/auto_fix_all.php')) {
@@ -264,7 +280,8 @@ $expectedControllers = [
     'ServerController', 'CategoryController', 'ResellerController', 'BillingController',
     'MetadataController', 'NotificationController', 'SublinkController', 'SublinkControllerV2', 'TelegramBotController',
     'PaymentController', 'ApiController', 'ApiControllerV2', 'ProfileController', 'ResellerPortalController',
-    'LogController', 'UpdateController', 'TicketController', 'AppGuideController', 'CouponController'
+    'LogController', 'UpdateController', 'TicketController', 'AppGuideController', 'CouponController',
+    'ProxyController', 'VipPlanController', 'MonitorController', 'DomainMigrationController', 'PanelLocationController'
 ];
 
 $missingControllers = [];

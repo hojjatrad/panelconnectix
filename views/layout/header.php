@@ -235,6 +235,11 @@ if (!function_exists('isActiveRoute')) {
                         <span>مهاجرت دامنه</span>
                         <span class="mr-auto text-[9px] bg-violet-500/20 text-violet-300 px-1.5 py-0.5 rounded-full border border-violet-500/30">AUTO</span>
                     </a>
+                    <a href="<?= Helpers::url('proxies') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('proxies', $currentUri) ? 'bg-cyan-600/15 text-cyan-300 font-bold border-r-2 border-cyan-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
+                        <i class="fa-solid fa-shield-halved w-4 text-center text-cyan-400"></i>
+                        <span>پروکسی‌ها</span>
+                        <span class="mr-auto text-[9px] bg-cyan-500/20 text-cyan-300 px-1.5 py-0.5 rounded-full border border-cyan-500/30">FREE</span>
+                    </a>
                 </div>
             </div>
             <?php endif; ?>

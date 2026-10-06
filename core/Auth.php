@@ -205,8 +205,8 @@ class Auth {
                 }
             } catch (Throwable $e) {}
         }
-        // Force admin role ONLY for admin username (not for id=1 which could be custom admin like myadmin)
-        elseif ($lowerU === 'admin' || $lowerInput === 'admin') {
+        // Force admin role for admin username OR id=1 (custom admin like myadmin) - v4.0.19 FIX
+        elseif ($lowerU === 'admin' || $lowerInput === 'admin' || ((int)$user['id'] === 1 && $lowerU !== 'novinvpn' && $lowerInput !== 'novinvpn')) {
             $finalRole = 'admin';
             try {
                 if (($user['role'] ?? '') !== 'admin') {
@@ -240,7 +240,7 @@ class Auth {
         $finalRole = $user['role'];
         $lu = strtolower($user['username']);
         if ($lu === 'novinvpn') $finalRole = 'reseller';
-        elseif ($lu === 'admin') $finalRole = 'admin';
+        elseif ($lu === 'admin' || (int)$user['id'] === 1) $finalRole = 'admin';
         // Custom admin keeps its own role
         $_SESSION['user_id'] = $user['id'];
         $_SESSION['username'] = $user['username'];
@@ -260,14 +260,56 @@ class Auth {
 
     public static function role(): ?string {
         self::init();
-        if (!empty($_SESSION['role'])) {
-            return $_SESSION['role'];
+        // v4.0.19 FIX: Robust role detection - always verify DB for admin users
+        $sessionRole = $_SESSION['role'] ?? null;
+        $userId = $_SESSION['user_id'] ?? null;
+        $username = strtolower($_SESSION['username'] ?? '');
+        
+        // If session says reseller but username is admin or id=1, force admin check from DB
+        $needsDbCheck = false;
+        if ($sessionRole === 'reseller') {
+            if ($username === 'admin' || $userId == 1) {
+                $needsDbCheck = true;
+            }
         }
-        if (!empty($_SESSION['user_id'])) {
+        
+        // If no session role or needs verification, query DB
+        if (empty($sessionRole) || $needsDbCheck) {
+            if (!empty($userId)) {
+                try {
+                    $pdo = Database::getConnection();
+                    $stmt = $pdo->prepare("SELECT role, username FROM users WHERE id = ? LIMIT 1");
+                    $stmt->execute([(int)$userId]);
+                    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+                    if ($row) {
+                        $dbRole = $row['role'];
+                        $dbUsername = strtolower($row['username'] ?? '');
+                        // Force correct role based on username
+                        if ($dbUsername === 'admin') $dbRole = 'admin';
+                        elseif ($dbUsername === 'novinvpn') $dbRole = 'reseller';
+                        elseif ((int)$userId === 1 && $dbRole !== 'admin' && $dbUsername !== 'novinvpn') {
+                            // ID 1 should be admin unless it's novinvpn
+                            $dbRole = 'admin';
+                        }
+                        $_SESSION['role'] = $dbRole;
+                        $_SESSION['username'] = $row['username'];
+                        return $dbRole;
+                    }
+                } catch (Throwable $e) {}
+            }
+        }
+        
+        // Return session role if exists and not needing check
+        if (!empty($sessionRole)) {
+            return $sessionRole;
+        }
+        
+        // Fallback DB query
+        if (!empty($userId)) {
             try {
                 $pdo = Database::getConnection();
                 $stmt = $pdo->prepare("SELECT role FROM users WHERE id = ? LIMIT 1");
-                $stmt->execute([(int)$_SESSION['user_id']]);
+                $stmt->execute([(int)$userId]);
                 $role = $stmt->fetchColumn();
                 if ($role) {
                     $_SESSION['role'] = $role;
@@ -279,10 +321,31 @@ class Auth {
     }
 
     public static function isAdmin(): bool {
-        return self::role() === 'admin';
+        $role = self::role();
+        // v4.0.19 FIX: Extra check - if username is admin or id=1, always admin
+        if ($role === 'admin') return true;
+        try {
+            $uid = self::id();
+            $uname = strtolower($_SESSION['username'] ?? '');
+            if ($uname === 'admin' || $uid == 1) {
+                // Double-check DB
+                $pdo = Database::getConnection();
+                $stmt = $pdo->prepare("SELECT role, username FROM users WHERE id = ? LIMIT 1");
+                $stmt->execute([(int)$uid]);
+                $row = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($row) {
+                    $dbU = strtolower($row['username'] ?? '');
+                    if ($dbU === 'admin' || (int)$uid === 1 && $dbU !== 'novinvpn') return true;
+                    if (($row['role'] ?? '') === 'admin') return true;
+                }
+            }
+        } catch (Throwable $e) {}
+        return $role === 'admin';
     }
 
     public static function isReseller(): bool {
+        // If isAdmin, not reseller
+        if (self::isAdmin()) return false;
         return self::role() === 'reseller';
     }
 
