@@ -229,7 +229,6 @@ if (!function_exists('isActiveRoute')) {
                         <span>دامنه چرخشی</span>
                         <span class="mr-auto text-[9px] bg-cyan-500/20 text-cyan-300 px-1.5 py-0.5 rounded-full border border-cyan-500/30">ANTI-FILTER</span>
                     </a>
-                                    </a>
                     <a href="<?= Helpers::url('settings/domain-migration') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('domain-migration', $currentUri) ? 'bg-violet-600/15 text-violet-300 font-bold border-r-2 border-violet-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
                         <i class="fa-solid fa-right-left w-4 text-center text-violet-400"></i>
                         <span>مهاجرت دامنه</span>
