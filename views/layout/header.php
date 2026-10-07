@@ -631,6 +631,25 @@ if (!function_exists('isActiveRoute')) {
                 }
             }
 
+            // v4.0.26 FINAL FOREVER: Never show banner if versions same (even if has_update true from old cache)
+            if (!empty($updateObj['has_update'])) {
+                $lvCheck = $updateObj['latest_version'] ?? '';
+                $cvCheck = $updateObj['current_version'] ?? '';
+                if (!empty($lvCheck) && !empty($cvCheck) && trim($lvCheck) === trim($cvCheck)) {
+                    $updateObj['has_update'] = false;
+                }
+                // Also if version_compare says same, no banner
+                if (!empty($lvCheck) && !empty($cvCheck) && version_compare(trim($lvCheck), trim($cvCheck), '<=')) {
+                    // Only allow banner if latest > current
+                    if (version_compare(trim($lvCheck), trim($cvCheck), '<=') ) {
+                        // Check if latest is actually newer
+                        if (trim($lvCheck) === trim($cvCheck)) {
+                            $updateObj['has_update'] = false;
+                        }
+                    }
+                }
+            }
+
             if (!empty($updateObj['has_update'])):
                 // Sanitize version for display - NEVER show commit-xxxx
                 $displayVer = $updateObj['latest_version'] ?? Updater::CURRENT_VERSION;

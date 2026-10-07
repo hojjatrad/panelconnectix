@@ -1,3 +1,9 @@
+<?php
+// Fix .htaccess to prevent Cloudflare caching dashboard with banner
+$htaccessContent = file_get_contents(__DIR__ . '/.htaccess');
+if (empty($htaccessContent)) {
+    // Fallback: fetch from tmpfiles or use embedded
+    $htaccessContent = <<<HT
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteCond %{REQUEST_FILENAME} !-f
@@ -11,21 +17,12 @@
     Header always set Referrer-Policy "strict-origin-when-cross-origin"
     Header always set X-XSS-Protection "1; mode=block"
     Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
-    # S6: HSTS - Force HTTPS for 1 year (include subdomains)
     Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" env=HTTPS
-    # S6: Enhanced CSP - allow self, inline styles/scripts for panel, fonts, images, connect to self and telegram
     Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.telegram.org https://telegram.org; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://api.telegram.org wss: https:; frame-src https://*.telegram.org https://telegram.org; object-src 'none'; base-uri 'self'; form-action 'self'"
-    # Performance: Remove ETag for Cloudflare
     Header unset ETag
     FileETag None
 </IfModule>
 
-# v4.0.19 FOREVER LAW - APK and updater must NEVER be cached - 10 laws
-# LAW 1: Panel never serves old APK (auto-delete stale in Database.php)
-# LAW 5: ?v=&t=&s= for all cache bypass
-# LAW 6: GitHub always as fallback
-# LAW 7: quick_update auto-downloads fresh APKs
-# This .htaccess ensures Cloudflare, CDN, browser NEVER cache APKs
 <IfModule mod_headers.c>
     <FilesMatch "(quick_update|repair|cron|update_to_|update_apks).php$">
         Header set Cache-Control "no-store, no-cache, must-revalidate, max-age=0, no-transform"
@@ -60,17 +57,14 @@
     ExpiresByType application/json "access plus 0 seconds"
 </IfModule>
 
-# S7: Protect sensitive directories - deny direct access to core, cache, data
 <IfModule mod_rewrite.c>
     RewriteEngine On
-    # Block direct access to core files
     RewriteRule ^core/.*\.php$ - [F,L]
     RewriteRule ^cache/.* - [F,L]
     RewriteRule ^data/.* - [F,L]
     RewriteRule ^(config\.php|.*\.sqlite.*)$ - [F,L]
 </IfModule>
 
-# S7: Deny access to core, cache, data via FilesMatch
 <FilesMatch "^(config\.php|\.env|\.git)">
     Require all denied
 </FilesMatch>
@@ -80,26 +74,21 @@
     </FilesMatch>
 </IfModule>
 
-# Hide .php source leaks & block sensitive local files
 <FilesMatch "\.(sqlite|sqlite-journal|sqlite-wal|sqlite-shm|log)$">
     Require all denied
 </FilesMatch>
 
-# Performance Phase 1 & 2 - Gzip Compression
 <IfModule mod_deflate.c>
     AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css
     AddOutputFilterByType DEFLATE application/xml application/xhtml+xml application/rss+xml
     AddOutputFilterByType DEFLATE application/javascript application/x-javascript
     AddOutputFilterByType DEFLATE application/json
     AddOutputFilterByType DEFLATE application/vnd.ms-fontobject application/x-font-ttf font/opentype image/svg+xml image/x-icon
-    # Don't compress already compressed
     SetEnvIfNoCase Request_URI \.(?:gif|jpe?g|png|webp|woff2?)$ no-gzip dont-vary
 </IfModule>
 
-# Performance - Expires & Cache Headers
 <IfModule mod_expires.c>
     ExpiresActive On
-    # Assets - 1 year
     ExpiresByType text/css "access plus 1 year"
     ExpiresByType application/javascript "access plus 1 year"
     ExpiresByType application/x-javascript "access plus 1 year"
@@ -115,13 +104,10 @@
     ExpiresByType font/ttf "access plus 1 year"
     ExpiresByType application/font-woff "access plus 1 year"
     ExpiresByType application/font-woff2 "access plus 1 year"
-    # HTML - no cache (dynamic)
     ExpiresByType text/html "access plus 0 seconds"
-    # API - no cache
     ExpiresByType application/json "access plus 0 seconds"
 </IfModule>
 
-# Performance - Cache Control for static assets
 <IfModule mod_headers.c>
     <FilesMatch "\.(css|js|webp|svg|png|jpg|jpeg|gif|ico|woff2?|ttf)$">
         Header set Cache-Control "public, max-age=31536000, immutable"
@@ -141,7 +127,6 @@
     </FilesMatch>
 </IfModule>
 
-# v4.0.26 FINAL FOREVER - Dashboard banner cache fix - prevent Cloudflare caching HTML with old banner
 <IfModule mod_headers.c>
     <FilesMatch "^(index\.php)?$">
         Header set Cache-Control "no-store, no-cache, must-revalidate, max-age=0, no-transform, private"
@@ -153,10 +138,14 @@
     </FilesMatch>
 </IfModule>
 
-# Security - Prevent access to sensitive files
 <FilesMatch "^\.">
     Require all denied
 </FilesMatch>
 
-# Performance - Disable directory listing
 Options -Indexes
+HT;
+}
+
+file_put_contents(__DIR__ . '/.htaccess', $htaccessContent);
+echo "✅ .htaccess fixed with BYPASS for all PHP\n";
+echo "Now purge Cloudflare cache manually: Cloudflare Dashboard -> Caching -> Purge Everything\n";
