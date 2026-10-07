@@ -510,12 +510,17 @@ if (!function_exists('isActiveRoute')) {
 
     <!-- Main Content Area -->
     <main class="flex-1 flex flex-col min-w-0 overflow-y-auto">
-        <!-- Top Navbar ULTRA v7.0 -->
+        <!-- Top Navbar ULTRA Dynamic v<?= Updater::CURRENT_VERSION ?? '7.3.0' ?> -->
         <header class="h-14 bg-slate-900/70 border-b border-slate-800/80 flex items-center justify-between px-6 shrink-0 backdrop-blur-xl sticky top-0 z-30">
             <div class="flex items-center gap-3">
+                <?php
+                // v4.0.30 FIX: Dynamic version instead of hardcoded v7.0
+                $ultraVer = defined('App\Core\Updater::CURRENT_VERSION') ? \App\Core\Updater::CURRENT_VERSION : (class_exists('Updater') ? Updater::CURRENT_VERSION : '7.3.0');
+                if (empty($ultraVer) || $ultraVer === '7.0') $ultraVer = '7.3.0';
+                ?>
                 <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                     <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                    سامانه هوشمند ULTRA v7.0
+                    سامانه هوشمند ULTRA v<?= htmlspecialchars($ultraVer) ?>
                 </span>
                 <div class="hidden md:flex items-center gap-2 text-[11px] text-slate-500">
                     <span class="w-1 h-1 bg-slate-600 rounded-full"></span>
