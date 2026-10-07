@@ -27,6 +27,14 @@ class AppApkMirror {
         'Connectix-Android.apk',     // full build (legacy name)
     ];
 
+    /** Mapping from local name to possible GitHub asset names (new and old conventions) */
+    public const APK_ALIASES = [
+        'Connectix-ARM64-v8a.apk' => ['Connectix-Android-ARM64.apk', 'Connectix-ARM64-v8a.apk', 'Connectix-Android.apk'],
+        'Connectix-Universal.apk' => ['Connectix-Android-Universal.apk', 'Connectix-Universal.apk'],
+        'Connectix-ARM32-v7a.apk' => ['Connectix-Android-ARM32.apk', 'Connectix-ARM32-v7a.apk'],
+        'Connectix-Android.apk' => ['Connectix-Android-Universal.apk', 'Connectix-Android.apk', 'Connectix-Universal.apk'],
+    ];
+
     /** Panel web root (this file lives in <root>/core/) */
     public static function rootDir(): string {
         return dirname(__DIR__);
@@ -95,7 +103,16 @@ class AppApkMirror {
         }
 
         foreach (self::APK_NAMES as $name) {
+            // v4.0.27 FIX: Support both naming conventions (Android-ARM64 vs ARM64-v8a)
             $asset = $assets[$name] ?? null;
+            if (!$asset && isset(self::APK_ALIASES[$name])) {
+                foreach (self::APK_ALIASES[$name] as $alias) {
+                    if (isset($assets[$alias])) {
+                        $asset = $assets[$alias];
+                        break;
+                    }
+                }
+            }
             $local = $root . '/' . $name;
             $expectedSize = (int)($asset['size'] ?? 0);
 
