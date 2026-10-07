@@ -739,11 +739,18 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
         }
 
         $rawSublink = base64_encode(implode("\n", array_column($serverList, 'config_uri')));
+        // v4.0.26: Return both direct (exact main server) and panel sublinks
+        $directSub = trim($client['direct_sublink'] ?? $client['node_sublink'] ?? '');
+        $panelSub = Helpers::subUrl($client['sub_token']);
 
         self::jsonSuccess([
             'servers' => $serverList,
             'raw_sublink_base64' => $rawSublink,
-            'sub_url' => Helpers::subUrl($client['sub_token']),
+            'sub_url' => $panelSub,
+            'direct_sublink' => $directSub,
+            'panel_sublink' => $panelSub,
+            'direct_sublink_redirect' => $panelSub . '?direct=1',
+            'credential_source' => $client['credential_source'] ?? 'unknown',
             'total_servers' => count($serverList)
         ]);
     }

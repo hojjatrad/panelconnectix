@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../core/Database.php';
 require_once __DIR__ . '/../core/Helpers.php';
 require_once __DIR__ . '/../core/Setting.php';
+require_once __DIR__ . '/../core/SublinkExtractor.php';
 require_once __DIR__ . '/../core/Provisioner.php';
 require_once __DIR__ . '/../drivers/DriverFactory.php';
 
@@ -33,6 +34,23 @@ class SublinkControllerV2 {
         if (!$client) {
             http_response_code(404);
             die("<h2 style='text-align:center;margin-top:50px;color:#f43f5e;font-family:sans-serif;'>اشتراک یافت نشد یا منقضی گردیده است.</h2>");
+        }
+
+        // v4.0.26: Direct mode - if ?direct=1 or ?mode=direct, 302 redirect to exact main server sublink without any addition
+        $isDirectMode = isset($_GET['direct']) || (isset($_GET['mode']) && $_GET['mode'] === 'direct') || isset($_GET['exact']);
+        if ($isDirectMode) {
+            $directSub = trim($client['direct_sublink'] ?? $client['node_sublink'] ?? '');
+            if (!empty($directSub) && filter_var($directSub, FILTER_VALIDATE_URL)) {
+                // 302 redirect to exact main server sublink
+                header("Location: $directSub", true, 302);
+                exit;
+            }
+            // If direct_sublink empty but node_sublink exists, try to fetch and proxy exact content
+            if (!empty($directSub)) {
+                header('Content-Type: text/plain; charset=utf-8');
+                echo $directSub;
+                exit;
+            }
         }
 
         // 2. Detect if Client is a VPN App (User-Agent check or format param)

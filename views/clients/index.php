@@ -103,8 +103,15 @@ function initials($name,$user){
 <tr><td colspan="7" class="py-16 text-center"><i class="fa-solid fa-inbox text-4xl text-slate-700 mb-3 block"></i><span class="text-slate-500">هیچ کاربری یافت نشد</span></td></tr>
 <?php else: foreach($clients as $c):
 $pct = $c['traffic_limit_bytes']>0 ? round(($c['traffic_used_bytes']/$c['traffic_limit_bytes'])*100,1) : 0;
-$subUrlRaw = !empty($c['node_sublink']) ? $c['node_sublink'] : Helpers::subUrl($c['sub_token']);
+// v4.0.26: Dual mode - direct_sublink exact from main server + panel_sublink for own app
+$directSubRaw = !empty($c['direct_sublink']) ? $c['direct_sublink'] : (!empty($c['node_sublink']) ? $c['node_sublink'] : Helpers::subUrl($c['sub_token']));
+$panelSubRaw = Helpers::subUrl($c['sub_token']);
+$subUrlRaw = $directSubRaw; // Default to direct (exact main server) for backward compat and user request
 $subUrl = Helpers::fixSublinkDomain($subUrlRaw);
+$panelSubUrl = Helpers::fixSublinkDomain($panelSubRaw);
+$directSubUrl = $subUrl; // Exact same as main server
+// For redirect mode: panel sub with ?direct=1 redirects to exact main server sub
+$directRedirectUrl = $panelSubUrl . '?direct=1';
 $daysRemText = Helpers::daysRemaining($c['expire_at']);
 $isExpired = str_contains($daysRemText, 'منقضی') || $c['status']==='expired';
 $ini = initials($c['customer_name'] ?? '', $c['username']);
@@ -222,7 +229,8 @@ if(preg_match('/(\d+)\s*روز/', $daysRemText, $m)){
     <i class="fa-solid fa-shield-halved text-[12px] group-hover/btn:scale-110 transition"></i>
 </button>
 <button type="button" onclick="openInspectModal(<?= $c['id'] ?>,'<?= htmlspecialchars($c['username']) ?>','<?= $subUrl ?>')" class="w-8 h-8 flex items-center justify-center bg-slate-800 hover:bg-purple-900/40 text-purple-300 hover:text-purple-200 rounded-xl border border-slate-700 hover:border-purple-700/40 transition group/btn" title="QR و ساب‌لینک"><i class="fa-solid fa-qrcode text-[12px] group-hover/btn:scale-110 transition"></i></button>
-<button type="button" data-copy="<?= htmlspecialchars($subUrl,ENT_QUOTES) ?>" onclick="copyToClipboard(this.getAttribute('data-copy'),this)" class="w-8 h-8 flex items-center justify-center bg-slate-800 hover:bg-cyan-900/40 text-cyan-300 hover:text-cyan-200 rounded-xl border border-slate-700 hover:border-cyan-700/40 transition group/btn" title="کپی ساب"><i class="fa-solid fa-link text-[12px] group-hover/btn:scale-110 transition"></i></button>
+<button type="button" data-copy="<?= htmlspecialchars($directSubUrl,ENT_QUOTES) ?>" onclick="copyToClipboard(this.getAttribute('data-copy'),this)" class="w-8 h-8 flex items-center justify-center bg-slate-800 hover:bg-cyan-900/40 text-cyan-300 hover:text-cyan-200 rounded-xl border border-slate-700 hover:border-cyan-700/40 transition group/btn" title="کپی ساب مستقیم (دقیقا سرور اصلی - بدون اضافه)"><i class="fa-solid fa-link text-[12px] group-hover/btn:scale-110 transition"></i></button>
+<button type="button" data-copy="<?= htmlspecialchars($panelSubUrl,ENT_QUOTES) ?>" onclick="copyToClipboard(this.getAttribute('data-copy'),this)" class="w-8 h-8 flex items-center justify-center bg-slate-800 hover:bg-violet-900/40 text-violet-300 hover:text-violet-200 rounded-xl border border-slate-700 hover:border-violet-700/40 transition group/btn" title="کپی ساب پنل (برای اپ خودت - با یوزر/پسورد بدون وارد کردن ساب)"><i class="fa-solid fa-mobile-screen text-[12px] group-hover/btn:scale-110 transition"></i></button>
                         <a href="<?= Helpers::url('clients/'.$c['id'].'/usage') ?>" class="w-8 h-8 flex items-center justify-center bg-slate-800 hover:bg-violet-900/40 text-violet-300 hover:text-violet-200 rounded-xl border border-slate-700 hover:border-violet-700/40 transition group/btn" title="تاریخچه مصرف ULTRA"><i class="fa-solid fa-chart-area text-[12px] group-hover/btn:scale-110 transition"></i></a>
 <button type="button" onclick='openEditClientModal(<?= json_encode($c, JSON_HEX_APOS|JSON_HEX_QUOT) ?>)' class="w-8 h-8 flex items-center justify-center bg-slate-800 hover:bg-amber-900/40 text-amber-300 hover:text-amber-200 rounded-xl border border-slate-700 hover:border-amber-700/40 transition group/btn" title="ویرایش نام/یوزر/پسورد"><i class="fa-solid fa-pen text-[11px] group-hover/btn:scale-110 transition"></i></button>
 <button type="button" onclick="openRenewModal(<?= $c['id'] ?>,'<?= htmlspecialchars($c['username']) ?>')" class="w-8 h-8 flex items-center justify-center bg-slate-800 hover:bg-emerald-900/40 text-emerald-400 hover:text-emerald-300 rounded-xl border border-slate-700 hover:border-emerald-700/40 transition group/btn" title="تمدید"><i class="fa-solid fa-rotate text-[11px] group-hover/btn:scale-110 transition"></i></button>
