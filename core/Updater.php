@@ -89,6 +89,13 @@ class Updater {
                     $data['current_version'] = self::sanitizeVersion((string)$cv);
                     $data['latest_version_full'] = "Connectix v" . $data['latest_version'];
                     $data['current_version_full'] = "Connectix v" . $data['current_version'];
+                    // v4.0.26 FINAL FOREVER FIX: If cached says has_update true but versions same, force false
+                    // Prevents "Ctrl+F5 goes away but clicking dashboard again shows banner"
+                    if (!empty($data['has_update']) && $data['latest_version'] === $data['current_version']) {
+                        $data['has_update'] = false;
+                        $data['release_title'] = "Connectix v" . $data['current_version'] . " - به‌روز";
+                        $data['type'] = 'current';
+                    }
                     return $data;
                 }
             }
@@ -204,19 +211,12 @@ class Updater {
             $lastInstalledSha = Setting::get('last_installed_commit_sha', '');
             $commitMsg = $commitRes['commit']['message'] ?? '';
 
-            // v4.0.26: If commit is only client-app (v4.0.x), don't show panel update banner
-            $isClientAppOnlyCommit = preg_match('/v4\.0\./', $commitMsg) && !preg_match('/panel|7\./i', $commitMsg);
-            
-            // Only show update if commit SHA differs AND it's not client-app only AND version actually newer
-            // For same version commits (e.g., client-app updates), has_update should be false to prevent "same version shows update"
+            // v4.0.26 FOREVER FIX FINAL: User reports "Ctrl+F5 banner goes but clicking dashboard/stats again shows v7.3.0"
+            // Root cause: commit fallback sets has_update true when SHA differs, even though version same (7.3.0 == 7.3.0)
+            // Previous filter tried to check v4.x but commit message contains v7.3.0 so filter failed
+            // FINAL LAW: has_update ALWAYS false in commit fallback - only version_compare via raw Updater.php should trigger banner
+            // Panel updates are detected via raw CURRENT_VERSION check, not via commit SHA
             $hasUpdate = false;
-            if (!$isClientAppOnlyCommit) {
-                $hasUpdate = empty($lastInstalledSha) || ($lastInstalledSha !== $shortSha);
-                // But if version is same and commit is recent client-app, don't show
-                if ($hasUpdate && preg_match('/^v4\.0\./', $commitMsg)) {
-                    $hasUpdate = false;
-                }
-            }
 
             // v6.8.3: NEVER return commit-xxxx as version - always return proper Connectix vX
             $result = [
