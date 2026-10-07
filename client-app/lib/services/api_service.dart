@@ -1303,7 +1303,7 @@ class ApiService {
       final m = RegExp(r'v?(\d+\.\d+\.\d+)').firstMatch(downloadUrl);
       if (m != null) expectedVer = m.group(1) ?? '';
     } catch (_) {}
-    if (expectedVer.isEmpty) expectedVer = '4.0.25';
+    if (expectedVer.isEmpty) expectedVer = '4.0.26';
     
     // v4.0.19 FOREVER LAW: Generate all URLs with deep cache busting + GitHub fallback
     List<String> generateAllUrls(String primary, String fallback) {
@@ -1321,7 +1321,7 @@ class ApiService {
         urls.add(u);
       }
       
-      // v4.0.25: Extract version with deep parse
+      // v4.0.26: Extract version with deep parse
       String ver = '';
       try {
         final verMatch = RegExp(r'v?(\d+\.\d+\.\d+)').firstMatch(primary);
@@ -1330,9 +1330,9 @@ class ApiService {
           final verMatch2 = RegExp(r'v?(\d+\.\d+\.\d+)').firstMatch(fallback);
           if (verMatch2 != null) ver = verMatch2.group(1) ?? '';
         }
-        if (ver.isEmpty) ver = '4.0.25';
+        if (ver.isEmpty) ver = '4.0.26';
       } catch (_) {}
-      if (ver.isEmpty) ver = '4.0.25';
+      if (ver.isEmpty) ver = '4.0.26';
       
       final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
       final random = (DateTime.now().millisecondsSinceEpoch % 9000 + 1000).toString();
