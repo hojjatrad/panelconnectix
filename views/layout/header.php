@@ -79,30 +79,34 @@ if (!function_exists('isActiveRoute')) {
         document.addEventListener('DOMContentLoaded', () => setTimeout(window.ConnectixStats.load, 300));
     }
     </script>
+    <?php
+    // v4.0.30 FIX: Add version to assets to bust cache - no more Ctrl+F5 needed
+    $assetVer = Updater::CURRENT_VERSION ?? '7.3.0';
+    ?>
     <?php if (file_exists($localTailwind)): ?>
-    <script src="<?= $base ?>/assets/js/tailwind.js"></script>
+    <script src="<?= $base ?>/assets/js/tailwind.js?v=<?= $assetVer ?>"></script>
     <?php else: ?>
     <script src="https://cdn.tailwindcss.com"></script>
     <?php endif; ?>
     <?php if (file_exists($localChart)): ?>
-    <script src="<?= $base ?>/assets/js/chart.min.js"></script>
+    <script src="<?= $base ?>/assets/js/chart.min.js?v=<?= $assetVer ?>"></script>
     <?php else: ?>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <?php endif; ?>
     <?php if (file_exists($localFA)): ?>
-    <link rel="stylesheet" href="<?= $base ?>/assets/css/fontawesome.min.css">
+    <link rel="stylesheet" href="<?= $base ?>/assets/css/fontawesome.min.css?v=<?= $assetVer ?>">
     <?php else: ?>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <?php endif; ?>
     <?php if (file_exists($localVazir)): ?>
-    <link rel="stylesheet" href="<?= $base ?>/assets/css/vazirmatn.css">
+    <link rel="stylesheet" href="<?= $base ?>/assets/css/vazirmatn.css?v=<?= $assetVer ?>">
     <?php else: ?>
     <style>@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap');</style>
     <?php endif; ?>
-    <link rel="manifest" href="<?= $base ?>/manifest.json">
+    <link rel="manifest" href="<?= $base ?>/manifest.json?v=<?= $assetVer ?>">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="Connectix ULTRA">
-    <link rel="apple-touch-icon" href="<?= $base ?>/assets/img/icon-192.png">
+    <link rel="apple-touch-icon" href="<?= $base ?>/assets/img/icon-192.png?v=<?= $assetVer ?>">
     <style>
         * { font-family: 'Vazirmatn', sans-serif; }
         ::-webkit-scrollbar { width: 5px; height: 5px; }
@@ -710,9 +714,35 @@ if (!function_exists('isActiveRoute')) {
         }
     }
 
-    // PWA Service Worker registration v7.0 ULTRA
+    // PWA Service Worker registration v7.3.0 ULTRA - FIXED: No more Ctrl+F5 needed
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('<?= $base ?>/sw.js').then(()=>console.log('PWA SW registered')).catch(()=>{});
+        // v4.0.30 FIX: Add version to SW URL and force update check
+        const swUrl = '<?= $base ?>/sw.js?v=<?= $assetVer ?? Updater::CURRENT_VERSION ?? "7.3.0" ?>';
+        navigator.serviceWorker.register(swUrl).then(reg => {
+            console.log('PWA SW registered v7.3.0');
+            // Check for updates every 5 minutes
+            setInterval(() => {
+                reg.update().then(() => console.log('SW update checked'));
+            }, 5*60*1000);
+            // If new SW found, auto-reload
+            reg.addEventListener('updatefound', () => {
+                const newWorker = reg.installing;
+                newWorker.addEventListener('statechange', () => {
+                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                        console.log('New SW available, reloading...');
+                        // Auto-reload to get new version without Ctrl+F5
+                        if (confirm('نسخه جدید پنل موجود است. بروزرسانی شود؟')) {
+                            window.location.reload();
+                        }
+                    }
+                });
+            });
+        }).catch(()=>{});
+        // Force reload if SW controller changes
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            console.log('SW controller changed, reloading...');
+            window.location.reload();
+        });
     }
 
     // Initialize state on page load
