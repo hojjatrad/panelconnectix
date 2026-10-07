@@ -145,13 +145,27 @@ class Updater {
             }
         }
 
-        // 2. Source 2: Releases list
+        // 2. Source 2: Releases list - v4.0.26 FIX: Ignore client-app releases (v4.x) for panel update check
         $url = "https://api.github.com/repos/{$repo}/releases";
         $releases = self::githubRequest($url, $token);
+        // Filter out client-app releases (v4.x) - only panel releases (v7.x, v8.x etc) should trigger panel update banner
+        if (is_array($releases)) {
+            $releases = array_filter($releases, function($r) {
+                $tag = $r['tag_name'] ?? '';
+                // Skip client-app releases v4.x
+                if (preg_match('/^v?4\./', $tag)) return false;
+                return true;
+            });
+            $releases = array_values($releases);
+        }
         $res = (is_array($releases) && !empty($releases[0]['tag_name'])) ? $releases[0] : null;
 
         if (!$res) {
             $res = self::githubRequest("https://api.github.com/repos/{$repo}/releases/latest", $token);
+            // Also filter latest if it's client-app release
+            if ($res && isset($res['tag_name']) && preg_match('/^v?4\./', $res['tag_name'])) {
+                $res = null; // Ignore client-app latest
+            }
         }
 
         if ($res && isset($res['tag_name'])) {
@@ -181,25 +195,38 @@ class Updater {
         }
 
         // 3. Fallback to branch commits API if no release tagged
+        // v4.0.26 FIX: Don't show update banner for same version even if commit SHA differs (prevents "same version shows update" issue)
         $commitUrl = "https://api.github.com/repos/{$repo}/commits/{$branch}";
         $commitRes = self::githubRequest($commitUrl, $token);
 
         if ($commitRes && isset($commitRes['sha'])) {
             $shortSha = substr($commitRes['sha'], 0, 7);
             $lastInstalledSha = Setting::get('last_installed_commit_sha', '');
+            $commitMsg = $commitRes['commit']['message'] ?? '';
 
-            $hasUpdate = empty($lastInstalledSha) || ($lastInstalledSha !== $shortSha);
+            // v4.0.26: If commit is only client-app (v4.0.x), don't show panel update banner
+            $isClientAppOnlyCommit = preg_match('/v4\.0\./', $commitMsg) && !preg_match('/panel|7\./i', $commitMsg);
+            
+            // Only show update if commit SHA differs AND it's not client-app only AND version actually newer
+            // For same version commits (e.g., client-app updates), has_update should be false to prevent "same version shows update"
+            $hasUpdate = false;
+            if (!$isClientAppOnlyCommit) {
+                $hasUpdate = empty($lastInstalledSha) || ($lastInstalledSha !== $shortSha);
+                // But if version is same and commit is recent client-app, don't show
+                if ($hasUpdate && preg_match('/^v4\.0\./', $commitMsg)) {
+                    $hasUpdate = false;
+                }
+            }
 
             // v6.8.3: NEVER return commit-xxxx as version - always return proper Connectix vX
-            // If has_update due to new commit but version same, still show version name, not commit hash
             $result = [
                 'has_update' => $hasUpdate,
                 'current_version' => $currentVer,
                 'current_version_full' => "Connectix v{$currentVer}",
-                'latest_version' => $hasUpdate ? $currentVer : $currentVer, // Always version, never commit hash
+                'latest_version' => $currentVer, // Always same version for commit fallback, never commit hash
                 'latest_version_full' => "Connectix v{$currentVer}",
                 'release_title' => $hasUpdate ? "نسخه جدید Connectix v{$currentVer} در دسترس است" : "Connectix v{$currentVer} - به‌روز",
-                'changelog' => $commitRes['commit']['message'] ?? 'آخرین تغییرات مستقیم مخزن گیت‌هاب',
+                'changelog' => $commitMsg ?: 'آخرین تغییرات مستقیم مخزن گیت‌هاب',
                 'download_url' => "https://github.com/{$repo}/archive/refs/heads/{$branch}.zip",
                 'published_at' => $commitRes['commit']['committer']['date'] ?? date('Y-m-d H:i:s'),
                 'checked_at' => date('Y-m-d H:i:s'),
