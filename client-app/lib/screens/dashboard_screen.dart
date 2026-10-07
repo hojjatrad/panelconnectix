@@ -16,6 +16,7 @@ import 'server_list_modal.dart';
 import 'bypass_apps_screen.dart';
 import 'advanced_settings_screen.dart';
 import 'proxy_screen.dart';
+import 'gps_spoof_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final ClientModel client;
@@ -2742,6 +2743,29 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                           Icon(Icons.security_rounded, color: Color(0xFF38BDF8), size: 18),
                           SizedBox(width: 6),
                           Text('پروکسی', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 12, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  // GPS Spoof Button - v4.0.28 NEW - Combined Method 1 + 3
+                  InkWell(
+                    onTap: () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const GpsSpoofScreen()));
+                    },
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E293B),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        children: const [
+                          Icon(Icons.location_on_rounded, color: Color(0xFF10B981), size: 18),
+                          SizedBox(width: 6),
+                          Text('GPS', style: TextStyle(color: Color(0xFF10B981), fontSize: 12, fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ),

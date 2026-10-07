@@ -7,8 +7,12 @@ import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.location.Location
+import android.location.LocationManager
+import android.location.provider.ProviderProperties
 import android.net.Uri
 import android.os.Build
+import android.os.SystemClock
 import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.content.FileProvider
@@ -19,6 +23,8 @@ import java.io.File
 import java.util.ArrayList
 import java.util.HashMap
 import java.util.HashSet
+import java.util.Timer
+import java.util.TimerTask
 
 class MainActivity: FlutterActivity() {
     private val CHANNEL = "com.connectix.vpn/updater"
@@ -26,6 +32,11 @@ class MainActivity: FlutterActivity() {
     private val V2RAY_CHANNEL_ID = "A_FLUTTER_V2RAY_SERVICE_CH_ID"
     private val NOTIF_ID = 1
     private var methodChannel: MethodChannel? = null
+    // v4.0.28 GPS Spoof - Method 1 (Mock) + Method 3 (VPN Service) combined
+    private var mockLocationTimer: Timer? = null
+    private var currentMockLat: Double = 0.0
+    private var currentMockLng: Double = 0.0
+    private var isMocking: Boolean = false
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -910,6 +921,252 @@ class MainActivity: FlutterActivity() {
                             }
                         }
                     }.start()
+                }
+
+                // v4.0.28 GPS Spoof + Device Info - Combined Method 1 + 3
+                "getAbi" -> {
+                    try {
+                        val abis = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                            Build.SUPPORTED_ABIS
+                        } else {
+                            arrayOf(Build.CPU_ABI, Build.CPU_ABI2)
+                        }
+                        val primaryAbi = abis.firstOrNull() ?: "arm64-v8a"
+                        android.util.Log.i("ConnectixGPS", "Device ABI: ${abis.joinToString()} primary: $primaryAbi")
+                        result.success(primaryAbi)
+                    } catch (e: Exception) {
+                        result.success("arm64-v8a")
+                    }
+                }
+                "isMockLocationEnabled" -> {
+                    try {
+                        val isEnabled = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            try {
+                                Settings.Secure.getInt(contentResolver, Settings.Secure.ALLOW_MOCK_LOCATION, 0) != 0 ||
+                                !Settings.Secure.getString(contentResolver, Settings.Secure.ALLOW_MOCK_LOCATION).isNullOrEmpty() ||
+                                packageManager.getApplicationInfo(packageName, 0).let {
+                                    // Check if this app is selected as mock location app
+                                    try {
+                                        val mockApp = Settings.Secure.getString(contentResolver, "mock_location")
+                                        mockApp == packageName || Settings.Secure.getString(contentResolver, Settings.Secure.ALLOW_MOCK_LOCATION) == "1"
+                                    } catch (_: Exception) { false }
+                                }
+                            } catch (_: Exception) {
+                                // For Android 6+, check if developer options enabled and app is mock location app
+                                try {
+                                    val devEnabled = Settings.Global.getInt(contentResolver, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
+                                    devEnabled
+                                } catch (_: Exception) { false }
+                            }
+                        } else {
+                            Settings.Secure.getInt(contentResolver, Settings.Secure.ALLOW_MOCK_LOCATION, 0) != 0
+                        }
+                        // Also check if we can set mock location (app is selected)
+                        var canMock = false
+                        try {
+                            val lm = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+                            // Try to check if mock location app is this app
+                            canMock = true // Assume true if we can get here, actual test will be in setMock
+                        } catch (_: Exception) {}
+                        result.success(mapOf("enabled" to isEnabled, "canMock" to canMock))
+                    } catch (e: Exception) {
+                        result.success(mapOf("enabled" to false, "canMock" to false, "error" to (e.message ?: "")))
+                    }
+                }
+                "openMockLocationSettings" -> {
+                    try {
+                        val intent = Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
+                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        startActivity(intent)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        try {
+                            val intent = Intent(Settings.ACTION_SETTINGS)
+                            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                            startActivity(intent)
+                            result.success(true)
+                        } catch (e2: Exception) {
+                            result.error("SETTINGS_ERROR", e2.message, null)
+                        }
+                    }
+                }
+                "setMockLocation" -> {
+                    // Method 1: Basic mock location via Test Provider
+                    val lat = call.argument<Double>("lat") ?: 0.0
+                    val lng = call.argument<Double>("lng") ?: 0.0
+                    val alt = call.argument<Double>("alt") ?: 0.0
+                    try {
+                        currentMockLat = lat
+                        currentMockLng = lng
+                        val lm = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+                        
+                        // Remove existing test providers
+                        try { lm.removeTestProvider(LocationManager.GPS_PROVIDER) } catch (_: Exception) {}
+                        try { lm.removeTestProvider(LocationManager.NETWORK_PROVIDER) } catch (_: Exception) {}
+                        
+                        // Add test provider for GPS
+                        try {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                lm.addTestProvider(
+                                    LocationManager.GPS_PROVIDER,
+                                    false, false, false, false, false, true, true,
+                                    ProviderProperties.POWER_USAGE_LOW, ProviderProperties.ACCURACY_FINE
+                                )
+                            } else {
+                                @Suppress("DEPRECATION")
+                                lm.addTestProvider(
+                                    LocationManager.GPS_PROVIDER,
+                                    false, false, false, false, true, true, true,
+                                    0, 5
+                                )
+                            }
+                            lm.setTestProviderEnabled(LocationManager.GPS_PROVIDER, true)
+                        } catch (e: Exception) {
+                            android.util.Log.w("ConnectixGPS", "Add GPS test provider failed: ${e.message}")
+                        }
+                        
+                        // Add test provider for Network
+                        try {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                lm.addTestProvider(
+                                    LocationManager.NETWORK_PROVIDER,
+                                    false, false, false, false, false, true, true,
+                                    ProviderProperties.POWER_USAGE_LOW, ProviderProperties.ACCURACY_FINE
+                                )
+                            } else {
+                                @Suppress("DEPRECATION")
+                                lm.addTestProvider(
+                                    LocationManager.NETWORK_PROVIDER,
+                                    false, false, false, false, true, true, true,
+                                    0, 5
+                                )
+                            }
+                            lm.setTestProviderEnabled(LocationManager.NETWORK_PROVIDER, true)
+                        } catch (e: Exception) {
+                            android.util.Log.w("ConnectixGPS", "Add Network test provider failed: ${e.message}")
+                        }
+                        
+                        // Set mock location
+                        val mockLocation = Location(LocationManager.GPS_PROVIDER).apply {
+                            latitude = lat
+                            longitude = lng
+                            altitude = alt
+                            accuracy = 3.0f
+                            time = System.currentTimeMillis()
+                            elapsedRealtimeNanos = SystemClock.elapsedRealtimeNanos()
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                bearingAccuracyDegrees = 0.1f
+                                verticalAccuracyMeters = 0.1f
+                                speedAccuracyMetersPerSecond = 0.1f
+                            }
+                        }
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+                            mockLocation.isMock = true
+                        }
+                        
+                        try { lm.setTestProviderLocation(LocationManager.GPS_PROVIDER, mockLocation) } catch (e: Exception) {
+                            android.util.Log.w("ConnectixGPS", "Set GPS location failed: ${e.message}")
+                        }
+                        try { 
+                            val netLoc = Location(LocationManager.NETWORK_PROVIDER).apply {
+                                latitude = lat
+                                longitude = lng
+                                altitude = alt
+                                accuracy = 5.0f
+                                time = System.currentTimeMillis()
+                                elapsedRealtimeNanos = SystemClock.elapsedRealtimeNanos()
+                            }
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+                                netLoc.isMock = true
+                            }
+                            lm.setTestProviderLocation(LocationManager.NETWORK_PROVIDER, netLoc) 
+                        } catch (_: Exception) {}
+                        
+                        android.util.Log.i("ConnectixGPS", "Mock location set: $lat, $lng")
+                        result.success(true)
+                    } catch (e: Exception) {
+                        android.util.Log.e("ConnectixGPS", "setMockLocation failed: ${e.message}", e)
+                        result.error("MOCK_ERROR", e.message, null)
+                    }
+                }
+                "startMockLocation" -> {
+                    // Start continuous mocking (updates every 2s to keep location alive)
+                    val lat = call.argument<Double>("lat") ?: currentMockLat
+                    val lng = call.argument<Double>("lng") ?: currentMockLng
+                    val interval = call.argument<Int>("interval") ?: 2000
+                    try {
+                        currentMockLat = lat
+                        currentMockLng = lng
+                        isMocking = true
+                        
+                        mockLocationTimer?.cancel()
+                        mockLocationTimer = Timer()
+                        mockLocationTimer?.scheduleAtFixedRate(object : TimerTask() {
+                            override fun run() {
+                                try {
+                                    val lm = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+                                    val mockLocation = Location(LocationManager.GPS_PROVIDER).apply {
+                                        latitude = currentMockLat
+                                        longitude = currentMockLng
+                                        accuracy = 3.0f + (Math.random() * 2).toFloat() // Slight random for realism
+                                        time = System.currentTimeMillis()
+                                        elapsedRealtimeNanos = SystemClock.elapsedRealtimeNanos()
+                                        bearing = (Math.random() * 360).toFloat()
+                                        speed = (Math.random() * 0.5).toFloat()
+                                    }
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+                                        mockLocation.isMock = true
+                                    }
+                                    try { lm.setTestProviderLocation(LocationManager.GPS_PROVIDER, mockLocation) } catch (_: Exception) {}
+                                    try { 
+                                        val netLoc = Location(LocationManager.NETWORK_PROVIDER).apply {
+                                            latitude = currentMockLat
+                                            longitude = currentMockLng
+                                            accuracy = 5.0f
+                                            time = System.currentTimeMillis()
+                                            elapsedRealtimeNanos = SystemClock.elapsedRealtimeNanos()
+                                        }
+                                        lm.setTestProviderLocation(LocationManager.NETWORK_PROVIDER, netLoc) 
+                                    } catch (_: Exception) {}
+                                } catch (_: Exception) {}
+                            }
+                        }, 0, interval.toLong())
+                        
+                        android.util.Log.i("ConnectixGPS", "Started mocking at $lat, $lng every ${interval}ms")
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("MOCK_START_ERROR", e.message, null)
+                    }
+                }
+                "stopMockLocation" -> {
+                    try {
+                        isMocking = false
+                        mockLocationTimer?.cancel()
+                        mockLocationTimer = null
+                        
+                        val lm = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+                        try { lm.removeTestProvider(LocationManager.GPS_PROVIDER) } catch (_: Exception) {}
+                        try { lm.removeTestProvider(LocationManager.NETWORK_PROVIDER) } catch (_: Exception) {}
+                        
+                        android.util.Log.i("ConnectixGPS", "Stopped mocking")
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("MOCK_STOP_ERROR", e.message, null)
+                    }
+                }
+                "getAbi" -> {
+                    // For device_info channel compatibility
+                    try {
+                        val abis = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                            Build.SUPPORTED_ABIS
+                        } else {
+                            arrayOf(Build.CPU_ABI, Build.CPU_ABI2)
+                        }
+                        val primaryAbi = abis.firstOrNull() ?: "arm64-v8a"
+                        result.success(primaryAbi)
+                    } catch (e: Exception) {
+                        result.success("arm64-v8a")
+                    }
                 }
                 else -> {
                     result.notImplemented()
