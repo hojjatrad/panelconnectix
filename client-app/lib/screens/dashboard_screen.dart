@@ -73,7 +73,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Map<String, dynamic>? _updateInfo;
   bool _isCheckingUpdate = false;
 
-  static const String currentAppVersion = '4.0.26';
+  static const String currentAppVersion = '4.0.30';
 
   // "Download over Wi-Fi only" for update packages
   bool _updateWifiOnly = false;
@@ -547,19 +547,30 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     _isCheckingUpdate = true;
     try {
       final prefs = await SharedPreferences.getInstance();
+      final dismissed = prefs.getString('dismissed_version') ?? '';
       final updateData = await ApiService.checkAppUpdate();
       if (mounted && updateData != null) {
         final latest = (updateData['latest_version'] ?? '').toString();
         final lastPrompted = prefs.getString('last_prompted_version') ?? '';
 
         final bool isNew = isNewerVersion(latest, currentAppVersion);
+        final bool isDismissed = dismissed == latest && dismissed.isNotEmpty;
+        
+        print('v4.0.29 UPDATE CHECK: current=$currentAppVersion latest=$latest isNew=$isNew dismissed=$isDismissed lastPrompted=$lastPrompted');
+        
+        // v4.0.29 FIX: Always show update if newer, even if dismissed before (for important fixes)
+        // But respect dismissed for same version unless force
+        final forceUpdate = updateData['force_update'] == true;
+        final shouldShow = isNew && (!isDismissed || forceUpdate);
+        
         setState(() {
-          _hasAppUpdate = isNew;
-          _updateInfo = isNew ? updateData : null;
+          _hasAppUpdate = shouldShow;
+          _updateInfo = shouldShow ? updateData : null;
         });
 
         // Automatically alert user with one-click install dialog if not yet prompted for this version
-        if (isNew && lastPrompted != latest) {
+        // v4.0.29 FIX: Always show dialog for new version, even if previously dismissed (for critical fixes)
+        if (shouldShow && (lastPrompted != latest || forceUpdate)) {
           await prefs.setString('last_prompted_version', latest);
           Future.delayed(const Duration(milliseconds: 1400), () {
             if (mounted) {
@@ -567,8 +578,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             }
           });
         }
+      } else {
+        print('v4.0.29 UPDATE CHECK: updateData is null - no update info');
       }
-    } catch (_) {
+    } catch (e) {
+      print('v4.0.29 UPDATE CHECK error: $e');
     } finally {
       _isCheckingUpdate = false;
     }

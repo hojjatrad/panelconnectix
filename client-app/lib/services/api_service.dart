@@ -1152,8 +1152,28 @@ class ApiService {
     return {'url': '', 'size': 0, 'size_human': '', 'abi': 'unknown', 'arch': 'unknown', 'recommended': false};
   }
 
+  // v4.0.30 FIX: Update banner not showing - Forever fix
+  static bool isNewerVersionStatic(String latest, String current) {
+    try {
+      List<int> parse(String v) => v.replaceAll(RegExp(r'[^\d.]'), '').split('.').map((e) => int.tryParse(e) ?? 0).toList();
+      final l = parse(latest);
+      final c = parse(current);
+      for (int i = 0; i < 3; i++) {
+        final lv = i < l.length ? l[i] : 0;
+        final cv = i < c.length ? c[i] : 0;
+        if (lv > cv) return true;
+        if (lv < cv) return false;
+      }
+    } catch (_) {}
+    return false;
+  }
+
   static Future<Map<String, dynamic>?> checkAppUpdate() async {
     final deviceAbi = await getDeviceAbi();
+    Map<String, dynamic>? panelResult;
+    String panelVersion = '';
+    
+    // Try panel API first
     final orderedUrls = getOrderedBaseUrls();
     for (final currentBase in orderedUrls) {
       try {
@@ -1177,15 +1197,19 @@ class ApiService {
           await _saveWorkingUrl(currentBase);
           final map = Map<String, dynamic>.from(data['data']);
           final latestVer = (map['latest_version'] ?? '').toString();
+          // Skip if panel returns 0.0.0 or 3.x (disabled)
+          if (latestVer == '0.0.0' || latestVer.startsWith('3.0.') || latestVer.startsWith('3.1.')) {
+            print('Panel returned disabled version $latestVer, trying GitHub');
+            continue;
+          }
           final serverUrl = (map['download_url'] ?? '').toString();
           final universalUrl = (map['universal_url'] ?? '').toString();
           final dynamicGhArm64 = "https://github.com/hojjatrad/panelconnectix/releases/download/v$latestVer/Connectix-Android-ARM64.apk";
           final dynamicGhUniversal = "https://github.com/hojjatrad/panelconnectix/releases/download/v$latestVer/Connectix-Android-Universal.apk";
 
-          // v4.0.13: Ensure panel host URL is used (vpbotn.ir works, ir/cf 404)
           String finalDownload = serverUrl;
           if (finalDownload.isEmpty || !finalDownload.startsWith('http') || finalDownload.contains('ir.vpbotn.ir/Connectix') || finalDownload.contains('cf.vpbotn.ir/Connectix')) {
-            finalDownload = "https://vpbotn.ir/Connectix-ARM64-v8a.apk";
+            finalDownload = "https://vpbotn.ir/Connectix-ARM64-v8a.apk?v=$latestVer&t=${DateTime.now().millisecondsSinceEpoch}";
             if (serverUrl.isNotEmpty && serverUrl.startsWith('http') && serverUrl.contains('vpbotn.ir') && !serverUrl.contains('ir.vpbotn.ir') && !serverUrl.contains('cf.vpbotn.ir')) {
               finalDownload = serverUrl;
             } else if (serverUrl.isNotEmpty && serverUrl.startsWith('http') && !serverUrl.contains('vpbotn.ir')) {
@@ -1194,18 +1218,26 @@ class ApiService {
           }
           String finalFallback = universalUrl;
           if (finalFallback.isEmpty || !finalFallback.startsWith('http') || finalFallback.contains('ir.vpbotn.ir/Connectix') || finalFallback.contains('cf.vpbotn.ir/Connectix')) {
-            finalFallback = "https://vpbotn.ir/Connectix-Universal.apk";
+            finalFallback = "https://vpbotn.ir/Connectix-Universal.apk?v=$latestVer&t=${DateTime.now().millisecondsSinceEpoch}";
           }
 
           map['download_url'] = finalDownload.isNotEmpty ? finalDownload : dynamicGhArm64;
           map['fallback_url'] = finalFallback.isNotEmpty ? finalFallback : dynamicGhUniversal;
           map['device_abi'] = deviceAbi;
           map['selected_arch'] = 'arm64';
-          return map;
+          panelResult = map;
+          panelVersion = latestVer;
+          print('Panel update check: $latestVer from $currentBase');
+          break; // Got panel result, now check GitHub for newer
         }
-      } catch (_) {}
+      } catch (e) {
+        print('Panel check failed: $e');
+      }
     }
 
+    // v4.0.30 FIX: Always check GitHub raw as well, return newest version
+    Map<String, dynamic>? githubResult;
+    String githubVersion = '';
     try {
       final ghResp = await http.get(
         Uri.parse("https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/app_release.json?v=${DateTime.now().millisecondsSinceEpoch}"),
@@ -1239,7 +1271,7 @@ class ApiService {
           final updateType = (ghData['update_type'] ?? 'full').toString();
           final autoUpdate = ghData['auto_update'] != null ? Map<String, dynamic>.from(ghData['auto_update']) : {};
           
-          return {
+          githubResult = {
             'has_update': true,
             'latest_version': ver,
             'latest_code': ghData['code'] ?? 60,
@@ -1257,9 +1289,30 @@ class ApiService {
             'size_human': bestApk['size_human'] ?? '36 MB',
             'size': bestApk['size'] ?? 0,
           };
+          githubVersion = ver;
+          print('GitHub update check: $ver');
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      print('GitHub check failed: $e');
+    }
+
+    // v4.0.30 FIX: Return newest version between panel and GitHub
+    if (panelResult != null && githubResult != null) {
+      if (isNewerVersionStatic(githubVersion, panelVersion)) {
+        print('Returning GitHub newer: $githubVersion > $panelVersion');
+        return githubResult;
+      } else {
+        print('Returning panel newer: $panelVersion >= $githubVersion');
+        return panelResult;
+      }
+    } else if (githubResult != null) {
+      print('Returning GitHub only: $githubVersion');
+      return githubResult;
+    } else if (panelResult != null) {
+      print('Returning panel only: $panelVersion');
+      return panelResult;
+    }
 
     return null;
   }
