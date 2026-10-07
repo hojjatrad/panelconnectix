@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/Setting.php';
 require_once __DIR__ . '/Helpers.php';
+require_once __DIR__ . '/SublinkExtractor.php';
 require_once __DIR__ . '/../drivers/DriverFactory.php';
 
 /**
@@ -80,7 +81,7 @@ class NodeSync {
         );
         $stUpd = $pdo->prepare(
             "UPDATE clients
-                SET traffic_limit_bytes = ?, traffic_used_bytes = ?, expire_at = ?, status = ?, node_sublink = ?
+                SET traffic_limit_bytes = ?, traffic_used_bytes = ?, expire_at = ?, status = ?, node_sublink = ?, direct_sublink = ?
               WHERE id = ?"
         );
         $stTrafficOnly = $pdo->prepare(
@@ -119,8 +120,15 @@ class NodeSync {
                 $limit = (int)round($limit * 1073741824);
             }
             $used     = (int)($u['traffic_used_bytes'] ?? 0);
-            $nodeSub  = (string)($u['subscription_url'] ?? '');
+            // v4.0.26: Extract EXACT sublink from main server without any addition
+            $exactSub = SublinkExtractor::extractExactSub($u);
+            $nodeSub  = $exactSub; // Keep for backward compat, exact same
             $origPass = (string)($u['password'] ?? '');
+            // v4.0.26: Try to extract credentials from sub, if not found panel generates
+            $extractedCreds = SublinkExtractor::extractCredentials($exactSub, trim((string)($u['username'] ?? '')));
+            $extractedUser = $extractedCreds[0] ?? trim((string)($u['username'] ?? ''));
+            $extractedPass = $extractedCreds[1] ?? $origPass;
+            $credentialSource = $extractedCreds[2] ?? 'unknown';
             $groupName = (string)($u['group_name'] ?? 'default');
             $planName = (string)($u['plan_name'] ?? '');
 
@@ -139,18 +147,29 @@ class NodeSync {
                         $stats['updated']++;
                         continue;
                     }
-                    // Update with original password preservation logic
-                    $stUpd->execute([$limit, $effectiveUsed, $expireAt, $status, $nodeSub, (int)$row['id']]);
-                    // If we have original password column, update it
-                    if ($hasOrigPassCol && !empty($origPass)) {
+                    // Update with exact sublink (direct) + credential source
+                    $stUpd->execute([$limit, $effectiveUsed, $expireAt, $status, $nodeSub, $exactSub, (int)$row['id']]);
+                    // Update extra columns: direct_sublink, credential_source, panel_sublink, original_password
+                    try {
+                        $pdo->prepare("UPDATE clients SET direct_sublink = ?, credential_source = ?, panel_sublink = ? WHERE id = ?")
+                            ->execute([$exactSub, $credentialSource, $exactSub, (int)$row['id']]);
+                    } catch (Throwable $e) {}
+                    // If we have original password column, update it + panel password if extracted
+                    if ($hasOrigPassCol) {
                         try {
-                            $pdo->prepare("UPDATE clients SET original_password = ? WHERE id = ?")->execute([$origPass, (int)$row['id']]);
+                            $passToSave = !empty($extractedPass) ? $extractedPass : $origPass;
+                            if (!empty($passToSave)) {
+                                $pdo->prepare("UPDATE clients SET original_password = ?, password = ? WHERE id = ?")
+                                    ->execute([$passToSave, $passToSave, (int)$row['id']]);
+                            }
                         } catch (Throwable $e) {}
                     }
                     $stats['updated']++;
                 } else {
-                    // For 100% sync, use original password from API if available, else generate
-                    $panelPassword = !empty($origPass) ? $origPass : self::generatePassword();
+                    // v4.0.26: Use extracted credentials - if sub has user/pass, use that, else panel generates
+                    // This allows app to connect without entering sub link, just username/password
+                    $panelPassword = !empty($extractedPass) ? $extractedPass : (!empty($origPass) ? $origPass : self::generatePassword());
+                    $panelUsername = !empty($extractedUser) ? $extractedUser : $username;
                     $insParams = [
                         $syncResellerId,
                         (int)($server['id'] ?? 0),
@@ -159,7 +178,7 @@ class NodeSync {
                         $insParams[] = $syncPlanId;
                     }
                     $insParams = array_merge($insParams, [
-                        $username,
+                        $panelUsername,
                         $panelPassword,
                         self::generateUuid(),
                         Helpers::generateToken(24),
@@ -171,10 +190,16 @@ class NodeSync {
                     ]);
                     $stIns->execute($insParams);
                     $newId = (int)$pdo->lastInsertId();
-                    if ($hasOrigPassCol && !empty($origPass) && $panelPassword !== $origPass) {
+                    // v4.0.26: Store exact direct sublink and credential source for dual mode
+                    try {
+                        $pdo->prepare("UPDATE clients SET direct_sublink = ?, credential_source = ?, panel_sublink = ?, original_password = ? WHERE id = ?")
+                            ->execute([$exactSub, $credentialSource, $exactSub, $panelPassword, $newId]);
+                    } catch (Throwable $e) {
+                        // Fallback: try only direct_sublink
                         try {
-                            $pdo->prepare("UPDATE clients SET original_password = ? WHERE id = ?")->execute([$origPass, $newId]);
-                        } catch (Throwable $e) {}
+                            $pdo->prepare("UPDATE clients SET direct_sublink = ?, credential_source = ? WHERE id = ?")
+                                ->execute([$exactSub, $credentialSource, $newId]);
+                        } catch (Throwable $e2) {}
                     }
                     // Store extra info in custom_note if needed
                     if (!empty($groupName) || !empty($planName)) {
