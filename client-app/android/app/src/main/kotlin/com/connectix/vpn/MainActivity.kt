@@ -37,6 +37,10 @@ class MainActivity: FlutterActivity() {
     private var currentMockLat: Double = 0.0
     private var currentMockLng: Double = 0.0
     private var isMocking: Boolean = false
+    // v4.0.29 FIX: Screen off disconnect + slow download
+    private var wakeLock: android.os.PowerManager.WakeLock? = null
+    private var wifiLock: android.net.wifi.WifiManager.WifiLock? = null
+    private var downloadId: Long = -1
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -1166,6 +1170,168 @@ class MainActivity: FlutterActivity() {
                         result.success(primaryAbi)
                     } catch (e: Exception) {
                         result.success("arm64-v8a")
+                    }
+                }
+
+                // v4.0.29 FIX: Screen off disconnect - Keep VPN alive
+                "acquireWakeLock" -> {
+                    try {
+                        val powerManager = getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+                        if (wakeLock == null) {
+                            wakeLock = powerManager.newWakeLock(
+                                android.os.PowerManager.PARTIAL_WAKE_LOCK,
+                                "ConnectixVPN::KeepAlive"
+                            )
+                        }
+                        if (wakeLock?.isHeld == false) {
+                            wakeLock?.acquire(10*60*60*1000L) // 10 hours
+                            android.util.Log.i("ConnectixKeepAlive", "WakeLock acquired")
+                        }
+                        val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as android.net.wifi.WifiManager
+                        if (wifiLock == null) {
+                            wifiLock = wifiManager.createWifiLock(
+                                android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF,
+                                "ConnectixVPN::WifiLock"
+                            )
+                        }
+                        if (wifiLock?.isHeld == false) {
+                            wifiLock?.acquire()
+                            android.util.Log.i("ConnectixKeepAlive", "WifiLock acquired")
+                        }
+                        result.success(true)
+                    } catch (e: Exception) {
+                        android.util.Log.e("ConnectixKeepAlive", "acquireWakeLock failed: ${e.message}", e)
+                        result.success(false)
+                    }
+                }
+                "releaseWakeLock" -> {
+                    try {
+                        wakeLock?.let { if (it.isHeld) it.release() }
+                        wifiLock?.let { if (it.isHeld) it.release() }
+                        android.util.Log.i("ConnectixKeepAlive", "WakeLocks released")
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
+                }
+                "requestBatteryOptimizationExemption" -> {
+                    try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            val pm = getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+                            val isIgnoring = pm.isIgnoringBatteryOptimizations(packageName)
+                            if (!isIgnoring) {
+                                val intent = Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                                    data = Uri.parse("package:$packageName")
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                }
+                                startActivity(intent)
+                                result.success(false) // Not yet ignoring, requested
+                            } else {
+                                result.success(true) // Already ignoring
+                            }
+                        } else {
+                            result.success(true)
+                        }
+                    } catch (e: Exception) {
+                        result.error("BATTERY_OPT_ERROR", e.message, null)
+                    }
+                }
+                "isIgnoringBatteryOptimizations" -> {
+                    try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            val pm = getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+                            result.success(pm.isIgnoringBatteryOptimizations(packageName))
+                        } else {
+                            result.success(true)
+                        }
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
+                }
+                // v4.0.29 FIX: Slow download - Use DownloadManager for background download that continues when screen off
+                "downloadWithDownloadManager" -> {
+                    val url = call.argument<String>("url") ?: ""
+                    val fileName = call.argument<String>("fileName") ?: "Connectix-Update.apk"
+                    val expectedVer = call.argument<String>("expectedVersion") ?: ""
+                    try {
+                        if (url.isEmpty()) {
+                            result.error("INVALID_URL", "URL empty", null)
+                            return@setMethodCallHandler
+                        }
+                        // Use DownloadManager for reliable background download
+                        val dm = getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
+                        val uri = Uri.parse(url)
+                        val request = android.app.DownloadManager.Request(uri).apply {
+                            setTitle("Connectix v$expectedVer - در حال دانلود")
+                            setDescription("دانلود نسخه جدید - حتی با خاموش شدن صفحه ادامه دارد")
+                            setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                            setDestinationInExternalFilesDir(context, null, fileName)
+                            setAllowedOverMetered(true)
+                            setAllowedOverRoaming(true)
+                            setVisibleInDownloadsUi(true)
+                            addRequestHeader("User-Agent", "Mozilla/5.0 (Linux; Android 10; Mobile) Connectix v4.0.29")
+                            addRequestHeader("Cache-Control", "no-cache")
+                        }
+                        downloadId = dm.enqueue(request)
+                        android.util.Log.i("ConnectixDownload", "DownloadManager enqueued id=$downloadId url=$url")
+                        result.success(mapOf("downloadId" to downloadId, "fileName" to fileName))
+                    } catch (e: Exception) {
+                        android.util.Log.e("ConnectixDownload", "DownloadManager failed: ${e.message}", e)
+                        result.error("DOWNLOAD_MANAGER_ERROR", e.message, null)
+                    }
+                }
+                "getDownloadManagerStatus" -> {
+                    val id = call.argument<Long>("downloadId") ?: downloadId
+                    try {
+                        val dm = getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
+                        val query = android.app.DownloadManager.Query().setFilterById(id)
+                        val cursor = dm.query(query)
+                        if (cursor.moveToFirst()) {
+                            val statusIdx = cursor.getColumnIndex(android.app.DownloadManager.COLUMN_STATUS)
+                            val bytesIdx = cursor.getColumnIndex(android.app.DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
+                            val totalIdx = cursor.getColumnIndex(android.app.DownloadManager.COLUMN_TOTAL_SIZE_BYTES)
+                            val reasonIdx = cursor.getColumnIndex(android.app.DownloadManager.COLUMN_REASON)
+                            val status = cursor.getInt(statusIdx)
+                            val bytes = cursor.getLong(bytesIdx)
+                            val total = cursor.getLong(totalIdx)
+                            val reason = cursor.getInt(reasonIdx)
+                            val localUriIdx = cursor.getColumnIndex(android.app.DownloadManager.COLUMN_LOCAL_URI)
+                            val localUri = cursor.getString(localUriIdx)
+                            cursor.close()
+                            
+                            val statusStr = when(status) {
+                                android.app.DownloadManager.STATUS_PENDING -> "pending"
+                                android.app.DownloadManager.STATUS_RUNNING -> "running"
+                                android.app.DownloadManager.STATUS_PAUSED -> "paused"
+                                android.app.DownloadManager.STATUS_SUCCESSFUL -> "successful"
+                                android.app.DownloadManager.STATUS_FAILED -> "failed"
+                                else -> "unknown"
+                            }
+                            result.success(mapOf(
+                                "status" to status,
+                                "statusStr" to statusStr,
+                                "bytes" to bytes,
+                                "total" to total,
+                                "reason" to reason,
+                                "localUri" to (localUri ?: ""),
+                                "progress" to if (total > 0) (bytes.toDouble() / total.toDouble()) else 0.0
+                            ))
+                        } else {
+                            cursor.close()
+                            result.success(mapOf("status" to -1, "statusStr" to "not_found"))
+                        }
+                    } catch (e: Exception) {
+                        result.error("STATUS_ERROR", e.message, null)
+                    }
+                }
+                "cancelDownloadManager" -> {
+                    try {
+                        val id = call.argument<Long>("downloadId") ?: downloadId
+                        val dm = getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
+                        dm.remove(id)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.success(false)
                     }
                 }
                 else -> {

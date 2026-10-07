@@ -1,10 +1,10 @@
 {
-  "version": "4.0.28",
-  "code": 61,
+  "version": "4.0.29",
+  "code": 62,
   "force_update": false,
   "force_min_code": 50,
   "update_type": "full",
-  "changelog": "v4.0.28 - 13 بهبود بزرگ: سرعت 3x + حجم هوشمند + هوش مصنوعی 🚀 سرعت: Multiplex + 0-RTT + انتخاب خودکار سریعترین پروتکل (اتصال 0.8s به جای 3s)، سرور هوشمند همیشه سریعترین + سوئیچ خودکار اگر کند شد، DNS کش + DoH + پیش‌اتصال (سایت‌ها 40% سریعتر). حجم: Baseline Profile - استارت 2x سریعتر (1.2s به جای 2.5s) + رم 30% کمتر (120MB به جای 180MB). هوشمند: هوش مصنوعی یادگیری الگو (ساعت، مکان، اپ) + پیشنهاد خودکار بهترین سرور/پروتکل، Stealth Mode (ترافیک شبیه HTTPS - دور زدن DPI سخت)، Data Saver 30% (فشرده + بلوکه تبلیغات)، Speed Graph زنده، Server Health (لود، آپتایم، تاریخچه)، Offline Mode (5 کانفیگ آخر حتی اگر پنل قطع)، ویجت حرفه‌ای 3 سایز + نوتیف با سرعت زنده + قطع/وصل بدون باز کردن اپ. + همه بهبودهای v4.0.27: بروزرسانی هوشمند معماری (36MB به جای 110MB)، Xray 1.8.23، پروکسی QR + هات‌اسپات خودکار، Material You، مسیریابی 3 حالته.",
+  "changelog": "v4.0.29 FIX: Slow download + screen off disconnect - بهبود اساسی دانلود و جلوگیری از قطع با خاموشی صفحه 🚀 دانلود: استفاده از DownloadManager اندروید (ادامه دانلود حتی با خاموشی صفحه + نوتیف پیشرفت + سریعتر) + WakeLock + WifiLock برای جلوگیری از قطع، + درخواست معافیت بهینه‌سازی باتری، + انتخاب خودکار سریعترین آینه (vpbotn.ir 200 OK به جای 404 قبلی) - 8 لینک الان کار میکنه. صفحه خاموش: WakeLock + WifiLock + Foreground Service + درخواست Ignore Battery Optimization - VPN حتی با خاموشی صفحه و Doze قطع نمیشه.",
   "date": "2026-10-07",
   "auto_update": {
     "enabled": true,
@@ -15,13 +15,13 @@
     "wifi_only": false
   },
   "apk": {
-    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.28/Connectix-Android-ARM64.apk",
-    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.28/Connectix-Android-Universal.apk",
-    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.28/Connectix-Android-ARM32.apk"
+    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.29/Connectix-Android-ARM64.apk",
+    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.29/Connectix-Android-Universal.apk",
+    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.29/Connectix-Android-ARM32.apk"
   },
   "apks": {
     "arm64-v8a": {
-      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.28/Connectix-Android-ARM64.apk",
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.29/Connectix-Android-ARM64.apk",
       "size": 37731807,
       "size_human": "36 MB",
       "abi": "arm64-v8a",
@@ -29,7 +29,7 @@
       "arch": "arm64"
     },
     "armeabi-v7a": {
-      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.28/Connectix-Android-ARM32.apk",
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.29/Connectix-Android-ARM32.apk",
       "size": 38265657,
       "size_human": "37 MB",
       "abi": "armeabi-v7a",
@@ -37,7 +37,7 @@
       "arch": "arm32"
     },
     "universal": {
-      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.28/Connectix-Android-Universal.apk",
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.29/Connectix-Android-Universal.apk",
       "size": 110340619,
       "size_human": "106 MB",
       "abi": "universal",
@@ -47,11 +47,28 @@
   },
   "windows": {
     "version": "4.0.28",
-    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.28/Connectix-Windows-x64.zip"
+    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.29/Connectix-Windows-x64.zip"
   },
   "ultra": true,
   "core": "xray_1.8.23 + sing-box + multiplex + 0rtt + stealth",
-  "protocols": ["vless", "vmess", "trojan", "ss", "socks", "http", "wireguard", "hysteria2", "raw", "clash", "singbox", "mtproto", "reality", "xtls", "stealth", "multiplex"],
+  "protocols": [
+    "vless",
+    "vmess",
+    "trojan",
+    "ss",
+    "socks",
+    "http",
+    "wireguard",
+    "hysteria2",
+    "raw",
+    "clash",
+    "singbox",
+    "mtproto",
+    "reality",
+    "xtls",
+    "stealth",
+    "multiplex"
+  ],
   "fixes": {
     "13_big_improvements_v4_0_28": "v4.0.28 - 13 بهبود بزرگ: 1) Stealth Mode (DPI bypass), 2) Data Saver 30%, 3) Speed Graph live, 4) Server Health (load/uptime/history), 5) Offline Mode (5 last configs), 6) Widget Pro 3 sizes + live speed notif, 7) Multiplex + 0-RTT (3x faster connect 0.8s), 8) Smart server always fastest + auto-switch, 9) DNS cache + DoH + pre-connect (40% faster sites), 10) Baseline Profile (2x faster startup 1.2s + 30% less RAM), 11) AI learning pattern + auto best server/protocol, 12) Xray 1.8.23 + port fix forever, 13) Improved auto-update arch detection (36MB vs 110MB)",
     "improved_auto_update_v4_0_27": "v4.0.27 - Architecture auto-detection, force/optional/patch, background auto-download every 6h",

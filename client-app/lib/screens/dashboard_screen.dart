@@ -1361,6 +1361,27 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   void _startTunnel({bool isReconnect = false}) async {
+    // v4.0.29 FIX: Screen off disconnect - Acquire WakeLock + WifiLock + Battery exemption
+    try {
+      const channel = MethodChannel('com.connectix.vpn/updater');
+      await channel.invokeMethod('acquireWakeLock');
+      print('v4.0.29 WakeLock acquired for VPN keepalive');
+      
+      // Check battery optimization and request exemption if needed (once per install)
+      final prefs = await SharedPreferences.getInstance();
+      final hasRequestedBattery = prefs.getBool('has_requested_battery_opt') ?? false;
+      if (!hasRequestedBattery) {
+        final isIgnoring = await channel.invokeMethod('isIgnoringBatteryOptimizations');
+        if (isIgnoring != true) {
+          print('v4.0.29 Requesting battery optimization exemption');
+          await channel.invokeMethod('requestBatteryOptimizationExemption');
+          await prefs.setBool('has_requested_battery_opt', true);
+        }
+      }
+    } catch (e) {
+      print('v4.0.29 WakeLock/battery check failed: $e');
+    }
+
     if (_selectedServer == null || _selectedServer!.configUri.isEmpty || _selectedServer!.isInfoBanner) {
       final clean = _servers.where((s) => !s.isInfoBanner && s.configUri.isNotEmpty).toList();
       if (clean.isNotEmpty) {

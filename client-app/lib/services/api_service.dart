@@ -1385,6 +1385,78 @@ class ApiService {
   // LAW 8: Use externalFilesDir for FileProvider (best for MIUI/Samsung) + grant to 9 installers
   // LAW 9: Pure Intent (ACTION_INSTALL_PACKAGE + VIEW + Chooser) - NO PackageInstaller API
   // LAW 10: Show detailed error with file path, size, version, and browser fallback
+  // v4.0.29 FIX: Screen off disconnect + slow download - Use DownloadManager + WakeLock
+  static Future<bool> acquireWakeLock() async {
+    try {
+      const channel = MethodChannel('com.connectix.vpn/updater');
+      final result = await channel.invokeMethod('acquireWakeLock');
+      return result == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<bool> releaseWakeLock() async {
+    try {
+      const channel = MethodChannel('com.connectix.vpn/updater');
+      final result = await channel.invokeMethod('releaseWakeLock');
+      return result == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<bool> isIgnoringBatteryOptimizations() async {
+    try {
+      const channel = MethodChannel('com.connectix.vpn/updater');
+      final result = await channel.invokeMethod('isIgnoringBatteryOptimizations');
+      return result == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<bool> requestBatteryOptimizationExemption() async {
+    try {
+      const channel = MethodChannel('com.connectix.vpn/updater');
+      final result = await channel.invokeMethod('requestBatteryOptimizationExemption');
+      return result == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<Map<String, dynamic>?> downloadWithDownloadManager(String url, String expectedVer) async {
+    try {
+      const channel = MethodChannel('com.connectix.vpn/updater');
+      final result = await channel.invokeMethod('downloadWithDownloadManager', {
+        'url': url,
+        'fileName': 'Connectix-Update.apk',
+        'expectedVersion': expectedVer,
+      });
+      if (result is Map) {
+        return Map<String, dynamic>.from(result);
+      }
+      return null;
+    } catch (e) {
+      print('DownloadManager error: $e');
+      return null;
+    }
+  }
+
+  static Future<Map<String, dynamic>?> getDownloadManagerStatus(int downloadId) async {
+    try {
+      const channel = MethodChannel('com.connectix.vpn/updater');
+      final result = await channel.invokeMethod('getDownloadManagerStatus', {'downloadId': downloadId});
+      if (result is Map) {
+        return Map<String, dynamic>.from(result);
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   static Future<void> downloadAndInstallApk({
 
     required String downloadUrl,
@@ -1398,7 +1470,107 @@ class ApiService {
       final m = RegExp(r'v?(\d+\.\d+\.\d+)').firstMatch(downloadUrl);
       if (m != null) expectedVer = m.group(1) ?? '';
     } catch (_) {}
-    if (expectedVer.isEmpty) expectedVer = '4.0.26';
+    if (expectedVer.isEmpty) expectedVer = '4.0.29';
+
+    // v4.0.29 FIX: Acquire WakeLock + WifiLock to prevent screen off disconnect during download and VPN
+    await acquireWakeLock();
+    
+    // v4.0.29 FIX: Try DownloadManager first (fastest, background, continues when screen off)
+    try {
+      print('v4.0.29 Trying DownloadManager for $downloadUrl');
+      final dmResult = await downloadWithDownloadManager(downloadUrl, expectedVer);
+      if (dmResult != null && dmResult['downloadId'] != null) {
+        final downloadId = dmResult['downloadId'] as int;
+        print('DownloadManager started id=$downloadId');
+        // Poll status
+        int attempts = 0;
+        while (attempts < 180) { // 3 minutes max
+          await Future.delayed(const Duration(seconds: 1));
+          final status = await getDownloadManagerStatus(downloadId);
+          if (status == null) {
+            attempts++;
+            continue;
+          }
+          final statusStr = status['statusStr']?.toString() ?? '';
+          final bytes = (status['bytes'] ?? 0) is int ? status['bytes'] as int : 0;
+          final total = (status['total'] ?? 0) is int ? status['total'] as int : 0;
+          final progress = (status['progress'] ?? 0.0) is double ? status['progress'] as double : 0.0;
+          
+          if (total > 0) {
+            onProgress(progress, bytes, total);
+          }
+          
+          if (statusStr == 'successful') {
+            print('DownloadManager success');
+            final localUri = status['localUri']?.toString() ?? '';
+            // Get file path from URI
+            String filePath = '';
+            if (localUri.startsWith('file://')) {
+              filePath = Uri.parse(localUri).path;
+            } else {
+              // Try to get from external files dir
+              try {
+                const channel = MethodChannel('com.connectix.vpn/updater');
+                final cacheDir = await channel.invokeMethod<String>('getCacheDir') ?? '';
+                filePath = '$cacheDir/Connectix-Update.apk';
+                // DownloadManager saves to external files dir
+                // Check if file exists at that path, if not try alternative
+                final file = File(filePath);
+                if (!await file.exists()) {
+                  // Try external files dir directly
+                  filePath = '/storage/emulated/0/Android/data/com.connectix.vpn/files/Connectix-Update.apk';
+                }
+              } catch (_) {}
+            }
+            
+            // Verify and install
+            if (filePath.isNotEmpty) {
+              try {
+                final file = File(filePath);
+                if (await file.exists()) {
+                  final len = await file.length();
+                  if (len > 1000000) {
+                    // Verify APK header
+                    final raf = await file.open();
+                    final header = await raf.read(4);
+                    await raf.close();
+                    if (header.length >= 2 && header[0] == 0x50 && header[1] == 0x4B) {
+                      print('DownloadManager APK verified, installing');
+                      try {
+                        const channel = MethodChannel('com.connectix.vpn/updater');
+                        final installResult = await channel.invokeMethod('installApk', {'filePath': file.path, 'allowSameVersion': true});
+                        if (installResult == true || installResult == 'true' || installResult == null) {
+                          await releaseWakeLock();
+                          onSuccess();
+                          return;
+                        }
+                      } catch (e) {
+                        print('Install via DownloadManager file failed: $e');
+                      }
+                    }
+                  }
+                }
+              } catch (e) {
+                print('DownloadManager file handling failed: $e');
+              }
+            }
+            break;
+          } else if (statusStr == 'failed') {
+            print('DownloadManager failed, trying next method');
+            break;
+          } else if (statusStr == 'running' || statusStr == 'pending') {
+            // Continue polling
+            attempts++;
+            continue;
+          } else {
+            attempts++;
+          }
+        }
+        print('DownloadManager polling ended, falling back to http methods');
+      }
+    } catch (e) {
+      print('DownloadManager attempt failed: $e');
+    }
     
     // v4.0.19 FOREVER LAW: Generate all URLs with deep cache busting + GitHub fallback
     List<String> generateAllUrls(String primary, String fallback) {
