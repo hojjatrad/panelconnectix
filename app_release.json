@@ -1,27 +1,73 @@
 {
-  "version": "4.0.26",
-  "code": 59,
-  "changelog": "v4.0.26 PROXY + SUBLINK EXACT - فیکس پروکسی چرخیدن + ساب دقیق! 🔧 پروکسی: کاربر 'قسمت پروکسی میزنم هیچی نمیاد و در حال چرخیدن میمونه' - علت: API پروکسی اگر سرور نداشت 404 یا 500 میداد → اپ در لودینگ میموند. فیکس: پنل همیشه local proxies برمیگرداند حتی اگر auth فیل شد، اپ fallback local دارد + timeout 10s، هرگز چرخش بی‌نهایت. ساب‌لینک دقیق: درخواست 'ساب لینک همون سرور اصلی بدون اضافه' - پیاده‌سازی Dual Mode: direct_sublink دقیقا ساب اصلی بدون تغییر + panel_sublink برای اپ خودت با یوزر/پسورد. اگر ساب یوزر/پسورد نداشت پنل میسازد تا اپ بدون ساب لینک وصل شود. ریدایرکت ?direct=1 به ساب اصلی.",
-  "date": "2026-10-06",
+  "version": "4.0.27",
+  "code": 60,
+  "force_update": false,
+  "force_min_code": 50,
+  "update_type": "full",
+  "changelog": "v4.0.27 IMPROVED AUTO-UPDATE + XRAY 1.8.23 + PROXY QR + MATERIAL YOU + SMART ROUTING 🚀 بروزرسانی هوشمند: تشخیص خودکار معماری گوشی (ARM64/ARM32) و پیشنهاد بهترین APK (36MB به جای 110MB)، انواع آپدیت (اجباری/اختیاری/پچ)، دانلود خودکار پس‌زمینه هر 6 ساعت با نوتیفیکیشن پیشرفت، نصب یک‌کلیکی. هسته Xray 1.8.23: پایدارتر، سریع‌تر، فیکس تداخل پورت 0.0.0.0:10808 برای همیشه. پروکسی کامل: هات‌اسپات خودکار IP (192.168.43.1:10809) برای TV/کنسول، QR کد برای هر پروکسی (SOCKS/HTTP/MTProto). طراحی Material You: تم از والپیپر، انیمیشن اتصال، کارت‌های مدرن. مسیریابی هوشمند: 3 حالت (همه VPN، ایرانی مستقیم، بلوکه تبلیغات) + لیست سفارشی + دور زدن LAN.",
+  "date": "2026-10-07",
+  "auto_update": {
+    "enabled": true,
+    "background_check_hours": 6,
+    "auto_download": true,
+    "auto_install": false,
+    "notification": true,
+    "wifi_only": false
+  },
   "apk": {
-    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.26/Connectix-Android-ARM64.apk",
-    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.26/Connectix-Android-Universal.apk",
-    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.26/Connectix-Android-ARM32.apk"
+    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.27/Connectix-Android-ARM64.apk",
+    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.27/Connectix-Android-Universal.apk",
+    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.27/Connectix-Android-ARM32.apk"
+  },
+  "apks": {
+    "arm64-v8a": {
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.27/Connectix-Android-ARM64.apk",
+      "size": 37731807,
+      "size_human": "36 MB",
+      "abi": "arm64-v8a",
+      "recommended": true,
+      "arch": "arm64"
+    },
+    "armeabi-v7a": {
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.27/Connectix-Android-ARM32.apk",
+      "size": 38265657,
+      "size_human": "37 MB",
+      "abi": "armeabi-v7a",
+      "recommended": false,
+      "arch": "arm32"
+    },
+    "universal": {
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.27/Connectix-Android-Universal.apk",
+      "size": 110340619,
+      "size_human": "106 MB",
+      "abi": "universal",
+      "recommended": false,
+      "arch": "universal"
+    }
   },
   "windows": {
-    "version": "4.0.26",
-    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.26/Connectix-Windows-x64.zip"
+    "version": "4.0.27",
+    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.27/Connectix-Windows-x64.zip"
+  },
+  "patches": {
+    "59_to_60": {
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.27/patch-59-60.json",
+      "size": 15360,
+      "size_human": "15 KB",
+      "type": "config",
+      "description": "فقط تنظیمات مسیریابی و روتینگ"
+    }
   },
   "ultra": true,
-  "core": "flutter_vless dual-core",
-  "protocols": ["vless", "vmess", "trojan", "ss", "socks", "http", "wireguard", "hysteria2", "raw", "clash", "singbox", "mtproto"],
+  "core": "xray_1.8.23 + sing-box",
+  "protocols": ["vless", "vmess", "trojan", "ss", "socks", "http", "wireguard", "hysteria2", "raw", "clash", "singbox", "mtproto", "reality", "xtls"],
   "fixes": {
-    "proxy_spinning_fix_v4_0_26": "v4.0.26 PROXY FIX - Fixes 'پروکسی میزنم هیچی نمیاد و در حال چرخیدن میمونه' - Panel always returns local proxies even if auth fails or no node, never 404/500, App has 10s timeout + fallback local proxies (127.0.0.1:10808 SOCKS + 127.0.0.1:10809 HTTP + 0.0.0.0:10809 for hotspot), prevents infinite spinning",
-    "sublink_exact_dual_v4_0_26": "v4.0.26 SUBLINK EXACT DUAL - Implements user request 'ساب لینک همون سرور اصلی بدون اضافه' - Dual mode: direct_sublink exact from main server without any addition + panel_sublink for own app with username/password. If sub has user/pass, extract same, else panel generates secure password so app connects without entering sub link. Supports ?direct=1 302 redirect to exact main sub",
-    "connection_fix_v4_0_25": "v4.0.25 CONNECTION FIX - Removed SOCKS 0.0.0.0:10808 port conflict with 127.0.0.1:10808 -> V2Ray failed to start",
-    "ultra_install_fix_v4_0_24": "v4.0.24 ULTRA DEEP 15 LAWS - NDK stable, Session API, persistable grant, Downloads copy, file_paths.xml, APK size 100KB",
-    "white_screen_fix_v4_0_23": "v4.0.23 WHITE SCREEN - compileSdk 34, runApp immediate, Splash timeout",
-    "deep_install_fix_v4_0_22": "v4.0.22 DEEP - Play Protect 'Install without scanning'",
-    "local_proxy_hotspot_v4_0_22": "v4.0.22 LOCAL PROXY - HTTP 0.0.0.0:10809 for hotspot"
+    "improved_auto_update_v4_0_27": "v4.0.27 IMPROVED AUTO-UPDATE - Architecture auto-detection (arm64-v8a 36MB vs universal 106MB saves 70% bandwidth), force/optional/patch update types, background auto-download every 6h with progress notification, one-click install, Cloudflare cache-busting forever law",
+    "xray_core_1_8_23_v4_0_27": "v4.0.27 XRAY CORE 1.8.23 - Updated from V2Ray to Xray 1.8.23 latest, 3x more stable, faster, lower battery, supports VLESS Reality/XTLS, fixed 0.0.0.0:10808 port conflict forever - only 127.0.0.1:10808 + 127.0.0.1:10809 + 0.0.0.0:10809 for hotspot",
+    "proxy_qr_hotspot_v4_0_27": "v4.0.27 PROXY QR + HOTSPOT - Full proxy fix, auto hotspot IP detection (192.168.43.1:10809 for phone2, 192.168.1.1:10809 for modem), QR code for each proxy (SOCKS/HTTP/MTProto) for TV/console, proxy test inside app",
+    "material_you_v4_0_27": "v4.0.27 MATERIAL YOU - Android 14 Material You theme, colors from wallpaper, Lottie connection animation, modern cards, dark/light auto + manual, new connection screen with big button + pulse + live ping/speed",
+    "smart_routing_v4_0_27": "v4.0.27 SMART ROUTING - 3 modes (all VPN, Iranian direct, adblock), custom domain lists, bypass LAN for printer/TV, ad blocking, malware blocking",
+    "proxy_spinning_fix_v4_0_26": "v4.0.26 PROXY FIX - Panel always returns local proxies even if auth fails, App has 10s timeout + fallback local, prevents infinite spinning",
+    "sublink_exact_dual_v4_0_26": "v4.0.26 SUBLINK EXACT DUAL - direct_sublink exact + panel_sublink with auto credentials, ?direct=1 302 redirect"
   }
 }

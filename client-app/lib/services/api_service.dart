@@ -1088,14 +1088,79 @@ class ApiService {
     return [];
   }
 
+  // v4.0.27 IMPROVED AUTO-UPDATE - Architecture detection + force/optional + auto-download
+  static Future<String> getDeviceAbi() async {
+    try {
+      const channel = MethodChannel('com.connectix.vpn/device_info');
+      final abi = await channel.invokeMethod<String>('getAbi');
+      if (abi != null && abi.isNotEmpty) return abi;
+    } catch (_) {}
+    // Fallback: try to detect via Platform
+    try {
+      // Most modern devices are arm64
+      return 'arm64-v8a';
+    } catch (_) {
+      return 'arm64-v8a';
+    }
+  }
+
+  static Map<String, dynamic> selectBestApk(Map<String, dynamic> apksData, String deviceAbi) {
+    // v4.0.27: Select best APK based on device ABI
+    // Priority: exact match > arm64 > arm32 > universal
+    if (apksData.containsKey(deviceAbi)) {
+      return {
+        'url': apksData[deviceAbi]['url'] ?? '',
+        'size': apksData[deviceAbi]['size'] ?? 0,
+        'size_human': apksData[deviceAbi]['size_human'] ?? '',
+        'abi': deviceAbi,
+        'arch': apksData[deviceAbi]['arch'] ?? deviceAbi,
+        'recommended': true,
+      };
+    }
+    // Fallback to arm64-v8a (95% of devices)
+    if (apksData.containsKey('arm64-v8a')) {
+      return {
+        'url': apksData['arm64-v8a']['url'] ?? '',
+        'size': apksData['arm64-v8a']['size'] ?? 0,
+        'size_human': apksData['arm64-v8a']['size_human'] ?? '36 MB',
+        'abi': 'arm64-v8a',
+        'arch': 'arm64',
+        'recommended': true,
+      };
+    }
+    if (apksData.containsKey('armeabi-v7a')) {
+      return {
+        'url': apksData['armeabi-v7a']['url'] ?? '',
+        'size': apksData['armeabi-v7a']['size'] ?? 0,
+        'size_human': apksData['armeabi-v7a']['size_human'] ?? '37 MB',
+        'abi': 'armeabi-v7a',
+        'arch': 'arm32',
+        'recommended': false,
+      };
+    }
+    // Last resort: universal
+    if (apksData.containsKey('universal')) {
+      return {
+        'url': apksData['universal']['url'] ?? '',
+        'size': apksData['universal']['size'] ?? 0,
+        'size_human': apksData['universal']['size_human'] ?? '106 MB',
+        'abi': 'universal',
+        'arch': 'universal',
+        'recommended': false,
+      };
+    }
+    return {'url': '', 'size': 0, 'size_human': '', 'abi': 'unknown', 'arch': 'unknown', 'recommended': false};
+  }
+
   static Future<Map<String, dynamic>?> checkAppUpdate() async {
+    final deviceAbi = await getDeviceAbi();
     final orderedUrls = getOrderedBaseUrls();
     for (final currentBase in orderedUrls) {
       try {
         final prefs = await SharedPreferences.getInstance();
         final token = prefs.getString('auth_token') ?? '';
 
-        final url = Uri.parse("$currentBase/api/v1/app/check-update?auth_token=${Uri.encodeComponent(token)}&platform=${Platform.isWindows ? 'windows' : 'android'}");
+        final url = Uri.parse("$currentBase/api/v1/app/check-update?auth_token=${Uri.encodeComponent(token)}&platform=${Platform.isWindows ? 'windows' : 'android'}&abi=${Uri.encodeComponent(deviceAbi)}");
         final response = await http.get(
           url,
           headers: {
@@ -1120,15 +1185,13 @@ class ApiService {
           // v4.0.13: Ensure panel host URL is used (vpbotn.ir works, ir/cf 404)
           String finalDownload = serverUrl;
           if (finalDownload.isEmpty || !finalDownload.startsWith('http') || finalDownload.contains('ir.vpbotn.ir/Connectix') || finalDownload.contains('cf.vpbotn.ir/Connectix')) {
-            // If serverUrl is broken 404, use panel host directly
             finalDownload = "https://vpbotn.ir/Connectix-ARM64-v8a.apk";
             if (serverUrl.isNotEmpty && serverUrl.startsWith('http') && serverUrl.contains('vpbotn.ir') && !serverUrl.contains('ir.vpbotn.ir') && !serverUrl.contains('cf.vpbotn.ir')) {
               finalDownload = serverUrl;
             } else if (serverUrl.isNotEmpty && serverUrl.startsWith('http') && !serverUrl.contains('vpbotn.ir')) {
-              finalDownload = serverUrl; // GitHub or other
+              finalDownload = serverUrl;
             }
           }
-          // Fallback to panel universal
           String finalFallback = universalUrl;
           if (finalFallback.isEmpty || !finalFallback.startsWith('http') || finalFallback.contains('ir.vpbotn.ir/Connectix') || finalFallback.contains('cf.vpbotn.ir/Connectix')) {
             finalFallback = "https://vpbotn.ir/Connectix-Universal.apk";
@@ -1136,6 +1199,8 @@ class ApiService {
 
           map['download_url'] = finalDownload.isNotEmpty ? finalDownload : dynamicGhArm64;
           map['fallback_url'] = finalFallback.isNotEmpty ? finalFallback : dynamicGhUniversal;
+          map['device_abi'] = deviceAbi;
+          map['selected_arch'] = 'arm64';
           return map;
         }
       } catch (_) {}
@@ -1143,24 +1208,54 @@ class ApiService {
 
     try {
       final ghResp = await http.get(
-        Uri.parse("https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/app_release.json"),
-        headers: {'Accept': 'application/json'},
+        Uri.parse("https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/app_release.json?v=${DateTime.now().millisecondsSinceEpoch}"),
+        headers: {'Accept': 'application/json', 'Cache-Control': 'no-cache'},
       ).timeout(const Duration(seconds: 5));
       if (ghResp.statusCode == 200) {
         final ghData = jsonDecode(utf8.decode(ghResp.bodyBytes));
         final ver = (ghData['version'] ?? '').toString();
         if (ver.isNotEmpty) {
-          final apkArm64 = ghData['apk']?['arm64']?.toString() ??
-              "https://github.com/hojjatrad/panelconnectix/releases/download/v$ver/Connectix-Android-ARM64.apk";
-          final apkUniversal = ghData['apk']?['universal']?.toString() ??
-              "https://github.com/hojjatrad/panelconnectix/releases/download/v$ver/Connectix-Android-Universal.apk";
+          // v4.0.27: Support new apks format with architecture detection
+          Map<String, dynamic> apksData = {};
+          if (ghData['apks'] != null) {
+            apksData = Map<String, dynamic>.from(ghData['apks']);
+          } else if (ghData['apk'] != null) {
+            // Legacy format
+            final apk = ghData['apk'] as Map<String, dynamic>;
+            apksData = {
+              'arm64-v8a': {'url': apk['arm64'] ?? '', 'size': 37731807, 'size_human': '36 MB', 'abi': 'arm64-v8a'},
+              'universal': {'url': apk['universal'] ?? '', 'size': 110340619, 'size_human': '106 MB', 'abi': 'universal'},
+              'armeabi-v7a': {'url': apk['arm32'] ?? '', 'size': 38265657, 'size_human': '37 MB', 'abi': 'armeabi-v7a'},
+            };
+          }
+          
+          final bestApk = selectBestApk(apksData, deviceAbi);
+          final apkArm64 = bestApk['url']?.toString() ?? "https://github.com/hojjatrad/panelconnectix/releases/download/v$ver/Connectix-Android-ARM64.apk";
+          final apkUniversal = apksData['universal']?['url']?.toString() ?? "https://github.com/hojjatrad/panelconnectix/releases/download/v$ver/Connectix-Android-Universal.apk";
+          
+          // v4.0.27: Force update logic
+          final forceUpdate = ghData['force_update'] == true;
+          final forceMinCode = (ghData['force_min_code'] ?? 0) is int ? ghData['force_min_code'] as int : int.tryParse(ghData['force_min_code'].toString()) ?? 0;
+          final updateType = (ghData['update_type'] ?? 'full').toString();
+          final autoUpdate = ghData['auto_update'] != null ? Map<String, dynamic>.from(ghData['auto_update']) : {};
+          
           return {
             'has_update': true,
             'latest_version': ver,
+            'latest_code': ghData['code'] ?? 60,
             'title': 'Connectix v$ver',
             'changelog': (ghData['changelog'] ?? '• نگارش جدید سامانه منتشر شد.').toString(),
             'download_url': apkArm64,
             'fallback_url': apkUniversal,
+            'device_abi': deviceAbi,
+            'selected_apk': bestApk,
+            'all_apks': apksData,
+            'force_update': forceUpdate,
+            'force_min_code': forceMinCode,
+            'update_type': updateType,
+            'auto_update': autoUpdate,
+            'size_human': bestApk['size_human'] ?? '36 MB',
+            'size': bestApk['size'] ?? 0,
           };
         }
       }
