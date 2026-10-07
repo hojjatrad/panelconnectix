@@ -714,35 +714,88 @@ if (!function_exists('isActiveRoute')) {
         }
     }
 
-    // PWA Service Worker registration v7.3.0 ULTRA - FIXED: No more Ctrl+F5 needed
+    // PWA Service Worker registration v7.3.0 ULTRA - FIXED: No more Ctrl+F5 needed + dashboard click bug
     if ('serviceWorker' in navigator) {
-        // v4.0.30 FIX: Add version to SW URL and force update check
-        const swUrl = '<?= $base ?>/sw.js?v=<?= $assetVer ?? Updater::CURRENT_VERSION ?? "7.3.0" ?>';
-        navigator.serviceWorker.register(swUrl).then(reg => {
+        // v4.0.30 FIX: Force unregister old SW v7.0 that causes dashboard click to show old banner
+        (async () => {
+            try {
+                const regs = await navigator.serviceWorker.getRegistrations();
+                for (const reg of regs) {
+                    const url = reg.active?.scriptURL || reg.installing?.scriptURL || '';
+                    // If old SW without version or with old cache name, unregister
+                    if (url.includes('sw.js')) {
+                        const isOld = !url.includes('v7.3.0') && !url.includes('v=7.3.0') && !url.includes('v=7.3');
+                        // Also check cache names
+                        const cacheNames = await caches.keys();
+                        const hasOldCache = cacheNames.some(n => n.includes('v7-0') || n.includes('v7.0'));
+                        if (isOld || hasOldCache) {
+                            console.log('Found old SW/cache, unregistering...', url, cacheNames);
+                            // Delete all old caches
+                            for (const name of cacheNames) {
+                                if (name.includes('v7-0') || name.includes('v7.0') || name !== 'connectix-ultra-v7-3-0' && name !== 'connectix-static-v7-3-0') {
+                                    await caches.delete(name);
+                                    console.log('Deleted old cache:', name);
+                                }
+                            }
+                            await reg.unregister();
+                            console.log('Unregistered old SW, reloading...');
+                            // Force reload without cache
+                            window.location.reload(true);
+                            return;
+                        }
+                    }
+                }
+            } catch (e) {
+                console.log('SW cleanup error:', e);
+            }
+            
+            // Register new SW
+            const swUrl = '<?= $base ?>/sw.js?v=<?= $assetVer ?? Updater::CURRENT_VERSION ?? "7.3.0" ?>';
+            const reg = await navigator.serviceWorker.register(swUrl);
             console.log('PWA SW registered v7.3.0');
-            // Check for updates every 5 minutes
+            
+            // Check for updates every 2 minutes (more frequent)
             setInterval(() => {
                 reg.update().then(() => console.log('SW update checked'));
-            }, 5*60*1000);
+            }, 2*60*1000);
+            
             // If new SW found, auto-reload
             reg.addEventListener('updatefound', () => {
                 const newWorker = reg.installing;
                 newWorker.addEventListener('statechange', () => {
                     if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
                         console.log('New SW available, reloading...');
-                        // Auto-reload to get new version without Ctrl+F5
                         if (confirm('نسخه جدید پنل موجود است. بروزرسانی شود؟')) {
                             window.location.reload();
                         }
                     }
                 });
             });
-        }).catch(()=>{});
+        })();
+        
         // Force reload if SW controller changes
         navigator.serviceWorker.addEventListener('controllerchange', () => {
             console.log('SW controller changed, reloading...');
             window.location.reload();
         });
+        
+        // Clear old localStorage that may cause dashboard to show old data
+        try {
+            const oldVer = localStorage.getItem('connectix_panel_version');
+            const currentVer = '<?= $assetVer ?? Updater::CURRENT_VERSION ?? "7.3.0" ?>';
+            if (oldVer && oldVer !== currentVer) {
+                console.log('Version changed from', oldVer, 'to', currentVer, '- clearing old data');
+                // Don't clear all localStorage, just version-related
+                localStorage.setItem('connectix_panel_version', currentVer);
+            } else if (!oldVer) {
+                localStorage.setItem('connectix_panel_version', currentVer);
+            }
+        } catch (e) {}
+    } else {
+        // No SW support, ensure version in localStorage
+        try {
+            localStorage.setItem('connectix_panel_version', '<?= $assetVer ?? Updater::CURRENT_VERSION ?? "7.3.0" ?>');
+        } catch (e) {}
     }
 
     // Initialize state on page load

@@ -118,11 +118,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         @touch(__DIR__ . '/.deploy_stamp');
         if (function_exists('opcache_reset')) @opcache_reset();
         
-        // Update version
+        // Update version - FIXED: Dynamic version, not hardcoded 7.2.0
         try {
             require_once __DIR__ . '/core/Database.php';
             require_once __DIR__ . '/core/Setting.php';
-            Setting::set('current_version', '7.2.0');
+            require_once __DIR__ . '/core/Updater.php';
+            Setting::set('current_version', Updater::CURRENT_VERSION);
             Setting::set('last_installed_commit_sha', substr($sessionId,0,7));
             // Fix roles
             $pdo = Database::getConnection();
