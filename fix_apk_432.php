@@ -1,11 +1,10 @@
 <?php
+use App\Models\Setting;
+use Illuminate\Support\Facades\Cache;
+
 require __DIR__ . '/vendor/autoload.php';
 $app = require_once __DIR__ . '/bootstrap/app.php';
 $app->make('Illuminate\Contracts\Console\Kernel')->bootstrap();
-
-use App\Models\Setting;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 
 try {
     $ver = '4.0.32';
@@ -21,10 +20,8 @@ try {
     Setting::setValue('app_download_url_universal', $universalUrl);
     Setting::setValue('app_download_url_arm32', $arm32Url);
     Setting::setValue('app_download_url', $arm64Url);
-    // Keep old date to prevent deletion
     Setting::setValue('app_version_updated_at', '2020-01-01 00:00:00');
     
-    // Clear cache
     Cache::flush();
     try { \Illuminate\Support\Facades\Artisan::call('config:clear'); } catch (Exception $e) {}
     try { \Illuminate\Support\Facades\Artisan::call('cache:clear'); } catch (Exception $e) {}
@@ -36,7 +33,6 @@ try {
     $u = Setting::getValue('app_version_updated_at', 'NOT SET');
     $d = Setting::getValue('app_download_url', 'NOT SET');
     
-    // Check APKs
     $arm64Path = public_path('Connectix-ARM64-v8a.apk');
     $uniPath = public_path('Connectix-Universal.apk');
     $arm32Path = public_path('Connectix-ARM32-v7a.apk');
@@ -50,7 +46,6 @@ try {
     echo "Universal exists: " . (file_exists($uniPath) ? "YES ".filesize($uniPath) : "NOT FOUND") . "\n";
     echo "ARM32 exists: " . (file_exists($arm32Path) ? "YES ".filesize($arm32Path) : "NOT FOUND") . "\n";
     
-    // List all APKs in public
     $files = glob(public_path('Connectix-*.apk'));
     echo "All APKs in public:\n";
     foreach ($files as $f) {

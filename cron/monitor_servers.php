@@ -1,7 +1,7 @@
 <?php
 /**
  * Cron: Server Monitoring + Sublink Rotator - v6.9.0 PRO MAX
- * هر 5 دقیقه: crontab: */5 * * * * php /path/cron/monitor_servers.php
+ * هر 5 دقیقه: crontab: * /5 * * * * php /path/cron/monitor_servers.php
  */
 
 @set_time_limit(300);

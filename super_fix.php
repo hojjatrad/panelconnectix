@@ -177,6 +177,3 @@ echo "<a href='ultimate_fix.php' style='background:#334155;color:#fff;padding:10
 echo "<div style='font-size:11px;color:#64748b;margin-top:20px'>بعد از فیکس پاک کن! | v7.2.5 | ".date('Y-m-d H:i:s')."</div>";
 echo "</body></html>";
 
-} catch (Throwable $e) {
-    echo "<div style='background:#7f1d1d;color:#fca5a5;padding:20px;border-radius:12px'>❌ ".$e->getMessage()."<pre>".$e->getTraceAsString()."</pre></div>";
-}
