@@ -2724,10 +2724,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
               const SizedBox(height: 20),
 
-              // Smart Connect & Quick Controls Row - v4.0.33 FIX: Wrap to prevent overflow, FittedBox for text
+              // Smart Connect & Quick Controls Row - v4.0.34 FIX: Wrap RTL + FittedBox to prevent overflow & flipping
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
+                textDirection: TextDirection.rtl,
+                alignment: WrapAlignment.start,
                 children: [
                   // 1-Tap Smart Connect - Flexible width
                   InkWell(
