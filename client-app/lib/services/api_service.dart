@@ -1910,19 +1910,9 @@ class ApiService {
             final baseProgress = 0.05 + (urlIndex / allUrls.length) * 0.1; // 5% to 15% for URL switching, monotonic
             safeProgress(baseProgress, 0, 0);
             
-            client = http.Client();
-            final request = http.Request('GET', Uri.parse(requestUrl));
-            request.headers.addAll({
-              'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Mobile) Connectix v4.0.38',
-              'Accept': '*/*',
-              'Cache-Control': 'no-cache',
-              'Accept-Encoding': 'identity', // No compression for resume
-            });
-            
             // FUNDAMENTAL: Resume support via Range header + ?start= param (Cloudflare strips Range, so use query param)
             String requestUrl = url;
             if (existingSize > 0 && resumeAttempt > 0) {
-              request.headers['Range'] = 'bytes=$existingSize-';
               // Cloudflare strips Range header, so also use ?start= query param as fallback
               if (url.contains('download_apk.php')) {
                 requestUrl = url + (url.contains('?') ? '&' : '?') + 'start=$existingSize';
@@ -1936,6 +1926,18 @@ class ApiService {
                 }
               }
               log('v4.0.38 Resume: Range bytes=$existingSize- + URL $requestUrl');
+            }
+            
+            client = http.Client();
+            final request = http.Request('GET', Uri.parse(requestUrl));
+            request.headers.addAll({
+              'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Mobile) Connectix v4.0.39',
+              'Accept': '*/*',
+              'Cache-Control': 'no-cache',
+              'Accept-Encoding': 'identity', // No compression for resume
+            });
+            if (existingSize > 0 && resumeAttempt > 0) {
+              request.headers['Range'] = 'bytes=$existingSize-';
             }
             
             // FUNDAMENTAL: Large timeouts for Iran slow connections - 30s for send, 60s for stream (was 12s/20s)
