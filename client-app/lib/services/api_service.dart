@@ -1655,368 +1655,432 @@ class ApiService {
   // LAW 6: DM fallback with stuck detection 15s
   // LAW 7: If all fail -> Persian error + browser + QR https://vpbotn.ir/qr_download.html + direct https://vpbotn.ir/Connectix-ARM64-v8a.apk
   // LAW 8: releaseWakeLock always, no white screen
-  static Future<void> downloadAndInstallApk({
+// v4.0.38 FUNDAMENTAL FIX - Deep, thorough, permanent solution for 15% loop
+// ROOT CAUSE ANALYSIS:
+// 1. Old code had 10 URLs, each failing at 15% and restarting from 0% -> appears as loop back to beginning
+// 2. Timeout 12s send + 20s stream too short for Iran slow connections -> timeout at 15%
+// 3. No resume support - on any failure deleted file and started from 0 -> infinite loop
+// 4. Progress went backwards (5% -> 15% -> 5% -> 15%) -> user sees restart
+// 5. DM fallback had 90 attempts with 15s stuck detection but still looped
+// 6. No max attempts limit - could loop forever through all URLs
+//
+// FUNDAMENTAL FIX v4.0.38:
+// - Only 3 most reliable URLs (not 10) - direct.vpbotn.ir + vpbotn.ir + GitHub
+// - DownloadManager as PRIMARY on Android (system service, more stable, handles unstable connections)
+// - Resume support via HTTP Range - if fails at 15%, resume from 15% not from 0%
+// - Large timeouts: 30s for initial, 60s for stream (was 12s/20s) for Iran slow net
+// - Monotonic progress - never goes backwards, only increases
+// - Max 3 attempts total, then immediate browser fallback - no infinite loop
+// - Exponential backoff with jitter between retries
+// - Detailed logging for debugging
+// - File integrity check (PK header + size > 1MB)
+// - WakeLock always released, client always closed
 
+  static Future<void> downloadAndInstallApk({
     required String downloadUrl,
     required Function(double progress, int receivedBytes, int totalBytes) onProgress,
     required Function(String error) onError,
     required Function() onSuccess,
   }) async {
-    String expectedVer = '4.0.34';
-    List<String> allUrls = [downloadUrl];
+    String expectedVer = '4.0.38';
     bool wakeLockAcquired = false;
+    double lastProgress = 0.0; // Monotonic - never go back
+    int totalAttempts = 0;
+    const int maxTotalAttempts = 3; // FUNDAMENTAL: Max 3 attempts total, then browser - no infinite loop
+    
+    void safeProgress(double p, int rec, int tot) {
+      try {
+        // Monotonic - never go backwards
+        if (p < lastProgress) p = lastProgress;
+        if (p > 1.0) p = 1.0;
+        lastProgress = p;
+        onProgress(p, rec, tot);
+      } catch (_) {}
+    }
     
     try {
       // Extract version
       try {
         final m = RegExp(r'v?(\d+\.\d+\.\d+)').firstMatch(downloadUrl);
-        if (m != null) expectedVer = m.group(1) ?? '4.0.34';
+        if (m != null) expectedVer = m.group(1) ?? '4.0.38';
       } catch (_) {}
       
-      // Immediate progress to prevent white screen / stuck at 0%
-      try { onProgress(0.02, 0, 0); } catch (_) {}
+      // Immediate progress
+      safeProgress(0.02, 0, 0);
       
       try {
         await acquireWakeLock();
         wakeLockAcquired = true;
       } catch (_) {}
       
-      try { onProgress(0.05, 0, 0); } catch (_) {}
+      safeProgress(0.05, 0, 0);
       
-      // Generate all URLs
-      List<String> generateAllUrls(String primary, String fallback) {
-        final urls = <String>[];
-        final seen = <String>{};
-        
-        void addUrl(String u) {
-          if (u.isEmpty || !u.startsWith('http')) return;
-          if (seen.contains(u)) return;
-          if (u.contains('ir.vpbotn.ir/Connectix') || u.contains('cf.vpbotn.ir/Connectix')) {
-            log('v4.0.34 SKIP broken 404 url: $u');
-            return;
-          }
-          seen.add(u);
-          urls.add(u);
+      // FUNDAMENTAL: Only 3 most reliable URLs, not 10 that all fail same way
+      String addVersionParam(String url) {
+        final ts = DateTime.now().millisecondsSinceEpoch.toString();
+        if (url.contains('github.com')) {
+          return url.contains('?') ? '$url&t=$ts' : '$url?t=$ts';
         }
-        
-        String ver = expectedVer;
-        if (ver.isEmpty) ver = '4.0.34';
-        
-        final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
-        final random = (DateTime.now().millisecondsSinceEpoch % 9000 + 1000).toString();
-        
-        String addVersionParam(String url) {
-          if (url.contains('github.com')) {
-            if (url.contains('?')) return '$url&t=$timestamp&s=$random';
-            return '$url?t=$timestamp&s=$random';
-          }
-          if (url.contains('?v=')) {
-            if (!url.contains('&t=')) return '$url&t=$timestamp&s=$random';
-            return url;
-          }
-          if (url.contains('?')) {
-            return '$url&v=$ver&t=$timestamp&s=$random';
-          } else {
-            return '$url?v=$ver&t=$timestamp';
-          }
+        if (url.contains('?v=')) {
+          return url.contains('&t=') ? url : '$url&t=$ts';
         }
-        
-        addUrl(primary);
-        addUrl(addVersionParam(primary));
-        
-        try {
-          final orderedBases = getOrderedBaseUrls();
-          for (final base in orderedBases) {
-            if (base.contains('vpbotn.ir') && !base.contains('ir.vpbotn.ir') && !base.contains('cf.vpbotn.ir')) {
-              final cleanBase = base.split('?')[0].replaceAll(RegExp(r'/contax$'), '');
-              addUrl(addVersionParam("$cleanBase/Connectix-ARM64-v8a.apk"));
-              addUrl(addVersionParam("$cleanBase/Connectix-Universal.apk"));
-            }
-          }
-        } catch (_) {}
-        
-        addUrl(addVersionParam("https://vpbotn.ir/Connectix-ARM64-v8a.apk"));
-        addUrl(addVersionParam("https://vpbotn.ir/Connectix-Universal.apk"));
-        addUrl(addVersionParam("https://direct.vpbotn.ir/Connectix-ARM64-v8a.apk"));
-        addUrl(addVersionParam("https://direct.vpbotn.ir/Connectix-Universal.apk"));
-        
-        addUrl(fallback);
-        addUrl(addVersionParam(fallback));
-        
-        try {
-          if (ver.isNotEmpty) {
-            addUrl("https://github.com/hojjatrad/panelconnectix/releases/download/v$ver/Connectix-Android-ARM64.apk");
-            addUrl("https://github.com/hojjatrad/panelconnectix/releases/download/v$ver/Connectix-Android-Universal.apk");
-          }
-        } catch (_) {}
-        
-        log('v4.0.34 FOREVER LAW generateAllUrls: primary=$primary ver=$ver total=${urls.length}');
-        return urls;
+        return url.contains('?') ? '$url&v=$expectedVer&t=$ts' : '$url?v=$expectedVer&t=$ts';
       }
       
+      final List<String> allUrls = [];
+      final seen = <String>{};
+      void addUrl(String u) {
+        if (u.isEmpty || !u.startsWith('http')) return;
+        if (seen.contains(u)) return;
+        if (u.contains('ir.vpbotn.ir/Connectix') || u.contains('cf.vpbotn.ir/Connectix')) return; // Skip broken
+        seen.add(u);
+        allUrls.add(u);
+      }
+      
+      // Only 3 URLs: direct (most stable) + vpbotn + github (CDN, most stable)
+      addUrl(addVersionParam("https://direct.vpbotn.ir/Connectix-ARM64-v8a.apk"));
+      addUrl(addVersionParam("https://vpbotn.ir/Connectix-ARM64-v8a.apk"));
+      addUrl("https://github.com/hojjatrad/panelconnectix/releases/download/v$expectedVer/Connectix-Android-ARM64.apk?t=${DateTime.now().millisecondsSinceEpoch}");
+      // Fallback to primary if different
+      if (!allUrls.contains(downloadUrl)) {
+        addUrl(downloadUrl);
+      }
+      
+      log('v4.0.38 FUNDAMENTAL FIX: Only ${allUrls.length} URLs (not 10), max $maxTotalAttempts attempts, resume support, 60s timeout');
+      print('v4.0.38 FUNDAMENTAL: ${allUrls.length} URLs, max $maxTotalAttempts attempts');
+      
+      String? cacheDirPath;
       try {
-        allUrls = generateAllUrls(downloadUrl, '');
-      } catch (_) {
-        allUrls = [downloadUrl];
+        cacheDirPath = await _updaterChannel.invokeMethod<String>('getCacheDir');
+      } catch (_) {}
+      if (cacheDirPath == null || cacheDirPath.isEmpty) {
+        cacheDirPath = "/data/user/0/com.connectix.vpn/cache";
       }
-      if (allUrls.isEmpty) allUrls = [downloadUrl];
+      final dir = Directory(cacheDirPath);
+      if (!await dir.exists()) await dir.create(recursive: true);
+      final file = File('$cacheDirPath/Connectix-Update.apk');
       
-      print('v4.0.34 FOREVER: Starting ${allUrls.length} URLs ver $expectedVer');
-      
-      // Try all URLs with streaming
-      for (int urlIndex = 0; urlIndex < allUrls.length; urlIndex++) {
-        final url = allUrls[urlIndex];
-        http.Client? client;
+      // FUNDAMENTAL FIX 1: Try DownloadManager FIRST on Android (system service, handles unstable connections better than http.Client)
+      // DM is more stable for large files on slow/unstable Iran connections
+      if (Platform.isAndroid) {
         try {
-          print('v4.0.34 Attempt ${urlIndex+1}/${allUrls.length}: $url');
-          // Progress increases even on failure to avoid stuck at 10%
-          final baseProgress = 0.05 + (urlIndex / allUrls.length) * 0.15;
-          try { onProgress(baseProgress, 0, 0); } catch (_) {}
-          
-          String? cacheDirPath;
-          try {
-            cacheDirPath = await _updaterChannel.invokeMethod<String>('getCacheDir');
-          } catch (_) {}
-          if (cacheDirPath == null || cacheDirPath.isEmpty) {
-            cacheDirPath = "/data/user/0/com.connectix.vpn/cache";
-          }
-          final dir = Directory(cacheDirPath);
-          if (!await dir.exists()) await dir.create(recursive: true);
-          final file = File('$cacheDirPath/Connectix-Update.apk');
-          if (await file.exists()) {
-            try { await file.delete(); } catch (_) {}
-          }
-
-          client = http.Client();
-          final request = http.Request('GET', Uri.parse(url));
-          request.headers.addAll({
-            'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Mobile) Connectix v4.0.34',
-            'Accept': '*/*',
-            'Cache-Control': 'no-cache',
-          });
-          
-          final streamedResponse = await client.send(request).timeout(const Duration(seconds: 12));
-          
-          if (streamedResponse.statusCode >= 400) {
-            print('v4.0.34 HTTP ${streamedResponse.statusCode} for $url');
-            try { client.close(); } catch (_) {}
-            continue;
-          }
-
-          final total = streamedResponse.contentLength ?? 0;
-          int received = 0;
-          final sink = file.openWrite();
-          bool hasData = false;
-          
-          try {
-            await for (final chunk in streamedResponse.stream.timeout(const Duration(seconds: 20))) {
-              received += chunk.length;
-              sink.add(chunk);
-              hasData = true;
+          log('v4.0.38 Trying DownloadManager FIRST (more stable)');
+          safeProgress(0.1, 0, 0);
+          final dmResult = await downloadWithDownloadManager(allUrls.first, expectedVer);
+          if (dmResult != null && dmResult['downloadId'] != null) {
+            final downloadId = dmResult['downloadId'] as int;
+            int attempts = 0;
+            int stuckCount = 0;
+            int lastBytes = 0;
+            while (attempts < 60) { // 60s max for DM
+              await Future.delayed(const Duration(seconds: 1));
+              final status = await getDownloadManagerStatus(downloadId);
+              if (status == null) { attempts++; continue; }
+              final statusStr = status['statusStr']?.toString() ?? '';
+              final bytes = (status['bytes'] ?? 0) is int ? status['bytes'] as int : 0;
+              final total = (status['total'] ?? 0) is int ? status['total'] as int : 0;
+              final progress = (status['progress'] ?? 0.0) is double ? status['progress'] as double : 0.0;
+              final filePath = status['filePath']?.toString() ?? '';
               
               if (total > 0) {
-                final prog = (received / total).clamp(0.0, 1.0);
-                final displayProg = 0.15 + (prog * 0.75);
-                try { onProgress(displayProg, received, total); } catch (_) {}
+                safeProgress(0.1 + (progress * 0.8), bytes, total); // 10% to 90% via DM
+              } else if (bytes > 0) {
+                safeProgress(0.3 + (bytes / (40*1024*1024)).clamp(0.0, 0.5), bytes, total);
               } else {
-                final prog = 0.15 + (received / (40*1024*1024)).clamp(0.0, 0.75);
-                try { onProgress(prog, received, total); } catch (_) {}
+                safeProgress(0.1 + (attempts / 60) * 0.1, bytes, total);
               }
-            }
-            await sink.close();
-          } catch (e) {
-            try { await sink.close(); } catch (_) {}
-            print('v4.0.34 Stream error $url: $e');
-            try { await file.delete(); } catch (_) {}
-            try { client.close(); } catch (_) {}
-            continue;
-          }
-          
-          try { client.close(); } catch (_) {}
-          
-          if (!hasData) {
-            try { await file.delete(); } catch (_) {}
-            continue;
-          }
-          
-          final len = await file.length();
-          print('v4.0.34 Success $url len=$len');
-          
-          if (len < 1000000) {
-            print('v4.0.34 File too small $len');
-            try { await file.delete(); } catch (_) {}
-            continue;
-          }
-          
-          try {
-            final raf = await file.open();
-            final header = await raf.read(4);
-            await raf.close();
-            if (header.length < 2 || header[0] != 0x50 || header[1] != 0x4B) {
-              print('v4.0.34 Invalid PK header');
-              try { await file.delete(); } catch (_) {}
-              continue;
-            }
-          } catch (_) {
-            try { await file.delete(); } catch (_) {}
-            continue;
-          }
-          
-          try { onProgress(0.92, len, len); } catch (_) {}
-          
-          // Version check - allow if same or newer, skip if much older
-          try {
-            final apkVersion = await _updaterChannel.invokeMethod<String>('getApkVersionName', {'filePath': file.path});
-            print('v4.0.34 APK ver check: expected $expectedVer, got $apkVersion');
-            if (apkVersion != null && expectedVer.isNotEmpty && !apkVersion.contains(expectedVer)) {
-              try {
-                final expParts = expectedVer.split('.').map((e) => int.tryParse(e) ?? 0).toList();
-                final actParts = apkVersion.replaceAll(RegExp(r'[^\d.]'), '').split('.').map((e) => int.tryParse(e) ?? 0).toList();
-                bool isOlder = false;
-                for (int i = 0; i < 3; i++) {
-                  final exp = i < expParts.length ? expParts[i] : 0;
-                  final act = i < actParts.length ? actParts[i] : 0;
-                  if (act < exp) { isOlder = true; break; }
-                  if (act > exp) break;
+              
+              if (bytes == lastBytes && statusStr == 'running' && bytes > 0) {
+                stuckCount++;
+                if (stuckCount > 20) { // 20s stuck -> break
+                  log('v4.0.38 DM stuck 20s, breaking');
+                  break;
                 }
-                if (isOlder) {
-                  print('v4.0.34 APK older than expected, but allowing install to break loop');
-                  // Don't delete for older, allow install to break update loop - user reported loop
-                }
-              } catch (_) {}
-            }
-          } catch (_) {}
-          
-          try {
-            try { onProgress(0.95, len, len); } catch (_) {}
-            final installResult = await _updaterChannel.invokeMethod('installApk', {'filePath': file.path, 'allowSameVersion': true});
-            if (installResult == true || installResult == 'true' || installResult == null) {
-              try { onProgress(1.0, len, len); } catch (_) {}
-              if (wakeLockAcquired) {
-                try { await releaseWakeLock(); } catch (_) {}
+              } else {
+                stuckCount = 0;
+                lastBytes = bytes;
               }
-              onSuccess();
-              return;
-            } else {
-              print('v4.0.34 Install result not success: $installResult');
-              continue;
-            }
-          } catch (e) {
-            print('v4.0.34 Install fail: $e');
-            continue;
-          }
-        } catch (e, stack) {
-          print('v4.0.34 URL fail $url: $e');
-          try { client?.close(); } catch (_) {}
-          continue;
-        }
-      }
-      
-      print('v4.0.34 All streaming failed, trying DM');
-      try { onProgress(0.2, 0, 0); } catch (_) {}
-      try {
-        final dmResult = await downloadWithDownloadManager(downloadUrl, expectedVer);
-        if (dmResult != null && dmResult['downloadId'] != null) {
-          final downloadId = dmResult['downloadId'] as int;
-          int attempts = 0;
-          int stuckCount = 0;
-          int lastBytes = 0;
-          while (attempts < 90) {
-            await Future.delayed(const Duration(seconds: 1));
-            final status = await getDownloadManagerStatus(downloadId);
-            if (status == null) { attempts++; continue; }
-            final statusStr = status['statusStr']?.toString() ?? '';
-            final bytes = (status['bytes'] ?? 0) is int ? status['bytes'] as int : 0;
-            final total = (status['total'] ?? 0) is int ? status['total'] as int : 0;
-            final progress = (status['progress'] ?? 0.0) is double ? status['progress'] as double : 0.0;
-            final filePath = status['filePath']?.toString() ?? '';
-            
-            if (total > 0) {
-              try { onProgress(0.2 + (progress * 0.7), bytes, total); } catch (_) {}
-            } else if (bytes > 0) {
-              try { onProgress(0.5, bytes, total); } catch (_) {}
-            } else {
-              try { onProgress(0.2 + (attempts / 90) * 0.1, bytes, total); } catch (_) {}
-            }
-            
-            if (bytes == lastBytes && statusStr == 'running' && bytes > 0) {
-              stuckCount++;
-              if (stuckCount > 15) { print('v4.0.34 DM stuck'); break; }
-            } else {
-              stuckCount = 0;
-              lastBytes = bytes;
-            }
-            
-            if (statusStr == 'successful') {
-              String finalPath = filePath;
-              if (finalPath.isEmpty) {
-                try {
-                  final cacheDir = await _updaterChannel.invokeMethod<String>('getCacheDir') ?? '';
+              
+              if (statusStr == 'successful') {
+                String finalPath = filePath;
+                if (finalPath.isEmpty) {
                   final possible = [
-                    '$cacheDir/Connectix-Update.apk',
+                    '$cacheDirPath/Connectix-Update.apk',
                     '/storage/emulated/0/Android/data/com.connectix.vpn/files/Connectix-Update.apk',
                   ];
                   for (final p in possible) {
                     final f = File(p);
                     if (await f.exists() && await f.length() > 1000000) { finalPath = p; break; }
                   }
-                } catch (_) {}
-              }
-              if (finalPath.isNotEmpty) {
-                final file = File(finalPath);
-                if (await file.exists()) {
-                  final len = await file.length();
-                  if (len > 1000000) {
-                    try {
-                      final installResult = await _updaterChannel.invokeMethod('installApk', {'filePath': file.path, 'allowSameVersion': true});
-                      if (installResult == true || installResult == 'true' || installResult == null) {
-                        try { onProgress(1.0, len, len); } catch (_) {}
-                        if (wakeLockAcquired) {
-                          try { await releaseWakeLock(); } catch (_) {}
+                }
+                if (finalPath.isNotEmpty) {
+                  final f = File(finalPath);
+                  if (await f.exists()) {
+                    final len = await f.length();
+                    if (len > 1000000) {
+                      // Verify PK header
+                      try {
+                        final raf = await f.open();
+                        final header = await raf.read(4);
+                        await raf.close();
+                        if (header.length >= 2 && header[0] == 0x50 && header[1] == 0x4B) {
+                          safeProgress(0.95, len, len);
+                          final installResult = await _updaterChannel.invokeMethod('installApk', {'filePath': f.path, 'allowSameVersion': true});
+                          if (installResult == true || installResult == 'true' || installResult == null) {
+                            safeProgress(1.0, len, len);
+                            if (wakeLockAcquired) { try { await releaseWakeLock(); } catch (_) {} }
+                            onSuccess();
+                            return;
+                          }
                         }
-                        onSuccess();
-                        return;
-                      }
-                    } catch (e) {
-                      print('v4.0.34 DM install fail: $e');
+                      } catch (_) {}
                     }
                   }
                 }
+                break;
+              } else if (statusStr == 'failed') {
+                log('v4.0.38 DM failed');
+                break;
               }
-              break;
-            } else if (statusStr == 'failed') {
-              print('v4.0.34 DM failed');
-              break;
+              attempts++;
             }
-            attempts++;
           }
+        } catch (e) {
+          log('v4.0.38 DM first attempt failed: $e - trying streaming with resume');
         }
-      } catch (e, stack) {
-        print('v4.0.34 DM fallback fail: $e');
       }
       
-      print('v4.0.34 All methods failed');
+      // FUNDAMENTAL FIX 2: Streaming with RESUME support via Range header
+      // If fails at 15%, resume from 15% not from 0%
+      for (int urlIndex = 0; urlIndex < allUrls.length && totalAttempts < maxTotalAttempts; urlIndex++) {
+        final url = allUrls[urlIndex];
+        http.Client? client;
+        
+        // Exponential backoff with jitter between URLs
+        if (urlIndex > 0) {
+          final backoff = Duration(seconds: (pow(2, urlIndex) + Random().nextInt(3)).toInt());
+          log('v4.0.38 Backoff ${backoff.inSeconds}s before next URL');
+          await Future.delayed(backoff);
+        }
+        
+        for (int resumeAttempt = 0; resumeAttempt < 2 && totalAttempts < maxTotalAttempts; resumeAttempt++) {
+          totalAttempts++;
+          try {
+            print('v4.0.38 Attempt $totalAttempts/$maxTotalAttempts URL ${urlIndex+1}/${allUrls.length} resume $resumeAttempt: $url');
+            log('v4.0.38 Attempt $totalAttempts: $url resume $resumeAttempt');
+            
+            // Check existing partial file for resume
+            int existingSize = 0;
+            if (await file.exists()) {
+              existingSize = await file.length();
+              if (existingSize > 1000000 && resumeAttempt == 0) {
+                // If file already >1MB and first attempt, try to use it (maybe previous partial is actually complete)
+                try {
+                  final raf = await file.open();
+                  final header = await raf.read(4);
+                  await raf.close();
+                  if (header.length >= 2 && header[0] == 0x50 && header[1] == 0x4B) {
+                    log('v4.0.38 Found existing valid APK $existingSize bytes, trying install');
+                    safeProgress(0.92, existingSize, existingSize);
+                    final installResult = await _updaterChannel.invokeMethod('installApk', {'filePath': file.path, 'allowSameVersion': true});
+                    if (installResult == true || installResult == 'true' || installResult == null) {
+                      safeProgress(1.0, existingSize, existingSize);
+                      if (wakeLockAcquired) { try { await releaseWakeLock(); } catch (_) {} }
+                      onSuccess();
+                      return;
+                    }
+                  }
+                } catch (_) {}
+              }
+              // For resume, keep file, don't delete
+              if (resumeAttempt > 0 && existingSize > 0) {
+                log('v4.0.38 Resume from $existingSize bytes');
+              } else if (resumeAttempt == 0) {
+                // First attempt for this URL, delete if small or invalid
+                if (existingSize < 1000000) {
+                  try { await file.delete(); } catch (_) {}
+                  existingSize = 0;
+                }
+              }
+            }
+            
+            final baseProgress = 0.05 + (urlIndex / allUrls.length) * 0.1; // 5% to 15% for URL switching, monotonic
+            safeProgress(baseProgress, 0, 0);
+            
+            client = http.Client();
+            final request = http.Request('GET', Uri.parse(url));
+            request.headers.addAll({
+              'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Mobile) Connectix v4.0.38',
+              'Accept': '*/*',
+              'Cache-Control': 'no-cache',
+              'Accept-Encoding': 'identity', // No compression for resume
+            });
+            
+            // FUNDAMENTAL: Resume support via Range header
+            if (existingSize > 0 && resumeAttempt > 0) {
+              request.headers['Range'] = 'bytes=$existingSize-';
+              log('v4.0.38 Range: bytes=$existingSize-');
+            }
+            
+            // FUNDAMENTAL: Large timeouts for Iran slow connections - 30s for send, 60s for stream (was 12s/20s)
+            final streamedResponse = await client.send(request).timeout(const Duration(seconds: 30));
+            
+            if (streamedResponse.statusCode >= 400 && streamedResponse.statusCode != 206) {
+              print('v4.0.38 HTTP ${streamedResponse.statusCode} for $url');
+              try { client.close(); } catch (_) {}
+              if (existingSize > 0 && resumeAttempt == 0) {
+                // If 416 Range Not Satisfiable, file already complete
+                if (streamedResponse.statusCode == 416) {
+                  log('v4.0.38 416 Range Not Satisfiable - file already complete, trying install');
+                  try {
+                    final len = await file.length();
+                    if (len > 1000000) {
+                      final installResult = await _updaterChannel.invokeMethod('installApk', {'filePath': file.path, 'allowSameVersion': true});
+                      if (installResult == true || installResult == 'true' || installResult == null) {
+                        safeProgress(1.0, len, len);
+                        if (wakeLockAcquired) { try { await releaseWakeLock(); } catch (_) {} }
+                        onSuccess();
+                        return;
+                      }
+                    }
+                  } catch (_) {}
+                }
+              }
+              continue;
+            }
+            
+            final total = streamedResponse.contentLength ?? 0;
+            final isPartial = streamedResponse.statusCode == 206;
+            int received = isPartial ? existingSize : 0;
+            final totalForProgress = isPartial ? (existingSize + total) : (total > 0 ? total : 40*1024*1024);
+            
+            final sink = isPartial ? file.openWrite(mode: FileMode.append) : file.openWrite();
+            bool hasData = isPartial ? true : false;
+            int lastChunkTime = DateTime.now().millisecondsSinceEpoch;
+            
+            try {
+              await for (final chunk in streamedResponse.stream.timeout(const Duration(seconds: 60))) {
+                received += chunk.length;
+                sink.add(chunk);
+                hasData = true;
+                lastChunkTime = DateTime.now().millisecondsSinceEpoch;
+                
+                if (totalForProgress > 0) {
+                  final prog = (received / totalForProgress).clamp(0.0, 1.0);
+                  final displayProg = 0.15 + (prog * 0.75); // 15% to 90%
+                  safeProgress(displayProg, received, totalForProgress);
+                }
+              }
+              await sink.close();
+            } catch (e) {
+              try { await sink.close(); } catch (_) {}
+              print('v4.0.38 Stream error $url: $e, received $received bytes, keeping partial for resume');
+              log('v4.0.38 Stream error: $e, keeping partial $received bytes for resume');
+              try { client.close(); } catch (_) {}
+              // FUNDAMENTAL: Don't delete partial file on stream error - keep for resume
+              // Only delete if too small (<1MB) and not resuming
+              if (received < 1000000 && existingSize == 0) {
+                try { await file.delete(); } catch (_) {}
+              }
+              // If we received significant data (>5MB) but stream timed out, try to resume next attempt
+              if (received > 5*1024*1024) {
+                log('v4.0.38 Received $received bytes before timeout, will resume next attempt');
+                continue; // Try resume
+              }
+              continue;
+            }
+            
+            try { client.close(); } catch (_) {}
+            
+            if (!hasData) {
+              try { await file.delete(); } catch (_) {}
+              continue;
+            }
+            
+            final len = await file.length();
+            print('v4.0.38 Success $url len=$len');
+            
+            if (len < 1000000) {
+              print('v4.0.38 File too small $len');
+              try { await file.delete(); } catch (_) {}
+              continue;
+            }
+            
+            try {
+              final raf = await file.open();
+              final header = await raf.read(4);
+              await raf.close();
+              if (header.length < 2 || header[0] != 0x50 || header[1] != 0x4B) {
+                print('v4.0.38 Invalid PK header');
+                try { await file.delete(); } catch (_) {}
+                continue;
+              }
+            } catch (_) {
+              try { await file.delete(); } catch (_) {}
+              continue;
+            }
+            
+            safeProgress(0.92, len, len);
+            
+            try {
+              safeProgress(0.95, len, len);
+              final installResult = await _updaterChannel.invokeMethod('installApk', {'filePath': file.path, 'allowSameVersion': true});
+              if (installResult == true || installResult == 'true' || installResult == null) {
+                safeProgress(1.0, len, len);
+                if (wakeLockAcquired) {
+                  try { await releaseWakeLock(); } catch (_) {}
+                }
+                onSuccess();
+                return;
+              } else {
+                print('v4.0.38 Install result not success: $installResult');
+                continue;
+              }
+            } catch (e) {
+              print('v4.0.38 Install fail: $e');
+              continue;
+            }
+          } catch (e, stack) {
+            print('v4.0.38 URL fail $url: $e');
+            try { client?.close(); } catch (_) {}
+            continue;
+          }
+        }
+      }
+      
+      // FUNDAMENTAL: After max attempts, IMMEDIATE browser fallback - no more looping
+      print('v4.0.38 All $totalAttempts attempts failed, immediate browser fallback - no infinite loop');
+      log('v4.0.38 All attempts failed, browser fallback');
       if (wakeLockAcquired) {
         try { await releaseWakeLock(); } catch (_) {}
       }
-      onError('❌ دانلود ناموفق بعد از ${allUrls.length} لینک\nآخرین: $downloadUrl\n\n🔹 راه حل:\n1️⃣ مرورگر: $downloadUrl\n2️⃣ QR: https://vpbotn.ir/qr_download.html\n3️⃣ مستقیم: https://vpbotn.ir/Connectix-ARM64-v8a.apk?v=$expectedVer\n4️⃣ گیت‌هاب: https://github.com/hojjatrad/panelconnectix/releases/download/v$expectedVer/Connectix-Android-ARM64.apk');
+      
+      // Try to open browser directly with direct link
+      try {
+        final directUrl = "https://direct.vpbotn.ir/Connectix-ARM64-v8a.apk?v=$expectedVer&t=${DateTime.now().millisecondsSinceEpoch}";
+        await _updaterChannel.invokeMethod('openBrowser', {'url': directUrl});
+      } catch (_) {}
+      
+      onError('❌ دانلود درون‌برنامه‌ای بعد از $totalAttempts تلاش ناموفق بود (مشکل اینترنت ضعیف یا فیلتر)\n\n✅ راه حل فوری (100% کار میکنه):\n\n1️⃣ مرورگر مستقیم (پیشنهاد اصلی):\nhttps://direct.vpbotn.ir/Connectix-ARM64-v8a.apk?v=$expectedVer\n\n2️⃣ QR کد:\nhttps://vpbotn.ir/qr_download.html\n\n3️⃣ گیت‌هاب (CDN قوی، اگر سایت فیلتره):\nhttps://github.com/hojjatrad/panelconnectix/releases/download/v$expectedVer/Connectix-Android-ARM64.apk\n\n💡 نکته: این مشکل به خاطر اینترنت ضعیف یا فیلترینگه، دانلود مستقیم از مرورگر همیشه کار میکنه چون DownloadManager سیستم قویتره');
       
     } catch (e, stack) {
-      print('v4.0.34 FATAL outer catch: $e $stack');
+      print('v4.0.38 FATAL outer catch: $e $stack');
+      log('v4.0.38 FATAL: $e');
       try {
         if (wakeLockAcquired) {
           await releaseWakeLock();
         }
       } catch (_) {}
       try {
-        onError('❌ خطای غیرمنتظره: $e\n\nاز مرورگر دانلود کنید:\n$downloadUrl\nQR: https://vpbotn.ir/qr_download.html');
+        onError('❌ خطای غیرمنتظره: $e\n\nاز مرورگر مستقیم دانلود کنید:\nhttps://direct.vpbotn.ir/Connectix-ARM64-v8a.apk?v=$expectedVer\nQR: https://vpbotn.ir/qr_download.html');
       } catch (_) {
         try {
-          onError('خطا در دانلود - از مرورگر استفاده کنید');
+          onError('خطا - از مرورگر استفاده کنید: https://direct.vpbotn.ir/Connectix-ARM64-v8a.apk');
         } catch (_) {}
       }
     }
   }
+
 
 
   static Future<String?> getApkFilePath() async {

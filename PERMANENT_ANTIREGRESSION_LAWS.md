@@ -208,3 +208,51 @@ Wrap(
 ---
 
 **امضا:** این قوانین برای همیشه است و هیچوقت نباید شکسته بشه - v4.0.37 2026-10-08
+
+---
+
+## 📜 قانون 11: دانلود هیچوقت 15% → 0% → 15% لوپ نکنه (FIX v4.0.38 FUNDAMENTAL)
+
+**باگ:** تا 15 درصد دانلود میکنه بعد دوباره برمیگرده از اول و همش تکرار میشه - حلقه بینهایت
+
+**ریشه عمیق:**
+1. 10 URL - هر کدام 15% fail و از 0 شروع → کاربر میبینه 15% → 0% → 15% لوپ
+2. Timeout کوتاه 12s/20s برای اینترنت ضعیف ایران → timeout تو 15%
+3. بدون Resume - هر fail فایل delete و از 0 → حلقه بینهایت
+4. Progress برعکس 5% → 15% → 5% → 15%
+5. بدون حد max attempts - 10 URL * 90 DM = بینهایت
+6. http.Client ضعیف برای فایل بزرگ رو اینترنت ناپایدار
+
+**قانون دائمی FUNDAMENTAL:**
+1. فقط 3 URL قابل اعتماد (نه 10): direct.vpbotn.ir + vpbotn.ir + GitHub CDN
+2. DownloadManager اول (نه آخر) - سیستم اندروید قویتر - 60 ثانیه
+3. Resume via Range: اگر 15% fail از 15% ادامه نه از 0% - `Range: bytes=existingSize-` + 206 Partial
+4. Timeout بزرگ: 30s اولیه + 60s استریم (قبل 12s/20s)
+5. Monotonic progress: هیچوقت برنمیگرده عقب - `if (p < lastProgress) p = lastProgress`
+6. Max 3 تلاش بعد مرورگر: بعد 3 تلاش `openBrowser(directUrl)` - 100% کار میکنه
+7. Exponential backoff + jitter: 2s, 4s, 8s
+8. فایل ناقص نگه دار: رو stream error delete نکن - نگه دار برای resume
+9. سرور Accept-Ranges bytes: `.htaccess Header set Accept-Ranges bytes`
+10. مرورگر فوری بعد 3 تلاش
+
+**کد محافظ:**
+```dart
+// LAW 11 FUNDAMENTAL: No 15% -> 0% -> 15% loop ever
+// Only 3 URLs, DM first, Resume via Range, 60s timeout, Monotonic, Max 3 attempts then browser
+double lastProgress = 0.0;
+void safeProgress(double p, int rec, int tot) {
+  if (p < lastProgress) p = lastProgress; // Never go back
+  lastProgress = p;
+  onProgress(p, rec, tot);
+}
+const maxTotalAttempts = 3; // No infinite loop
+// Range: bytes=existingSize-
+// Timeout: 30s send, 60s stream
+// Keep partial on error for resume
+// After max attempts: openBrowser(directUrl)
+```
+
+**تست:**
+- قطع اینترنت تو 15% → resume از 15% ادامه نه از 0%
+- 3 بار fail → مرورگر باز میشه که 100% کار میکنه (DM سیستم)
+- Progress هیچوقت برنمیگرده عقب

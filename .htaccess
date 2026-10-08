@@ -45,7 +45,10 @@
         Header set Cloudflare-CDN-Cache-Control "no-store, max-age=0"
         Header set X-Content-Type-Options "nosniff"
         Header set X-Accel-Buffering "no"
+        Header set Accept-Ranges "bytes"
         Header set Vary "Accept-Encoding"
+        # v4.0.38 FUNDAMENTAL FIX - Support resume via Range for 15% loop fix
+        Header set Content-Disposition "attachment"
     </FilesMatch>
     <FilesMatch "app_release\.json$">
         Header set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
