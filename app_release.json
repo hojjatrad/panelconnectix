@@ -1,10 +1,10 @@
 {
-  "version": "4.0.36",
-  "code": 69,
+  "version": "4.0.37",
+  "code": 70,
   "force_update": false,
   "force_min_code": 50,
   "update_type": "full",
-  "changelog": "• ZERO-COST SPEED: CDN R2+Bunny+GitHub fallback + SpeedTest auto-sort fastest + gRPC Mux BBR\n• ZERO-COST STABILITY: Multi-Domain Fallback (vpbotn+direct+cf+IP) + HealthCheck 30s + Auto-Reconnect 5x exponential + Offline cache last working\n• ZERO-COST ANTI-FILTER: Reality + Fragment TLSHello 100-200 + uTLS chrome + DoH cloudflare/google + Mux 8 + TCP FastOpen KeepAlive + Mix WS/gRPC/HTTPUpgrade + Port hopping + SS2022 Trojan fallback + Telegram Gist encrypted",
+  "changelog": "• LAW 6: حذف سرعت تکراری پایین - فقط یکجا زیر دکمه اتصال + قوانین دائمی ضدبازگشت 10 قانون برای همیشه\n• ZERO-COST: CDN+SpeedTest+Reality+Fragment+uTLS+DoH+Mux+BBR+MultiDomain+HealthCheck+AutoReconnect+Offline+PortHopping+SS2022",
   "date": "2026-10-08",
   "auto_update": {
     "enabled": true,
@@ -15,13 +15,13 @@
     "wifi_only": false
   },
   "apk": {
-    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.36/Connectix-Android-ARM64.apk",
-    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.36/Connectix-Android-Universal.apk",
-    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.36/Connectix-Android-ARM32.apk"
+    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.37/Connectix-Android-ARM64.apk",
+    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.37/Connectix-Android-Universal.apk",
+    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.37/Connectix-Android-ARM32.apk"
   },
   "apks": {
     "arm64-v8a": {
-      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.36/Connectix-Android-ARM64.apk",
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.37/Connectix-Android-ARM64.apk",
       "size": 37754800,
       "size_human": "36 MB",
       "abi": "arm64-v8a",
@@ -29,7 +29,7 @@
       "arch": "arm64"
     },
     "armeabi-v7a": {
-      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.36/Connectix-Android-ARM32.apk",
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.37/Connectix-Android-ARM32.apk",
       "size": 38289172,
       "size_human": "37 MB",
       "abi": "armeabi-v7a",
@@ -37,7 +37,7 @@
       "arch": "arm32"
     },
     "universal": {
-      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.36/Connectix-Android-Universal.apk",
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.37/Connectix-Android-Universal.apk",
       "size": 110398144,
       "size_human": "106 MB",
       "abi": "universal",
@@ -77,12 +77,12 @@
     "material_you_v4_0_27": "v4.0.27 - Material You theme + animation",
     "smart_routing_v4_0_27": "v4.0.27 - Smart routing 3 modes + adblock + LAN bypass"
   },
-  "version_code": 69,
+  "version_code": 70,
   "release_date": "2026-10-08",
   "apk_urls": {
-    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.36/Connectix-Android-ARM64.apk",
-    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.36/Connectix-Android-Universal.apk",
-    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.36/Connectix-Android-ARM32.apk"
+    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.37/Connectix-Android-ARM64.apk",
+    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.37/Connectix-Android-Universal.apk",
+    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.37/Connectix-Android-ARM32.apk"
   },
   "download_url": "https://vpbotn.ir/Connectix-ARM64-v8a.apk?v=4.0.36&t=1791479773"
 }

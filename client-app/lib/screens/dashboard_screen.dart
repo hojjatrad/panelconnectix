@@ -73,7 +73,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Map<String, dynamic>? _updateInfo;
   bool _isCheckingUpdate = false;
 
-  static const String currentAppVersion = '4.0.36';
+  static const String currentAppVersion = '4.0.37';
 
   // "Download over Wi-Fi only" for update packages
   bool _updateWifiOnly = false;
@@ -3357,47 +3357,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
               const SizedBox(height: 16),
 
-              // Live Traffic Speeds if connected
-              ValueListenableBuilder<V2RayStatus>(
-                valueListenable: _v2rayStatus,
-                builder: (context, status, _) {
-                  if (!_isConnected) return const SizedBox.shrink();
-                  return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0F172A),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFF1E293B)),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.arrow_downward_rounded, size: 16, color: Color(0xFF10B981)),
-                            const SizedBox(width: 6),
-                            Text(
-                              'دانلود: ${_formatSpeed(status.downloadSpeed)}',
-                              style: const TextStyle(color: Color(0xFFE2E8F0), fontSize: 12, fontWeight: FontWeight.bold),
-                            ),
-                          ],
-                        ),
-                        Container(width: 1, height: 20, color: const Color(0xFF1E293B)),
-                        Row(
-                          children: [
-                            const Icon(Icons.arrow_upward_rounded, size: 16, color: Color(0xFF38BDF8)),
-                            const SizedBox(width: 6),
-                            Text(
-                              'آپلود: ${_formatSpeed(status.uploadSpeed)}',
-                              style: const TextStyle(color: Color(0xFFE2E8F0), fontSize: 12, fontWeight: FontWeight.bold),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
+              // v4.0.37 LAW: Removed duplicate bottom speed indicator - only one speed display under connect button (user request)
+              // Previously had duplicate: one under connect button (_buildSpeedChip) and one at bottom (this block)
+              // Now only _buildSpeedChip under connect button shows speed - single source of truth
               // App Version & Support Footer
               Container(
                 padding: const EdgeInsets.symmetric(vertical: 8),
