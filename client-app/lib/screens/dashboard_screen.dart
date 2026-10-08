@@ -2724,104 +2724,116 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
               const SizedBox(height: 20),
 
-              // Smart Connect & Quick Controls Row
-              Row(
+              // Smart Connect & Quick Controls Row - v4.0.33 FIX: Wrap to prevent overflow, FittedBox for text
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: [
-                  // 1-Tap Smart Connect
-                  Expanded(
-                    child: InkWell(
-                      onTap: _smartConnect,
-                      borderRadius: BorderRadius.circular(16),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1E1B4B),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: const Color(0xFF4338CA)),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            _isSmartConnecting
-                                ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF818CF8)),
-                                  )
-                                : const Icon(Icons.bolt_rounded, color: Colors.amber, size: 20),
-                            const SizedBox(width: 8),
-                            const Text(
+                  // 1-Tap Smart Connect - Flexible width
+                  InkWell(
+                    onTap: _smartConnect,
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E1B4B),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFF4338CA)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _isSmartConnecting
+                              ? const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF818CF8)),
+                                )
+                              : const Icon(Icons.bolt_rounded, color: Colors.amber, size: 16),
+                          const SizedBox(width: 6),
+                          const FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
                               'اتصال هوشمند',
-                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  // Proxy Button - v4.0.18 NEW
+                  // Proxy Button - v4.0.18 NEW - Compact
                   InkWell(
                     onTap: () {
                       Navigator.push(context, MaterialPageRoute(builder: (_) => const ProxyScreen()));
                     },
                     borderRadius: BorderRadius.circular(16),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                       decoration: BoxDecoration(
                         color: const Color(0xFF1E293B),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.3)),
                       ),
                       child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: const [
-                          Icon(Icons.security_rounded, color: Color(0xFF38BDF8), size: 18),
-                          SizedBox(width: 6),
-                          Text('پروکسی', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 12, fontWeight: FontWeight.bold)),
+                          Icon(Icons.security_rounded, color: Color(0xFF38BDF8), size: 16),
+                          SizedBox(width: 4),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text('پروکسی', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.bold)),
+                          ),
                         ],
                       ),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  // GPS Spoof Button - v4.0.28 NEW - Combined Method 1 + 3
+                  // GPS Spoof Button - v4.0.28 NEW - Compact
                   InkWell(
                     onTap: () {
                       Navigator.push(context, MaterialPageRoute(builder: (_) => const GpsSpoofScreen()));
                     },
                     borderRadius: BorderRadius.circular(16),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                       decoration: BoxDecoration(
                         color: const Color(0xFF1E293B),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
                       ),
                       child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: const [
-                          Icon(Icons.location_on_rounded, color: Color(0xFF10B981), size: 18),
-                          SizedBox(width: 6),
-                          Text('GPS', style: TextStyle(color: Color(0xFF10B981), fontSize: 12, fontWeight: FontWeight.bold)),
+                          Icon(Icons.location_on_rounded, color: Color(0xFF10B981), size: 16),
+                          SizedBox(width: 4),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text('GPS', style: TextStyle(color: Color(0xFF10B981), fontSize: 11, fontWeight: FontWeight.bold)),
+                          ),
                         ],
                       ),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  // Hotspot & Proxy Sharing Modal Trigger
+                  // Hotspot & Proxy Sharing Modal Trigger - Compact
                   InkWell(
                     onTap: _openHotspotProxySharingSheet,
                     borderRadius: BorderRadius.circular(16),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                       decoration: BoxDecoration(
                         color: const Color(0xFF0F172A),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(color: const Color(0xFF334155)),
                       ),
                       child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: const [
-                          Icon(Icons.wifi_tethering_rounded, color: Color(0xFF34D399), size: 18),
-                          SizedBox(width: 6),
-                          Text('TV', style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 12)),
+                          Icon(Icons.wifi_tethering_rounded, color: Color(0xFF34D399), size: 16),
+                          SizedBox(width: 4),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text('TV', style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 11)),
+                          ),
                         ],
                       ),
                     ),

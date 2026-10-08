@@ -1,10 +1,10 @@
 {
-  "version": "4.0.32",
-  "code": 65,
+  "version": "4.0.33",
+  "code": 66,
   "force_update": false,
   "force_min_code": 50,
   "update_type": "full",
-  "changelog": "v4.0.32 FOREVER LAW: دانلود گیر میکنه برای همیشه حل شد 🚀 قانون همیشگی: 1) هیچوقت در حال برقراری ارتباط گیر نکنه (>10ثانیه)، 2) همیشه progress زنده 0-100% با MB، 3) streaming http.Client (نه http.get RAM) + تمام 8 لینک با timeout 15/25 ثانیه، 4) PK header validation، 5) DM fallback با تشخیص گیر کردن 15 ثانیه، 6) اگر همه شکست → پیغام فارسی واضح + مرورگر + QR لینک https://vpbotn.ir/qr_download.html + مستقیم https://vpbotn.ir/Connectix-ARM64-v8a.apk، 7) تست واقعی دانلود 200 OK",
+  "changelog": "v4.0.33 FIX: دکمه های صفحه اول نوشته ازشون بیرون زده + حلقه بروزرسانی v4.0.32 🚀 فیکس UI: Row دکمه های اتصال هوشمند/پروکسی/GPS/TV که overflow میکرد → Wrap با FittedBox و padding کمتر (11px) و icon 16px تا در صفحه جا بشن + SingleChildScrollView fallback. فیکس حلقه آپدیت: سرور APK قدیمی v4.0.31 داشت ولی نسخه 4.0.32 اعلام میکرد → کاربر نصب میکرد ولی باز 4.0.31 میموند و دوباره پیغام آپدیت. الان APK واقعی v4.0.32 (37.7M) آپلود شد 200 OK + title/changelog آپدیت شد. FOREVER LAW دانلود همچنان فعال: streaming + 8 لینک + progress زنده.",
   "date": "2026-10-08",
   "auto_update": {
     "enabled": true,
@@ -15,30 +15,30 @@
     "wifi_only": false
   },
   "apk": {
-    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.32/Connectix-Android-ARM64.apk",
-    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.32/Connectix-Android-Universal.apk",
-    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.32/Connectix-Android-ARM32.apk"
+    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.33/Connectix-Android-ARM64.apk",
+    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.33/Connectix-Android-Universal.apk",
+    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.33/Connectix-Android-ARM32.apk"
   },
   "apks": {
     "arm64-v8a": {
-      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.32/Connectix-Android-ARM64.apk",
-      "size": 37731807,
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.33/Connectix-Android-ARM64.apk",
+      "size": 37752174,
       "size_human": "36 MB",
       "abi": "arm64-v8a",
       "recommended": true,
       "arch": "arm64"
     },
     "armeabi-v7a": {
-      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.32/Connectix-Android-ARM32.apk",
-      "size": 38265657,
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.33/Connectix-Android-ARM32.apk",
+      "size": 38288426,
       "size_human": "37 MB",
       "abi": "armeabi-v7a",
       "recommended": false,
       "arch": "arm32"
     },
     "universal": {
-      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.32/Connectix-Android-Universal.apk",
-      "size": 110340619,
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.33/Connectix-Android-Universal.apk",
+      "size": 110393080,
       "size_human": "106 MB",
       "abi": "universal",
       "recommended": false,
