@@ -1528,16 +1528,118 @@ class ApiService {
     // v4.0.29 FIX: Acquire WakeLock + WifiLock to prevent screen off disconnect during download and VPN
     await acquireWakeLock();
     
-    // v4.0.29 FIX: Try DownloadManager first (fastest, background, continues when screen off)
+    // v4.0.31 FIX: Download stuck in updating state - Use streaming HTTP first (shows progress), DownloadManager as fallback
+    // First try: Direct streaming HTTP with progress (most reliable, shows progress immediately)
     try {
-      print('v4.0.29 Trying DownloadManager for $downloadUrl');
+      print('v4.0.31 Trying streaming HTTP first for $downloadUrl');
+      final urls = generateAllUrls(downloadUrl, fallback);
+      for (final url in urls) {
+        try {
+          print('v4.0.31 Attempt streaming download: $url');
+          String? cacheDirPath;
+          try {
+            cacheDirPath = await _updaterChannel.invokeMethod<String>('getCacheDir');
+          } catch (_) {}
+          if (cacheDirPath == null || cacheDirPath.isEmpty) {
+            cacheDirPath = "/data/user/0/com.connectix.vpn/cache";
+          }
+          final dir = Directory(cacheDirPath);
+          if (!await dir.exists()) await dir.create(recursive: true);
+          final file = File('$cacheDirPath/Connectix-Update.apk');
+          if (await file.exists()) {
+            try { await file.delete(); } catch (_) {}
+          }
+
+          final client = HttpClient();
+          client.connectionTimeout = const Duration(seconds: 15);
+          client.idleTimeout = const Duration(seconds: 15);
+          final uri = Uri.parse(url);
+          final request = await client.getUrl(uri);
+          request.headers.set(HttpHeaders.userAgentHeader, 'Mozilla/5.0 (Linux; Android 10; Mobile) Connectix v4.0.31');
+          request.headers.set(HttpHeaders.acceptHeader, '*/*');
+          request.headers.set(HttpHeaders.cacheControlHeader, 'no-cache');
+          request.followRedirects = true;
+          request.maxRedirects = 5;
+          final response = await request.close().timeout(const Duration(seconds: 20));
+
+          if (response.statusCode >= 400) {
+            print('Streaming HTTP ${response.statusCode} for $url');
+            client.close();
+            continue;
+          }
+
+          final total = response.contentLength > 0 ? response.contentLength : 0;
+          int received = 0;
+          final sink = file.openWrite();
+          
+          await for (final chunk in response) {
+            received += chunk.length;
+            sink.add(chunk);
+            if (total > 0) {
+              final prog = received / total;
+              onProgress(prog, received, total);
+            } else {
+              // If total unknown, show received MB
+              onProgress(0.5, received, 0);
+            }
+          }
+          await sink.close();
+          client.close();
+          
+          final len = await file.length();
+          print('Streaming download success: $url len=$len');
+          if (len < 1000000) {
+            try { await file.delete(); } catch (_) {}
+            continue;
+          }
+          
+          // Validate APK header
+          try {
+            final raf = await file.open();
+            final header = await raf.read(4);
+            await raf.close();
+            if (header.length < 2 || header[0] != 0x50 || header[1] != 0x4B) {
+              try { await file.delete(); } catch (_) {}
+              continue;
+            }
+          } catch (_) {
+            try { await file.delete(); } catch (_) {}
+            continue;
+          }
+          
+          // Install
+          try {
+            final installResult = await _updaterChannel.invokeMethod('installApk', {'filePath': file.path, 'allowSameVersion': true});
+            if (installResult == true || installResult == 'true' || installResult == null) {
+              await releaseWakeLock();
+              onSuccess();
+              return;
+            }
+          } catch (e) {
+            print('Install failed: $e');
+            continue;
+          }
+        } catch (e) {
+          print('Streaming attempt failed for $url: $e');
+          continue;
+        }
+      }
+    } catch (e) {
+      print('Streaming HTTP overall failed: $e');
+    }
+
+    // Second try: DownloadManager (background, continues when screen off) - with better file path handling
+    try {
+      print('v4.0.31 Trying DownloadManager as fallback for $downloadUrl');
       final dmResult = await downloadWithDownloadManager(downloadUrl, expectedVer);
       if (dmResult != null && dmResult['downloadId'] != null) {
         final downloadId = dmResult['downloadId'] as int;
         print('DownloadManager started id=$downloadId');
-        // Poll status
+        // Poll status - with faster timeout and better handling
         int attempts = 0;
-        while (attempts < 180) { // 3 minutes max
+        int stuckCount = 0;
+        int lastBytes = 0;
+        while (attempts < 120) { // 2 minutes max (was 3)
           await Future.delayed(const Duration(seconds: 1));
           final status = await getDownloadManagerStatus(downloadId);
           if (status == null) {
@@ -1551,6 +1653,20 @@ class ApiService {
           
           if (total > 0) {
             onProgress(progress, bytes, total);
+          } else if (bytes > 0) {
+            onProgress(0.5, bytes, 0);
+          }
+          
+          // Detect stuck download (no progress for 10 seconds)
+          if (bytes == lastBytes && statusStr == 'running') {
+            stuckCount++;
+            if (stuckCount > 15) {
+              print('DownloadManager stuck, breaking');
+              break;
+            }
+          } else {
+            stuckCount = 0;
+            lastBytes = bytes;
           }
           
           if (statusStr == 'successful') {

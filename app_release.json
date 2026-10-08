@@ -1,10 +1,10 @@
 {
-  "version": "4.0.30",
-  "code": 63,
+  "version": "4.0.31",
+  "code": 64,
   "force_update": false,
   "force_min_code": 50,
   "update_type": "full",
-  "changelog": "v4.0.30 FIX: پیغام بروزرسانی نمایش داده نمیشه - فیکس اساسی 🚀 علت: currentAppVersion هاردکد 4.0.26 بود + پنل latest_version خالی/3.1.0 برمیگردوند + فقط پنل چک میشد نه گیت‌هاب. فیکس Forever: 1) currentAppVersion داینامیک شد 4.0.30، 2) checkAppUpdate هم پنل و هم گیت‌هاب raw چک میکنه و جدیدترین را برمیگردونه، 3) اگر پنل 0.0.0 یا 3.x برگردونه اسکیپ و گیت‌هاب چک، 4) داشبورد لاگ اضافه شد + بنر حتی اگر قبلا dismiss شده باشه برای فیکس‌های مهم نشون داده میشه، 5) force_update پشتیبانی. + فیکس قبلی: دانلود سریع با DownloadManager (ادامه با صفحه خاموش) + WakeLock + WifiLock + معافیت باتری.",
+  "changelog": "v4.0.31 FIX: دانلود بروزرسانی در حال بروزرسانی میمونه و دانلود انجام نمیشه - فیکس اساسی 🚀 علت: DownloadManager با content:// URI و file path اشتباه + http.get کل فایل تو RAM بدون progress + polling 3 دقیقه گیر میکرد. فیکس Forever: 1) Streaming HTTP اول با progress زنده (حتی اگر total نامشخص) + تمام 8 لینک با fallback، 2) DownloadManager دوم با handling content:// URI + کپی به cache + چک 4 مسیر ممکن + تشخیص گیر کردن (15 ثانیه بدون پیشرفت → fallback)، 3) MainActivity filePath handling برای content:// + external files dir، 4) APK header validation + نصب خودکار، 5) اگر همه شکست → دکمه مرورگر.",
   "date": "2026-10-07",
   "auto_update": {
     "enabled": true,
@@ -15,13 +15,13 @@
     "wifi_only": false
   },
   "apk": {
-    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.30/Connectix-Android-ARM64.apk",
-    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.30/Connectix-Android-Universal.apk",
-    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.30/Connectix-Android-ARM32.apk"
+    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.31/Connectix-Android-ARM64.apk",
+    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.31/Connectix-Android-Universal.apk",
+    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.31/Connectix-Android-ARM32.apk"
   },
   "apks": {
     "arm64-v8a": {
-      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.30/Connectix-Android-ARM64.apk",
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.31/Connectix-Android-ARM64.apk",
       "size": 37731807,
       "size_human": "36 MB",
       "abi": "arm64-v8a",
@@ -29,7 +29,7 @@
       "arch": "arm64"
     },
     "armeabi-v7a": {
-      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.30/Connectix-Android-ARM32.apk",
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.31/Connectix-Android-ARM32.apk",
       "size": 38265657,
       "size_human": "37 MB",
       "abi": "armeabi-v7a",
@@ -37,7 +37,7 @@
       "arch": "arm32"
     },
     "universal": {
-      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.30/Connectix-Android-Universal.apk",
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.31/Connectix-Android-Universal.apk",
       "size": 110340619,
       "size_human": "106 MB",
       "abi": "universal",
@@ -47,7 +47,7 @@
   },
   "windows": {
     "version": "4.0.28",
-    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.30/Connectix-Windows-x64.zip"
+    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.31/Connectix-Windows-x64.zip"
   },
   "ultra": true,
   "core": "xray_1.8.23 + sing-box + multiplex + 0rtt + stealth",

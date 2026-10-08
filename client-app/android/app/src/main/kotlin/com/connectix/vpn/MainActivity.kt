@@ -1296,7 +1296,58 @@ class MainActivity: FlutterActivity() {
                             val total = cursor.getLong(totalIdx)
                             val reason = cursor.getInt(reasonIdx)
                             val localUriIdx = cursor.getColumnIndex(android.app.DownloadManager.COLUMN_LOCAL_URI)
-                            val localUri = cursor.getString(localUriIdx)
+                            var localUri = cursor.getString(localUriIdx) ?: ""
+                            // v4.0.31 FIX: Handle content:// URIs and provide direct file path
+                            var filePath = ""
+                            try {
+                                if (localUri.startsWith("content://")) {
+                                    // Try to get file path from DownloadManager's local file
+                                    // For external files dir, we know the path
+                                    val externalFile = getExternalFilesDir(null)?.let { 
+                                        java.io.File(it, "Connectix-Update.apk").absolutePath 
+                                    } ?: ""
+                                    if (externalFile.isNotEmpty() && java.io.File(externalFile).exists()) {
+                                        filePath = externalFile
+                                        localUri = "file://$externalFile"
+                                    } else {
+                                        // Try to copy from content URI to cache
+                                        try {
+                                            val inputStream = contentResolver.openInputStream(Uri.parse(localUri))
+                                            if (inputStream != null) {
+                                                val cacheFile = java.io.File(cacheDir, "Connectix-Update.apk")
+                                                val outputStream = java.io.FileOutputStream(cacheFile)
+                                                inputStream.copyTo(outputStream)
+                                                inputStream.close()
+                                                outputStream.close()
+                                                filePath = cacheFile.absolutePath
+                                                localUri = "file://$filePath"
+                                            }
+                                        } catch (e: Exception) {
+                                            android.util.Log.w("ConnectixDownload", "Failed to copy from content URI: ${e.message}")
+                                        }
+                                    }
+                                } else if (localUri.startsWith("file://")) {
+                                    filePath = Uri.parse(localUri).path ?: ""
+                                }
+                                // Fallback: check known locations
+                                if (filePath.isEmpty()) {
+                                    val possiblePaths = listOf(
+                                        getExternalFilesDir(null)?.let { java.io.File(it, "Connectix-Update.apk").absolutePath } ?: "",
+                                        java.io.File(cacheDir, "Connectix-Update.apk").absolutePath,
+                                        "/storage/emulated/0/Android/data/$packageName/files/Connectix-Update.apk",
+                                        "$cacheDir/Connectix-Update.apk"
+                                    )
+                                    for (p in possiblePaths) {
+                                        if (p.isNotEmpty() && java.io.File(p).exists() && java.io.File(p).length() > 1000000) {
+                                            filePath = p
+                                            localUri = "file://$p"
+                                            break
+                                        }
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                android.util.Log.w("ConnectixDownload", "File path handling failed: ${e.message}")
+                            }
                             cursor.close()
                             
                             val statusStr = when(status) {
@@ -1314,7 +1365,8 @@ class MainActivity: FlutterActivity() {
                                 "total" to total,
                                 "reason" to reason,
                                 "localUri" to (localUri ?: ""),
-                                "progress" to if (total > 0) (bytes.toDouble() / total.toDouble()) else 0.0
+                                "filePath" to filePath,
+                                "progress" to if (total > 0) (bytes.toDouble() / total.toDouble()) else if (bytes > 0) 0.5 else 0.0
                             ))
                         } else {
                             cursor.close()
