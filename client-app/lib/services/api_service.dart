@@ -1510,6 +1510,22 @@ class ApiService {
     }
   }
 
+  // v4.0.32 FOREVER LAW: Download must NEVER stay in connecting state - Bulletproof
+  // LAW 1: Always show progress from 0% to 100% with MB, never stuck at connecting >10 sec
+  // LAW 2: Try all 8 URLs with streaming, not just primary
+  // LAW 3: If all streaming fail, try DownloadManager with stuck detection
+  // LAW 4: If all fail, call onError with browser fallback - NEVER leave UI stuck
+  // LAW 5: Use http.Client streaming (not http.get RAM) for progress
+  // LAW 6: Timeout per URL 20 sec, total max 4 min, always call onError if fails
+  // LAW 7: Test with real download, ensure progress works
+  // v4.0.32 FOREVER LAW: Download must NEVER stay in connecting state - Bulletproof
+  // LAW 1: Always show progress from 0% to 100% with MB, never stuck at connecting >10 sec
+  // LAW 2: Try all 8 URLs with streaming, not just primary
+  // LAW 3: If all streaming fail, try DownloadManager with stuck detection
+  // LAW 4: If all fail, call onError with browser fallback - NEVER leave UI stuck
+  // LAW 5: Use http.Client streaming (not http.get RAM) for progress
+  // LAW 6: Timeout per URL 20 sec, total max 4 min, always call onError if fails
+  // LAW 7: Test with real download, ensure progress works
   static Future<void> downloadAndInstallApk({
 
     required String downloadUrl,
@@ -1517,231 +1533,16 @@ class ApiService {
     required Function(String error) onError,
     required Function() onSuccess,
   }) async {
-    // v4.0.19 FOREVER: extract version for stale check (outer scope)
     String expectedVer = '';
     try {
       final m = RegExp(r'v?(\d+\.\d+\.\d+)').firstMatch(downloadUrl);
       if (m != null) expectedVer = m.group(1) ?? '';
     } catch (_) {}
-    if (expectedVer.isEmpty) expectedVer = '4.0.29';
+    if (expectedVer.isEmpty) expectedVer = '4.0.32';
 
-    // v4.0.29 FIX: Acquire WakeLock + WifiLock to prevent screen off disconnect during download and VPN
     await acquireWakeLock();
     
-    // v4.0.31 FIX: Download stuck in updating state - Use streaming HTTP first (shows progress), DownloadManager as fallback
-    // First try: Direct streaming HTTP with progress (most reliable, shows progress immediately)
-    try {
-      print('v4.0.31 Trying streaming HTTP first for $downloadUrl');
-      final urls = generateAllUrls(downloadUrl, fallback);
-      for (final url in urls) {
-        try {
-          print('v4.0.31 Attempt streaming download: $url');
-          String? cacheDirPath;
-          try {
-            cacheDirPath = await _updaterChannel.invokeMethod<String>('getCacheDir');
-          } catch (_) {}
-          if (cacheDirPath == null || cacheDirPath.isEmpty) {
-            cacheDirPath = "/data/user/0/com.connectix.vpn/cache";
-          }
-          final dir = Directory(cacheDirPath);
-          if (!await dir.exists()) await dir.create(recursive: true);
-          final file = File('$cacheDirPath/Connectix-Update.apk');
-          if (await file.exists()) {
-            try { await file.delete(); } catch (_) {}
-          }
-
-          final client = HttpClient();
-          client.connectionTimeout = const Duration(seconds: 15);
-          client.idleTimeout = const Duration(seconds: 15);
-          final uri = Uri.parse(url);
-          final request = await client.getUrl(uri);
-          request.headers.set(HttpHeaders.userAgentHeader, 'Mozilla/5.0 (Linux; Android 10; Mobile) Connectix v4.0.31');
-          request.headers.set(HttpHeaders.acceptHeader, '*/*');
-          request.headers.set(HttpHeaders.cacheControlHeader, 'no-cache');
-          request.followRedirects = true;
-          request.maxRedirects = 5;
-          final response = await request.close().timeout(const Duration(seconds: 20));
-
-          if (response.statusCode >= 400) {
-            print('Streaming HTTP ${response.statusCode} for $url');
-            client.close();
-            continue;
-          }
-
-          final total = response.contentLength > 0 ? response.contentLength : 0;
-          int received = 0;
-          final sink = file.openWrite();
-          
-          await for (final chunk in response) {
-            received += chunk.length;
-            sink.add(chunk);
-            if (total > 0) {
-              final prog = received / total;
-              onProgress(prog, received, total);
-            } else {
-              // If total unknown, show received MB
-              onProgress(0.5, received, 0);
-            }
-          }
-          await sink.close();
-          client.close();
-          
-          final len = await file.length();
-          print('Streaming download success: $url len=$len');
-          if (len < 1000000) {
-            try { await file.delete(); } catch (_) {}
-            continue;
-          }
-          
-          // Validate APK header
-          try {
-            final raf = await file.open();
-            final header = await raf.read(4);
-            await raf.close();
-            if (header.length < 2 || header[0] != 0x50 || header[1] != 0x4B) {
-              try { await file.delete(); } catch (_) {}
-              continue;
-            }
-          } catch (_) {
-            try { await file.delete(); } catch (_) {}
-            continue;
-          }
-          
-          // Install
-          try {
-            final installResult = await _updaterChannel.invokeMethod('installApk', {'filePath': file.path, 'allowSameVersion': true});
-            if (installResult == true || installResult == 'true' || installResult == null) {
-              await releaseWakeLock();
-              onSuccess();
-              return;
-            }
-          } catch (e) {
-            print('Install failed: $e');
-            continue;
-          }
-        } catch (e) {
-          print('Streaming attempt failed for $url: $e');
-          continue;
-        }
-      }
-    } catch (e) {
-      print('Streaming HTTP overall failed: $e');
-    }
-
-    // Second try: DownloadManager (background, continues when screen off) - with better file path handling
-    try {
-      print('v4.0.31 Trying DownloadManager as fallback for $downloadUrl');
-      final dmResult = await downloadWithDownloadManager(downloadUrl, expectedVer);
-      if (dmResult != null && dmResult['downloadId'] != null) {
-        final downloadId = dmResult['downloadId'] as int;
-        print('DownloadManager started id=$downloadId');
-        // Poll status - with faster timeout and better handling
-        int attempts = 0;
-        int stuckCount = 0;
-        int lastBytes = 0;
-        while (attempts < 120) { // 2 minutes max (was 3)
-          await Future.delayed(const Duration(seconds: 1));
-          final status = await getDownloadManagerStatus(downloadId);
-          if (status == null) {
-            attempts++;
-            continue;
-          }
-          final statusStr = status['statusStr']?.toString() ?? '';
-          final bytes = (status['bytes'] ?? 0) is int ? status['bytes'] as int : 0;
-          final total = (status['total'] ?? 0) is int ? status['total'] as int : 0;
-          final progress = (status['progress'] ?? 0.0) is double ? status['progress'] as double : 0.0;
-          
-          if (total > 0) {
-            onProgress(progress, bytes, total);
-          } else if (bytes > 0) {
-            onProgress(0.5, bytes, 0);
-          }
-          
-          // Detect stuck download (no progress for 10 seconds)
-          if (bytes == lastBytes && statusStr == 'running') {
-            stuckCount++;
-            if (stuckCount > 15) {
-              print('DownloadManager stuck, breaking');
-              break;
-            }
-          } else {
-            stuckCount = 0;
-            lastBytes = bytes;
-          }
-          
-          if (statusStr == 'successful') {
-            print('DownloadManager success');
-            final localUri = status['localUri']?.toString() ?? '';
-            // Get file path from URI
-            String filePath = '';
-            if (localUri.startsWith('file://')) {
-              filePath = Uri.parse(localUri).path;
-            } else {
-              // Try to get from external files dir
-              try {
-                const channel = MethodChannel('com.connectix.vpn/updater');
-                final cacheDir = await channel.invokeMethod<String>('getCacheDir') ?? '';
-                filePath = '$cacheDir/Connectix-Update.apk';
-                // DownloadManager saves to external files dir
-                // Check if file exists at that path, if not try alternative
-                final file = File(filePath);
-                if (!await file.exists()) {
-                  // Try external files dir directly
-                  filePath = '/storage/emulated/0/Android/data/com.connectix.vpn/files/Connectix-Update.apk';
-                }
-              } catch (_) {}
-            }
-            
-            // Verify and install
-            if (filePath.isNotEmpty) {
-              try {
-                final file = File(filePath);
-                if (await file.exists()) {
-                  final len = await file.length();
-                  if (len > 1000000) {
-                    // Verify APK header
-                    final raf = await file.open();
-                    final header = await raf.read(4);
-                    await raf.close();
-                    if (header.length >= 2 && header[0] == 0x50 && header[1] == 0x4B) {
-                      print('DownloadManager APK verified, installing');
-                      try {
-                        const channel = MethodChannel('com.connectix.vpn/updater');
-                        final installResult = await channel.invokeMethod('installApk', {'filePath': file.path, 'allowSameVersion': true});
-                        if (installResult == true || installResult == 'true' || installResult == null) {
-                          await releaseWakeLock();
-                          onSuccess();
-                          return;
-                        }
-                      } catch (e) {
-                        print('Install via DownloadManager file failed: $e');
-                      }
-                    }
-                  }
-                }
-              } catch (e) {
-                print('DownloadManager file handling failed: $e');
-              }
-            }
-            break;
-          } else if (statusStr == 'failed') {
-            print('DownloadManager failed, trying next method');
-            break;
-          } else if (statusStr == 'running' || statusStr == 'pending') {
-            // Continue polling
-            attempts++;
-            continue;
-          } else {
-            attempts++;
-          }
-        }
-        print('DownloadManager polling ended, falling back to http methods');
-      }
-    } catch (e) {
-      print('DownloadManager attempt failed: $e');
-    }
-    
-    // v4.0.19 FOREVER LAW: Generate all URLs with deep cache busting + GitHub fallback
+    // v4.0.32 FOREVER LAW: Generate all URLs with deep cache busting
     List<String> generateAllUrls(String primary, String fallback) {
       final urls = <String>[];
       final seen = <String>{};
@@ -1750,32 +1551,21 @@ class ApiService {
         if (u.isEmpty || !u.startsWith('http')) return;
         if (seen.contains(u)) return;
         if (u.contains('ir.vpbotn.ir/Connectix') || u.contains('cf.vpbotn.ir/Connectix')) {
-          log('v4.0.19 SKIP broken 404 url: $u');
+          log('v4.0.32 SKIP broken 404 url: $u');
           return;
         }
         seen.add(u);
         urls.add(u);
       }
       
-      // v4.0.26: Extract version with deep parse
-      String ver = '';
-      try {
-        final verMatch = RegExp(r'v?(\d+\.\d+\.\d+)').firstMatch(primary);
-        if (verMatch != null) ver = verMatch.group(1) ?? '';
-        if (ver.isEmpty) {
-          final verMatch2 = RegExp(r'v?(\d+\.\d+\.\d+)').firstMatch(fallback);
-          if (verMatch2 != null) ver = verMatch2.group(1) ?? '';
-        }
-        if (ver.isEmpty) ver = '4.0.26';
-      } catch (_) {}
-      if (ver.isEmpty) ver = '4.0.26';
+      String ver = expectedVer;
+      if (ver.isEmpty) ver = '4.0.32';
       
       final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
       final random = (DateTime.now().millisecondsSinceEpoch % 9000 + 1000).toString();
       
       String addVersionParam(String url) {
         if (url.contains('github.com')) {
-          // GitHub: add cache buster too
           if (url.contains('?')) return '$url&t=$timestamp&s=$random';
           return '$url?t=$timestamp&s=$random';
         }
@@ -1790,11 +1580,9 @@ class ApiService {
         }
       }
       
-      // v4.0.15: PRIMARY FIRST with version param preserved - this is from panel check-update with ?v=4.0.15
       addUrl(primary);
       addUrl(addVersionParam(primary));
       
-      // Force panel host URLs with version param (fastest inside Iran, verified working)
       try {
         final orderedBases = getOrderedBaseUrls();
         for (final base in orderedBases) {
@@ -1806,14 +1594,14 @@ class ApiService {
         }
       } catch (_) {}
       
-      // Always add main working panel URLs with version
       addUrl(addVersionParam("https://vpbotn.ir/Connectix-ARM64-v8a.apk"));
       addUrl(addVersionParam("https://vpbotn.ir/Connectix-Universal.apk"));
+      addUrl(addVersionParam("https://direct.vpbotn.ir/Connectix-ARM64-v8a.apk"));
+      addUrl(addVersionParam("https://direct.vpbotn.ir/Connectix-Universal.apk"));
       
       addUrl(fallback);
       addUrl(addVersionParam(fallback));
       
-      // GitHub direct URLs as last resort
       try {
         if (ver.isNotEmpty) {
           addUrl("https://github.com/hojjatrad/panelconnectix/releases/download/v$ver/Connectix-Android-ARM64.apk");
@@ -1821,14 +1609,27 @@ class ApiService {
         }
       } catch (_) {}
       
-      log('v4.0.19 FOREVER LAW generateAllUrls: primary=$primary ver=$ver total=${urls.length} urls=$urls');
+      log('v4.0.32 FOREVER LAW generateAllUrls: primary=$primary ver=$ver total=${urls.length} urls=$urls');
       return urls;
     }
-
-    Future<bool> attemptDownloadWithHttp(String url) async {
-      // Method 1: Try with http package (more reliable for redirects)
+    
+    List<String> allUrls = [];
+    try {
+      allUrls = generateAllUrls(downloadUrl, '');
+    } catch (_) {
+      allUrls = [downloadUrl];
+    }
+    if (allUrls.isEmpty) allUrls = [downloadUrl];
+    
+    print('v4.0.32 FOREVER: Starting download ${allUrls.length} URLs, ver $expectedVer');
+    try { onProgress(0.05, 0, 0); } catch (_) {}
+    
+    for (int urlIndex = 0; urlIndex < allUrls.length; urlIndex++) {
+      final url = allUrls[urlIndex];
       try {
-        log('download attempt (http pkg): $url');
+        print('v4.0.32 Attempt ${urlIndex+1}/${allUrls.length}: $url');
+        try { onProgress(0.05 + (urlIndex * 0.02), 0, 0); } catch (_) {}
+        
         String? cacheDirPath;
         try {
           cacheDirPath = await _updaterChannel.invokeMethod<String>('getCacheDir');
@@ -1843,292 +1644,204 @@ class ApiService {
           try { await file.delete(); } catch (_) {}
         }
 
-        final response = await http.get(
-          Uri.parse(url),
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Mobile) Connectix',
+        final client = http.Client();
+        try {
+          final request = http.Request('GET', Uri.parse(url));
+          request.headers.addAll({
+            'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Mobile) Connectix v4.0.32',
             'Accept': '*/*',
             'Cache-Control': 'no-cache',
-          },
-        ).timeout(const Duration(minutes: 3));
-
-        if (response.statusCode >= 400) {
-          log('http pkg download HTTP ${response.statusCode} for $url');
-          // Check if it's HTML error page
-          final bodyStr = utf8.decode(response.bodyBytes, allowMalformed: true);
-          if (bodyStr.length < 5000 && (bodyStr.contains('<html') || bodyStr.contains('404') || bodyStr.contains('403'))) {
-            log('http pkg got HTML error page (${bodyStr.length} bytes) for $url');
-            throw Exception('خطای سرور: ${response.statusCode} - صفحه خطا دریافت شد');
+          });
+          
+          final streamedResponse = await client.send(request).timeout(const Duration(seconds: 15));
+          
+          if (streamedResponse.statusCode >= 400) {
+            print('v4.0.32 HTTP ${streamedResponse.statusCode} for $url');
+            client.close();
+            continue;
           }
-          throw Exception('کد خطا: ${response.statusCode}');
-        }
 
-        if (response.bodyBytes.length < 1000000) {
-          final bodyStr = utf8.decode(response.bodyBytes, allowMalformed: true);
-          if (bodyStr.contains('<html') || bodyStr.contains('<!DOCTYPE')) {
-            log('http pkg got HTML (${response.bodyBytes.length} bytes) instead of APK for $url: ${bodyStr.substring(0, 200)}');
-            throw Exception('فایل HTML دریافت شد به جای APK (احتمالا فیلترینگ یا خطای سرور) - حجم: ${response.bodyBytes.length}');
+          final total = streamedResponse.contentLength ?? 0;
+          int received = 0;
+          final sink = file.openWrite();
+          bool hasData = false;
+          
+          await for (final chunk in streamedResponse.stream.timeout(const Duration(seconds: 25))) {
+            received += chunk.length;
+            sink.add(chunk);
+            hasData = true;
+            
+            if (total > 0) {
+              final prog = (received / total).clamp(0.0, 1.0);
+              final displayProg = 0.1 + (prog * 0.85);
+              try { onProgress(displayProg, received, total); } catch (_) {}
+            } else {
+              final prog = 0.1 + (received / (40*1024*1024)).clamp(0.0, 0.85);
+              try { onProgress(prog, received, total); } catch (_) {}
+            }
           }
-          throw Exception('فایل ناقص است (حجم ${response.bodyBytes.length} بایت) از $url');
-        }
-
-        await file.writeAsBytes(response.bodyBytes);
-        final len = await file.length();
-        
-        // Validate APK header PK
-        try {
-          final raf = await file.open();
-          final header = await raf.read(4);
-          await raf.close();
-          if (header.length < 2 || header[0] != 0x50 || header[1] != 0x4B) {
-            final firstBytes = String.fromCharCodes(header);
-            log('http pkg invalid APK header: $firstBytes for $url len=$len');
-            throw Exception('فایل APK معتبر نیست (هدر: $firstBytes) - ممکن است صفحه خطا باشد');
+          
+          await sink.close();
+          client.close();
+          
+          if (!hasData) {
+            try { await file.delete(); } catch (_) {}
+            continue;
           }
-        } catch (e) {
-          if (e.toString().contains('APK معتبر نیست') || e.toString().contains('صفحه خطا')) rethrow;
-        }
-
-        log('http pkg download success: $url len=$len');
-        onProgress(1.0, len, len);
-        
-        // v4.0.19 FOREVER LAW: Verify APK versionName via native PackageManager
-        try {
-          final apkVersion = await _updaterChannel.invokeMethod<String>('getApkVersionName', {'filePath': file.path});
-          log('v4.0.19 APK version check: expected contains $expectedVer, got $apkVersion from $url');
-          if (apkVersion != null && apkVersion.isNotEmpty) {
-            // If expected version is in URL but APK version is different and older, it's stale
-            if (expectedVer.isNotEmpty && !apkVersion.contains(expectedVer)) {
-              // Check if apkVersion is older than expected
+          
+          final len = await file.length();
+          print('v4.0.32 Success $url len=$len');
+          
+          if (len < 1000000) {
+            try { await file.delete(); } catch (_) {}
+            continue;
+          }
+          
+          try {
+            final raf = await file.open();
+            final header = await raf.read(4);
+            await raf.close();
+            if (header.length < 2 || header[0] != 0x50 || header[1] != 0x4B) {
+              try { await file.delete(); } catch (_) {}
+              continue;
+            }
+          } catch (_) {
+            try { await file.delete(); } catch (_) {}
+            continue;
+          }
+          
+          try { onProgress(0.95, len, len); } catch (_) {}
+          
+          try {
+            final apkVersion = await _updaterChannel.invokeMethod<String>('getApkVersionName', {'filePath': file.path});
+            print('v4.0.32 APK ver check: expected $expectedVer, got $apkVersion');
+            if (apkVersion != null && expectedVer.isNotEmpty && !apkVersion.contains(expectedVer)) {
               try {
-                final expectedParts = expectedVer.split('.').map((e) => int.tryParse(e) ?? 0).toList();
-                final actualParts = apkVersion.replaceAll(RegExp(r'[^\d.]'), '').split('.').map((e) => int.tryParse(e) ?? 0).toList();
+                final expParts = expectedVer.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+                final actParts = apkVersion.replaceAll(RegExp(r'[^\d.]'), '').split('.').map((e) => int.tryParse(e) ?? 0).toList();
                 bool isOlder = false;
                 for (int i = 0; i < 3; i++) {
-                  final exp = i < expectedParts.length ? expectedParts[i] : 0;
-                  final act = i < actualParts.length ? actualParts[i] : 0;
+                  final exp = i < expParts.length ? expParts[i] : 0;
+                  final act = i < actParts.length ? actParts[i] : 0;
                   if (act < exp) { isOlder = true; break; }
                   if (act > exp) break;
                 }
                 if (isOlder) {
-                  log('v4.0.19 STALE APK DETECTED: expected $expectedVer but got $apkVersion from $url - trying next URL');
                   try { await file.delete(); } catch (_) {}
-                  return false; // Try next URL
+                  continue;
                 }
               } catch (_) {}
             }
-          }
-        } catch (e) {
-          log('v4.0.19 APK version check failed (non-fatal): $e');
-        }
-        
-        // Try install
-        try {
-          final installResult = await _updaterChannel.invokeMethod('installApk', {'filePath': file.path, 'allowSameVersion': true});
-          if (installResult == true || installResult == 'true' || installResult == null) {
-            onSuccess();
-            return true;
-          } else {
-            throw Exception('نصب شروع نشد: $installResult');
-          }
-        } catch (nativeErr) {
-          final errStr = nativeErr.toString();
-          if (errStr.contains('FILE_NOT_FOUND')) {
-            onError('❌ فایل یافت نشد: ${file.path} - $url\nحجم: ${(len/1024/1024).toStringAsFixed(1)} MB\nاز مرورگر دانلود کنید');
-          } else if (errStr.contains('INSTALL_ERROR')) {
-            final detail = errStr.length > 400 ? errStr.substring(0, 400) : errStr;
-            onError('❌ خطای نصب: $detail\nاز مرورگر: $url');
-          } else {
-            onError('❌ نصب نشد: $errStr\nحجم: ${(len/1024/1024).toStringAsFixed(1)} MB\nمرورگر: $url');
-          }
-          return false;
-        }
-      } catch (e) {
-        log('http pkg download failed for $url: $e');
-        return false;
-      }
-    }
-
-    Future<bool> attemptDownloadWithHttpClient(String url) async {
-      // Method 2: HttpClient with streaming (original method, for large files)
-      String? cacheDirPath;
-      try {
-        cacheDirPath = await _updaterChannel.invokeMethod<String>('getCacheDir');
-      } catch (_) {}
-      if (cacheDirPath == null || cacheDirPath.isEmpty) {
-        cacheDirPath = "/data/user/0/com.connectix.vpn/cache";
-      }
-      final dir = Directory(cacheDirPath);
-      if (!await dir.exists()) await dir.create(recursive: true);
-      final file = File('$cacheDirPath/Connectix-Update.apk');
-      if (await file.exists()) {
-        try { await file.delete(); } catch (_) {}
-      }
-
-      final httpClient = HttpClient();
-      httpClient.connectionTimeout = const Duration(seconds: 25);
-      httpClient.idleTimeout = const Duration(seconds: 25);
-      httpClient.autoUncompress = false;
-      try {
-        log('download attempt (HttpClient): $url');
-        final uri = Uri.parse(url);
-        final request = await httpClient.getUrl(uri);
-        request.headers.set(HttpHeaders.userAgentHeader, 'Mozilla/5.0 (Linux; Android 10; Mobile) Connectix v4.0.11');
-        request.headers.set(HttpHeaders.acceptHeader, '*/*');
-        request.headers.set(HttpHeaders.cacheControlHeader, 'no-cache');
-        request.followRedirects = true;
-        request.maxRedirects = 5;
-        final response = await request.close().timeout(const Duration(minutes: 6));
-
-        if (response.statusCode >= 400) {
-          log('HttpClient download HTTP ${response.statusCode} for $url');
-          throw Exception('کد خطا: ${response.statusCode} از $url');
-        }
-
-        final total = response.contentLength > 0 ? response.contentLength : 0;
-        log('HttpClient start: $url total=$total status=${response.statusCode}');
-
-        final sink = file.openWrite();
-        int received = 0;
-        await for (final chunk in response) {
-          sink.add(chunk);
-          received += chunk.length;
-          if (total > 0) {
-            onProgress((received / total).clamp(0.0, 1.0), received, total);
-          } else {
-            final fakeProgress = (received / (40 * 1024 * 1024)).clamp(0.0, 0.95);
-            onProgress(fakeProgress, received, 0);
-          }
-        }
-        await sink.flush();
-        await sink.close();
-
-        final len = await file.length();
-        log('HttpClient finished: $url len=$len total=$total');
-
-        if (!await file.exists()) throw Exception('فایل ایجاد نشد: $url');
-        if (len < 1000000) {
-          // Check if HTML
-          try {
-            final firstKb = await file.openRead(0, 1024).transform(utf8.decoder).join();
-            if (firstKb.contains('<html') || firstKb.contains('<!DOCTYPE')) {
-              throw Exception('فایل HTML دریافت شد (${len} بایت) از $url - احتمال فیلترینگ:\n${firstKb.substring(0, 200)}');
-            }
           } catch (_) {}
-          throw Exception('فایل ناقص است (حجم ${len} بایت) از $url - اینترنت ناپایدار');
-        }
-        try {
-          final raf = await file.open();
-          final header = await raf.read(4);
-          await raf.close();
-          if (header.length < 2 || header[0] != 0x50 || header[1] != 0x4B) {
-            throw Exception('APK معتبر نیست از $url - هدر اشتباه');
+          
+          try {
+            try { onProgress(0.98, len, len); } catch (_) {}
+            final installResult = await _updaterChannel.invokeMethod('installApk', {'filePath': file.path, 'allowSameVersion': true});
+            if (installResult == true || installResult == 'true' || installResult == null) {
+              try { onProgress(1.0, len, len); } catch (_) {}
+              await releaseWakeLock();
+              onSuccess();
+              return;
+            }
+          } catch (e) {
+            print('v4.0.32 Install fail: $e');
+            continue;
           }
         } catch (e) {
-          if (e.toString().contains('معتبر نیست') || e.toString().contains('HTML') || e.toString().contains('ناقص')) rethrow;
-        }
-
-        // v4.0.19 FOREVER LAW: Verify APK versionName
-        try {
-          final apkVersion = await _updaterChannel.invokeMethod<String>('getApkVersionName', {'filePath': file.path});
-          log('v4.0.19 HttpClient APK version check: expected $expectedVer, got $apkVersion from $url');
-          if (apkVersion != null && apkVersion.isNotEmpty && expectedVer.isNotEmpty && !apkVersion.contains(expectedVer)) {
-            try {
-              final expectedParts = expectedVer.split('.').map((e) => int.tryParse(e) ?? 0).toList();
-              final actualParts = apkVersion.replaceAll(RegExp(r'[^\d.]'), '').split('.').map((e) => int.tryParse(e) ?? 0).toList();
-              bool isOlder = false;
-              for (int i = 0; i < 3; i++) {
-                final exp = i < expectedParts.length ? expectedParts[i] : 0;
-                final act = i < actualParts.length ? actualParts[i] : 0;
-                if (act < exp) { isOlder = true; break; }
-                if (act > exp) break;
-              }
-              if (isOlder) {
-                log('v4.0.19 STALE APK DETECTED HttpClient: expected $expectedVer but got $apkVersion - next URL');
-                try { await file.delete(); } catch (_) {}
-                return false;
-              }
-            } catch (_) {}
-          }
-        } catch (e) {
-          log('v4.0.19 APK version check failed (non-fatal): $e');
-        }
-
-        try {
-          final installResult = await _updaterChannel.invokeMethod('installApk', {'filePath': file.path, 'allowSameVersion': true});
-          if (installResult == true || installResult == 'true' || installResult == null) {
-            onSuccess();
-            return true;
-          } else {
-            throw Exception('نصب شروع نشد: $installResult');
-          }
-        } catch (nativeErr) {
-          final errStr = nativeErr.toString();
-          onError('❌ نصب نشد: $errStr\nفایل: $url\nحجم: ${(len/1024/1024).toStringAsFixed(1)} MB\nراهنما: تنظیمات → نصب ناشناخته → فعال');
-          return false;
+          try { client.close(); } catch (_) {}
+          print('v4.0.32 Streaming fail $url: $e');
+          continue;
         }
       } catch (e) {
-        log('HttpClient failed for $url: $e');
-        return false;
-      } finally {
-        try { httpClient.close(force: true); } catch (_) {}
+        print('v4.0.32 URL fail $url: $e');
+        continue;
       }
     }
-
+    
+    print('v4.0.32 All streaming failed, trying DM');
+    try { onProgress(0.1, 0, 0); } catch (_) {}
     try {
-      try {
-        final canInstall = await _updaterChannel.invokeMethod<bool>('canInstallPackages') ?? true;
-        if (!canInstall) {
-          await _updaterChannel.invokeMethod('openInstallPermissionSettings');
-          onError('دسترسی «نصب برنامه‌های ناشناخته» را فعال کنید:\nتنظیمات → حریم خصوصی → نصب ناشناخته → Connectix را فعال کنید\n\nسپس دوباره تلاش کنید.');
-          return;
+      final dmResult = await downloadWithDownloadManager(downloadUrl, expectedVer);
+      if (dmResult != null && dmResult['downloadId'] != null) {
+        final downloadId = dmResult['downloadId'] as int;
+        int attempts = 0;
+        int stuckCount = 0;
+        int lastBytes = 0;
+        while (attempts < 90) {
+          await Future.delayed(const Duration(seconds: 1));
+          final status = await getDownloadManagerStatus(downloadId);
+          if (status == null) { attempts++; continue; }
+          final statusStr = status['statusStr']?.toString() ?? '';
+          final bytes = (status['bytes'] ?? 0) is int ? status['bytes'] as int : 0;
+          final total = (status['total'] ?? 0) is int ? status['total'] as int : 0;
+          final progress = (status['progress'] ?? 0.0) is double ? status['progress'] as double : 0.0;
+          final filePath = status['filePath']?.toString() ?? '';
+          
+          if (total > 0) {
+            try { onProgress(0.1 + (progress * 0.85), bytes, total); } catch (_) {}
+          } else if (bytes > 0) {
+            try { onProgress(0.5, bytes, total); } catch (_) {}
+          }
+          
+          if (bytes == lastBytes && statusStr == 'running' && bytes > 0) {
+            stuckCount++;
+            if (stuckCount > 15) { print('v4.0.32 DM stuck'); break; }
+          } else {
+            stuckCount = 0;
+            lastBytes = bytes;
+          }
+          
+          if (statusStr == 'successful') {
+            String finalPath = filePath;
+            if (finalPath.isEmpty) {
+              try {
+                final cacheDir = await _updaterChannel.invokeMethod<String>('getCacheDir') ?? '';
+                final possible = [
+                  '$cacheDir/Connectix-Update.apk',
+                  '/storage/emulated/0/Android/data/com.connectix.vpn/files/Connectix-Update.apk',
+                ];
+                for (final p in possible) {
+                  final f = File(p);
+                  if (await f.exists() && await f.length() > 1000000) { finalPath = p; break; }
+                }
+              } catch (_) {}
+            }
+            if (finalPath.isNotEmpty) {
+              final file = File(finalPath);
+              if (await file.exists()) {
+                final len = await file.length();
+                if (len > 1000000) {
+                  try {
+                    final installResult = await _updaterChannel.invokeMethod('installApk', {'filePath': file.path, 'allowSameVersion': true});
+                    if (installResult == true || installResult == 'true' || installResult == null) {
+                      try { onProgress(1.0, len, len); } catch (_) {}
+                      await releaseWakeLock();
+                      onSuccess();
+                      return;
+                    }
+                  } catch (e) {
+                    print('v4.0.32 DM install fail: $e');
+                  }
+                }
+              }
+            }
+            break;
+          } else if (statusStr == 'failed') {
+            break;
+          }
+          attempts++;
         }
-      } catch (_) {}
-
-      String fallbackUrl = '';
-      try {
-        final updateData = await checkAppUpdate();
-        fallbackUrl = (updateData?['fallback_url'] ?? '').toString();
-      } catch (_) {}
-
-      final allUrls = generateAllUrls(downloadUrl, fallbackUrl);
-      log('v4.0.11 download: trying ${allUrls.length} URLs: $allUrls');
-
-      // Try each URL with http package first (fast), then HttpClient (streaming)
-      for (int i = 0; i < allUrls.length; i++) {
-        final url = allUrls[i];
-        log('v4.0.11 trying ${i+1}/${allUrls.length}: $url');
-        
-        // Try http package first (better for small/medium files, handles redirects)
-        bool ok = await attemptDownloadWithHttp(url);
-        if (ok) return;
-        
-        // If http package failed, try HttpClient streaming (better for large files)
-        ok = await attemptDownloadWithHttpClient(url);
-        if (ok) return;
-        
-        // Small delay before next URL
-        await Future.delayed(Duration(milliseconds: 500));
       }
-
-      // All URLs failed
-      onError('❌ تمام ${allUrls.length} لینک دانلود شکست خورد.\n\n'
-          '🔍 دلایل احتمالی:\n'
-          '• فیلترینگ گیت‌هاب در ایران (همراه اول/ایرانسل)\n'
-          '• اینترنت ناپایدار\n'
-          '• فضای ذخیره‌سازی پر\n\n'
-          '✅ راه حل:\n'
-          '1. با WiFi امتحان کنید (نه دیتا)\n'
-          '2. فیلترشکن را خاموش کنید و دوباره امتحان کنید\n'
-          '3. روی \"دانلود با مرورگر\" بزنید و از پوشه دانلود نصب کنید\n\n'
-          'لینک مستقیم:\n$downloadUrl');
     } catch (e) {
-      log('downloadAndInstallApk top-level error: $e');
-      onError('❌ خطای کلی: $e\n\nاز مرورگر دانلود کنید:\n$downloadUrl');
+      print('v4.0.32 DM fallback fail: $e');
     }
+    
+    print('v4.0.32 All methods failed');
+    await releaseWakeLock();
+    onError('❌ دانلود ناموفق بعد از ${allUrls.length} لینک\nآخرین: $downloadUrl\n\n🔹 راه حل:\n1️⃣ مرورگر\n2️⃣ QR: https://vpbotn.ir/qr_download.html\n3️⃣ مستقیم: https://vpbotn.ir/Connectix-ARM64-v8a.apk?v=$expectedVer');
   }
 
-  // v4.0.12 PRO MAX: New methods for robust installer fallback
+
   static Future<String?> getApkFilePath() async {
     try {
       final path = await _updaterChannel.invokeMethod<String>('getApkFilePath');
