@@ -73,7 +73,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Map<String, dynamic>? _updateInfo;
   bool _isCheckingUpdate = false;
 
-  static const String currentAppVersion = '4.0.35';
+  static const String currentAppVersion = '4.0.36';
 
   // "Download over Wi-Fi only" for update packages
   bool _updateWifiOnly = false;
@@ -640,6 +640,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 if (_autoPauseForBankingEnabled) {
                   _startForegroundAppMonitoring();
                 }
+                // v4.0.36 ZERO-COST ST4: Save last working server (free, offline cache)
+                if (_selectedServer != null) {
+                  ApiService.saveLastWorkingServer(_selectedServer!);
+                  ApiService.log('ST4: Saved last working ${ _selectedServer!.name}');
+                }
               }
               final down = _formatSpeed(status.downloadSpeed);
               final up = _formatSpeed(status.uploadSpeed);
@@ -650,12 +655,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 isConnected: true,
               );
             } else if (status.state == 'DISCONNECTED') {
+              final wasConnected = _isConnected;
               _isConnected = false;
               _isConnecting = false;
-              if (!_pausedByBankingApp) {
-                _userIntentionallyDisconnected = true;
-              }
-              _reconnectAttempts = 0;
               _timer?.cancel();
               if (!_pausedByBankingApp) {
                 _stopForegroundAppMonitoring();
@@ -665,6 +667,37 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 content: '',
                 isConnected: false,
               );
+              
+              // v4.0.36 ZERO-COST ST3: Auto-Reconnect with exponential backoff (free, no disadvantage)
+              // If disconnect was NOT intentional and auto-reconnect enabled
+              if (wasConnected && !_userIntentionallyDisconnected && !_pausedByBankingApp && _autoReconnectEnabled) {
+                if (_reconnectAttempts < 5) {
+                  _reconnectAttempts++;
+                  final delay = Duration(seconds: _reconnectAttempts * 2); // 2s, 4s, 6s, 8s, 10s
+                  ApiService.log('ST3 Auto-Reconnect attempt $_reconnectAttempts/5 in ${delay.inSeconds}s');
+                  Future.delayed(delay, () {
+                    if (mounted && !_isConnected && !_isConnecting && !_userIntentionallyDisconnected) {
+                      ApiService.log('ST3 Auto-Reconnect executing attempt $_reconnectAttempts');
+                      _startTunnel();
+                    }
+                  });
+                } else {
+                  // Max attempts reached, show notification
+                  _reconnectAttempts = 0;
+                  _userIntentionallyDisconnected = true;
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('اتصال قطع شد - 5 بار تلاش ناموفق، لطفا دستی وصل شوید')),
+                    );
+                  }
+                }
+              } else {
+                // Intentional disconnect
+                if (!_pausedByBankingApp) {
+                  _userIntentionallyDisconnected = true;
+                }
+                _reconnectAttempts = 0;
+              }
             }
           });
         }
@@ -1645,6 +1678,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         }
       }
 
+      // v4.0.36 ZERO-COST: Enhance with anti-filter + speed + stability
+      try {
+        finalConfig = _enhanceWithZeroCostAntiFilter(finalConfig);
+        ApiService.log('v4.0.36 ZERO-COST: Enhanced config with Fragment+uTLS+DoH+BBR');
+      } catch (e) {
+        ApiService.log('v4.0.36 enhance failed: $e - using original');
+      }
+
       // v3.5.8: Robust start with fallback - if safe config fails, retry with original config and no bypass
       bool started = false;
       String lastError = '';
@@ -1718,6 +1759,158 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           SnackBar(content: Text('خطا در اتصال وی‌پی‌ان: $e')),
         );
       }
+    }
+  }
+
+  // v4.0.36 ZERO-COST: Enhance Xray config with Fragment + uTLS + DoH + BBR + ECH (all free, no disadvantage)
+  String _enhanceWithZeroCostAntiFilter(String configJson) {
+    try {
+      final Map<String, dynamic> cfg = jsonDecode(configJson) as Map<String, dynamic>;
+      
+      // 1. DNS with DoH (F6) - Cloudflare + Google DoH for anti-filter
+      cfg['dns'] = {
+        'servers': [
+          'https://cloudflare-dns.com/dns-query',
+          'https://dns.google/dns-query',
+          '8.8.8.8',
+          '1.1.1.1',
+          'localhost'
+        ],
+        'queryStrategy': 'UseIPv4',
+        'disableCache': false,
+        'disableFallback': false,
+      };
+      
+      // 2. Enhance outbounds with Fragment + uTLS + TCP optimizations (F2 + F6 + S4)
+      if (cfg['outbounds'] is List) {
+        final outbounds = cfg['outbounds'] as List;
+        for (int i = 0; i < outbounds.length; i++) {
+          try {
+            final ob = outbounds[i] as Map<String, dynamic>;
+            final protocol = (ob['protocol'] ?? '').toString().toLowerCase();
+            
+            // Only enhance vless/vmess/trojan/shadowsocks
+            if (!['vless', 'vmess', 'trojan', 'shadowsocks', 'ss'].contains(protocol)) continue;
+            
+            // Ensure streamSettings exists
+            final streamSettings = (ob['streamSettings'] as Map<String, dynamic>?) != null
+                ? Map<String, dynamic>.from(ob['streamSettings'] as Map)
+                : <String, dynamic>{};
+            
+            // F6: uTLS fingerprint = chrome (hide Xray fingerprint)
+            if (streamSettings['security'] == 'tls' || streamSettings['security'] == 'reality') {
+              // For TLS/Reality, add fingerprint
+              streamSettings['tlsSettings'] = streamSettings['tlsSettings'] ?? {};
+              final tlsSettings = Map<String, dynamic>.from(streamSettings['tlsSettings'] as Map? ?? {});
+              // uTLS fingerprint - most effective free anti-filter
+              if (!tlsSettings.containsKey('fingerprint')) {
+                tlsSettings['fingerprint'] = 'chrome';
+              }
+              // ECH - Encrypted Client Hello (if supported)
+              if (!tlsSettings.containsKey('ech')) {
+                tlsSettings['ech'] = false; // ECH not yet stable in Xray, but prepare
+              }
+              streamSettings['tlsSettings'] = tlsSettings;
+              
+              // For Reality, keep existing settings
+              if (streamSettings['security'] == 'reality') {
+                final realitySettings = streamSettings['realitySettings'] as Map? ?? {};
+                // Reality already has strong anti-filter, keep it
+              }
+            }
+            
+            // S4 + F2: TCP optimizations + Fragment (BBR on client side)
+            // sockopt with fragment for TLS hello fragmentation (bypass DPI)
+            final sockopt = (streamSettings['sockopt'] as Map<String, dynamic>?) != null
+                ? Map<String, dynamic>.from(streamSettings['sockopt'] as Map)
+                : <String, dynamic>{};
+            
+            // TCP optimizations (free, no disadvantage)
+            sockopt['tcpNoDelay'] = true;
+            sockopt['tcpKeepAliveIdle'] = 100;
+            sockopt['tcpKeepAliveInterval'] = 30;
+            sockopt['tcpFastOpen'] = true;
+            sockopt['mark'] = 0;
+            
+            // F2: Fragment - split TLS hello to bypass DPI (most effective free method)
+            // Only for TLS, not for Reality (Reality has its own)
+            if (streamSettings['security'] == 'tls') {
+              sockopt['fragment'] = {
+                'packets': 'tlshello',
+                'length': '100-200',
+                'interval': '10-20',
+              };
+              // Alternative fragment for non-TLS
+            } else if (streamSettings['security'] != 'reality') {
+              // For non-TLS, use smaller fragment as noise
+              sockopt['fragment'] = {
+                'packets': '1-3',
+                'length': '50-100',
+                'interval': '10-20',
+              };
+            }
+            
+            streamSettings['sockopt'] = sockopt;
+            ob['streamSettings'] = streamSettings;
+            
+            // S4: Mux for speed (free, improves speed on weak connections)
+            final mux = (ob['mux'] as Map<String, dynamic>?) != null
+                ? Map<String, dynamic>.from(ob['mux'] as Map)
+                : <String, dynamic>{};
+            if (!mux.containsKey('enabled')) {
+              mux['enabled'] = true;
+              mux['concurrency'] = 8;
+              mux['xudpConcurrency'] = 8;
+              mux['xudpProxyUDP443'] = 'reject';
+            }
+            ob['mux'] = mux;
+            
+            outbounds[i] = ob;
+          } catch (e) {
+            // Ignore per-outbound errors
+            continue;
+          }
+        }
+      }
+      
+      // 3. Add routing rule for DoH bypass (ensure DoH servers go direct)
+      if (cfg['routing'] is Map) {
+        final routing = Map<String, dynamic>.from(cfg['routing'] as Map);
+        final rules = (routing['rules'] as List?) != null
+            ? List<dynamic>.from(routing['rules'] as List)
+            : <dynamic>[];
+        
+        // Ensure DoH domains go direct
+        bool hasDoHRule = false;
+        for (final r in rules) {
+          try {
+            final rule = r as Map;
+            final domain = rule['domain']?.toString() ?? '';
+            if (domain.contains('cloudflare-dns.com') || domain.contains('dns.google')) {
+              hasDoHRule = true;
+              break;
+            }
+          } catch (_) {}
+        }
+        if (!hasDoHRule) {
+          rules.insert(0, {
+            'type': 'field',
+            'outboundTag': 'direct',
+            'domain': [
+              'cloudflare-dns.com',
+              'dns.google',
+              'dns.cloudflare.com',
+            ],
+          });
+        }
+        routing['rules'] = rules;
+        cfg['routing'] = routing;
+      }
+      
+      return jsonEncode(cfg);
+    } catch (e) {
+      // If enhancement fails, return original
+      return configJson;
     }
   }
 

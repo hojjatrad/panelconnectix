@@ -552,6 +552,109 @@ class ApiService {
     return [];
   }
 
+  // v4.0.36 ZERO-COST: Last Working Server Cache (ST4)
+  static Future<void> saveLastWorkingServer(ServerModel server) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('last_working_server', jsonEncode(server.toJson()));
+      await prefs.setInt('last_working_time', DateTime.now().millisecondsSinceEpoch);
+      log('ST4: Saved last working server: ${server.name}');
+    } catch (e) {
+      debugPrint("saveLastWorkingServer Error: $e");
+    }
+  }
+
+  static Future<ServerModel?> getLastWorkingServer() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final str = prefs.getString('last_working_server');
+      final time = prefs.getInt('last_working_time') ?? 0;
+      // Expire after 7 days
+      if (DateTime.now().millisecondsSinceEpoch - time > 7 * 24 * 60 * 60 * 1000) {
+        return null;
+      }
+      if (str != null && str.isNotEmpty) {
+        final Map<String, dynamic> map = jsonDecode(str);
+        return ServerModel.fromJson(map);
+      }
+    } catch (e) {
+      debugPrint("getLastWorkingServer Error: $e");
+    }
+    return null;
+  }
+
+  static Future<void> clearLastWorkingServer() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('last_working_server');
+      await prefs.remove('last_working_time');
+    } catch (_) {}
+  }
+
+  // v4.0.36 ZERO-COST: Get Best Server sorted by ping (S2)
+  static List<ServerModel> getBestServersSorted(List<ServerModel> servers) {
+    final list = List<ServerModel>.from(servers);
+    list.sort((a, b) {
+      // 0 = ready (best after measured), then lowest ping, then -1 error last
+      int scoreA = a.pingMs == null ? 9999 : (a.pingMs == 0 ? 1 : (a.pingMs! < 0 ? 10000 : a.pingMs!));
+      int scoreB = b.pingMs == null ? 9999 : (b.pingMs == 0 ? 1 : (b.pingMs! < 0 ? 10000 : b.pingMs!));
+      if (scoreA != scoreB) return scoreA.compareTo(scoreB);
+      // Recommended first if same ping
+      if (a.isRecommended && !b.isRecommended) return -1;
+      if (!a.isRecommended && b.isRecommended) return 1;
+      return 0;
+    });
+    return list;
+  }
+
+  // v4.0.36 ZERO-COST: Multi-Domain Fallback for ANY API request (ST1)
+  static Future<http.Response> requestWithFallback(
+    String path, {
+    String method = 'GET',
+    Map<String, String>? headers,
+    dynamic body,
+    Duration timeout = const Duration(seconds: 10),
+  }) async {
+    final ordered = getOrderedBaseUrls();
+    http.Response? lastResponse;
+    Exception? lastError;
+    
+    for (int i = 0; i < ordered.length; i++) {
+      final base = ordered[i];
+      try {
+        final url = Uri.parse("$base$path");
+        log('ST1 fallback try ${i+1}/${ordered.length}: $url');
+        
+        http.Response resp;
+        if (method == 'POST') {
+          resp = await http.post(url, headers: headers, body: body).timeout(timeout);
+        } else {
+          resp = await http.get(url, headers: headers).timeout(timeout);
+        }
+        
+        if (resp.statusCode == 200) {
+          // Save working URL if different
+          if (base != baseUrl) {
+            baseUrl = base;
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('api_base_url_working', base);
+            await prefs.setString('api_base_url', base);
+            log('ST1: Found working base: $base');
+          }
+          return resp;
+        }
+        lastResponse = resp;
+      } catch (e) {
+        lastError = e as Exception;
+        log('ST1 fallback $base failed: $e');
+        continue;
+      }
+    }
+    
+    if (lastResponse != null) return lastResponse;
+    throw lastError ?? Exception('All fallback domains failed for $path');
+  }
+
   // v8.0: Login with intelligent resolver + migration handling
   static Future<Map<String, dynamic>> login(String username, String password) async {
     final orderedUrls = getOrderedBaseUrls();
@@ -1020,6 +1123,23 @@ class ApiService {
       }));
     }
     log('pingAllServers: completed for ${servers.length} servers');
+    
+    // v4.0.36 ZERO-COST S2: Auto-sort by ping after measurement
+    try {
+      servers.sort((a, b) {
+        int scoreA = a.pingMs == null ? 9999 : (a.pingMs == 0 ? 1 : (a.pingMs! < 0 ? 10000 : a.pingMs!));
+        int scoreB = b.pingMs == null ? 9999 : (b.pingMs == 0 ? 1 : (b.pingMs! < 0 ? 10000 : b.pingMs!));
+        if (scoreA != scoreB) return scoreA.compareTo(scoreB);
+        if (a.isRecommended && !b.isRecommended) return -1;
+        if (!a.isRecommended && b.isRecommended) return 1;
+        return 0;
+      });
+      log('pingAllServers: sorted by ping - fastest first: ${servers.isNotEmpty ? servers.first.name + " ${servers.first.pingMs}ms" : "none"}');
+      // Save sorted list
+      await saveCachedServers(servers);
+    } catch (e) {
+      log('pingAllServers: sort error $e');
+    }
   }
 
   static Future<ClientModel?> getProfile() async {
