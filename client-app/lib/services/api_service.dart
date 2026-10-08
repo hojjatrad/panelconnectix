@@ -1858,7 +1858,7 @@ class ApiService {
         
         // Exponential backoff with jitter between URLs
         if (urlIndex > 0) {
-          final backoff = Duration(seconds: (pow(2, urlIndex) + Random().nextInt(3)).toInt());
+          final backoff = Duration(seconds: (math.pow(2, urlIndex) + math.Random().nextInt(3)).toInt());
           log('v4.0.38 Backoff ${backoff.inSeconds}s before next URL');
           await Future.delayed(backoff);
         }
