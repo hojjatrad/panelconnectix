@@ -1,7 +1,7 @@
 name: connectix_vpn
 description: Connectix Professional Multiplatform VPN Client - ULTRA Dual-Core Xray + sing-box (VLESS Reality/Vision, VMess, Trojan, SS, SOCKS, HTTP, WireGuard, Raw JSON) + PROXY for Telegram + FOREVER INSTALL FIX v4.0.22 + LOCAL PROXY HOTSPOT FIX
 publish_to: 'none'
-version: 4.0.38+71
+version: 4.0.39+72
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

@@ -1737,7 +1737,10 @@ class ApiService {
         allUrls.add(u);
       }
       
-      // Only 3 URLs: direct (most stable) + vpbotn + github (CDN, most stable)
+      // FUNDAMENTAL FIX: Use download_apk.php with resume support (?start=) as primary - bypasses Cloudflare Range strip
+      // Only 3 most reliable URLs with resume support
+      addUrl("https://vpbotn.ir/download_apk.php?file=arm64&v=$expectedVer&t=${DateTime.now().millisecondsSinceEpoch}");
+      addUrl("https://direct.vpbotn.ir/download_apk.php?file=arm64&v=$expectedVer&t=${DateTime.now().millisecondsSinceEpoch}");
       addUrl(addVersionParam("https://direct.vpbotn.ir/Connectix-ARM64-v8a.apk"));
       addUrl(addVersionParam("https://vpbotn.ir/Connectix-ARM64-v8a.apk"));
       addUrl("https://github.com/hojjatrad/panelconnectix/releases/download/v$expectedVer/Connectix-Android-ARM64.apk?t=${DateTime.now().millisecondsSinceEpoch}");
@@ -1908,7 +1911,7 @@ class ApiService {
             safeProgress(baseProgress, 0, 0);
             
             client = http.Client();
-            final request = http.Request('GET', Uri.parse(url));
+            final request = http.Request('GET', Uri.parse(requestUrl));
             request.headers.addAll({
               'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Mobile) Connectix v4.0.38',
               'Accept': '*/*',
@@ -1916,10 +1919,23 @@ class ApiService {
               'Accept-Encoding': 'identity', // No compression for resume
             });
             
-            // FUNDAMENTAL: Resume support via Range header
+            // FUNDAMENTAL: Resume support via Range header + ?start= param (Cloudflare strips Range, so use query param)
+            String requestUrl = url;
             if (existingSize > 0 && resumeAttempt > 0) {
               request.headers['Range'] = 'bytes=$existingSize-';
-              log('v4.0.38 Range: bytes=$existingSize-');
+              // Cloudflare strips Range header, so also use ?start= query param as fallback
+              if (url.contains('download_apk.php')) {
+                requestUrl = url + (url.contains('?') ? '&' : '?') + 'start=$existingSize';
+              } else {
+                // For static files, try to use download_apk.php with start param if direct Range fails
+                // Convert static URL to download_apk.php?file=arm64&start=
+                if (url.contains('Connectix-ARM64')) {
+                  requestUrl = 'https://vpbotn.ir/download_apk.php?file=arm64&v=$expectedVer&start=$existingSize&t=${DateTime.now().millisecondsSinceEpoch}';
+                } else if (url.contains('Connectix-Universal')) {
+                  requestUrl = 'https://vpbotn.ir/download_apk.php?file=universal&v=$expectedVer&start=$existingSize&t=${DateTime.now().millisecondsSinceEpoch}';
+                }
+              }
+              log('v4.0.38 Resume: Range bytes=$existingSize- + URL $requestUrl');
             }
             
             // FUNDAMENTAL: Large timeouts for Iran slow connections - 30s for send, 60s for stream (was 12s/20s)
