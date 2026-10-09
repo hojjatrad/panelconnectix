@@ -75,11 +75,23 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Map<String, dynamic>? _updateInfo;
   bool _isCheckingUpdate = false;
 
-  static const String currentAppVersion = '4.0.45';
-  static String _actualInstalledVersion = '4.0.45'; // Will be updated from PackageManager
-  static int _actualInstalledCode = 78;
+  static const String currentAppVersion = '4.0.46';
+  static String _actualInstalledVersion = '4.0.46'; // Will be updated from PackageManager
+  static int _actualInstalledCode = 80;
 
-  // v4.0.45 FOREVER LAW: Get ACTUAL installed version from PackageManager, not hardcoded
+  // v4.0.46 FOREVER CACHE FIX - PERMANENT LAW - NEVER REGRESS
+  // LAW 1: Panel must NEVER serve old APK (auto-delete stale files)
+  // LAW 2: App must verify APK versionName after download via PackageManager.getPackageArchiveInfo
+  // LAW 3: If downloaded version != expected, try next URL automatically
+  // LAW 4: Clear old files before download
+  // LAW 5: ?v=version&t=time&s=random for ALL cache bypass
+  // LAW 6: Always try GitHub as fallback even if panel file exists
+  // LAW 7: Footer must read actual version from PackageManager, not const - FIXED v4.0.46 (was 4.0.45 bug)
+  // LAW 16: Version from app_release.json, never hardcoded, delete stale APKs on version change
+
+  // v4.0.46 FOREVER LAW: Get ACTUAL installed version from PackageManager, not hardcoded - NEVER REGRESS
+  // LAW 7: Footer must read actual version from PackageManager, not const
+  // LAW 16: Version from app_release.json, never hardcoded, delete stale APKs
   static Future<void> loadActualInstalledVersion() async {
     try {
       const channel = MethodChannel('com.connectix.vpn/updater');
@@ -89,14 +101,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         final verCode = (result['versionCode'] ?? '').toString();
         if (verName.isNotEmpty) {
           _actualInstalledVersion = verName;
-          print('v4.0.45 Actual installed version: $verName ($verCode)');
+          print('v4.0.46 Actual installed version: $verName ($verCode)');
         }
         if (verCode.isNotEmpty) {
-          _actualInstalledCode = int.tryParse(verCode) ?? 78;
+          _actualInstalledCode = int.tryParse(verCode) ?? 79;
         }
       }
     } catch (e) {
-      print('v4.0.45 loadActualInstalledVersion error: $e - using hardcoded $currentAppVersion');
+      print('v4.0.46 loadActualInstalledVersion error: $e - using hardcoded $currentAppVersion');
     }
   }
 
@@ -2988,9 +3000,41 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
               const SizedBox(height: 16),
 
-              // v4.0.45 NO-SCROLL OPTIMIZATION: Removed Wrap (Smart Connect, Proxy, GPS, TV) from main page
-              // All moved to AdvancedSettingsScreen (gear) per user request for first-page no-scroll
-              // Only Connect button + Server selector remain on first page
+              // v4.0.46 NO-SCROLL OPTIMIZATION: Keep ONLY Smart Connect on first page per user request
+              // Proxy, GPS, TV moved to gear settings, but Smart Connect stays on first page
+              // This keeps first page no-scroll (only 1 button) + smart connect convenience
+              Center(
+                child: InkWell(
+                  onTap: _smartConnect,
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E1B4B),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFF4338CA)),
+                    ),
+                    child: Row(
+                      textDirection: TextDirection.rtl,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _isSmartConnecting
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF818CF8)),
+                              )
+                            : const Icon(Icons.bolt_rounded, color: Colors.amber, size: 16),
+                        const SizedBox(width: 6),
+                        const Text(
+                          'اتصال هوشمند - بهترین سرور',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
 
               const SizedBox(height: 8),
 

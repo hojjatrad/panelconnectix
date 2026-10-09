@@ -1,10 +1,10 @@
 {
   "version": "4.0.46",
-  "code": 79,
+  "code": 80,
   "force_update": false,
   "force_min_code": 50,
   "update_type": "full",
-  "changelog": "✅ v4.0.46 NO-SCROLL OPTIMIZED - صفحه اول بدون اسکرول:\n\n• صفحه اول: فقط حجم + دکمه اتصال + انتخاب سرور + نسخه - بدون اسکرول\n• پروکسی، GPS، TV، اتصال هوشمند همه به چرخ‌دنده (تنظیمات پیشرفته) منتقل شد\n• تنظیمات پیشرفته: 4 کارت سریع (پروکسی/GPS/TV/هوشمند) + عبور مستقیم + توقف خودکار بانک\n• فیکس بروزرسانی: \"ارتباط برقرار نشد\" حل شد - baseUrls فقط vpbotn.ir و direct، تایم‌اوت 10 ثانیه، GitHub fallback\n• فیکس کش: نسخه 4.0.46 با کد 79، SW v4-0-46\n• بهینه‌سازی: حذف Wrap و کارت پایین برای جلوگیری از اسکرول\n• 14 میکرو-اینترکشن Ultimate + TUN واقعی",
+  "changelog": "✅ v4.0.46 NO-SCROLL + SMART CONNECT + FOREVER CACHE FIX:\n\n• صفحه اول: حجم + اتصال هوشمند (در مرکز) + دکمه اتصال + سرور + نسخه - بدون اسکرول\n• پروکسی، GPS، TV به چرخ‌دنده منتقل شد، اما اتصال هوشمند در صفحه اول ماند (درخواست شما)\n• 🔒 FOREVER CACHE FIX: فیکس باگ نمایش نسخه قدیمی بعد نصب - currentAppVersion 4.0.45→4.0.46، actualVersion از PackageManager، کد 79→80\n• قانون دائمی: نسخه واقعی از PackageManager، نه hardcoded، ?v&t&s&cb&r&_ برای دور زدن کش، حذف APK قدیمی، تایید PK\n• فیکس بروزرسانی: \"ارتباط برقرار نشد\" حل شد - baseUrls فقط vpbotn.ir/direct، تایم‌اوت 10s\n• 14 میکرو-اینترکشن Ultimate + TUN واقعی",
   "date": "2026-10-09",
   "auto_update": {
     "enabled": true,
@@ -52,12 +52,12 @@
   "ultra": true,
   "core": "xray_1.8.23 + sing-box + multiplex + 0rtt + stealth + FULL BUG FIX",
   "protocols": ["vless","vmess","trojan","ss","socks","http","wireguard","hysteria2","raw","clash","singbox","mtproto","reality","xtls","stealth","multiplex"],
-  "version_code": 79,
+  "version_code": 80,
   "release_date": "2026-10-09",
   "apk_urls": {
     "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.46/Connectix-ARM64-v8a.apk",
     "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.46/Connectix-Universal.apk",
     "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.46/Connectix-ARM32-v7a.apk"
   },
-  "download_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.46/Connectix-ARM64-v8a.apk"
+  "download_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.46/Connectix-Android-ARM64.apk"
 }
