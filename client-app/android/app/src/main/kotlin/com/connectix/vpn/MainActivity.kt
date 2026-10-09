@@ -808,6 +808,32 @@ class MainActivity: FlutterActivity() {
                         result.success("")
                     }
                 }
+                "getInstalledAppVersion" -> {
+                    // v4.0.43 FOREVER LAW: Get ACTUAL installed app version from PackageManager, not hardcoded
+                    // Fixes "still shows old version 4.0.39 after install" - must read real version
+                    try {
+                        val pm = context.packageManager
+                        val packageName = context.packageName
+                        val info = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                            pm.getPackageInfo(packageName, android.content.pm.PackageManager.PackageInfoFlags.of(0))
+                        } else {
+                            @Suppress("DEPRECATION")
+                            pm.getPackageInfo(packageName, 0)
+                        }
+                        val versionName = info.versionName ?: ""
+                        val versionCode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                            info.longVersionCode.toString()
+                        } else {
+                            @Suppress("DEPRECATION")
+                            info.versionCode.toString()
+                        }
+                        android.util.Log.i("ConnectixInstaller", "v4.0.43 getInstalledAppVersion: $versionName ($versionCode)")
+                        result.success(mapOf("versionName" to versionName, "versionCode" to versionCode))
+                    } catch (e: Exception) {
+                        android.util.Log.e("ConnectixInstaller", "v4.0.43 getInstalledAppVersion failed: ${e.message}")
+                        result.success(mapOf("versionName" to "", "versionCode" to ""))
+                    }
+                }
                 "getAllInstalledApps" -> {
                     Thread {
                         try {

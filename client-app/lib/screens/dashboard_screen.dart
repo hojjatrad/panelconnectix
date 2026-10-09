@@ -75,6 +75,32 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   bool _isCheckingUpdate = false;
 
   static const String currentAppVersion = '4.0.43';
+  static String _actualInstalledVersion = '4.0.43'; // Will be updated from PackageManager
+  static int _actualInstalledCode = 76;
+
+  // v4.0.43 FOREVER LAW: Get ACTUAL installed version from PackageManager, not hardcoded
+  static Future<void> loadActualInstalledVersion() async {
+    try {
+      const channel = MethodChannel('com.connectix.vpn/updater');
+      final result = await channel.invokeMethod('getInstalledAppVersion').timeout(const Duration(seconds: 2), onTimeout: () => null);
+      if (result is Map) {
+        final verName = (result['versionName'] ?? '').toString();
+        final verCode = (result['versionCode'] ?? '').toString();
+        if (verName.isNotEmpty) {
+          _actualInstalledVersion = verName;
+          print('v4.0.43 Actual installed version: $verName ($verCode)');
+        }
+        if (verCode.isNotEmpty) {
+          _actualInstalledCode = int.tryParse(verCode) ?? 76;
+        }
+      }
+    } catch (e) {
+      print('v4.0.43 loadActualInstalledVersion error: $e - using hardcoded $currentAppVersion');
+    }
+  }
+
+  static String get actualVersion => _actualInstalledVersion;
+  static int get actualCode => _actualInstalledCode;
 
   // "Download over Wi-Fi only" for update packages
   bool _updateWifiOnly = false;
@@ -517,13 +543,15 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   static bool isNewerVersion(String latest, String current) {
     try {
+      // v4.0.43 FOREVER: Use actual installed version if available, not hardcoded
+      final effectiveCurrent = current == currentAppVersion ? _actualInstalledVersion : current;
       List<int> parse(String v) => v
           .replaceAll(RegExp(r'[^\d.]'), '')
           .split('.')
           .map((e) => int.tryParse(e) ?? 0)
           .toList();
       final l = parse(latest);
-      final c = parse(current);
+      final c = parse(effectiveCurrent);
       for (int i = 0; i < 3; i++) {
         final lv = i < l.length ? l[i] : 0;
         final cv = i < c.length ? c[i] : 0;
@@ -2598,7 +2626,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
-                    'نسخه $currentAppVersion',
+                    'نسخه ${actualVersion} (کد $actualCode)',
                     style: const TextStyle(color: Color(0xFF64748B), fontSize: 9),
                   ),
                 ],
@@ -3376,7 +3404,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      'نسخه $currentAppVersion',
+                      'نسخه ${actualVersion} (کد $actualCode)',
                       style: const TextStyle(color: Color(0xFF475569), fontSize: 10),
                     ),
                     const SizedBox(width: 14),
