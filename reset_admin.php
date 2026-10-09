@@ -20,6 +20,17 @@ try {
             if ($fixed !== $content) @file_put_contents($pdFile, $fixed);
         }
     }
+    // Fix repair.php $b bug directly
+    try {
+        $repFile = __DIR__ . '/repair.php';
+        if (file_exists($repFile)) {
+            $repContent = @file_get_contents($repFile);
+            if ($repContent && strpos($repContent, 'str_contains($lower, b))') !== false) {
+                $repContent = str_replace('str_contains($lower, b))', 'str_contains($lower, $b))', $repContent);
+                @file_put_contents($repFile, $repContent);
+            }
+        }
+    } catch (Throwable $e) {}
     // Fetch fresh drivers from GitHub - use commit-specific URL to bypass cache + hardcoded fallback for app_release.json
     $commit = '73f2bee';
     // Hardcode app_release.json 4.0.45 as ultimate fallback
