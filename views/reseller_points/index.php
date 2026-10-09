@@ -8,7 +8,7 @@
                 <h1 class="text-xl font-black text-white flex items-center gap-3">
                     <span class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-yellow-500 flex items-center justify-center text-white"><i class="fa-solid fa-trophy"></i></span>
                     سیستم امتیاز و وفاداری نمایندگان
-                    <span class="text-[10px] bg-amber-500/20 text-amber-300 px-2.5 py-1 rounded-full border border-amber-500/30">LOYALTY ULTRA v7.1</span>
+                    <span class="text-[10px] bg-amber-500/20 text-amber-300 px-2.5 py-1 rounded-full border border-amber-500/30">LOYALTY v4.0.45</span>
                 </h1>
                 <p class="text-xs text-slate-400 mt-2">هر فروش = امتیاز - سطح بالاتر = تخفیف بیشتر + جایزه</p>
             </div>

@@ -428,7 +428,7 @@ if (time() - $lastNightlyReport >= 86400) {
     }
 }
 
-// GitHub Auto-Update Engine (همگام‌سازی و به‌روزرسانی خودکار با گیت‌هاب روی کرون جاب هاست)
+// Main Server Auto-Update Engine (همگام‌سازی و به‌روزرسانی خودکار با سرور اصلی روی کرون جاب هاست)
 $isAutoApply = Setting::get('auto_apply_github_updates', '1') !== '0';
 
 // 4a. CI Quality Gate — apply the webhook-parked update once Panel CI goes green
@@ -447,8 +447,8 @@ try {
             if (!empty($info['has_update'])) {
                 $res = Updater::applyUpdate(false);
                 if (!empty($res['success'])) {
-                    $msg = "⚡️ <b>آپدیت آنی گیت‌هاب با وب‌هوک اعمال شد!</b>\n\n"
-                         . "تغییرات جدید مستقیماً از مخزن گیت‌هاب دریافت و روی پنل هاست مستقر گردید.\n"
+                    $msg = "⚡️ <b>آپدیت آنی با وب‌هوک اعمال شد!</b>\n\n"
+                         . "تغییرات جدید مستقیماً از سرور اصلی دریافت و روی پنل هاست مستقر گردید.\n"
                          . "🏷 نسخه: <code>" . htmlspecialchars((string)($res['version'] ?? ''), ENT_QUOTES) . "</code>\n"
                          . "🧪 درِ کیفیت CI: ✅ سبز\n"
                          . "📅 زمان: " . date('Y-m-d H:i:s');
@@ -488,7 +488,7 @@ $forceCheck = isset($_GET['auto_update']) || isset($_GET['update_now']) || (php_
 // Check every 3 minutes if auto-apply enabled, or if forced
 if ($forceCheck || (time() - $lastUpdateCheck >= 180)) {
     Setting::set('last_cron_update_check', (string)time());
-    echo "[" . date('Y-m-d H:i:s') . "] Checking GitHub (hojjatrad/panelconnectix) for updates..." . $eol;
+    echo "[" . date('Y-m-d H:i:s') . "] Checking Main Server (hojjatrad/panelconnectix) for updates..." . $eol;
     try {
         require_once __DIR__ . '/../core/Updater.php';
         $updateInfo = Updater::checkForUpdates(true);
@@ -499,7 +499,7 @@ if ($forceCheck || (time() - $lastUpdateCheck >= 180)) {
                 $notifySha = ($updateInfo['type'] ?? '') === 'commit'
                     ? str_replace('commit-', '', (string)($updateInfo['latest_version'] ?? ''))
                     : (string)($updateInfo['latest_version'] ?? '');
-                $msg = "🚀 <b>به‌روزرسانی خودکار پنل از گیت‌هاب با موفقیت اعمال شد!</b>\n\n"
+                $msg = "🚀 <b>به‌روزرسانی خودکار پنل از سرور اصلی با موفقیت اعمال شد!</b>\n\n"
                      . "🏷 نسخه جدید: <code>{$updateInfo['latest_version']}</code>\n"
                      . "📅 زمان: " . date('Y-m-d H:i:s') . "\n"
                      . "📝 تغییرات: " . strip_tags($updateInfo['changelog'] ?? 'همگام‌سازی آخرین کدهای مخزن');
@@ -511,7 +511,7 @@ if ($forceCheck || (time() - $lastUpdateCheck >= 180)) {
                 echo "[Auto-Update Error] " . ($applyRes['error'] ?? 'failed') . $eol;
             }
         } else {
-            echo "[Auto-Update] Panel is up-to-date with GitHub ({$updateInfo['latest_version']})." . $eol;
+            echo "[Auto-Update] Panel is up-to-date with Main Server ({$updateInfo['latest_version']})." . $eol;
         }
     } catch (Throwable $e) {
         echo "[Auto-Update Error] " . $e->getMessage() . $eol;

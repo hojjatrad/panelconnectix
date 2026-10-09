@@ -23,8 +23,8 @@ try {
     Setting::set('app_update_enabled', '1');
 
     $panelBase = 'https://vpbotn.ir';
-    $githubArm64 = "https://github.com/hojjatrad/panelconnectix/releases/download/v{$latestVer}/Connectix-Android-ARM64.apk";
-    $githubUniversal = "https://github.com/hojjatrad/panelconnectix/releases/download/v{$latestVer}/Connectix-Android-Universal.apk";
+    $main-serverArm64 = "https://github.com/hojjatrad/panelconnectix/releases/download/v{$latestVer}/Connectix-Android-ARM64.apk";
+    $main-serverUniversal = "https://github.com/hojjatrad/panelconnectix/releases/download/v{$latestVer}/Connectix-Android-Universal.apk";
     
     Setting::set('app_download_url', $panelBase . "/Connectix-ARM64-v8a.apk?v={$latestVer}&t={$ts}&s={$rnd}&cb={$ts}{$rnd}&r={$rnd}&_={$ts}");
     Setting::set('app_universal_url', $panelBase . "/Connectix-Universal.apk?v={$latestVer}&t={$ts}&s={$rnd}&cb={$ts}{$rnd}&r={$rnd}&_={$ts}");
@@ -65,8 +65,8 @@ try {
     ];
     
     $apkDownloads = [
-        'Connectix-ARM64-v8a.apk' => $githubArm64,
-        'Connectix-Universal.apk' => $githubUniversal,
+        'Connectix-ARM64-v8a.apk' => $main-serverArm64,
+        'Connectix-Universal.apk' => $main-serverUniversal,
         'Connectix-ARM32-v7a.apk' => "https://github.com/hojjatrad/panelconnectix/releases/download/v{$latestVer}/Connectix-Android-ARM32.apk",
     ];
     
@@ -99,7 +99,7 @@ try {
             }
         }
         if (!$downloaded) {
-            echo "⚠️ Could not download $localName - will use GitHub URL fallback\n";
+            echo "⚠️ Could not download $localName - will use Main Server URL fallback\n";
             if (is_file($localPath)) @unlink($localPath);
         }
         $altMap = [
@@ -121,13 +121,13 @@ try {
         'date' => date('Y-m-d'),
         'changelog' => "🚀 فیکس بحرانی اتصال غیرواقعی!\n• ✅ TUN روی اندروید همیشه فعال - VPN واقعی\n• ✅ حذف Fragment برای Reality/Vision - قبلا باعث فیک VPN میشد\n• ✅ Mux 8->4 برای سازگاری\n• ✅ DNS بدون DoH direct\n• رفع باگ: CONNECTED اما فیلترشکن واقعی نبود",
         'apk' => [
-            'arm64' => $githubArm64,
-            'universal' => $githubUniversal,
+            'arm64' => $main-serverArm64,
+            'universal' => $main-serverUniversal,
             'arm32' => "https://github.com/hojjatrad/panelconnectix/releases/download/v{$latestVer}/Connectix-Android-ARM32.apk"
         ],
         'apks' => [
             'arm64-v8a' => [
-                'url' => $githubArm64,
+                'url' => $main-serverArm64,
                 'size' => 38000000,
                 'size_human' => '36 MB',
                 'abi' => 'arm64-v8a',
@@ -143,7 +143,7 @@ try {
                 'arch' => 'arm32'
             ],
             'universal' => [
-                'url' => $githubUniversal,
+                'url' => $main-serverUniversal,
                 'size' => 111000000,
                 'size_human' => '106 MB',
                 'abi' => 'universal',
@@ -171,8 +171,8 @@ try {
         ],
         'version_code' => (int)$latestCode,
         'apk_urls' => [
-            'arm64' => $githubArm64,
-            'universal' => $githubUniversal,
+            'arm64' => $main-serverArm64,
+            'universal' => $main-serverUniversal,
             'arm32' => "https://github.com/hojjatrad/panelconnectix/releases/download/v{$latestVer}/Connectix-Android-ARM32.apk"
         ]
     ];
@@ -199,7 +199,7 @@ try {
 
     echo "\n=== FIX v4.0.45 DONE ===\n";
     echo "Version: {$latestVer} Code: {$latestCode}\n";
-    echo "GitHub ARM64: {$githubArm64}\n";
+    echo "Main Server ARM64: {$main-serverArm64}\n";
     echo "Check API: https://vpbotn.ir/api/v1/app/check-update?platform=android&v=4.0.39&t={$ts}\n";
 
 } catch (Throwable $e) {

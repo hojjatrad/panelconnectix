@@ -117,7 +117,7 @@ $appPub = AppReleasePublisher::status();
 $appAutoMode = (($appPub['source'] ?? 'auto') !== 'admin');
 ?>
                     <p class="text-[11px] text-slate-400 leading-relaxed">
-                        بیلد هر نسخه‌ی جدید اپلیکیشن به‌صورت خودکار توسط گیت‌هاب ساخته و در ریلیس منتشر می‌شود و این پنل
+                        بیلد هر نسخه‌ی جدید اپلیکیشن به‌صورت خودکار توسط سرور اصلی ساخته و در ریلیس منتشر می‌شود و این پنل
                         <b>خودکار نسخه‌ی جدید را به کاربران اعلام می‌کند</b> (دیالوگ آپدیت با نوار پیشرفت + نصب مستقیم روی نسخه‌ی فعلی، بدون نیاز به حذف و نصب مجدد).
                         برای کنترل کامل، حالت «دستی» را فعال کنید.
                     </p>
@@ -126,7 +126,7 @@ $appAutoMode = (($appPub['source'] ?? 'auto') !== 'admin');
                         <span class="text-[11px] font-bold text-slate-300">حالت انتشار:</span>
                         <label class="flex items-center gap-1.5 text-[11px] text-slate-300 cursor-pointer">
                             <input type="radio" name="app_publish_mode" value="auto" <?= $appAutoMode ? 'checked' : '' ?> onchange="toggleAppPublishMode('auto')" class="accent-emerald-500">
-                            خودکار از گیت‌هاب (پیشنهادی)
+                            خودکار از سرور اصلی (پیشنهادی)
                         </label>
                         <label class="flex items-center gap-1.5 text-[11px] text-slate-300 cursor-pointer">
                             <input type="radio" name="app_publish_mode" value="manual" <?= !$appAutoMode ? 'checked' : '' ?> onchange="toggleAppPublishMode('manual')" class="accent-emerald-500">
@@ -136,7 +136,7 @@ $appAutoMode = (($appPub['source'] ?? 'auto') !== 'admin');
 
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px]">
                         <div class="bg-slate-950/60 border border-slate-800 rounded-xl p-2.5">
-                            <div class="text-slate-500 mb-0.5">نسخه در گیت‌هاب</div>
+                            <div class="text-slate-500 mb-0.5">نسخه در سرور اصلی</div>
                             <div class="font-mono font-bold text-emerald-300" dir="ltr"><?= htmlspecialchars((string)($appPub['remote_version'] ?? 'در انتظار بررسی...')) ?></div>
                         </div>
                         <div class="bg-slate-950/60 border border-slate-800 rounded-xl p-2.5">
@@ -168,12 +168,12 @@ $appAutoMode = (($appPub['source'] ?? 'auto') !== 'admin');
                     <div class="grid grid-cols-2 gap-2">
                         <div>
                             <label class="block text-[11px] text-slate-400 mb-1">لینک APK (ARM64 — اختیاری)</label>
-                            <input type="text" name="app_download_url" value="<?= htmlspecialchars(Setting::get('app_download_url', '')) ?>" dir="ltr" placeholder="خالی = فایل روی هاست پنل / گیت‌هاب"
+                            <input type="text" name="app_download_url" value="<?= htmlspecialchars(Setting::get('app_download_url', '')) ?>" dir="ltr" placeholder="خالی = فایل روی هاست پنل"
                                    class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-[11px]">
                         </div>
                         <div>
                             <label class="block text-[11px] text-slate-400 mb-1">لینک APK (Universal — اختیاری)</label>
-                            <input type="text" name="app_universal_url" value="<?= htmlspecialchars(Setting::get('app_universal_url', '')) ?>" dir="ltr" placeholder="خالی = فایل روی هاست پنل / گیت‌هاب"
+                            <input type="text" name="app_universal_url" value="<?= htmlspecialchars(Setting::get('app_universal_url', '')) ?>" dir="ltr" placeholder="خالی = فایل روی هاست پنل"
                                    class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-[11px]">
                         </div>
                     </div>
@@ -272,7 +272,7 @@ $appAutoMode = (($appPub['source'] ?? 'auto') !== 'admin');
                 </div>
                 <div>
                     <h4 class="text-xs font-bold text-white">آینه‌سازی APK روی هاست پنل (دانلود داخل برنامه)</h4>
-                    <p class="text-[11px] text-slate-400">نصب‌کننده‌ی داخل برنامه، APK را مستقیماً از همین هاست دانلود می‌کند (سریع و در داخل ایران). هر ۵ دقیقه به‌صورت خودکار با ریلیس گیت‌هاب همگام می‌شود.</p>
+                    <p class="text-[11px] text-slate-400">نصب‌کننده‌ی داخل برنامه، APK را مستقیماً از همین هاست دانلود می‌کند (سریع و در داخل ایران). هر ۵ دقیقه به‌صورت خودکار با ریلیس اصلی همگام می‌شود.</p>
                 </div>
             </div>
             <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px]">
@@ -292,7 +292,7 @@ $appAutoMode = (($appPub['source'] ?? 'auto') !== 'admin');
                   onsubmit="return confirm('فایل‌های APK با ریلیس فعلی گیت‌هاب مقایسه و در صورت نیاز دوباره روی هاست دانلود می‌شوند (چند صد مگابایت). ادامه می‌دهید؟');">
                 <?= Helpers::csrfField() ?>
                 <button type="submit" class="w-full py-2.5 bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 font-bold rounded-xl text-xs border border-emerald-500/30 transition">
-                    <i class="fa-solid fa-arrows-rotate ml-1.5"></i> همگام‌سازی فوری APKها با گیت‌هاب
+                    <i class="fa-solid fa-arrows-rotate ml-1.5"></i> همگام‌سازی فوری APKها با سرور اصلی
                 </button>
             </form>
         </div>

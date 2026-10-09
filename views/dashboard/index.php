@@ -1,6 +1,6 @@
 <?php require __DIR__ . '/../layout/header.php'; ?>
 
-<!-- ULTRA v7.0 PRO MAX - Glassmorphism Dashboard -->
+<!-- v4.0.45 PRO MAX - Glassmorphism Dashboard -->
 <style>
 @keyframes float { 0%,100% { transform: translateY(0px); } 50% { transform: translateY(-6px); } }
 @keyframes glow { 0%,100% { box-shadow: 0 0 20px rgba(168,85,247,0.2); } 50% { box-shadow: 0 0 35px rgba(168,85,247,0.4); } }

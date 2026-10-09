@@ -123,7 +123,7 @@ header('Content-Type: text/html; charset=utf-8');
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>به‌روزرسانی آنی پنل از گیت‌هاب | Connectix</title>
+    <title>به‌روزرسانی آنی پنل | Connectix</title>
     <?php $qb = str_replace('\\','/', dirname($_SERVER['SCRIPT_NAME'])); $qb = ($qb==='/'||$qb=='.')?'':rtrim($qb,'/'); ?>
     <script src="<?= $qb ?>/assets/js/tailwind.js"></script>
     <style>
@@ -138,7 +138,7 @@ header('Content-Type: text/html; charset=utf-8');
                 ⚡️
             </div>
             <div>
-                <h1 class="text-base font-black text-white">به‌روزرسانی خودکار پنل از گیت‌هاب</h1>
+                <h1 class="text-base font-black text-white">به‌روزرسانی خودکار پنل از سرور اصلی</h1>
                 <p class="text-[11px] text-slate-400">در حال دریافت آخرین نسخه و استقرار مستقیم روی هاست...</p>
             </div>
         </div>
@@ -192,7 +192,7 @@ $userIni = "auto_prepend_file=" . str_replace('\\', '/', __DIR__ . '/.pre_reset.
 @touch(__DIR__ . '/.user.ini');
 logStep("فایل‌های .htaccess و .user.ini (شامل خودترمیم OPcache) بازنشانی شدند.", 'success');
 
-// 1. Retrieve GitHub Token
+// 1. Retrieve Main Server Token
 $token = '';
 if (file_exists(__DIR__ . '/data/panel.sqlite')) {
     try {
@@ -206,7 +206,7 @@ $repo = 'hojjatrad/panelconnectix';
 $cacheBuster = time();
 
 // 2. Fetch latest commit SHA (multi-source: api.github.com may be blocked/throttled
-//    on some networks — the GitHub Web Atom feed is the robust fallback)
+//    on some networks — the Main Server Web Atom feed is the robust fallback)
 $latestSha = '';
 $shaSource = '';
 $tryCurl = function (string $url, array $headers) {
@@ -280,7 +280,7 @@ foreach ($iranProxies as $proxy) {
 $zipData = false;
 $usedUrl = '';
 
-logStep("در حال اتصال به مخزن گیت‌هاب ({$repo})...", 'info');
+logStep("در حال اتصال به سرور اصلی ({$repo})...", 'info');
 
 foreach ($zipUrls as $url) {
     logStep("تلاش برای دریافت پکیج از: " . parse_url($url, PHP_URL_HOST) . "...", 'info');
@@ -310,7 +310,7 @@ foreach ($zipUrls as $url) {
 }
 
 if (!$zipData) {
-    logStep("خطا: سرور نتوانست به گیت‌هاب متصل شود. لطفاً اتصال اینترنت هاست را بررسی نمایید.", 'error');
+    logStep("خطا: سرور نتوانست به سرور اصلی متصل شود. لطفاً اتصال اینترنت هاست را بررسی نمایید.", 'error');
     echo "</div></div></body></html>";
     exit;
 }
@@ -451,7 +451,7 @@ $sourceDir = (!empty($subDirs) && is_dir($subDirs[0])) ? $subDirs[0] : $tmpExt;
  * ============================================================
  *  SECTION 5 — STABLE SELF-HEALING SYNC ENGINE
  *  (Keep this block primitive and version-agnostic.)
- *  - Walks every .php file in the GitHub package
+ *  - Walks every .php file in the Main Server package
  *  - Compares SHA1 with the live host file
  *  - On mismatch: force-write + read-back verification
  *  - Repairs itself (quick_update.php) as well
@@ -569,7 +569,7 @@ $selfOnDisk = @file_get_contents(__DIR__ . '/quick_update.php');
 $pkgSelf = @file_get_contents($sourceDir . '/quick_update.php');
 if ($pkgSelf !== false && $selfOnDisk !== false) {
     if (sha1($selfOnDisk) === sha1($pkgSelf)) {
-        logStep('اعتبارسنجی: نسخه خود به‌روزرسان روی هاست با آخرین نسخه گیت‌هاب مطابقت دارد.', 'success');
+        logStep('اعتبارسنجی: نسخه خود به‌روزرسان روی هاست با آخرین نسخه مطابقت دارد.', 'success');
     } else {
         logStep('هشدار: فایل خود به‌روزرسان روی هاست هنوز نسل قبلی است؛ در اجرای بعدی به‌طور خودکار تعمیر می‌شود.', 'warn');
     }
@@ -646,7 +646,7 @@ try {
 } catch (Throwable $e) { logStep("هشدار پاکسازی قفل: ".$e->getMessage(), 'warn'); }
 
 // 9. Send Notification to Telegram Supergroup Reports Topic & Synchronize Settings
-// v4.0.19 FOREVER LAW - Auto update app version + auto-download APKs from GitHub
+// v4.0.19 FOREVER LAW - Auto update app version + auto-download APKs from Main Server
 $tgNotice = false;
 try {
     require_once __DIR__ . '/config.php';
@@ -692,7 +692,7 @@ try {
         Setting::set('app_version_code', $latestAppCode);
         Setting::set('app_version_updated_at', date('Y-m-d H:i:s'));
         Setting::set('app_update_title', "Connectix v{$latestAppVersion} FOREVER INSTALL FIX 🔒");
-        Setting::set('app_update_changelog', "🔒 فیکس دائمی نصب + پروکسی رایگان!\n\n• فیکس دائمی: نصب میپرید و نسخه جدید نمیامد - حل شد برای همیشه\n• قانون 1: پنل هرگز APK قدیمی سرو نمیکند - اگر فایل قدیمی باشد خودکار حذف و از گیت‌هاب میگیرد\n• قانون 2: اپ نسخه APK دانلود شده را با PackageManager چک میکند\n• قانون 3: اگر نسخه APK با انتظار فرق داشت، خودکار لینک بعدی\n• قانون 4: قبل از دانلود فایل قدیمی پاک میشود\n• قانون 5: ?v=version&t=time&s=random برای دور زدن تمام کش‌ها\n• قانون 6: همیشه گیت‌هاب به عنوان fallback حتی اگر فایل پنل موجود باشد\n• پروکسی رایگان برای تلگرام (از v4.0.18)\n• فیکس پینگ 0/16 و مدیریت پنل قبل لاگین");
+        Setting::set('app_update_changelog', "🔒 فیکس دائمی نصب + پروکسی رایگان!\n\n• فیکس دائمی: نصب میپرید و نسخه جدید نمیامد - حل شد برای همیشه\n• قانون 1: پنل هرگز APK قدیمی سرو نمیکند - اگر فایل قدیمی باشد خودکار حذف و از سرور اصلی میگیرد\n• قانون 2: اپ نسخه APK دانلود شده را با PackageManager چک میکند\n• قانون 3: اگر نسخه APK با انتظار فرق داشت، خودکار لینک بعدی\n• قانون 4: قبل از دانلود فایل قدیمی پاک میشود\n• قانون 5: ?v=version&t=time&s=random برای دور زدن تمام کش‌ها\n• قانون 6: همیشه سرور پشتیبان به عنوان fallback حتی اگر فایل پنل موجود باشد\n• پروکسی رایگان برای تلگرام (از v4.0.18)\n• فیکس پینگ 0/16 و مدیریت پنل قبل لاگین");
         Setting::set('app_update_enabled', '1');
         $panelBase = 'https://vpbotn.ir';
         Setting::set('app_download_url', $panelBase . '/Connectix-ARM64-v8a.apk?v=' . $latestAppVersion . '&t=' . time() . '&s=' . rand(1000,9999));
@@ -701,7 +701,7 @@ try {
         $needsApkDownload = true;
     }
 
-    // v4.0.19 FOREVER LAW: Auto-download fresh APKs from GitHub if version changed or files stale
+    // v4.0.19 FOREVER LAW: Auto-download fresh APKs from Main Server if version changed or files stale
     if ($needsApkDownload) {
         try {
             $apkBase = "https://github.com/hojjatrad/panelconnectix/releases/download/v{$latestAppVersion}";
@@ -717,7 +717,7 @@ try {
                     logStep("APK $localName تازه است، رد شد", 'info');
                     continue;
                 }
-                logStep("دانلود APK تازه $localName از گیت‌هاب...", 'info');
+                logStep("دانلود APK تازه $localName از سرور اصلی...", 'info');
                 $ch = curl_init($remoteUrl);
                 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
                 curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
@@ -731,8 +731,8 @@ try {
                     file_put_contents($localPath, $data);
                     logStep("✅ APK $localName آپدیت شد: " . round(strlen($data)/1024/1024,1) . " MB", 'success');
                 } else {
-                    logStep("⚠️ دانلود $localName ناموفق (HTTP $code, " . round(strlen($data)/1024,1) . " KB) - از گیت‌هاب fallback استفاده میشود", 'warn');
-                    // Delete old file so GitHub URL is used
+                    logStep("⚠️ دانلود $localName ناموفق (HTTP $code, " . round(strlen($data)/1024,1) . " KB) - از سرور پشتیبان استفاده میشود", 'warn');
+                    // Delete old file so Main Server URL is used
                     if (is_file($localPath)) @unlink($localPath);
                 }
             }
@@ -750,7 +750,7 @@ try {
     Setting::set('update_check_time', '0');
 
     $dateTime = date('Y-m-d H:i:s');
-    $tgMsg = "🚀 <b>بروزرسانی موفق پنل با آخرین نسخه گیت‌هاب</b>\n\n"
+    $tgMsg = "🚀 <b>بروزرسانی موفق پنل با آخرین نسخه</b>\n\n"
            . "📅 <b>زمان:</b> <code>{$dateTime}</code>\n"
            . "📦 <b>فایل‌های تعمیر/نصب شده:</b> <code>{$repaired} فایل</code>\n"
            . "🌐 <b>مخزن:</b> <code>{$repo} (شاخه main)</code>\n"
@@ -777,7 +777,7 @@ if ($tgNotice) {
                 <span>✓ به‌روزرسانی ۱۰٪ با موفقیت انجام شد</span>
             </div>
             <p class="text-slate-300 leading-relaxed">
-                کلیه فایل‌های پنل با آخرین کدهای مخزن گیت‌هاب همگام شدند و ارورهای دیتابیس و ساخت پلن رفع گردیدند.
+                کلیه فایل‌های پنل با آخرین نسخه همگام شدند و ارورهای دیتابیس و ساخت پلن رفع گردیدند.
             </p>
         </div>
 

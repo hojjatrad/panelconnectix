@@ -81,7 +81,7 @@ if (!function_exists('isActiveRoute')) {
     </script>
     <?php
     // v4.0.30 FIX: Add version to assets to bust cache - no more Ctrl+F5 needed
-    $assetVer = Updater::CURRENT_VERSION ?? '7.3.0';
+    $assetVer = Updater::CURRENT_VERSION ?? '4.0.45';
     ?>
     <?php if (file_exists($localTailwind)): ?>
     <script src="<?= $base ?>/assets/js/tailwind.js?v=<?= $assetVer ?>"></script>
@@ -503,7 +503,7 @@ if (!function_exists('isActiveRoute')) {
             require_once __DIR__ . '/../../core/Updater.php';
             $panelVersion = Updater::CURRENT_VERSION;
             ?>
-            <div class="mt-2 flex items-center justify-center gap-1.5 text-[10px] text-slate-500" title="پنل به‌صورت خودکار از گیت‌هاب به‌روز می‌شود — همه‌ی پنل‌ها (اصلی و نماینده‌ها) همگام‌اند">
+            <div class="mt-2 flex items-center justify-center gap-1.5 text-[10px] text-slate-500" title="پنل به‌صورت خودکار به‌روز می‌شود — همه‌ی پنل‌ها (اصلی و نماینده‌ها) همگام‌اند">
                 <i class="fa-brands fa-github text-[10px]"></i>
                 <span>نسخه پنل</span>
                 <span class="font-mono font-bold text-slate-300" dir="ltr">v<?= htmlspecialchars($panelVersion) ?></span>
@@ -514,13 +514,13 @@ if (!function_exists('isActiveRoute')) {
 
     <!-- Main Content Area -->
     <main class="flex-1 flex flex-col min-w-0 overflow-y-auto">
-        <!-- Top Navbar ULTRA Dynamic v<?= Updater::CURRENT_VERSION ?? '7.3.0' ?> -->
+        <!-- Top Navbar ULTRA Dynamic v<?= Updater::CURRENT_VERSION ?? '4.0.45' ?> -->
         <header class="h-14 bg-slate-900/70 border-b border-slate-800/80 flex items-center justify-between px-6 shrink-0 backdrop-blur-xl sticky top-0 z-30">
             <div class="flex items-center gap-3">
                 <?php
-                // v4.0.30 FIX: Dynamic version instead of hardcoded v7.0
-                $ultraVer = defined('App\Core\Updater::CURRENT_VERSION') ? \App\Core\Updater::CURRENT_VERSION : (class_exists('Updater') ? Updater::CURRENT_VERSION : '7.3.0');
-                if (empty($ultraVer) || $ultraVer === '7.0') $ultraVer = '7.3.0';
+                // v4.0.30 FIX: Dynamic version instead of hardcoded v4.0.45
+                $ultraVer = defined('App\Core\Updater::CURRENT_VERSION') ? \App\Core\Updater::CURRENT_VERSION : (class_exists('Updater') ? Updater::CURRENT_VERSION : '4.0.45');
+                if (empty($ultraVer) || $ultraVer === '7.0') $ultraVer = '4.0.45';
                 ?>
                 <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                     <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -572,7 +572,7 @@ if (!function_exists('isActiveRoute')) {
             </div>
         </div>
         <script>
-        // Theme toggle ULTRA v7.1
+        // Theme toggle v4.0.45
         function toggleTheme(){
             const isDark = document.documentElement.classList.contains('dark') || document.body.classList.contains('bg-slate-950');
             const newTheme = isDark ? 'light' : 'dark';
@@ -714,9 +714,9 @@ if (!function_exists('isActiveRoute')) {
         }
     }
 
-    // PWA Service Worker registration v7.3.0 ULTRA - FIXED: No more Ctrl+F5 needed + dashboard click bug
+    // PWA Service Worker registration v4.0.45 ULTRA - FIXED: No more Ctrl+F5 needed + dashboard click bug
     if ('serviceWorker' in navigator) {
-        // v4.0.30 FIX: Force unregister old SW v7.0 that causes dashboard click to show old banner
+        // v4.0.30 FIX: Force unregister old SW v4.0.45 that causes dashboard click to show old banner
         (async () => {
             try {
                 const regs = await navigator.serviceWorker.getRegistrations();
@@ -724,15 +724,15 @@ if (!function_exists('isActiveRoute')) {
                     const url = reg.active?.scriptURL || reg.installing?.scriptURL || '';
                     // If old SW without version or with old cache name, unregister
                     if (url.includes('sw.js')) {
-                        const isOld = !url.includes('v7.3.0') && !url.includes('v=7.3.0') && !url.includes('v=7.3');
+                        const isOld = !url.includes('v4.0.45') && !url.includes('v=4.0.45') && !url.includes('v=4.0.45');
                         // Also check cache names
                         const cacheNames = await caches.keys();
-                        const hasOldCache = cacheNames.some(n => n.includes('v7-0') || n.includes('v7.0'));
+                        const hasOldCache = cacheNames.some(n => n.includes('v4-0-45') || n.includes('v4.0.45'));
                         if (isOld || hasOldCache) {
                             console.log('Found old SW/cache, unregistering...', url, cacheNames);
                             // Delete all old caches
                             for (const name of cacheNames) {
-                                if (name.includes('v7-0') || name.includes('v7.0') || name !== 'connectix-ultra-v7-3-0' && name !== 'connectix-static-v7-3-0') {
+                                if (name.includes('v4-0-45') || name.includes('v4.0.45') || name !== 'connectix-ultra-v4-0-45' && name !== 'connectix-static-v4-0-45') {
                                     await caches.delete(name);
                                     console.log('Deleted old cache:', name);
                                 }
@@ -750,9 +750,9 @@ if (!function_exists('isActiveRoute')) {
             }
             
             // Register new SW
-            const swUrl = '<?= $base ?>/sw.js?v=<?= $assetVer ?? Updater::CURRENT_VERSION ?? "7.3.0" ?>';
+            const swUrl = '<?= $base ?>/sw.js?v=<?= $assetVer ?? Updater::CURRENT_VERSION ?? "4.0.45" ?>';
             const reg = await navigator.serviceWorker.register(swUrl);
-            console.log('PWA SW registered v7.3.0');
+            console.log('PWA SW registered v4.0.45');
             
             // Check for updates every 2 minutes (more frequent)
             setInterval(() => {
@@ -782,7 +782,7 @@ if (!function_exists('isActiveRoute')) {
         // Clear old localStorage that may cause dashboard to show old data
         try {
             const oldVer = localStorage.getItem('connectix_panel_version');
-            const currentVer = '<?= $assetVer ?? Updater::CURRENT_VERSION ?? "7.3.0" ?>';
+            const currentVer = '<?= $assetVer ?? Updater::CURRENT_VERSION ?? "4.0.45" ?>';
             if (oldVer && oldVer !== currentVer) {
                 console.log('Version changed from', oldVer, 'to', currentVer, '- clearing old data');
                 // Don't clear all localStorage, just version-related
@@ -794,7 +794,7 @@ if (!function_exists('isActiveRoute')) {
     } else {
         // No SW support, ensure version in localStorage
         try {
-            localStorage.setItem('connectix_panel_version', '<?= $assetVer ?? Updater::CURRENT_VERSION ?? "7.3.0" ?>');
+            localStorage.setItem('connectix_panel_version', '<?= $assetVer ?? Updater::CURRENT_VERSION ?? "4.0.45" ?>');
         } catch (e) {}
     }
 

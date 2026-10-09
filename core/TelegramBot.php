@@ -298,7 +298,7 @@ class TelegramBot {
     }
 
     /**
-     * Announce a successfully applied GitHub panel update to the supergroup
+     * Announce a successfully applied Main Server panel update to the supergroup
      * reports topic — with strict de-duplication so the bot never spams:
      *
      *   - the SAME commit sha is announced at most once per 60 minutes

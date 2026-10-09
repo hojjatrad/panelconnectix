@@ -243,7 +243,7 @@ class PanelLocationManager {
         $currentPath = self::getCurrentPanelPath();
         
         // نسخه پنل
-        $version = '7.2.5';
+        $version = '4.0.45';
         try {
             require_once __DIR__ . '/Updater.php';
             $version = Updater::CURRENT_VERSION;
@@ -510,7 +510,7 @@ HT;
             $path = self::getCurrentPanelPath();
             $domain = self::getCurrentDomain();
             
-            $version = '7.2.5';
+            $version = '4.0.45';
             try {
                 require_once __DIR__ . '/Updater.php';
                 $version = Updater::CURRENT_VERSION;
@@ -535,7 +535,7 @@ HT;
         $currentDomain = self::getCurrentDomain();
         $currentPath = self::getCurrentPanelPath();
         
-        $version = '7.2.5';
+        $version = '4.0.45';
         try {
             require_once __DIR__ . '/Updater.php';
             $version = Updater::CURRENT_VERSION;

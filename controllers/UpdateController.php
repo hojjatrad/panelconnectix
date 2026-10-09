@@ -35,7 +35,7 @@ class UpdateController {
         if ($updateInfo['has_update']) {
             $lv = $sanitize($updateInfo['latest_version'] ?? Updater::CURRENT_VERSION);
             $latestFull = "Connectix v{$lv}";
-            Helpers::flash('info', "🎉 نسخه جدید {$latestFull} در گیت‌هاب در دسترس است! لطفاً جهت اعمال دکمه به‌روزرسانی را لمس کنید.");
+            Helpers::flash('info', "🎉 نسخه جدید {$latestFull} در سرور اصلی در دسترس است! لطفاً جهت اعمال دکمه به‌روزرسانی را لمس کنید.");
         } else {
             $cv = $sanitize($updateInfo['current_version'] ?? Updater::CURRENT_VERSION);
             $currentFull = "Connectix v{$cv}";
@@ -182,7 +182,7 @@ class UpdateController {
         Setting::set('update_check_cache', '');
         Setting::set('update_check_time', '0');
 
-        Helpers::flash('success', 'تنظیمات مخزن گیت‌هاب با موفقیت ذخیره شد.');
+        Helpers::flash('success', 'تنظیمات مخزن اصلی با موفقیت ذخیره شد.');
         Helpers::redirect('updater');
     }
 
@@ -197,7 +197,7 @@ class UpdateController {
         $commitMsg = trim($_POST['git_commit_msg'] ?? 'Update Connectix Panel codebase');
 
         if (empty($remoteUrl)) {
-            Helpers::flash('error', 'آدرس مخزن ریموت گیت‌هاب الزامی است.');
+            Helpers::flash('error', 'آدرس مخزن ریموت الزامی است.');
             Helpers::redirect('updater');
         }
 
@@ -213,7 +213,7 @@ class UpdateController {
         $cmdPush = "cd " . escapeshellarg($panelDir) . " && git branch -M main && git push -u origin main 2>&1";
         $pushOutput = shell_exec($cmdPush);
 
-        Helpers::logActivity('git_push', "ارسال فایل‌های پنل به گیت‌هاب: {$remoteUrl}", 'system');
+        Helpers::logActivity('git_push', "ارسال فایل‌های پنل به مخزن اصلی: {$remoteUrl}", 'system');
         Helpers::flash('info', "فرمان Git اجرا شد:\n" . substr($pushOutput, 0, 300));
         Helpers::redirect('updater');
     }
@@ -322,8 +322,8 @@ class UpdateController {
         if ($res['success']) {
             try {
                 require_once __DIR__ . '/../core/TelegramBot.php';
-                $msg = "⚡️ <b>آپدیت آنی گیت‌هاب با وب‌هوک اعمال شد!</b>\n\n"
-                     . "تغییرات جدید مستقیماً از مخزن گیت‌هاب دریافت و روی پنل هاست مستقر گردید.\n"
+                $msg = "⚡️ <b>آپدیت آنی با وب‌هوک اعمال شد!</b>\n\n"
+                     . "تغییرات جدید مستقیماً از سرور اصلی دریافت و روی پنل هاست مستقر گردید.\n"
                      . "🏷 نسخه: <code>" . htmlspecialchars($res['version'] ?? '', ENT_QUOTES) . "</code>\n"
                      . "📅 زمان: " . date('Y-m-d H:i:s');
                 TelegramBot::announcePanelUpdate($pushedSha, $msg);

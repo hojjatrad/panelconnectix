@@ -1,5 +1,5 @@
 <?php
-$pageTitle = 'گزارش مالی اختصاصی - ULTRA v7.2';
+$pageTitle = 'گزارش مالی اختصاصی - v4.0.45';
 require __DIR__ . '/../layout/header.php';
 ?>
 <div class="space-y-6">
@@ -8,7 +8,7 @@ require __DIR__ . '/../layout/header.php';
             <h1 class="text-lg font-bold text-white flex items-center gap-2">
                 <i class="fa-solid fa-chart-line text-emerald-400"></i>
                 <span>گزارش مالی ULTRA - درآمد و سود</span>
-                <span class="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full text-[10px]">RESYNC v7.2</span>
+                <span class="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full text-[10px]">RESYNC v4.0.45</span>
             </h1>
             <p class="text-xs text-slate-400 mt-1">نمای کامل تراکنش‌ها، درآمد، هزینه و سود تخمینی شما</p>
         </div>

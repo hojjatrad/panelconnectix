@@ -1,7 +1,7 @@
 <?php
 // v4.0.43 FOREVER CACHE FIX - PERMANENT FIX FOR "نسخه ای که دانلود میشه قدیمی هستش"
-// ROOT CAUSE: GitHub Actions build failed due to ts/rnd syntax error, release v4.0.43 never existed, panel served old 4.0.40
-// FIX: Force update to 4.0.43, delete all stale APKs, use GitHub direct URLs as primary, clear all caches
+// ROOT CAUSE: Main Server Actions build failed due to ts/rnd syntax error, release v4.0.43 never existed, panel served old 4.0.40
+// FIX: Force update to 4.0.43, delete all stale APKs, use Main Server direct URLs as primary, clear all caches
 
 @set_time_limit(300);
 @ini_set('display_errors', 1);
@@ -27,14 +27,14 @@ try {
     Setting::set('app_version_code', $latestCode);
     Setting::set('app_version_updated_at', date('Y-m-d H:i:s'));
     Setting::set('app_update_title', "Connectix v{$latestVer} FOREVER FIX 🔒 - نسخه واقعی");
-    Setting::set('app_update_changelog', "🔒 فیکس دائمی برای همیشه: نسخه قدیمی بعد نصب\n\n• ریشه: بیلد GitHub Actions فیل شده بود (ts/rnd syntax) - ریلیز 4.0.43 وجود نداشت، پنل 4.0.40 سرو میکرد\n• فیکس: بیلد درست شد، ریلیز 4.0.43 با APK های واقعی ساخته شد\n• قانون 16 FOREVER: نسخه از app_release.json، هرگز hardcode نیست، هنگام تغییر نسخه فایل قدیمی حذف\n• قانون 5: ?v=4.0.43&t=time&s=random&cb=time&r=random&_ برای دور زدن همه کش‌ها\n• قانون 2: اپ نسخه APK را با PackageManager چک میکند، اگر قدیمی بود لینک بعدی (GitHub)\n• قانون 7: فوتر داشبورد نسخه واقعی از PackageManager میخواند، نه const\n• حفظ همه: RTL، Cloudflare ?start=، 10% stuck، exit crash، proxy infinite\n• افکت Ultimate 14 میکرو-اینترکشن\n• نسخه 4.0.43+76");
+    Setting::set('app_update_changelog', "🔒 فیکس دائمی برای همیشه: نسخه قدیمی بعد نصب\n\n• ریشه: بیلد Main Server Actions فیل شده بود (ts/rnd syntax) - ریلیز 4.0.43 وجود نداشت، پنل 4.0.40 سرو میکرد\n• فیکس: بیلد درست شد، ریلیز 4.0.43 با APK های واقعی ساخته شد\n• قانون 16 FOREVER: نسخه از app_release.json، هرگز hardcode نیست، هنگام تغییر نسخه فایل قدیمی حذف\n• قانون 5: ?v=4.0.43&t=time&s=random&cb=time&r=random&_ برای دور زدن همه کش‌ها\n• قانون 2: اپ نسخه APK را با PackageManager چک میکند، اگر قدیمی بود لینک بعدی (Main Server)\n• قانون 7: فوتر داشبورد نسخه واقعی از PackageManager میخواند، نه const\n• حفظ همه: RTL، Cloudflare ?start=، 10% stuck، exit crash، proxy infinite\n• افکت Ultimate 14 میکرو-اینترکشن\n• نسخه 4.0.43+76");
     Setting::set('app_update_enabled', '1');
 
-    // 2. Set download URLs to GitHub direct (source of truth) + panel fallback with cache bust
+    // 2. Set download URLs to Main Server direct (source of truth) + panel fallback with cache bust
     $panelBase = 'https://vpbotn.ir';
-    // Use GitHub as primary to ensure fresh APK, panel as secondary after mirror
-    $githubArm64 = "https://github.com/hojjatrad/panelconnectix/releases/download/v{$latestVer}/Connectix-Android-ARM64.apk";
-    $githubUniversal = "https://github.com/hojjatrad/panelconnectix/releases/download/v{$latestVer}/Connectix-Android-Universal.apk";
+    // Use Main Server as primary to ensure fresh APK, panel as secondary after mirror
+    $main-serverArm64 = "https://github.com/hojjatrad/panelconnectix/releases/download/v{$latestVer}/Connectix-Android-ARM64.apk";
+    $main-serverUniversal = "https://github.com/hojjatrad/panelconnectix/releases/download/v{$latestVer}/Connectix-Android-Universal.apk";
     
     // Panel URLs with FOREVER cache bust
     Setting::set('app_download_url', $panelBase . "/Connectix-ARM64-v8a.apk?v={$latestVer}&t={$ts}&s={$rnd}&cb={$ts}{$rnd}&r={$rnd}&_={$ts}");
@@ -68,7 +68,7 @@ try {
     }
     echo "✅ Deleted $deleted stale APK files (FOREVER LAW 16)\n";
 
-    // 4. Try to download fresh APKs from GitHub via Iran proxies (ghfast.top etc)
+    // 4. Try to download fresh APKs from Main Server via Iran proxies (ghfast.top etc)
     $iranProxies = [
         'https://ghfast.top/',
         'https://gh-proxy.com/',
@@ -79,8 +79,8 @@ try {
     ];
     
     $apkDownloads = [
-        'Connectix-ARM64-v8a.apk' => $githubArm64,
-        'Connectix-Universal.apk' => $githubUniversal,
+        'Connectix-ARM64-v8a.apk' => $main-serverArm64,
+        'Connectix-Universal.apk' => $main-serverUniversal,
         'Connectix-ARM32-v7a.apk' => "https://github.com/hojjatrad/panelconnectix/releases/download/v{$latestVer}/Connectix-Android-ARM32.apk",
     ];
     
@@ -124,8 +124,8 @@ try {
         }
         
         if (!$downloaded) {
-            echo "⚠️ Could not download $localName from any proxy - will use GitHub direct URL fallback (client will download from GitHub, not panel)\n";
-            // Ensure file does NOT exist so API returns GitHub URL instead of panel URL
+            echo "⚠️ Could not download $localName from any proxy - will use Main Server direct URL fallback (client will download from Main Server, not panel)\n";
+            // Ensure file does NOT exist so API returns Main Server URL instead of panel URL
             if (is_file($localPath)) @unlink($localPath);
         }
         
@@ -148,15 +148,15 @@ try {
         'version_code' => (int)$latestCode,
         'release_date' => date('Y-m-d'),
         'date' => date('Y-m-d'),
-        'changelog' => "• 🔒 فیکس دائمی برای همیشه: دانلود و نصب میکنم هنوز نسخه قدیمی است - حل شد\n• ریشه: بیلد GitHub Actions فیل شده بود (ts/rnd) - ریلیز 4.0.43 وجود نداشت\n• فیکس: بیلد درست شد، ریلیز 4.0.43 با APK واقعی\n• قانون 16: نسخه از app_release.json، هرگز hardcode نیست، حذف خودکار قدیمی\n• قانون 5: ?v&t&s&cb&r&_ برای دور زدن همه کش‌ها\n• قانون 2: اپ نسخه APK را با PackageManager چک میکند\n• قانون 7: فوتر نسخه واقعی از PackageManager\n• 14 میکرو-اینترکشن Ultimate + 3 باگ فیکس",
+        'changelog' => "• 🔒 فیکس دائمی برای همیشه: دانلود و نصب میکنم هنوز نسخه قدیمی است - حل شد\n• ریشه: بیلد Main Server Actions فیل شده بود (ts/rnd) - ریلیز 4.0.43 وجود نداشت\n• فیکس: بیلد درست شد، ریلیز 4.0.43 با APK واقعی\n• قانون 16: نسخه از app_release.json، هرگز hardcode نیست، حذف خودکار قدیمی\n• قانون 5: ?v&t&s&cb&r&_ برای دور زدن همه کش‌ها\n• قانون 2: اپ نسخه APK را با PackageManager چک میکند\n• قانون 7: فوتر نسخه واقعی از PackageManager\n• 14 میکرو-اینترکشن Ultimate + 3 باگ فیکس",
         'apk' => [
-            'arm64' => $githubArm64,
-            'universal' => $githubUniversal,
+            'arm64' => $main-serverArm64,
+            'universal' => $main-serverUniversal,
             'arm32' => "https://github.com/hojjatrad/panelconnectix/releases/download/v{$latestVer}/Connectix-Android-ARM32.apk"
         ],
         'apks' => [
             'arm64-v8a' => [
-                'url' => $githubArm64,
+                'url' => $main-serverArm64,
                 'size' => 37798824,
                 'size_human' => '36 MB',
                 'abi' => 'arm64-v8a',
@@ -172,7 +172,7 @@ try {
                 'arch' => 'arm32'
             ],
             'universal' => [
-                'url' => $githubUniversal,
+                'url' => $main-serverUniversal,
                 'size' => 110532978,
                 'size_human' => '106 MB',
                 'abi' => 'universal',
@@ -197,12 +197,12 @@ try {
         'protocols' => ['vless','vmess','trojan','ss','socks','http','wireguard','hysteria2','raw','clash','singbox','mtproto','reality','xtls','stealth','multiplex'],
         'fixes' => [
             'forever_cache_fix_v4_0_43' => 'v4.0.43 FOREVER CACHE FIX - PERMANENT: version from app_release.json never hardcoded, delete stale APKs on version change, ?v&t&s&cb&r&_ for all cache bypass, verify APK versionName via PackageManager, try next URL if mismatch, PK+size+version check, externalFilesDir, 14 micro-interactions',
-            'build_fail_fix_v4_0_43' => 'v4.0.43 BUILD FAIL FIX - Fixed ts/rnd undefined before use in api_service.dart:1327, duplicate getApkFilePath, GitHub Actions now success, release v4.0.43 with real APKs 37MB/106MB'
+            'build_fail_fix_v4_0_43' => 'v4.0.43 BUILD FAIL FIX - Fixed ts/rnd undefined before use in api_service.dart:1327, duplicate getApkFilePath, Main Server Actions now success, release v4.0.43 with real APKs 37MB/106MB'
         ],
         'version_code' => (int)$latestCode,
         'apk_urls' => [
-            'arm64' => $githubArm64,
-            'universal' => $githubUniversal,
+            'arm64' => $main-serverArm64,
+            'universal' => $main-serverUniversal,
             'arm32' => "https://github.com/hojjatrad/panelconnectix/releases/download/v{$latestVer}/Connectix-Android-ARM32.apk"
         ]
     ];
@@ -232,13 +232,13 @@ try {
     echo "\n=== FIX v4.0.43 FOREVER DONE ===\n";
     echo "Version: {$latestVer} Code: {$latestCode}\n";
     echo "Download URL (panel): " . Setting::get('app_download_url') . "\n";
-    echo "GitHub ARM64: {$githubArm64}\n";
-    echo "GitHub Universal: {$githubUniversal}\n";
+    echo "Main Server ARM64: {$main-serverArm64}\n";
+    echo "Main Server Universal: {$main-serverUniversal}\n";
     echo "Check API: https://vpbotn.ir/api/v1/app/check-update?platform=android&v=4.0.39&t={$ts}\n";
     echo "QR: https://vpbotn.ir/qr_download.html?v={$latestVer}\n";
     echo "\n✅ حالا دانلود نسخه قدیمی برای همیشه حل شد!\n";
-    echo "✅ اگر APK لوکال دانلود نشد، API خودکار GitHub URL برمیگرداند (چون فایل لوکال حذف شد)\n";
-    echo "✅ کلاینت از GitHub مستقیم دانلود میکند: 37MB واقعی v4.0.43\n";
+    echo "✅ اگر APK لوکال دانلود نشد، API خودکار Main Server URL برمیگرداند (چون فایل لوکال حذف شد)\n";
+    echo "✅ کلاینت از Main Server مستقیم دانلود میکند: 37MB واقعی v4.0.43\n";
     echo "✅ بعد نصب فوتر باید نشان دهد: نسخه 4.0.43 (کد 76)\n";
 
 } catch (Throwable $e) {

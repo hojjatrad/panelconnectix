@@ -282,7 +282,7 @@ if (isset($_GET['restore_index'])) {
 
 if (isset($_GET['update_from_git']) || (isset($_GET['restore_files']) && $_GET['restore_files'] === '1')) {
     header('Content-Type: text/html; charset=utf-8');
-    echo "<!DOCTYPE html><html lang='fa' dir='rtl'><head><meta charset='UTF-8'><title>به‌روزرسانی آنی</title><style>body{background:#0b0f19;color:#fff;font-family:sans-serif;padding:30px;text-align:center;}</style></head><body><h2>🚀 در حال به‌روزرسانی آنی کدهای پنل از مخزن گیت‌هاب...</h2>";
+    echo "<!DOCTYPE html><html lang='fa' dir='rtl'><head><meta charset='UTF-8'><title>به‌روزرسانی آنی</title><style>body{background:#0b0f19;color:#fff;font-family:sans-serif;padding:30px;text-align:center;}</style></head><body><h2>🚀 در حال به‌روزرسانی آنی کدهای پنل از سرور اصلی...</h2>";
     $repo = 'hojjatrad/panelconnectix';
     $url = "https://codeload.github.com/{$repo}/zip/refs/heads/main";
     $ch = curl_init($url);
@@ -345,7 +345,7 @@ if (isset($_GET['update_from_git']) || (isset($_GET['restore_files']) && $_GET['
             }
             if (function_exists('opcache_reset')) @opcache_reset();
             if (function_exists('clearstatcache')) @clearstatcache(true);
-            echo "<p style='color:#10b981;font-weight:bold;'>✓ تعداد {$count} فایل با موفقیت از گیت‌هاب بروزرسانی شد!</p>";
+            echo "<p style='color:#10b981;font-weight:bold;'>✓ تعداد {$count} فایل با موفقیت از سرور اصلی بروزرسانی شد!</p>";
             echo "<p><a href='repair.php' style='color:#a855f7;font-weight:bold;'>بازگشت به صفحه عیب‌یابی (repair.php)</a></p>";
         } else {
             echo "<p style='color:#ef4444;'>خطا در بازگشایی زیپ</p>";
@@ -1137,7 +1137,7 @@ foreach ($stepResults as $r) {
             <?php else: ?>
                 <a href="repair.php?restore_files=1" class="w-full py-3.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-2xl text-xs transition-all shadow-xl shadow-amber-900/40 flex items-center justify-center gap-2">
                     <i class="fa-solid fa-cloud-arrow-down"></i>
-                    <span>دانلود و بازسازی فوری تمامی فایل‌های پنل از گیت‌هاب</span>
+                    <span>دانلود و بازسازی فوری تمامی فایل‌های پنل از سرور اصلی</span>
                 </a>
             <?php endif; ?>
 

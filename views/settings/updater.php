@@ -6,9 +6,9 @@ require __DIR__ . '/../layout/header.php';
     <div>
         <h2 class="text-lg font-bold text-white flex items-center gap-2">
             <i class="fa-brands fa-github text-purple-400"></i>
-            <span>مرکز به‌روزرسانی و همگام‌سازی با گیت‌هاب (GitHub Updater)</span>
+            <span>مرکز به‌روزرسانی و همگام‌سازی</span>
         </h2>
-        <p class="text-xs text-slate-400 mt-1">استعلام خودکار نسخه جدید از مخزن گیت‌هاب و ارتقای ۱ کلیکه فایل‌های پنل</p>
+        <p class="text-xs text-slate-400 mt-1">استعلام خودکار نسخه جدید از سرور اصلی و ارتقای ۱ کلیکه فایل‌های پنل</p>
     </div>
 
     <div class="flex items-center gap-2">
@@ -68,7 +68,7 @@ require __DIR__ . '/../layout/header.php';
                             <i class="fa-solid fa-cloud-arrow-down animate-bounce"></i>
                         </div>
                         <div>
-                            <h3 class="font-bold text-sm text-white">🎉 نگارش جدید در گیت‌هاب منتشر شد: <span class="font-mono text-purple-300"><?= htmlspecialchars($displayLatestFull) ?></span></h3>
+                            <h3 class="font-bold text-sm text-white">🎉 نگارش جدید منتشر شد: <span class="font-mono text-purple-300"><?= htmlspecialchars($displayLatestFull) ?></span></h3>
                             <p class="text-xs text-purple-200/80 mt-1"><?= htmlspecialchars($updateInfo['release_title'] ?? "نسخه جدید {$displayLatestFull} در دسترس است") ?></p>
                             <span class="text-[10px] text-purple-300 block font-mono mt-0.5">تاریخ انتشار: <?= $updateInfo['published_at'] ?></span>
                         </div>
@@ -103,7 +103,7 @@ require __DIR__ . '/../layout/header.php';
                     <div class="pt-2">
                         <button type="button" onclick="startLiveUpdate()" class="w-full py-3 bg-gradient-to-r from-purple-600/90 to-indigo-600/90 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-xl text-xs transition border border-purple-500/30 flex items-center justify-center gap-2 cursor-pointer shadow-md">
                             <i class="fa-solid fa-arrows-rotate"></i>
-                            <span>دانلود و استقرار مجدد آخرین کدها از گیت‌هاب (اجرای نوار پیشرفت زنده)</span>
+                            <span>دانلود و استقرار مجدد آخرین کدها از سرور اصلی (اجرای نوار پیشرفت زنده)</span>
                         </button>
                     </div>
                 </div>
@@ -127,16 +127,16 @@ require __DIR__ . '/../layout/header.php';
         <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-sm space-y-4">
             <div class="flex items-center gap-2 border-b border-slate-800 pb-3">
                 <i class="fa-solid fa-code-commit text-emerald-400"></i>
-                <h3 class="font-bold text-xs text-white">ارسال و بارگذاری فایل‌ها به مخزن گیت‌هاب شما (Git Push)</h3>
+                <h3 class="font-bold text-xs text-white">ارسال و بارگذاری فایل‌ها به مخزن اصلی</h3>
             </div>
             <p class="text-xs text-slate-400">
-                اگر قصد دارید کدهای جاری همین پنل را بر روی مخزن گیت‌هاب خود بارگذاری نمایید، آدرس مخزن خود را وارد کرده و دکمه ارسال را لمس کنید:
+                اگر قصد دارید کدهای جاری همین پنل را بر روی مخزن اصلی خود بارگذاری نمایید، آدرس مخزن خود را وارد کرده و دکمه ارسال را لمس کنید:
             </p>
 
             <form action="<?= Helpers::url('updater/git-push') ?>" method="POST" class="space-y-3 text-xs" onsubmit="return confirm('آیا از کامیت و Push کردن فایل‌های فعلی پنل به مخزن مطمئن هستید؟');">
                 <?= Helpers::csrfField() ?>
                 <div>
-                    <label class="block text-slate-300 mb-1 font-semibold">آدرس ریموت گیت‌هاب (با توکن جهت دسترسی Push):</label>
+                    <label class="block text-slate-300 mb-1 font-semibold">آدرس ریموت مخزن (با توکن جهت دسترسی Push):</label>
                     <input type="text" name="git_remote_url" required dir="ltr" 
                            placeholder="https://YOUR_TOKEN@github.com/USERNAME/REPO.git"
                            class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-xs">
@@ -151,7 +151,7 @@ require __DIR__ . '/../layout/header.php';
 
                 <button type="submit" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition shadow flex items-center gap-2">
                     <i class="fa-solid fa-cloud-arrow-up"></i>
-                    <span>ارسال و بارگذاری کدها به گیت‌هاب (Push to GitHub)</span>
+                    <span>ارسال و بارگذاری کدها به مخزن اصلی</span>
                 </button>
             </form>
         </div>
@@ -165,7 +165,7 @@ require __DIR__ . '/../layout/header.php';
                 <h3 class="font-bold text-xs text-white">وب‌هوک استقرار آنی (GitHub Webhook)</h3>
             </div>
             <p class="text-[11px] text-slate-400 leading-relaxed">
-                برای به‌روزرسانی آنی و بدون تأخیر پنل به‌محض زدن Push در گیت‌هاب، آدرس وب‌هوک زیر را در تنظیمات مخزن گیت‌هاب (Settings > Webhooks) قرار دهید:
+                برای به‌روزرسانی آنی و بدون تأخیر پنل به‌محض زدن Push در گیت‌هاب، آدرس وب‌هوک زیر را در تنظیمات مخزن (Settings > Webhooks) قرار دهید:
             </p>
             <div class="flex items-center gap-2">
                 <input type="text" readonly value="<?= Helpers::fullUrl('updater/webhook?secret=' . APP_SECRET) ?>" 
@@ -176,13 +176,13 @@ require __DIR__ . '/../layout/header.php';
                     <i class="fa-solid fa-copy"></i>
                 </button>
             </div>
-            <span class="text-[10px] text-slate-500 block">Content type را در گیت‌هاب روی <code>application/json</code> قرار دهید.</span>
+            <span class="text-[10px] text-slate-500 block">Content type را در تنظیمات روی <code>application/json</code> قرار دهید.</span>
         </div>
 
         <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-sm space-y-4">
             <div class="flex items-center gap-2 border-b border-slate-800 pb-3">
                 <i class="fa-solid fa-sliders text-purple-400"></i>
-                <h3 class="font-bold text-xs text-white">تنظیمات مخزن گیت‌هاب</h3>
+                <h3 class="font-bold text-xs text-white">تنظیمات مخزن اصلی</h3>
             </div>
 
             <form action="<?= Helpers::url('updater/settings') ?>" method="POST" class="space-y-3.5 text-xs">
@@ -204,7 +204,7 @@ require __DIR__ . '/../layout/header.php';
             </div>
 
             <div>
-                <label class="block text-slate-300 mb-1 font-semibold">توکن اختصاصی گیت‌هاب (Personal Access Token):</label>
+                <label class="block text-slate-300 mb-1 font-semibold">توکن اختصاصی مخزن (Personal Access Token):</label>
                 <input type="password" name="github_token" value="<?= htmlspecialchars($token) ?>" dir="ltr" 
                        placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
                        class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono">
@@ -242,7 +242,7 @@ require __DIR__ . '/../layout/header.php';
         <!-- Progress Bar -->
         <div class="space-y-2">
             <div class="flex items-center justify-between text-xs text-slate-300">
-                <span id="progressStepText">مرحله ۱ از ۵: اتصال به گیت‌هاب</span>
+                <span id="progressStepText">مرحله ۱ از ۵: اتصال به سرور اصلی</span>
                 <span id="progressPercent" class="font-mono font-bold text-purple-400">15%</span>
             </div>
             <div class="w-full bg-slate-800 rounded-full h-3 overflow-hidden p-0.5 border border-slate-700">
@@ -255,7 +255,7 @@ require __DIR__ . '/../layout/header.php';
             <div id="stepItem1" class="flex items-center justify-between text-purple-300">
                 <span class="flex items-center gap-2">
                     <i class="fa-solid fa-spinner fa-spin text-purple-400 w-4"></i>
-                    <span>مرحله ۱: اعتبارسنجی نسخه و امضای رسمی در گیت‌هاب</span>
+                    <span>مرحله ۱: اعتبارسنجی نسخه و امضای رسمی</span>
                 </span>
                 <span class="text-[10px] font-mono text-purple-400" id="stepStatus1">در حال اجرا...</span>
             </div>
@@ -353,11 +353,11 @@ function startLiveUpdate(e) {
     }
 
     // Step 1: Connect
-    updateStepUI(1, 20, 'مرحله ۱ از ۵: بررسی ارتباط با گیت‌هاب...');
+    updateStepUI(1, 20, 'مرحله ۱ از ۵: بررسی ارتباط با سرور اصلی...');
 
     setTimeout(() => {
         // Step 2: Downloading
-        updateStepUI(2, 45, 'مرحله ۲ از ۵: دریافت پکیج از گیت‌هاب...');
+        updateStepUI(2, 45, 'مرحله ۲ از ۵: دریافت پکیج از سرور اصلی...');
 
         setTimeout(() => {
             // Step 3: Extracting

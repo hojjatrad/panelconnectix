@@ -4,7 +4,7 @@ require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Setting.php';
 
 class Updater {
-    public const CURRENT_VERSION = '7.3.0'; // v8.0 Panel Location Manager - Path Independence, Well-Known discovery, Smart Resolver, QR fallback
+    public const CURRENT_VERSION = '4.0.45'; // v4.0.45 Panel - Unified Versioning - Path Independence, Well-Known discovery, Smart Resolver, QR fallback
 
     public static function getCurrentVersion(): string {
         $dbVer = Setting::get('current_version', '');
@@ -137,7 +137,7 @@ class Updater {
                         'current_version_full' => "Connectix v{$currentVer}",
                         'latest_version' => $remoteVer,
                         'latest_version_full' => "Connectix v{$remoteVer}",
-                        'release_title' => "انتشار نسخه جدید Connectix v{$remoteVer} در گیت‌هاب",
+                        'release_title' => "انتشار نسخه جدید Connectix v{$remoteVer} در سرور اصلی",
                         'changelog' => "ارتقا به نگارش Connectix v{$remoteVer}: بهبود نمایش نسخه و رفع باگ commit-xxxx",
                         'download_url' => "https://github.com/{$repo}/archive/refs/heads/{$branch}.zip",
                         'published_at' => date('Y-m-d H:i:s'),
@@ -211,9 +211,9 @@ class Updater {
             $lastInstalledSha = Setting::get('last_installed_commit_sha', '');
             $commitMsg = $commitRes['commit']['message'] ?? '';
 
-            // v4.0.26 FOREVER FIX FINAL: User reports "Ctrl+F5 banner goes but clicking dashboard/stats again shows v7.3.0"
-            // Root cause: commit fallback sets has_update true when SHA differs, even though version same (7.3.0 == 7.3.0)
-            // Previous filter tried to check v4.x but commit message contains v7.3.0 so filter failed
+            // v4.0.26 FOREVER FIX FINAL: User reports "Ctrl+F5 banner goes but clicking dashboard/stats again shows v4.0.45"
+            // Root cause: commit fallback sets has_update true when SHA differs, even though version same (4.0.45 == 4.0.45)
+            // Previous filter tried to check v4.x but commit message contains v4.0.45 so filter failed
             // FINAL LAW: has_update ALWAYS false in commit fallback - only version_compare via raw Updater.php should trigger banner
             // Panel updates are detected via raw CURRENT_VERSION check, not via commit SHA
             $hasUpdate = false;
@@ -226,7 +226,7 @@ class Updater {
                 'latest_version' => $currentVer, // Always same version for commit fallback, never commit hash
                 'latest_version_full' => "Connectix v{$currentVer}",
                 'release_title' => $hasUpdate ? "نسخه جدید Connectix v{$currentVer} در دسترس است" : "Connectix v{$currentVer} - به‌روز",
-                'changelog' => $commitMsg ?: 'آخرین تغییرات مستقیم مخزن گیت‌هاب',
+                'changelog' => $commitMsg ?: 'آخرین تغییرات مستقیم مخزن اصلی',
                 'download_url' => "https://github.com/{$repo}/archive/refs/heads/{$branch}.zip",
                 'published_at' => $commitRes['commit']['committer']['date'] ?? date('Y-m-d H:i:s'),
                 'checked_at' => date('Y-m-d H:i:s'),
@@ -623,7 +623,7 @@ class Updater {
             while (ob_get_level() > 0) { @ob_end_clean(); }
             @ini_set('display_errors', $prevDisplay);
             @error_reporting($prevReporting);
-            return ['success' => false, 'error' => "خطا در دانلود فایل پکیج از گیت‌هاب (کد HTTP: {$httpCode})"];
+            return ['success' => false, 'error' => "خطا در دانلود فایل پکیج از سرور اصلی (کد HTTP: {$httpCode})"];
         }
 
         $written = @file_put_contents($zipFile, $zipData);
@@ -645,7 +645,7 @@ class Updater {
             $isHtml = $firstBytes && (str_contains($firstBytes, '<html') || str_contains($firstBytes, '<!DOCTYPE') || str_contains($firstBytes, '<br'));
             $detail = "سایز: " . ($zipSize ? round($zipSize/1024) . "KB" : "نامشخص") . " | فضای آزاد: " . round($freeSpace/1024/1024,2) . "MB | ZipArchive: " . (class_exists('ZipArchive') ? 'فعال' : 'غیرفعال') . " | پیش‌نمایش: " . htmlspecialchars(substr($firstPreview,0,120));
             if ($isHtml) {
-                $detail .= " | ⚠️ فایل دریافتی HTML است نه ZIP (احتمالاً خطای گیت‌هاب یا محدودیت API)";
+                $detail .= " | ⚠️ فایل دریافتی HTML است نه ZIP (احتمالاً خطای سرور یا محدودیت)";
             }
             self::deleteDirectory($tmpDir);
             while (ob_get_level() > 0) { @ob_end_clean(); }
@@ -717,7 +717,7 @@ class Updater {
 
         try {
             require_once __DIR__ . '/TelegramBot.php';
-            $msg = "🚀 <b>بروزرسانی موفق پنل با آخرین کدهای گیت‌هاب</b>\n\n"
+            $msg = "🚀 <b>بروزرسانی موفق پنل با آخرین نسخه</b>\n\n"
                  . "📅 <b>تاریخ:</b> " . date('Y-m-d H:i:s') . "\n"
                  . "🔖 <b>نگارش فعال:</b> <code>Connectix v{$installedVer}</code>\n"
                  . "📦 <b>مخزن:</b> <code>" . self::getRepo() . " (" . self::getBranch() . ")</code>\n"

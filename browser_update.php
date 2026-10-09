@@ -1,7 +1,7 @@
 <?php
 /**
- * BROWSER-BASED UPDATER v4.0.19 - For hosts where server cannot connect to GitHub (Iran)
- * Downloads ZIP via browser JS (client can access GitHub) then uploads to server via POST
+ * BROWSER-BASED UPDATER v4.0.19 - For hosts where server cannot connect to Main Server (Iran)
+ * Downloads ZIP via browser JS (client can access Main Server) then uploads to server via POST
  * Bypasses server outbound block
  */
 error_reporting(E_ALL & ~E_NOTICE);
@@ -156,7 +156,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         <div class="w-10 h-10 rounded-xl bg-cyan-600/20 text-cyan-400 flex items-center justify-center text-lg font-bold">🌐</div>
         <div>
             <h1 class="text-base font-black text-white">آپدیت مرورگری v4.0.19 - دور زدن فیلتر هاست</h1>
-            <p class="text-[11px] text-slate-400">وقتی هاست نمی‌تواند به گیت‌هاب وصل شود، مرورگر شما ZIP را دانلود و به هاست آپلود می‌کند</p>
+            <p class="text-[11px] text-slate-400">وقتی هاست نمی‌تواند به سرور اصلی وصل شود، مرورگر شما ZIP را دانلود و به هاست آپلود می‌کند</p>
         </div>
     </div>
 
@@ -166,7 +166,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     </div>
 
     <div class="grid grid-cols-1 gap-3">
-        <button id="startBtn" onclick="startBrowserUpdate()" class="w-full py-3 bg-gradient-to-r from-cyan-600 to-violet-600 hover:from-cyan-500 hover:to-violet-500 text-white font-black rounded-xl text-sm shadow-lg">🚀 شروع آپدیت مرورگری (دانلود از گیت‌هاب با مرورگر)</button>
+        <button id="startBtn" onclick="startBrowserUpdate()" class="w-full py-3 bg-gradient-to-r from-cyan-600 to-violet-600 hover:from-cyan-500 hover:to-violet-500 text-white font-black rounded-xl text-sm shadow-lg">🚀 شروع آپدیت مرورگری (دانلود با مرورگر)</button>
         <div class="grid grid-cols-2 gap-2">
             <a href="quick_update.php" class="py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs text-center">تلاش quick_update سروری</a>
             <a href="fix_deep_admin_crash_v4_0_19.php" class="py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs text-center">فیکس ادمین</a>
@@ -175,8 +175,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
     <div class="bg-amber-950/30 border border-amber-800/30 rounded-xl p-3 text-xs space-y-1">
         <p class="font-bold text-amber-300">💡 چرا این روش؟</p>
-        <p class="text-slate-300">هاست شما در ایران است و outbound به گیت‌هاب (api.github.com / codeload.github.com) فیلتر یا مسدود است. quick_update.php روی سرور اجرا می‌شود و نمی‌تواند ZIP را دانلود کند.</p>
-        <p class="text-slate-300">این صفحه ZIP را با <b>مرورگر شما</b> (که به گیت‌هاب دسترسی دارد) دانلود می‌کند، سپس تکه‌تکه به سرور آپلود و استخراج می‌کند.</p>
+        <p class="text-slate-300">هاست شما در ایران است و outbound به سرور اصلی (api.github.com / codeload.github.com) فیلتر یا مسدود است. quick_update.php روی سرور اجرا می‌شود و نمی‌تواند ZIP را دانلود کند.</p>
+        <p class="text-slate-300">این صفحه ZIP را با <b>مرورگر شما</b> (که به سرور اصلی دسترسی دارد) دانلود می‌کند، سپس تکه‌تکه به سرور آپلود و استخراج می‌کند.</p>
     </div>
 </div>
 
@@ -198,7 +198,7 @@ function log(msg, type='info') {
 
 async function startBrowserUpdate() {
     document.getElementById('startBtn').disabled = true;
-    document.getElementById('startBtn').textContent = '⏳ در حال دانلود از گیت‌هاب با مرورگر...';
+    document.getElementById('startBtn').textContent = '⏳ در حال دانلود با مرورگر...';
     logEl.innerHTML = '';
     log('شروع آپدیت مرورگری - Session: ' + sessionId, 'debug');
     
@@ -235,7 +235,7 @@ async function startBrowserUpdate() {
     }
     
     if (!zipBlob) {
-        log('❌ تمام لینک‌های گیت‌هاب ناموفق بود - لطفاً VPN مرورگر را روشن کنید یا از لینک مستقیم استفاده کنید', 'error');
+        log('❌ تمام لینک‌ها ناموفق بود - لطفاً VPN مرورگر را روشن کنید یا از لینک مستقیم استفاده کنید', 'error');
         log('💡 پیشنهاد: با VPN این صفحه را باز کنید، یا فایل ZIP را دستی از https://github.com/hojjatrad/panelconnectix/archive/refs/heads/main.zip دانلود و به data/tmp آپلود کنید', 'warn');
         document.getElementById('startBtn').disabled = false;
         document.getElementById('startBtn').textContent = '🚀 تلاش مجدد';
