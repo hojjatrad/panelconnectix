@@ -3,71 +3,69 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Connectix v4.0.39 - FUNDAMENTAL FIX Cloudflare Range Strip</title>
+<title>Connectix v4.0.40 - LAW 12 RTL FIX + FUNDAMENTAL FIX</title>
 <style>
 body{font-family:Tahoma,Arial;background:linear-gradient(135deg,#0f172a,#1e293b);color:#fff;margin:0;padding:20px;min-height:100vh}
 .container{max-width:900px;margin:0 auto}
 .card{background:rgba(255,255,255,0.05);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:24px;margin:16px 0}
 .btn{display:block;width:100%;padding:18px;background:linear-gradient(90deg,#10b981,#059669);color:#fff;text-decoration:none;border-radius:14px;font-weight:bold;font-size:18px;text-align:center;margin:12px 0;box-shadow:0 4px 20px rgba(16,185,129,0.3)}
-.btn-red{background:linear-gradient(90deg,#ef4444,#dc2626);box-shadow:0 4px 20px rgba(239,68,68,0.3)}
+.btn-red{background:linear-gradient(90deg,#6366f1,#4f46e5);box-shadow:0 4px 20px rgba(99,102,241,0.4)}
 .btn-blue{background:linear-gradient(90deg,#3b82f6,#2563eb);box-shadow:0 4px 20px rgba(59,130,246,0.3)}
 .qr-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}
 .qr-box{background:#fff;border-radius:16px;padding:16px;text-align:center}
 .qr-box img{width:100%;max-width:200px}
 .qr-box p{color:#000;margin:8px 0 0;font-size:11px;word-break:break-all}
-.badge{display:inline-block;background:#ef4444;color:#fff;padding:4px 12px;border-radius:20px;font-size:11px;margin:4px}
-h1{text-align:center;background:linear-gradient(90deg,#ef4444,#f59e0b);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-size:26px}
-h2{color:#ef4444}
+.badge{display:inline-block;background:#6366f1;color:#fff;padding:4px 12px;border-radius:20px;font-size:11px;margin:4px}
+h1{text-align:center;background:linear-gradient(90deg,#6366f1,#10b981);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-size:26px}
+h2{color:#6366f1}
 ul{line-height:1.8;font-size:13px}
 code{background:rgba(0,0,0,0.4);padding:2px 6px;border-radius:4px;font-size:10px}
 </style>
 </head>
 <body>
 <div class="container">
-<h1>🔥 Connectix v4.0.39<br>FUNDAMENTAL FIX - Cloudflare Range Strip + Resume</h1>
+<h1>✨ Connectix v4.0.40<br>LAW 12 RTL FIX + FUNDAMENTAL FIX</h1>
 
-<div class="card" style="border:2px solid #ef4444;background:rgba(239,68,68,0.15)">
-<h2 style="color:#ef4444">⬇️ دانلود مستقیم v4.0.39 - فیکس اساسی Cloudflare</h2>
-<a class="btn btn-red" href="https://vpbotn.ir/download_apk.php?file=arm64&v=4.0.39">🔴 دانلود v4.0.39 via download_apk.php - Resume ساپورت - FUNDAMENTAL FIX</a>
-<a class="btn" href="https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.39">📱 Direct download_apk.php - پایدارترین + Resume</a>
-<a class="btn" href="https://vpbotn.ir/Connectix-ARM64-v8a.apk?v=4.0.39">📱 ARM64 مستقیم 37MB</a>
-<a class="btn btn-blue" href="https://direct.vpbotn.ir/Connectix-ARM64-v8a.apk?v=4.0.39">🌍 Direct ARM64 37MB</a>
-<a class="btn" style="background:linear-gradient(90deg,#8b5cf6,#7c3aed)" href="https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.39/Connectix-Android-ARM64.apk">📦 GitHub CDN</a>
-<p style="text-align:center;font-size:11px">نسخه: 4.0.39 کد: 72 | 2026-10-09<br>فیکس: Cloudflare Range header رو حذف میکنه! + ?start= param + download_apk.php 206 Partial + Resume از 15% + فقط 3 URL + DM اول + 60s timeout + Monotonic + Max 3 بعد مرورگر</p>
-</div>
-
-<div class="card" style="border:2px solid #f59e0b;background:rgba(245,158,11,0.1)">
-<h2 style="color:#f59e0b">🔍 کشف اساسی - Cloudflare Range رو حذف میکنه!</h2>
-<p><span class="badge">ROOT CAUSE DEEP</span></p>
-<ul>
-<li><code>curl -H "Range: bytes=0-1023" https://vpbotn.ir/test_range.php</code> → <code>HTTP_RANGE: NOT SET</code> در PHP!</li>
-<li>Cloudflare با <code>cf-ray</code> و <code>cdn-loop</code> هدر Range رو strip میکنه - به origin نمیرسه</li>
-<li>حتی <code>direct.vpbotn.ir</code> هم پشت Cloudflare بود - هر دو دامنه cf-ray داشتن</li>
-<li>قبل: <code>Range: bytes=5000000-</code> → سرور 200 با کل فایل 37MB برمیگردوند نه 206 - resume کار نمیکرد</li>
-<li>نتیجه: هر fail تو 15% فایل 5.6MB پاک میشد و از صفر شروع → لوپ 15% → 0% → 15%</li>
-</ul>
+<div class="card" style="border:2px solid #6366f1;background:rgba(99,102,241,0.15)">
+<h2 style="color:#818cf8">⬇️ دانلود مستقیم v4.0.40 - فیکس RTL + Cloudflare</h2>
+<a class="btn btn-red" href="https://vpbotn.ir/download_apk.php?file=arm64&v=4.0.40">🔵 دانلود v4.0.40 via download_apk.php - RTL FIX + Resume</a>
+<a class="btn" href="https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.40">📱 Direct download_apk.php - پایدارترین + Resume</a>
+<a class="btn" href="https://vpbotn.ir/Connectix-ARM64-v8a.apk?v=4.0.40">📱 ARM64 مستقیم 37MB</a>
+<a class="btn btn-blue" href="https://direct.vpbotn.ir/Connectix-ARM64-v8a.apk?v=4.0.40">🌍 Direct ARM64 37MB</a>
+<a class="btn" style="background:linear-gradient(90deg,#8b5cf6,#7c3aed)" href="https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.40/Connectix-Android-ARM64.apk">📦 GitHub CDN v4.0.40</a>
+<p style="text-align:center;font-size:11px">نسخه: 4.0.40 کد: 73 | 2026-10-09<br>فیکس: RTL دکمه‌ها چپ→راست + غیرفعال + Cloudflare Range strip via ?start= + download_apk.php 206 + Resume از 15%</p>
 </div>
 
 <div class="card" style="border:2px solid #10b981;background:rgba(16,185,129,0.1)">
-<h2 style="color:#10b981">✅ فیکس اساسی - ?start= param + download_apk.php</h2>
-<p><span class="badge">FUNDAMENTAL FIX</span> <span class="badge">BYPASS CLOUDFLARE</span></p>
+<h2 style="color:#10b981">✅ LAW 12 RTL FIX - توضیح</h2>
+<p><span class="badge">RTL FIX</span> <span class="badge">BUTTONS STABLE</span></p>
 <ul>
-<li><b>download_apk.php جدید:</b> ساپورت <code>?start=5000000</code> + <code>Range</code> هدر - هر دو</li>
-<li><code>https://vpbotn.ir/download_apk.php?file=arm64&v=4.0.39&start=5000000</code> → <code>206 Partial Content</code> + <code>Content-Range: bytes 5000000-37762602/37762603</code> + <code>content-length: 32762603</code> → <b>کار میکنه حتی با Cloudflare!</b></li>
-<li>کلاینت جدید: <code>Range: bytes=existingSize-</code> + <code>URL?start=existingSize</code> - هر دو - اگر Cloudflare Range رو strip کرد query param کار میکنه</li>
-<li>اگر 15% fail (5.6MB) → دفعه بعد <code>?start=5664390</code> → از 15% ادامه نه از صفر - <b>دیگه لوپ نداری</b></li>
-<li>فقط 3 URL قابل اعتماد + DM اول + 60s timeout + Monotonic + Max 3 بعد مرورگر 100% کار میکنه</li>
-<li>سرور: <code>.htaccess Accept-Ranges bytes</code> + <code>download_apk.php</code> با <code>206</code> + <code>Content-Range</code></li>
+<li><b>مشکل:</b> هنگام اتصال، همه دکمه‌ها از چپ به راست می‌رفت و دیگه کار نمی‌کرد - نیاز به خروج کامل از اپ</li>
+<li><b>علت:</b> نبود Directionality RTL سراسری + Row ها بدون textDirection RTL + چیپ سرعت با متن مخلوط فارسی/انگلیسی باعث bidi flip + overflow که ناحیه کلیک را می‌پوشاند</li>
+<li><b>فیکس:</b> MaterialApp builder Directionality RTL برای کل اپ + Dashboard body Directionality RTL + تمام 33 Row textDirection RTL + اسپلیت چیپ سرعت فارسی RTL + انگلیسی LTR با Directionality جداگانه + FittedBox scaleDown + دکمه اتصال Center + Directionality RTL + GestureDetector opaque</li>
+<li>حفظ FUNDAMENTAL FIX v4.0.39: Cloudflare Range strip bypass via ?start= param + download_apk.php 206 Partial Content</li>
+</ul>
+</div>
+
+<div class="card" style="border:2px solid #f59e0b;background:rgba(245,158,11,0.1)">
+<h2 style="color:#f59e0b">🔍 FUNDAMENTAL FIX v4.0.39 - Cloudflare</h2>
+<p><span class="badge">CLOUDFLARE BYPASS</span></p>
+<ul>
+<li>Cloudflare هدر Range را strip می‌کند - به origin نمی‌رسد</li>
+<li>قبل: Range: bytes=5000000- → 200 با کل فایل 37MB → resume کار نمی‌کرد → لوپ 15%</li>
+<li>بعد: download_apk.php ساپورت ?start=5000000 → 206 Partial + Content-Range → حتی با Cloudflare کار می‌کند</li>
+<li>کلاینت: Range header + ?start= query param - هر دو - اگر Cloudflare Range را strip کرد query param کار می‌کند</li>
 </ul>
 </div>
 
 <div class="card">
-<h2>📱 QR کدها - پیشنهاد: download_apk.php با Resume</h2>
+<h2>📱 QR کدها - پیشنهاد: download_apk.php v4.0.40</h2>
+<p style="font-size:12px">اسکن کنید برای دانلود مستقیم با Resume - نسخه 4.0.40 RTL FIX</p>
 <div class="qr-grid">
-<div class="qr-box"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAcIAAAHCAQAAAABUY/ToAAAEBklEQVR4nO2dXYrjOhBGT10b8ihDLyBLsXc2zJJmB/ZSsgP5MSBT90ElWc40XBjwdTJUPQjHnUMkENJXP1KL8me2/POHIDjppJNOvpCrmE1rD7AJi4gAm71bpEdkgPLN/rreOvmWZKeqqgrhKSxDpzIBMq031Z/3pwCgM8Coqqrxyt46+W4kqrFToFNG1ayOdK7zaoz2VD5Cfjd/1jid/J/ItUfnoMqoT4G1h+Venk76TSf/LjIk5EfcRERuKnJP6LzelOWeYBlO+U0n/xJSVRNkOT2AzuEpOq8iWSOx9sgEQFDNyugjx+nkGSSmkCHrnP9ozFwPOdmYtpYwD41OiyOW0DmkRmdn8znk5IGUabX4kExskjV1ddMYHz22q7EVif2J43TyDLIuPLTLzRy0Nqnd5AgJfC9zsrUe2HoIEcmfQiS/Gx99EkKnApsoPIXx101l/PV1UW+dfEcya+q85qimGom2uKNpH4Cxfi83nzVOJ88jTVPnLUsTEJL5ak2IOlKDj3W7+6xxOnkemXMd2SWbwRwxjTX1EYpaslXK9ZCTv5MhYZnWMl9Ehk1YpIfxIQJ0CutNs0s2xgt76+TbkbSp1Vg/lsaiQpHinBW15OuQk9VK2Yc1FrYOqejsQ3Ta1JLHGJ1szaLTkaZpnbOgh4THHsX+rHE6eSq59ojcU2mGTu3dsImFqAHIedgez7k6+UqGhOrjpsUbs5SGTZXwlKbAUe7p4t46+Xak7WU1pdGGHKsUalL2VSj5XuZksb3GdQ80Nk+tUDJ55DFGJ49mnjovRdVdceFDdfVjKbT2OeTkwUpUKJVIdATybIo1il2erBzf55CTL2SnVjq09ujPuzYBIZnCU7KSXoZNrET/0t46+W5kKaWuIrruW/aurE0vWX1fh5xsyU5VHyIiA5ArFWuGY5EeCJrPLeq8V+d/3jidPIdsDo6pneuIatvV+pVkjF8J1gFYBwQ6dBm6i3rr5DuSVSsDVnSWGl/NHLZSJOv1Q05+Y3vOta1ejLSJeqty9Bo0J7+1NrVaCsxKGj81pSB7uMjnkJNHM7+MEqemHuTYU/Y0f8BzHU6+WFshtDvzWtJnM215CE0A+7PG6eR55OGca6yLEa0yaiR2/orvZU4eyf0etFBTZfoUVa3lRMGi0zLRqfyIF/bWybcj67mO9r6q/BeLTle/LNZtzNchJ38j7YpFNpGJTfKp6Z9Dp/kgfl542EooO6RLe+vke5GHC85C6nM4enzcVMY4WMB6EdBlAmX9gvHRp08bp5PnkYf7GONeIVRsPNSDFGHte5mTjbV6aC9cVC1Zj3IAtlwI4rWwTn5DbtktAzot1y5u+RpqmdizafXqIb9/yMnGxP/XgpNOOnkx+S85cPQZJXGPLQAAAABJRU5ErkJggg=="><p><b>download_apk.php</b><br>Resume ساپورت<br>پیشنهاد اصلی<br>?start= param</p></div>
-<div class="qr-box"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAcIAAAHCAQAAAABUY/ToAAAEIUlEQVR4nO2dS4rrOhBATz0JMrShF9BLUXbQS3pbs5aSBVywhg0y9QZS2XJ4o8s16VyqBiH+HGJBUa6vIsrvSf7nN0Fw0kknnXwii3S5FxGyiJAl0j/mTUTmrZ2zO+PrntbJH0eiugZVVVXSGtQOKyRV1WWqAKFdbed0DarLe63TyavJblqmb2lnuwkC0gqq69YvUETk/kd+08m/kiw3JX9W5E5QXYqI3EtE7pOqLtf8ppNvT8bT0SakR6yav1ZICuQ5VMkSKrS32h/4TSf/LrLpkAX4oUIBSQ9B89ev2BSJaUWYVmBSoLzqaZ38qeTWgi0A5N7OB5V/HzeFEiE97COLiMj8yqd18qeRsZuWJhXyHDi8a81zQOFbFCpjQvK91unkdSQtrl8mVZJWdCG0wxbWJ7vaP8Buea91OnkdiepqH01pLA0Eu9Lst5hj7Trk5CAtvQiY+qzQ4vikdTjX1Kd/U9chJ3eJUGaU8lHJMwKTIklBsgTtMVh3mVQgVKHE+m7rdPI6stU6YFKFqdp7ay9pqFZ7jQHtlsXtkJNncvoW1XUT1cdNyZ+qrb56B+Rebioy0zVn0Ka3W6eTF5Fmh+Dk7OwXkqpVWu0b7lM7eRLTjbp711ajb6oC9DeYXejZgPdap5PXkXSPR63Fo9uhYPmh1cI0hsSR65CTh0QoH0q+g1I+0Py17XXY0AOxpLR6mTBtkfTwuMzJQYY3WAvOsHzi8ULTPUnUzZL7Q04OYgoS9qAraPd9tMf7vQgyVTy2d/J/pJc52kHQQV/S2p0ii9C6Nnme2smzmDvd62VHpfVU69it1FT9XebkWZpPLWkBSY8IlIjmeW2XNX9+i1LAGqqD9m6091qnk9eRQ1jfvCAGO2Rd1OeRjn7hvdbp5HXkuX/ItIRJR58adpdpqka81zqdvI7c+4L2prOVIQbrs0HPEZrrkJOD9HfZkx2yMoce04p7zshnFJ08y1GKt7aPOtRhjw7YXpHF62VOPovZocPcWGK6x/HjOPUgrkNOmjTDs1j+2Rrz2cekw9nZ9n5qJ5+k54eYQNIKZAkqaZ1RSqjDDD5Tmw1Sed3TOvkTSesfOvqCpnNqyNzpY/TD4zInTxKhfLRhemH6FTWtoLBFhVDpo/ba8tQCt2a03m2dTl5HooOcjFG3SCtjRN/CeveHnBxlaLMf0kD7NMf+zXph7T7XISdNxn3QLMo/ctdDa+wY9LsOOflM9n3QAF3KTckz6FLivgXaJnJnkz4lVHw/RicHOYob45j02TalIw3pcx1OPstpH7Q2Eh0q+XPfO0a6hklasNHp8uE9+U7uct4HbYvaNtRbN5Qy07ZAS8sWNUuowlQhf9UXPa2TP5GMwL7pK7QkERCU/FUjad3iuHNVEVO491qnk9eR4v+14KSTTr6Y/A8Xi9b6QocGEQAAAABJRU5ErkJggg=="><p><b>Direct ARM64</b><br>37MB<br>پایدار</p></div>
-<div class="qr-box"><img src="data:image/png;base64,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"><p><b>GitHub CDN</b><br>اگر فیلتره</p></div>
-<div class="qr-box"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAcIAAAHCAQAAAABUY/ToAAAECElEQVR4nO2dX4rjOBCHv1oZ+lGGPkAfxblBH2nZI80N7KPMARasxwaZ3z5IsuVMw8DQ2SRN1UOIlXxEgqJU/6SY+DNZ/vpDEJx00kknr8hkVS5pgGXcjMUG6uAIdmEzs2PMhvvN1smHJIMkqW1q6UX2tz6MSZK0gv4ZQVLmGHvGdTp5G3IAwCBkYDMmgRYLYhnX8oFNP4f2lTTC9ONes3XyEcmhf4h5gPSaDcCIoOUCWt4Ey/v6Rb/p5Pcih6tnLWMA4opIBrAZMGSDIX/Nbzr5Hcni7JAGgM00pwGIEhCkmc2qFxQlzXeerZOPRVJ1A2Bag37zUiVI83Ot08nbkQPEXTUSCDIQc323vH1Y3d+APiH5XOt08nYkLayvlqZuVEB7FyQpc+xluB1y8iRFQeaWJCoJobl8Fqq+qChXfcR1yMmTVB2KEtMKEDNUT7p6S5pjhmml6toc5Trk5C4DxbSkIWt5y4MA2TRvxqRtsOItpRexjCEb8V/T/Wbr5COSJakIccWmFUF6zSK9yiCI5R2a5mwm2LBir55rnU7ejtx3K5U9qnjN/a4G9CW1oJokeq51Ovm/kHYBpJ8DVE+a6gVJGbskM83xw7zm6uRZin2ZJGmOmRKDae2Tj3VM1UBVx/q51unk7ciiQy3yCvXdHpwx7ZpT47eM72VOnqX2BR2WRqq5oOIUHfmhKK91OPmZNB2CUuGYgS4drTV0WexmkdwOOdlJLdlHdZHX4RRVpen8oZqxdh1ycpdiaYrb07pdgdB5Qe3Ts9/0XOt08nYkR0G1xGXz3iHUtX3oGAPcH3LyJNUOrftjc7HZi2Y179iKslWlnmudTt6O7GL2w7vujBGcQ7Io94ecvJIu8oKmPl28v6ccDzXz/JCTn5Hxww5zY5f0Urqo2xnFoPqShlYOec51Ovn1ZOtjbOpTLQ17MZYWzNdQ3/uHnLyWGpeVlxbg725P/crJxfYco5PXZKpnzOzCZqXfrJcgynmh+GFMK5Rz+c+3TidvRNJq9G2P+iW2D11PUdd37XbIySZ9w32USsl+L4t1aWtayd7zQ06e5dQwtLcrxv6Oj+v8kNshJz8hlzfJ7C0DyayapTRgF9jHoIzZeOfZOvlQJOpk3X2fbuzcYrR6H6OT19Kft9+3sbqX5T5dNO9NRJ6ndvIkfXOQ9rhMUivjV23ifOLVdcjJJqd70NJYBrVYyAYDNq0bkF4Faax3W03r651m6+RzkMdetgZpLpUzsMu5u+hBZuvk/cnzPWgh2zQjm9ZtEAlsmjMGGKSRchna8p7vNFsnH5dsPR2tJ38ZKVcPUe7Si31/7Bf9ppPfhfwlLqs9aMdZj1qHrUfLCJ6ndvIspt9/51Px/1pw0kknv4j8D5Eh0miYL/F3AAAAAElFTkSuQmCC"><p><b>vpbotn ARM64</b><br>37MB</p></div>
+<div class="qr-box"><p><b>download_apk.php v4.0.40</b><br>RTL FIX + Resume<br>پیشنهاد اصلی</p><p>https://vpbotn.ir/download_apk.php?file=arm64&v=4.0.40</p></div>
+<div class="qr-box"><p><b>Direct v4.0.40</b><br>37MB<br>پایدار</p><p>https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.40</p></div>
+<div class="qr-box"><p><b>GitHub v4.0.40</b><br>CDN</p><p>https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.40/Connectix-Android-ARM64.apk</p></div>
+<div class="qr-box"><p><b>vpbotn ARM64 v4.0.40</b><br>37MB</p><p>https://vpbotn.ir/Connectix-ARM64-v8a.apk?v=4.0.40</p></div>
 </div>
 </div>
 
