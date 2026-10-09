@@ -74,11 +74,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Map<String, dynamic>? _updateInfo;
   bool _isCheckingUpdate = false;
 
-  static const String currentAppVersion = '4.0.43';
-  static String _actualInstalledVersion = '4.0.43'; // Will be updated from PackageManager
-  static int _actualInstalledCode = 76;
+  static const String currentAppVersion = '4.0.44';
+  static String _actualInstalledVersion = '4.0.44'; // Will be updated from PackageManager
+  static int _actualInstalledCode = 77;
 
-  // v4.0.43 FOREVER LAW: Get ACTUAL installed version from PackageManager, not hardcoded
+  // v4.0.44 FOREVER LAW: Get ACTUAL installed version from PackageManager, not hardcoded
   static Future<void> loadActualInstalledVersion() async {
     try {
       const channel = MethodChannel('com.connectix.vpn/updater');
@@ -88,14 +88,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         final verCode = (result['versionCode'] ?? '').toString();
         if (verName.isNotEmpty) {
           _actualInstalledVersion = verName;
-          print('v4.0.43 Actual installed version: $verName ($verCode)');
+          print('v4.0.44 Actual installed version: $verName ($verCode)');
         }
         if (verCode.isNotEmpty) {
-          _actualInstalledCode = int.tryParse(verCode) ?? 76;
+          _actualInstalledCode = int.tryParse(verCode) ?? 77;
         }
       }
     } catch (e) {
-      print('v4.0.43 loadActualInstalledVersion error: $e - using hardcoded $currentAppVersion');
+      print('v4.0.44 loadActualInstalledVersion error: $e - using hardcoded $currentAppVersion');
     }
   }
 
@@ -1494,11 +1494,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         return;
       }
 
+      // v4.0.44 FAKE VPN FIX: TUN mode must be TRUE on Android for real VPN
+      // Previously tunMode was only for Windows, causing proxyOnly:false but maybe not full TUN on some flutter_vless versions
+      // Now: Android always TUN (real VPN), Windows depends on setting
+      final tunMode = Platform.isAndroid ? true : (Platform.isWindows && _winTunnelMode == 'tun');
       // Windows Phase 2: full TUN mode needs admin on the FIRST run only
       // (creates the Wintun TAP adapter); afterwards the adapter persists.
-      final tunMode =
-          Platform.isWindows && _winTunnelMode == 'tun';
-      if (tunMode && !await _flutterV2ray.isElevated()) {
+      if (Platform.isWindows && tunMode && !await _flutterV2ray.isElevated()) {
         setState(() {
           _isConnecting = false;
         });
@@ -1791,26 +1793,31 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
   }
 
-  // v4.0.36 ZERO-COST: Enhance Xray config with Fragment + uTLS + DoH + BBR + ECH (all free, no disadvantage)
+  // v4.0.44 FAKE VPN FIX: Enhance Xray config with SAFE anti-filter + speed + stability
+  // PREVIOUS v4.0.36 had fragment for ALL non-Reality which breaks many servers -> FAKE VPN symptom
+  // NEW v4.0.44: No fragment for Reality/Vision, mux only 4 concurrency, DNS plain (no DoH direct), no DoH direct routing
   String _enhanceWithZeroCostAntiFilter(String configJson) {
     try {
       final Map<String, dynamic> cfg = jsonDecode(configJson) as Map<String, dynamic>;
       
-      // 1. DNS with DoH (F6) - Cloudflare + Google DoH for anti-filter
+      // 1. DNS - v4.0.44 FIX: Use plain DNS, not DoH direct (DoH often filtered in Iran via direct route)
+      // DoH via direct causes DNS fail -> filtered apps don't open
+      // Use 8.8.8.8, 1.1.1.1, 1.0.0.1, 8.8.4.4 with UseIP strategy, no DoH
       cfg['dns'] = {
         'servers': [
-          'https://cloudflare-dns.com/dns-query',
-          'https://dns.google/dns-query',
           '8.8.8.8',
           '1.1.1.1',
+          '1.0.0.1',
+          '8.8.4.4',
           'localhost'
         ],
-        'queryStrategy': 'UseIPv4',
+        'queryStrategy': 'UseIP',
         'disableCache': false,
         'disableFallback': false,
+        'tag': 'dns',
       };
       
-      // 2. Enhance outbounds with Fragment + uTLS + TCP optimizations (F2 + F6 + S4)
+      // 2. Enhance outbounds with SAFE settings (NO fragment for Reality/Vision)
       if (cfg['outbounds'] is List) {
         final outbounds = cfg['outbounds'] as List;
         for (int i = 0; i < outbounds.length; i++) {
@@ -1826,119 +1833,114 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 ? Map<String, dynamic>.from(ob['streamSettings'] as Map)
                 : <String, dynamic>{};
             
-            // F6: uTLS fingerprint = chrome (hide Xray fingerprint)
-            if (streamSettings['security'] == 'tls' || streamSettings['security'] == 'reality') {
-              // For TLS/Reality, add fingerprint
+            final security = (streamSettings['security'] ?? '').toString().toLowerCase();
+            final isReality = security == 'reality';
+            
+            // Check for Vision flow (xtls-rprx-vision) - must NOT use fragment/mux
+            bool isVision = false;
+            try {
+              final flow = (ob['settings']?['vnext']?[0]?['users']?[0]?['flow'] ?? ob['settings']?['users']?[0]?['flow'] ?? '').toString();
+              if (flow.contains('vision') || flow.contains('xtls')) isVision = true;
+            } catch (_) {}
+            
+            // F6: uTLS fingerprint = chrome (hide Xray fingerprint) - safe for all TLS/Reality
+            if (security == 'tls' || isReality) {
               streamSettings['tlsSettings'] = streamSettings['tlsSettings'] ?? {};
               final tlsSettings = Map<String, dynamic>.from(streamSettings['tlsSettings'] as Map? ?? {});
-              // uTLS fingerprint - most effective free anti-filter
               if (!tlsSettings.containsKey('fingerprint')) {
                 tlsSettings['fingerprint'] = 'chrome';
               }
-              // ECH - Encrypted Client Hello (if supported)
-              if (!tlsSettings.containsKey('ech')) {
-                tlsSettings['ech'] = false; // ECH not yet stable in Xray, but prepare
-              }
               streamSettings['tlsSettings'] = tlsSettings;
-              
-              // For Reality, keep existing settings
-              if (streamSettings['security'] == 'reality') {
-                final realitySettings = streamSettings['realitySettings'] as Map? ?? {};
-                // Reality already has strong anti-filter, keep it
-              }
             }
             
-            // S4 + F2: TCP optimizations + Fragment (BBR on client side)
-            // sockopt with fragment for TLS hello fragmentation (bypass DPI)
+            // S4: TCP optimizations (free, no disadvantage) - safe for all
             final sockopt = (streamSettings['sockopt'] as Map<String, dynamic>?) != null
                 ? Map<String, dynamic>.from(streamSettings['sockopt'] as Map)
                 : <String, dynamic>{};
             
-            // TCP optimizations (free, no disadvantage)
             sockopt['tcpNoDelay'] = true;
             sockopt['tcpKeepAliveIdle'] = 100;
             sockopt['tcpKeepAliveInterval'] = 30;
             sockopt['tcpFastOpen'] = true;
             sockopt['mark'] = 0;
             
-            // F2: Fragment - split TLS hello to bypass DPI (most effective free method)
-            // Only for TLS, not for Reality (Reality has its own)
-            if (streamSettings['security'] == 'tls') {
-              sockopt['fragment'] = {
-                'packets': 'tlshello',
-                'length': '100-200',
-                'interval': '10-20',
-              };
-              // Alternative fragment for non-TLS
-            } else if (streamSettings['security'] != 'reality') {
-              // For non-TLS, use smaller fragment as noise
-              sockopt['fragment'] = {
-                'packets': '1-3',
-                'length': '50-100',
-                'interval': '10-20',
-              };
-            }
+            // v4.0.44 FIX: NO FRAGMENT for Reality and Vision - fragment breaks them and causes FAKE VPN
+            // Fragment was causing silent outbound failure on many servers
+            // Only add fragment for plain TLS non-Vision if needed, and even then make it optional (disabled by default)
+            // For now: NO fragment at all to ensure real connection - user can enable via setting later if needed
+            // If you need fragment, uncomment below but with very conservative values:
+            // if (!isReality && !isVision && security == 'tls') {
+            //   sockopt['fragment'] = {'packets': 'tlshello', 'length': '10-20', 'interval': '10-20'};
+            // }
+            // Remove any existing fragment to be safe
+            sockopt.remove('fragment');
             
             streamSettings['sockopt'] = sockopt;
             ob['streamSettings'] = streamSettings;
             
-            // S4: Mux for speed (free, improves speed on weak connections)
-            final mux = (ob['mux'] as Map<String, dynamic>?) != null
-                ? Map<String, dynamic>.from(ob['mux'] as Map)
-                : <String, dynamic>{};
-            if (!mux.containsKey('enabled')) {
-              mux['enabled'] = true;
-              mux['concurrency'] = 8;
-              mux['xudpConcurrency'] = 8;
-              mux['xudpProxyUDP443'] = 'reject';
+            // S4: Mux - v4.0.44 FIX: Disable mux for Reality/Vision (they have their own), enable with concurrency 4 (not 8) for others
+            // Concurrency 8 was rejected by some servers causing speed 0
+            if (isReality || isVision) {
+              // For Reality/Vision, disable mux (Xray docs: mux not recommended with Vision)
+              final mux = (ob['mux'] as Map<String, dynamic>?) != null
+                  ? Map<String, dynamic>.from(ob['mux'] as Map)
+                  : <String, dynamic>{};
+              mux['enabled'] = false;
+              ob['mux'] = mux;
+            } else {
+              // For others, mux with safe concurrency 4
+              final mux = (ob['mux'] as Map<String, dynamic>?) != null
+                  ? Map<String, dynamic>.from(ob['mux'] as Map)
+                  : <String, dynamic>{};
+              if (!mux.containsKey('enabled')) {
+                mux['enabled'] = true;
+                mux['concurrency'] = 4; // v4.0.44: reduced from 8 to 4 for compatibility
+                mux['xudpConcurrency'] = 4;
+                mux['xudpProxyUDP443'] = 'reject';
+              } else {
+                // If mux already exists, ensure concurrency not too high
+                if ((mux['concurrency'] as int? ?? 0) > 4) mux['concurrency'] = 4;
+                if ((mux['xudpConcurrency'] as int? ?? 0) > 4) mux['xudpConcurrency'] = 4;
+              }
+              ob['mux'] = mux;
             }
-            ob['mux'] = mux;
             
             outbounds[i] = ob;
           } catch (e) {
-            // Ignore per-outbound errors
             continue;
           }
         }
       }
       
-      // 3. Add routing rule for DoH bypass (ensure DoH servers go direct)
+      // 3. v4.0.44 FIX: Remove DoH direct routing rule - DoH direct causes DNS fail in Iran
+      // Previously we added rule for cloudflare-dns.com, dns.google -> direct, but DoH is filtered
+      // Now DNS is plain 8.8.8.8 etc., no need for DoH direct rule
+      // Also ensure existing DoH direct rules are removed if present
       if (cfg['routing'] is Map) {
         final routing = Map<String, dynamic>.from(cfg['routing'] as Map);
         final rules = (routing['rules'] as List?) != null
             ? List<dynamic>.from(routing['rules'] as List)
             : <dynamic>[];
         
-        // Ensure DoH domains go direct
-        bool hasDoHRule = false;
-        for (final r in rules) {
+        // Remove any DoH direct rules (cloudflare-dns.com, dns.google, dns.cloudflare.com)
+        rules.removeWhere((r) {
           try {
             final rule = r as Map;
-            final domain = rule['domain']?.toString() ?? '';
-            if (domain.contains('cloudflare-dns.com') || domain.contains('dns.google')) {
-              hasDoHRule = true;
-              break;
-            }
-          } catch (_) {}
-        }
-        if (!hasDoHRule) {
-          rules.insert(0, {
-            'type': 'field',
-            'outboundTag': 'direct',
-            'domain': [
-              'cloudflare-dns.com',
-              'dns.google',
-              'dns.cloudflare.com',
-            ],
-          });
-        }
+            final domains = (rule['domain'] as List?)?.map((e) => e.toString()).toList() ?? [];
+            final domainStr = (rule['domain']?.toString() ?? '').toLowerCase();
+            return domains.any((d) => d.contains('cloudflare-dns.com') || d.contains('dns.google') || d.contains('dns.cloudflare.com')) ||
+                   domainStr.contains('cloudflare-dns.com') || domainStr.contains('dns.google');
+          } catch (_) {
+            return false;
+          }
+        });
+        
         routing['rules'] = rules;
         cfg['routing'] = routing;
       }
       
       return jsonEncode(cfg);
     } catch (e) {
-      // If enhancement fails, return original
       return configJson;
     }
   }

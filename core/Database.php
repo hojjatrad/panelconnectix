@@ -1171,7 +1171,7 @@ class Database {
                 }
             } catch (Throwable $e) {}
 
-            // v4.0.43 FOREVER LAW - PERMANENT FIX FOR OLD VERSION AFTER INSTALL
+            // v4.0.44 FOREVER LAW - PERMANENT FIX FOR OLD VERSION AFTER INSTALL
             // User reported: "برنامه آپ هنگام نصب میپره و نصب نمیشه و نسخه جدیدی نمیاد" and "دانلود و نصب میکنم هنوز نسخه قدیمی است"
             // ROOT CAUSE: Panel serves old APK content even with ?v= param (mirrored file stale on host)
             //            + Cloudflare cache + App downloads old APK and installs it, so version remains old
@@ -1196,7 +1196,7 @@ class Database {
                 require_once __DIR__ . '/Setting.php';
                 $currentVer = Setting::get('app_latest_version', '');
                 
-                // v4.0.43 FOREVER: Read latest version dynamically from app_release.json (never hardcoded)
+                // v4.0.44 FOREVER: Read latest version dynamically from app_release.json (never hardcoded)
                 $latestVer = '';
                 $latestCode = '';
                 $releaseJsonPath = __DIR__ . '/../app_release.json';
@@ -1230,18 +1230,25 @@ class Database {
                 }
                 // Ultimate fallback: hardcoded latest known
                 if ($latestVer === '') {
-                    $latestVer = '4.0.43';
-                    $latestCode = '76';
+                    $latestVer = '4.0.44';
+                    $latestCode = '77';
                 }
-                if ($latestCode === '') $latestCode = '76';
+                if ($latestCode === '') $latestCode = '77';
 
                 // If version is older than latest, auto-update and DELETE stale APKs (FOREVER LAW)
                 if ($currentVer === '' || version_compare($currentVer, $latestVer, '<')) {
                     Setting::set('app_latest_version', $latestVer);
                     Setting::set('app_version_code', $latestCode);
                     Setting::set('app_version_updated_at', date('Y-m-d H:i:s'));
-                    Setting::set('app_update_title', "Connectix v{$latestVer} ULTIMATE + FOREVER CACHE FIX 🔒✨");
-                    Setting::set('app_update_changelog', "✨ افکت اتصال فوق‌العاده + فیکس دائمی کش!\n\n• 14 میکرو-اینترکشن: حلقه 3x + مدار 8x + فیبر 14x + مایع + پلاسما + confetti\n• پرچم مواج 3D + غبار نورانی + صدای whoosh + لرزش + ضربان قلب\n• 🔒 فیکس دائمی: دانلود و نصب میکنم هنوز نسخه قدیمی است - حل شد برای همیشه\n• قانون 16: نسخه از app_release.json خوانده میشود، هرگز hardcode نیست\n• قانون 1: پنل هرگز APK قدیمی سرو نمیکند - اگر نسخه تغییر کرد، فایل قدیمی خودکار حذف\n• قانون 5: ?v=version&t=time&s=random برای دور زدن تمام کش‌ها (Cloudflare, CDN, browser)\n• قانون 2: اپ نسخه APK را با PackageManager چک میکند، اگر قدیمی بود لینک بعدی\n• قانون 7: بررسی PK + سایز >5MB + نسخه\n• رفع 3 باگ: دانلود 10%، خطای خروج، پروکسی بی‌نهایت");
+                    Setting::set('app_update_title', "Connectix v{$latestVer} FAKE VPN FIX + TUN REAL 🔒🚀");
+                    Setting::set('app_update_changelog', "🚀 فیکس بحرانی اتصال غیرواقعی!
+
+• ✅ TUN روی اندروید همیشه فعال - VPN واقعی
+• ✅ حذف Fragment برای Reality/Vision
+• ✅ Mux کاهش از 8 به 4
+• ✅ DNS بدون DoH direct
+• 🔒 فیکس دائمی کش
+• رفع باگ: اتصال CONNECTED اما فیلترشکن واقعی نبود");
                     Setting::set('app_update_enabled', '1');
                     $pb = 'https://vpbotn.ir';
                     $ts = time();
@@ -1271,14 +1278,14 @@ class Database {
                             
                             if ($shouldDelete) {
                                 @unlink($apkFile);
-                                error_log("v4.0.43 FOREVER LAW 16: Deleted stale APK $apkFile (ver $currentVer -> $latestVer, mtime " . date('Y-m-d H:i:s', $mtime) . ", size " . round($size/1024/1024,1) . "MB)");
+                                error_log("v4.0.44 FOREVER LAW 16: Deleted stale APK $apkFile (ver $currentVer -> $latestVer, mtime " . date('Y-m-d H:i:s', $mtime) . ", size " . round($size/1024/1024,1) . "MB)");
                             }
                         }
                     }
-                    error_log("v4.0.43 FOREVER: Updated app version $currentVer -> $latestVer (code $latestCode)");
+                    error_log("v4.0.44 FOREVER: Updated app version $currentVer -> $latestVer (code $latestCode)");
                 }
             } catch (Throwable $e) {
-                error_log("v4.0.43 FOREVER LAW error: " . $e->getMessage());
+                error_log("v4.0.44 FOREVER LAW error: " . $e->getMessage());
             }
 
             // Performance: Create indexes for fast lookups (Phase 2)
