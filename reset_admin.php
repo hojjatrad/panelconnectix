@@ -25,7 +25,7 @@ try {
     // Hardcode app_release.json 4.0.45 as ultimate fallback
     $hardcodedRelease = '{"version":"4.0.45","code":78,"force_update":false,"apk":{"arm64":"https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.45/Connectix-ARM64-v8a.apk","universal":"https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.45/Connectix-Universal.apk"},"version_code":78,"release_date":"2026-10-09"}';
     @file_put_contents(__DIR__ . '/app_release.json', $hardcodedRelease);
-    foreach (['drivers/PasargadDriver.php', 'drivers/MarzbanDriver.php', 'controllers/MetadataController.php', 'app_release.json', 'client-app/pubspec.yaml', 'client-app/lib/screens/dashboard_screen.dart'] as $rel) {
+    foreach (['repair.php', 'drivers/PasargadDriver.php', 'drivers/MarzbanDriver.php', 'controllers/MetadataController.php', 'app_release.json', 'client-app/pubspec.yaml', 'client-app/lib/screens/dashboard_screen.dart'] as $rel) {
         $local = __DIR__ . '/' . $rel;
         $url = 'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/' . $rel;
         $ch = curl_init($url);
