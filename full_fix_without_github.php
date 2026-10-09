@@ -1,8 +1,8 @@
 <?php
 /**
  * FULL FIX WITHOUT GITHUB v4.0.20 - Fixes Proxy 500 + Cache Admin/Reseller
- * For when quick_update.php and browser_update.php give 404 or cannot connect to GitHub
- * This file contains FIXED versions of critical files embedded, no GitHub needed
+ * For when quick_update.php and browser_update.php give 404 or cannot connect to Main Server
+ * This file contains FIXED versions of critical files embedded, no Main Server needed
  * 
  * Fixes in v4.0.20:
  * 1. Proxy 500: Call to undefined method Helpers::view() in ProxyController line 296 -> direct require
@@ -11,10 +11,10 @@
  * 
  * How to use:
  * 1. cPanel -> File Manager -> public_html/contax (or public_html)
- * 2. Create File -> full_fix_without_github.php
+ * 2. Create File -> full_fix_without_main-server.php
  * 3. Paste this entire content
  * 4. Save
- * 5. Open in browser: https://vpbotn.ir/full_fix_without_github.php or /contax/full_fix_without_github.php
+ * 5. Open in browser: https://vpbotn.ir/full_fix_without_main-server.php or /contax/full_fix_without_main-server.php
  * 6. Click Run Fix
  * 7. Purge Cloudflare cache (Dashboard -> Caching -> Purge Everything)
  * 8. Logout, Ctrl+F5, login again
@@ -580,13 +580,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['run_fix'])) {
 ?>
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Full Fix Without GitHub v4.0.20</title><script src="https://cdn.tailwindcss.com"></script><style>@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700;900&display=swap');*{font-family:'Vazirmatn',sans-serif}</style></head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Full Fix Without Main Server v4.0.20</title><script src="https://cdn.tailwindcss.com"></script><style>@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700;900&display=swap');*{font-family:'Vazirmatn',sans-serif}</style></head>
 <body class="bg-slate-950 text-slate-100 min-h-screen p-4 flex items-center justify-center">
 <div class="max-w-xl w-full bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-5 shadow-2xl">
     <div class="flex items-center gap-3 border-b border-slate-800 pb-4">
         <div class="w-10 h-10 rounded-xl bg-rose-600/20 text-rose-400 flex items-center justify-center text-lg font-bold">🛠️</div>
         <div>
-            <h1 class="text-base font-black text-white">فیکس کامل بدون GitHub v4.0.20</h1>
+            <h1 class="text-base font-black text-white">فیکس کامل بدون Main Server v4.0.20</h1>
             <p class="text-[11px] text-slate-400">فیکس Proxy 500 + کش ادمین/نماینده</p>
         </div>
     </div>
@@ -609,7 +609,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['run_fix'])) {
         <p class="text-cyan-300 font-mono">• index.php (فیکس کش Cloudflare)</p>
     </div>
     <form method="POST">
-        <button name="run_fix" value="1" class="w-full py-3 bg-gradient-to-r from-rose-600 to-violet-600 hover:from-rose-500 hover:to-violet-500 text-white font-black rounded-xl text-sm shadow-lg">🔧 اجرای فیکس کامل v4.0.20 (بدون GitHub)</button>
+        <button name="run_fix" value="1" class="w-full py-3 bg-gradient-to-r from-rose-600 to-violet-600 hover:from-rose-500 hover:to-violet-500 text-white font-black rounded-xl text-sm shadow-lg">🔧 اجرای فیکس کامل v4.0.20 (بدون Main Server)</button>
     </form>
     <div class="grid grid-cols-2 gap-2 text-xs">
         <div class="bg-slate-800 p-2 rounded-lg"><p class="text-slate-400">وضعیت فعلی:</p><p class="text-white font-mono"><?= file_exists(__DIR__.'/core/Auth.php')?'Auth.php وجود دارد':'Auth.php نیست' ?></p></div>

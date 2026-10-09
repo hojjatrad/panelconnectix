@@ -1,0 +1,2 @@
+# Skill: # Repository Reconnaissance
+Inspect root, branch, working tree, staged/unstaged diffs, latest commit, README, project instructions, manifests, lockfiles, CI, tests, entry points and repository memory. Run a safe baseline when possible. Preserve all pre-existing edits. Never use destructive reset/clean commands to simplify work. Record unavailable tools honestly.

@@ -1,0 +1,2 @@
+# Skill: # Security Review
+Review changed code and reachable callers for authentication/authorization, injection, path traversal, SSRF, unsafe deserialization, secrets, cryptography, dependencies, rate limits, privacy/logging, uploads, webhooks/replay, SQL/transactions and secure defaults. Findings need severity, location, attack scenario, impact, remedy and verification. Never run intrusive production tests or weaken controls without approval.

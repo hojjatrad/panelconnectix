@@ -124,7 +124,7 @@
                     <li>API: /api/v1/app/panel-location</li>
                     <li>Old Path Redirector: /contax → جدید</li>
                     <li>Brute-force: /, /contax, /panel, /admin...</li>
-                    <li>Remote Config: GitHub raw</li>
+                    <li>Remote Config: Main Server</li>
                     <li>QR اسکن (آخرین راه)</li>
                 </ol>
             </div>

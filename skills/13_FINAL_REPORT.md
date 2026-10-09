@@ -1,0 +1,2 @@
+# Skill: # Final Evidence Report
+Use `templates/FINAL_REPORT_TEMPLATE.md`. Separate implemented, tested, reviewed, committed and deployed states. Include exact commands and observed outcomes; skipped checks are `NOT RUN`, unknown claims `NOT VERIFIED`, external blockers `BLOCKED`. List pre-existing failures separately. Do not claim full coverage, “all tests passed”, “production-ready” or “bug-free” without scoped evidence.

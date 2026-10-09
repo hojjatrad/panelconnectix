@@ -1,0 +1,2 @@
+# Skill: # Frontend and UX
+Follow existing design/accessibility/localization conventions. Check loading, empty, success, error and permission-denied states; keyboard access, semantics, contrast, responsiveness, routes, URL parameters and input preservation. Avoid broad restyling in a functional fix. Do not claim browser verification unless a browser session or screenshot was actually inspected.

@@ -185,7 +185,7 @@ $appAutoMode = (($appPub['source'] ?? 'auto') !== 'admin');
                         </div>
                         <div>
                             <label class="block text-[11px] text-slate-400 mb-1">لینک دانلود ویندوز (ZIP — اختیاری)</label>
-                            <input type="text" name="app_download_url_windows" value="<?= htmlspecialchars(Setting::get('app_download_url_windows', '')) ?>" dir="ltr" placeholder="خالی = ریلیز گیت‌هاب (Connectix-Windows-x64.zip)"
+                            <input type="text" name="app_download_url_windows" value="<?= htmlspecialchars(Setting::get('app_download_url_windows', '')) ?>" dir="ltr" placeholder="خالی = ریلیس اصلی (Connectix-Windows-x64.zip)"
                                    class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-[11px]">
                         </div>
                     </div>
@@ -289,7 +289,7 @@ $appAutoMode = (($appPub['source'] ?? 'auto') !== 'admin');
                 <div class="text-[10px] text-slate-500">آخرین همگام‌سازی: <span dir="ltr"><?= htmlspecialchars((string)$mirrorLast['at']) ?></span></div>
             <?php endif; ?>
             <form method="post" action="<?= Helpers::url('app/apk-mirror') ?>" class="m-0"
-                  onsubmit="return confirm('فایل‌های APK با ریلیس فعلی گیت‌هاب مقایسه و در صورت نیاز دوباره روی هاست دانلود می‌شوند (چند صد مگابایت). ادامه می‌دهید؟');">
+                  onsubmit="return confirm('فایل‌های APK با ریلیس فعلی سرور اصلی مقایسه و در صورت نیاز دوباره روی هاست دانلود می‌شوند (چند صد مگابایت). ادامه می‌دهید؟');">
                 <?= Helpers::csrfField() ?>
                 <button type="submit" class="w-full py-2.5 bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 font-bold rounded-xl text-xs border border-emerald-500/30 transition">
                     <i class="fa-solid fa-arrows-rotate ml-1.5"></i> همگام‌سازی فوری APKها با سرور اصلی

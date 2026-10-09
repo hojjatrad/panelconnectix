@@ -1,0 +1,2 @@
+# Skill: # Language and Platform Adaptation
+Detect stack from repository evidence, not assumptions. Adapt to PHP, Python, JS/TS, Java, C#, Go, Rust, Ruby, SQL, shell, mobile, desktop, embedded or infrastructure projects using native tooling. Follow declared runtime versions and conventions; do not apply one language's commands blindly to another. Preserve declared cross-platform support.

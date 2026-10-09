@@ -1,0 +1,2 @@
+# Skill: # Release Readiness
+Check acceptance criteria, tests after final edit, regression/build/lint/type checks, independent review, security, diff/stat, untracked files, secrets, unrelated changes, compatibility, migration/rollback, docs and risks. A readiness assessment does not authorize commit, push, publish or deploy. Get explicit approval for those actions.

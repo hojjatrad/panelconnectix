@@ -1,0 +1,2 @@
+# Skill: # Debugging and Root Cause
+Capture symptom, expected result, environment and evidence. Reproduce safely; form one falsifiable hypothesis at a time. Add a regression reproducer, apply one focused fix and rerun it plus adjacent tests. Log failed attempts and what they falsified. Never repeat an identical failed patch without new evidence. After two distinct failures widen diagnosis; after three attempts, or earlier at high risk, stop and report the smallest useful next diagnostic step.

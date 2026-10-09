@@ -280,7 +280,7 @@ class UpdateController {
                 'success' => true,
                 'status' => 'up_to_date',
                 'version' => $info['current_version'] ?? '',
-                'message' => 'پنل هم‌اکنون با آخرین نسخه گیت‌هاب همگام است؛ تغییری اعمال نشد.'
+                'message' => 'پنل هم‌اکنون با آخرین نسخه همگام است؛ تغییری اعمال نشد.'
             ]);
             exit;
         }

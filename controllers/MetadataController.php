@@ -175,7 +175,7 @@ class MetadataController {
             if ($r['ok']) {
                 Helpers::flash('success', count($changed)
                     ? 'همگام‌سازی فوری انجام شد: ' . count($changed) . ' فایل APK روی هاست نصب/بروز شد.'
-                    : 'همه‌ی فایل‌های APK قبلاً با ریلیس گیت‌هاب همگام بودند.');
+                    : 'همه‌ی فایل‌های APK قبلاً همگام بودند.');
             } else {
                 $bad = array_filter($r['files'], fn($s) => !in_array($s, ['ok'], true));
                 Helpers::flash('error', 'همگام‌سازی با خطا: ' . implode('، ', array_map(fn($k, $v) => "$k ($v)", array_keys($bad), $bad)));

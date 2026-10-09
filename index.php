@@ -433,7 +433,7 @@ if (!empty($missingControllers)) {
                 <div class="pt-3 space-y-2">
                     <a href="repair.php?restore_files=1" class="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-lg shadow-purple-900/30">
                         <i class="fa-solid fa-cloud-arrow-down"></i>
-                        <span>دانلود و ترمیم خودکار فایل‌های گمشده از گیت‌هاب</span>
+                        <span>دانلود و ترمیم خودکار فایل‌های گمشده از سرور اصلی</span>
                     </a>
                     <a href="index.php" class="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium rounded-xl text-xs transition block">
                         تلاش مجدد و بارگذاری صفحه

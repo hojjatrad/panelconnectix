@@ -1,0 +1,2 @@
+# Skill: # Build, CI and Dependency Hygiene
+Inspect manifests, lockfiles, runtime versions, package manager and CI. Use pinned project commands. Avoid opportunistic upgrades. For necessary dependencies assess maintenance, license, supply chain and vulnerabilities; keep lockfiles synchronized. Do not execute untrusted scripts without risk review. If CI is inaccessible, report local checks only.

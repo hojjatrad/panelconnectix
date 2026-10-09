@@ -414,7 +414,7 @@ document.getElementById('guideVideo')?.addEventListener('play', () => {
   document.getElementById('videoPlaceholder')?.style.setProperty('display','none');
 });
 
-// Fallback images to GitHub raw if local 404
+// Fallback images to main server if local 404
 const githubRaw = '<?= $githubRaw ?>';
 document.querySelectorAll('img').forEach(img => {
   img.addEventListener('error', function() {

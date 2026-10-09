@@ -1,0 +1,2 @@
+# Skill: # Database and Migration Safety
+Inspect schema, constraints, indexes, transactions, data ownership and query plans when available. Prefer additive/backward-compatible migration. Define forward/rollback behavior, locking, backfill, partial failure and idempotence. Test on disposable synthetic data first. Never run destructive or production migration without explicit approval. If DB unavailable, mark runtime verification `NOT RUN`.

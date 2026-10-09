@@ -1,0 +1,2 @@
+# Skill: # Regression and Integration
+Identify adjacent flows and dependencies. Run the regression test, affected module tests, and broadest feasible suite/build/lint/type checks. Check API/schema/migration and old-client compatibility where relevant. Separate baseline failures from new failures. Rerun affected tests after the final edit. State scope and limitations.

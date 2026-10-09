@@ -1,0 +1,2 @@
+# Skill: # API and Integration Engineering
+Inspect contracts, versioning, authentication, permissions, pagination, rate limits and error semantics. Validate requests and remote responses. Use timeouts, bounded retries and idempotency for retried writes; verify webhook signatures and replay protection when relevant. Avoid sensitive logs. Use fixtures/sandbox safely. Do not claim external compatibility without actual contract evidence or successful integration test.

@@ -1,0 +1,2 @@
+# Skill: # Test Strategy
+Map each acceptance criterion to a test or manual check. Establish baseline and pre-existing failures. Use unit, integration, contract, end-to-end, security, regression and non-functional tests as relevant. Define pass criteria before execution. Report exact command, observed result, environment and limits. `NOT RUN` is never `PASS`; static inspection is not runtime testing.

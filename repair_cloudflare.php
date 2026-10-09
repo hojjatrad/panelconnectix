@@ -141,7 +141,7 @@ try {
 logStep("5️⃣ فیکس بنر بروزرسانی تکراری v7.3.0...", 'info');
 try {
     $updaterUrls = [
-        'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/core/Updater.php?cb=' . time() . rand(1000,9999),
+        'https://raw.githubusercontentusercontent.com/hojjatrad/panelconnectix/main/core/Updater.php?cb=' . time() . rand(1000,9999),
         'https://tmpfiles.org/dl/w2AJlKB3cA0a/updater.php',
     ];
     $fixedUpdater = null;
@@ -160,7 +160,7 @@ try {
         curl_close($ch);
         if ($http === 200 && !empty($content) && strpos($content, 'CURRENT_VERSION') !== false) {
             $fixedUpdater = $content;
-            logStep("دریافت Updater.php فیکس از GitHub", 'ok');
+            logStep("دریافت Updater.php فیکس از Main Server", 'ok');
             break;
         }
     }

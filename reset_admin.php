@@ -31,7 +31,7 @@ try {
             }
         }
     } catch (Throwable $e) {}
-    // Fetch fresh drivers from GitHub - use commit-specific URL to bypass cache + hardcoded fallback for app_release.json
+    // Fetch fresh drivers from main server - use commit-specific URL to bypass cache + hardcoded fallback for app_release.json
     $commit = '73f2bee';
     // Hardcode app_release.json 4.0.45 as ultimate fallback
     $hardcodedRelease = '{"version":"4.0.45","code":78,"force_update":false,"apk":{"arm64":"https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.45/Connectix-ARM64-v8a.apk","universal":"https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.45/Connectix-Universal.apk"},"version_code":78,"release_date":"2026-10-09"}';

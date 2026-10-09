@@ -1,0 +1,2 @@
+# Skill: # Independent Code Review
+Read the actual complete diff against the task and baseline; do not trust the author's summary. If possible use a separate agent/model/context. Otherwise label the work as a second-pass review, not a separate agent. Check logic, edge cases, errors, data integrity, concurrency, security, compatibility, tests, performance, accidental scope and secrets. Findings: severity, file/line, scenario, impact, remedy. “No findings identified in reviewed scope” is not “bug-free”.

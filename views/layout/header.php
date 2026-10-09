@@ -619,7 +619,7 @@ if (!function_exists('isActiveRoute')) {
             </div>
         <?php endif; ?>
 
-        <!-- GitHub New Version Available Banner for Admin - v6.8.3: Never show commit-xxxx -->
+        <!-- New Version Available Banner for Admin - v6.8.3: Never show commit-xxxx -->
         <?php 
         if (Auth::isAdmin() && class_exists('Updater')) {
             $cachedUpdate = Setting::get('update_check_cache');

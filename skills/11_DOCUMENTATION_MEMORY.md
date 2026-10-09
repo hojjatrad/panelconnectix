@@ -1,0 +1,2 @@
+# Skill: # Documentation and Persistent Repository Memory
+Use `engineering-memory/PROJECT_OVERVIEW.md`, `ARCHITECTURE.md`, `DECISIONS.md`, `TEST_CATALOG.md`, `BUG_LEDGER.md`, `CHANGELOG.md`, `KNOWN_ISSUES.md`. Validate memory against current code; label hypotheses; record dates, commit/source and evidence. Update after meaningful work and inspect memory diff. Never store secrets, credentials, private keys or unnecessary personal/production data. Persistence depends on saving/retaining repository files.

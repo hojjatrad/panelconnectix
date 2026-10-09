@@ -23,8 +23,8 @@ foreach ($dirs as $d) {
 }
 echo "\n=== Fix 440 file ===\n";
 echo file_exists(__DIR__.'/fix_440_simple.php') ? "exists ".filesize(__DIR__.'/fix_440_simple.php')." bytes\n" : "not exists\n";
-// Try to fetch new fix_440 from GitHub raw and overwrite
-$url = 'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/fix_440_simple.php';
+// Try to fetch new fix_440 from Main Server raw and overwrite
+$url = 'https://raw.githubusercontentusercontent.com/hojjatrad/panelconnectix/main/fix_440_simple.php';
 echo "Fetching new fix_440 from $url\n";
 $ch = curl_init($url);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);

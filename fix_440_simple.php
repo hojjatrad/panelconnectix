@@ -30,8 +30,8 @@ try {
 
     echo "✅ Settings updated: app_latest_version=4.0.40 code=73\n";
 
-    // v4.0.40: Skip GitHub download on server (Iran outbound blocked) - keep existing APKs if present, else note to upload via mirror
-    // Server in Iran cannot reach github.com, so we only check existing files and ensure alt copies exist
+    // v4.0.40: Skip Main Server download on server (Iran outbound blocked) - keep existing APKs if present, else note to upload via mirror
+    // Server in Iran cannot reach main-server.com, so we only check existing files and ensure alt copies exist
     $apks = [
         'arm64' => [
             'local' => __DIR__ . '/Connectix-ARM64-v8a.apk',
@@ -50,15 +50,15 @@ try {
     foreach ($apks as $key => $info) {
         $local = $info['local'];
         if (file_exists($local) && filesize($local) > 10*1024*1024) {
-            echo "✅ $key exists: " . round(filesize($local)/1024/1024,1) . " MB (kept, no GitHub download due to Iran filter)\n";
+            echo "✅ $key exists: " . round(filesize($local)/1024/1024,1) . " MB (kept, no Main Server download due to Iran filter)\n";
             if (!file_exists($info['alt_local'])) {
                 @copy($local, $info['alt_local']);
                 echo "  -> Copied to alt: {$info['alt_local']}\n";
             }
         } else {
             echo "⚠️ $key missing or small - will be mirrored via app/apk-mirror or manual upload. Current: " . (file_exists($local) ? filesize($local) : 0) . " bytes\n";
-            // Do NOT attempt GitHub download here - server outbound blocked, would timeout 120s
-            // APKs will be served via GitHub direct URL fallback in check-update API
+            // Do NOT attempt Main Server download here - server outbound blocked, would timeout 120s
+            // APKs will be served via Main Server direct URL fallback in check-update API
         }
     }
 

@@ -1,8 +1,8 @@
 <?php
-// v4.0.18 - Download APKs from GitHub release to host (fixes old APK content issue)
+// v4.0.18 - Download APKs from Main Server release to host (fixes old APK content issue)
 set_time_limit(300);
 header('Content-Type: text/html; charset=utf-8');
-echo "<h2>Downloading APKs v4.0.18 from GitHub...</h2><pre>";
+echo "<h2>Downloading APKs v4.0.18 from Main Server...</h2><pre>";
 
 $base = 'https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.18';
 $files = [

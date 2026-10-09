@@ -1,0 +1,2 @@
+# Skill: # Performance and Reliability
+When relevant inspect complexity, memory, query count/indexes, timeouts, retries/backoff, idempotency, cancellation, cleanup, cache invalidation, concurrency, overload behavior and privacy-safe observability. Measure with reproducible before/after method if claiming improvement. Never invent benchmarks; disclose unavailable representative environments.

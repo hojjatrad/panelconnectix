@@ -1,0 +1,2 @@
+# Skill: # Minimal-Scope Implementation
+Make the smallest correct patch; follow project conventions and supported runtimes. Preserve behavior outside scope. Avoid unrelated refactors, formatting churn, dependency upgrades and generated-file edits. Validate at trust boundaries, handle errors and inspect diff after each logical change. Explain necessary scope expansion before proceeding.

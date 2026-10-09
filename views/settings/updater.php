@@ -123,7 +123,7 @@ require __DIR__ . '/../layout/header.php';
             </div>
         </div>
 
-        <!-- Git Push Repository Form (For uploading code directly to GitHub) -->
+        <!-- Push Repository Form -->
         <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-sm space-y-4">
             <div class="flex items-center gap-2 border-b border-slate-800 pb-3">
                 <i class="fa-solid fa-code-commit text-emerald-400"></i>
@@ -162,10 +162,10 @@ require __DIR__ . '/../layout/header.php';
         <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-sm space-y-4">
             <div class="flex items-center gap-2 border-b border-slate-800 pb-3">
                 <i class="fa-solid fa-bolt text-amber-400"></i>
-                <h3 class="font-bold text-xs text-white">وب‌هوک استقرار آنی (GitHub Webhook)</h3>
+                <h3 class="font-bold text-xs text-white">وب‌هوک استقرار آنی</h3>
             </div>
             <p class="text-[11px] text-slate-400 leading-relaxed">
-                برای به‌روزرسانی آنی و بدون تأخیر پنل به‌محض زدن Push در گیت‌هاب، آدرس وب‌هوک زیر را در تنظیمات مخزن (Settings > Webhooks) قرار دهید:
+                برای به‌روزرسانی آنی و بدون تأخیر پنل به‌محض زدن Push، آدرس وب‌هوک زیر را در تنظیمات مخزن (Settings > Webhooks) قرار دهید:
             </p>
             <div class="flex items-center gap-2">
                 <input type="text" readonly value="<?= Helpers::fullUrl('updater/webhook?secret=' . APP_SECRET) ?>" 
@@ -263,7 +263,7 @@ require __DIR__ . '/../layout/header.php';
             <div id="stepItem2" class="flex items-center justify-between text-slate-500">
                 <span class="flex items-center gap-2">
                     <i class="fa-regular fa-circle w-4"></i>
-                    <span>مرحله ۲: دانلود مستقیم پکیج از سرورهای GitHub</span>
+                    <span>مرحله ۲: دانلود مستقیم پکیج از سرورهای اصلی</span>
                 </span>
                 <span class="text-[10px] font-mono" id="stepStatus2">در انتظار</span>
             </div>

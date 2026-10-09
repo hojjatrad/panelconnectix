@@ -424,7 +424,7 @@ foreach ($guides as $g) {
                             <i class="fa-brands fa-android text-xl text-emerald-400"></i>
                             <h4 class="font-bold text-white text-sm">سایر برنامه‌های اندروید (v2ray / sing-box)</h4>
                         </div>
-                        <span class="text-[10px] text-slate-400 font-mono">Google Play & GitHub</span>
+                        <span class="text-[10px] text-slate-400 font-mono">Google Play</span>
                     </div>
 
                     <div class="space-y-3">

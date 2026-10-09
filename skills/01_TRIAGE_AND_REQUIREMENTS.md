@@ -1,0 +1,2 @@
+# Skill: # Triage and Requirements
+Turn the request into observable acceptance criteria, non-goals, risk level, assumptions, affected areas and verification plan. Ask only when ambiguity materially affects security, data, public behavior, cost or architecture. Do not expand a narrow fix into a rewrite.

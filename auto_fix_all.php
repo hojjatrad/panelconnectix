@@ -294,9 +294,9 @@ if ($testDirect) {
 // 9. FIX v4.0.26: Dashboard banner v7.3.0 same version - auto fix
 logStep("گام 9: فیکس بنر بروزرسانی تکراری v7.3.0...", 'info');
 try {
-    // Download fixed Updater.php from GitHub raw
+    // Download fixed Updater.php from Main Server raw
     $updaterUrls = [
-        'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/core/Updater.php?cb=' . time() . rand(1000,9999),
+        'https://raw.githubusercontentusercontent.com/hojjatrad/panelconnectix/main/core/Updater.php?cb=' . time() . rand(1000,9999),
         'https://tmpfiles.org/dl/w2AJlKB3cA0a/updater.php',
     ];
     $fixedUpdater = null;

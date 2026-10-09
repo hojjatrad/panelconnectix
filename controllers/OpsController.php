@@ -125,12 +125,12 @@ class OpsController {
             }
         }
 
-        Helpers::logActivity('ops_rotate_webhook_secret', 'کلید وب‌هوک گیت‌هاب چرخش یافت (ops endpoint)', 'system');
+        Helpers::logActivity('ops_rotate_webhook_secret', 'کلید وب‌هوک چرخش یافت (ops endpoint)', 'system');
 
         if ($updated !== null && !empty($updated['id'])) {
             $this->respond([
                 'success' => true,
-                'message' => 'کلید وب‌هوک با موفقیت چرخش یافت (پنل + گیت‌هاب).',
+                'message' => 'کلید وب‌هوک با موفقیت چرخش یافت.',
                 'new_secret' => $newSecret,
                 'hook_id' => $updated['id'],
                 'old_secret_invalid_for_new_requests' => true,
@@ -139,7 +139,7 @@ class OpsController {
         }
         $this->respond([
             'success' => false,
-            'error' => 'پنل کلید جدید را ذخیره کرد، اما به‌روزرسانی هوک گیت‌هاب ناموفق بود. کلید جدید را دستی در تنظیمات وب‌هوک گیت‌هاب وارد کنید.',
+            'error' => 'پنل کلید جدید را ذخیره کرد، اما به‌روزرسانی هوک ناموفق بود. کلید جدید را دستی در تنظیمات وب‌هوک وارد کنید.',
             'new_secret' => $newSecret,
             'hint' => 'Settings → Webhooks → Edit → Secret',
         ]);

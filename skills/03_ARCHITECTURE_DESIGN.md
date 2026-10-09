@@ -1,0 +1,2 @@
+# Skill: # Architecture and Design
+Trace real data/control flow and interfaces. Choose the smallest maintainable change. Consider simpler alternatives for medium/high-risk work. Make validation, authorization, failure handling, observability and rollback explicit. For API/schema/migration changes assess compatibility, ordering, idempotence and rollback. Avoid new frameworks, abstractions or dependencies for style alone.

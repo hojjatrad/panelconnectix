@@ -1,0 +1,2 @@
+# Skill: # Test Engineering
+Write discriminating tests using project conventions. Cover normal, boundary, malformed, permission-denied and failure cases when relevant. For bug fixes, build a minimal reproducer that should fail on old behavior where feasible. Avoid flaky time/network dependencies. Do not weaken assertions or delete failing tests merely to get green. Report actual output and exit status.
