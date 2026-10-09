@@ -896,7 +896,11 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
             $hasMirroredUniversal = false;
         }
 
-        $versionParam = $latest !== '' ? '?v=' . urlencode($latest) . '&t=' . time() . '&s=' . rand(1000,9999) : '?t=' . time() . '&s=' . rand(1000,9999);
+        // v4.0.43 FOREVER LAW 16 - PERMANENT CACHE FIX - Always versioned with timestamp + random + cb
+        $ts = time();
+        $rnd = rand(1000,9999);
+        $cb = $ts . $rnd;
+        $versionParam = $latest !== '' ? '?v=' . urlencode($latest) . '&t=' . $ts . '&s=' . $rnd . '&cb=' . $cb . '&r=' . $rnd : '?t=' . $ts . '&s=' . $rnd . '&cb=' . $cb;
 
         $isGithubUrl = fn($u) => str_contains($u, 'github.com') || str_contains($u, 'githubusercontent.com');
         if ($downloadUrl === '' || ($isGithubUrl($downloadUrl) && $hasMirroredArm64)) {
@@ -919,11 +923,33 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
         if ($hasMirroredUniversal && $isGithubUrl($universalUrl)) {
             $universalUrl = $panelBase . '/Connectix-Universal.apk' . $versionParam;
         }
+        // v4.0.43 FOREVER - Ensure ALL panel URLs are versioned with timestamp+random+cb, never without version
+        $ts2 = time();
+        $rnd2 = rand(1000,9999);
         if (str_contains($downloadUrl, 'vpbotn.ir/Connectix') && !str_contains($downloadUrl, '?v=')) {
-            $downloadUrl .= (str_contains($downloadUrl, '?') ? '&' : '?') . 'v=' . urlencode($latest) . '&t=' . time() . '&s=' . rand(1000,9999);
+            $downloadUrl .= (str_contains($downloadUrl, '?') ? '&' : '?') . 'v=' . urlencode($latest) . '&t=' . $ts2 . '&s=' . $rnd2 . '&cb=' . $ts2 . $rnd2;
+        } elseif (str_contains($downloadUrl, 'vpbotn.ir/Connectix') && str_contains($downloadUrl, '?v=')) {
+            // Already versioned, but ensure t, s, cb present for cache bust
+            if (!str_contains($downloadUrl, '&t=')) $downloadUrl .= '&t=' . $ts2;
+            if (!str_contains($downloadUrl, '&s=')) $downloadUrl .= '&s=' . $rnd2;
+            if (!str_contains($downloadUrl, '&cb=')) $downloadUrl .= '&cb=' . $ts2 . $rnd2;
+            // Always add fresh timestamp to prevent Cloudflare cache
+            $downloadUrl .= '&_=' . $ts2;
         }
         if (str_contains($universalUrl, 'vpbotn.ir/Connectix') && !str_contains($universalUrl, '?v=')) {
-            $universalUrl .= (str_contains($universalUrl, '?') ? '&' : '?') . 'v=' . urlencode($latest) . '&t=' . time() . '&s=' . rand(1000,9999);
+            $universalUrl .= (str_contains($universalUrl, '?') ? '&' : '?') . 'v=' . urlencode($latest) . '&t=' . $ts2 . '&s=' . $rnd2 . '&cb=' . $ts2 . $rnd2;
+        } elseif (str_contains($universalUrl, 'vpbotn.ir/Connectix') && str_contains($universalUrl, '?v=')) {
+            if (!str_contains($universalUrl, '&t=')) $universalUrl .= '&t=' . $ts2;
+            if (!str_contains($universalUrl, '&s=')) $universalUrl .= '&s=' . $rnd2;
+            if (!str_contains($universalUrl, '&cb=')) $universalUrl .= '&cb=' . $ts2 . $rnd2;
+            $universalUrl .= '&_=' . $ts2;
+        }
+        // v4.0.43 FOREVER - Force GitHub URLs to also have cache bust
+        if (str_contains($downloadUrl, 'github.com') && !str_contains($downloadUrl, '?t=')) {
+            $downloadUrl .= (str_contains($downloadUrl, '?') ? '&' : '?') . 't=' . $ts2 . '&r=' . $rnd2;
+        }
+        if (str_contains($universalUrl, 'github.com') && !str_contains($universalUrl, '?t=')) {
+            $universalUrl .= (str_contains($universalUrl, '?') ? '&' : '?') . 't=' . $ts2 . '&r=' . $rnd2;
         }
         
         $githubArm64 = "https://github.com/{$repo}/releases/download/v{$latest}/Connectix-Android-ARM64.apk";

@@ -813,7 +813,11 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
         }
 
         // v4.0.19 FOREVER LAW: Always add ?v=version&t=time()&size= to bypass ALL caches
-        $versionParam = $latest !== '' ? '?v=' . urlencode($latest) . '&t=' . time() . '&s=' . rand(1000,9999) : '?t=' . time() . '&s=' . rand(1000,9999);
+        // v4.0.43 FOREVER LAW 16 - PERMANENT CACHE FIX
+        $ts = time();
+        $rnd = rand(1000,9999);
+        $cb = $ts . $rnd;
+        $versionParam = $latest !== '' ? '?v=' . urlencode($latest) . '&t=' . $ts . '&s=' . $rnd . '&cb=' . $cb . '&r=' . $rnd : '?t=' . $ts . '&s=' . $rnd . '&cb=' . $cb;
         
         if ($downloadUrl === '' || ($isGithubUrl($downloadUrl) && $hasMirroredArm64)) {
             $downloadUrl = $hasMirroredArm64 ? $panelBase . '/Connectix-ARM64-v8a.apk' . $versionParam : "https://github.com/{$repo}/releases/download/v{$latest}/Connectix-Android-ARM64.apk";

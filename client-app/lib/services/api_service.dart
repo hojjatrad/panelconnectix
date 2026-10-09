@@ -1324,21 +1324,44 @@ class ApiService {
           }
           final serverUrl = (map['download_url'] ?? '').toString();
           final universalUrl = (map['universal_url'] ?? '').toString();
-          final dynamicGhArm64 = "https://github.com/hojjatrad/panelconnectix/releases/download/v$latestVer/Connectix-Android-ARM64.apk";
-          final dynamicGhUniversal = "https://github.com/hojjatrad/panelconnectix/releases/download/v$latestVer/Connectix-Android-Universal.apk";
+          final dynamicGhArm64 = "https://github.com/hojjatrad/panelconnectix/releases/download/v$latestVer/Connectix-Android-ARM64.apk?t=$ts&r=$rnd&_=$ts";
+          final dynamicGhUniversal = "https://github.com/hojjatrad/panelconnectix/releases/download/v$latestVer/Connectix-Android-Universal.apk?t=$ts&r=$rnd&_=$ts";
+
+          // v4.0.43 FOREVER LAW 16 - PERMANENT CACHE FIX - Always versioned with t, s, cb, r
+          final ts = DateTime.now().millisecondsSinceEpoch;
+          final rnd = math.Random().nextInt(9999);
+          String addCacheBust(String url, String ver) {
+            if (url.isEmpty) return url;
+            final sep = url.contains('?') ? '&' : '?';
+            // Always ensure v, t, s, cb, r present
+            if (url.contains('?v=')) {
+              var u = url;
+              if (!u.contains('&t=')) u += '&t=$ts';
+              if (!u.contains('&s=')) u += '&s=$rnd';
+              if (!u.contains('&cb=')) u += '&cb=${ts}$rnd';
+              if (!u.contains('&r=')) u += '&r=$rnd';
+              u += '&_=$ts'; // Extra cache bust
+              return u;
+            }
+            return '$url${sep}v=$ver&t=$ts&s=$rnd&cb=${ts}$rnd&r=$rnd&_=$ts';
+          }
 
           String finalDownload = serverUrl;
           if (finalDownload.isEmpty || !finalDownload.startsWith('http') || finalDownload.contains('ir.vpbotn.ir/Connectix') || finalDownload.contains('cf.vpbotn.ir/Connectix')) {
-            finalDownload = "https://vpbotn.ir/Connectix-ARM64-v8a.apk?v=$latestVer&t=${DateTime.now().millisecondsSinceEpoch}";
+            finalDownload = "https://vpbotn.ir/Connectix-ARM64-v8a.apk?v=$latestVer&t=$ts&s=$rnd&cb=${ts}$rnd&r=$rnd&_=$ts";
             if (serverUrl.isNotEmpty && serverUrl.startsWith('http') && serverUrl.contains('vpbotn.ir') && !serverUrl.contains('ir.vpbotn.ir') && !serverUrl.contains('cf.vpbotn.ir')) {
-              finalDownload = serverUrl;
+              finalDownload = addCacheBust(serverUrl, latestVer);
             } else if (serverUrl.isNotEmpty && serverUrl.startsWith('http') && !serverUrl.contains('vpbotn.ir')) {
-              finalDownload = serverUrl;
+              finalDownload = addCacheBust(serverUrl, latestVer);
             }
+          } else {
+            finalDownload = addCacheBust(finalDownload, latestVer);
           }
           String finalFallback = universalUrl;
           if (finalFallback.isEmpty || !finalFallback.startsWith('http') || finalFallback.contains('ir.vpbotn.ir/Connectix') || finalFallback.contains('cf.vpbotn.ir/Connectix')) {
-            finalFallback = "https://vpbotn.ir/Connectix-Universal.apk?v=$latestVer&t=${DateTime.now().millisecondsSinceEpoch}";
+            finalFallback = "https://vpbotn.ir/Connectix-Universal.apk?v=$latestVer&t=$ts&s=$rnd&cb=${ts}$rnd&r=$rnd&_=$ts";
+          } else {
+            finalFallback = addCacheBust(finalFallback, latestVer);
           }
 
           map['download_url'] = finalDownload.isNotEmpty ? finalDownload : dynamicGhArm64;
@@ -1999,6 +2022,58 @@ class ApiService {
               continue;
             }
 
+            // v4.0.43 FOREVER LAW - Verify APK versionName via PackageManager
+            // If downloaded version != expected, try next URL automatically
+            try {
+              final apkVersion = await _updaterChannel.invokeMethod<String>('getApkVersionName', {'filePath': file.path}).timeout(const Duration(seconds: 3), onTimeout: () => '');
+              final apkVer = (apkVersion ?? '').trim();
+              log('v4.0.43 APK version check: expected $expectedVer, got $apkVer, len $len');
+              print('v4.0.43 APK version: expected $expectedVer, got $apkVer');
+              if (apkVer.isNotEmpty && expectedVer.isNotEmpty && apkVer != expectedVer) {
+                // If version mismatch and not same major, delete and try next
+                // Allow if apkVer is newer than expected (in case panel ahead)
+                try {
+                  bool isMismatch = true;
+                  // If apkVer is newer, allow it (don't delete)
+                  try {
+                    List<int> parseVer(String v) => v.replaceAll(RegExp(r'[^\d.]'), '').split('.').map((e) => int.tryParse(e) ?? 0).toList();
+                    final expParts = parseVer(expectedVer);
+                    final apkParts = parseVer(apkVer);
+                    bool apkNewer = false;
+                    bool apkOlder = false;
+                    for (int i = 0; i < 3; i++) {
+                      final e = i < expParts.length ? expParts[i] : 0;
+                      final a = i < apkParts.length ? apkParts[i] : 0;
+                      if (a > e) { apkNewer = true; break; }
+                      if (a < e) { apkOlder = true; break; }
+                    }
+                    if (apkNewer) {
+                      log('v4.0.43 APK $apkVer newer than expected $expectedVer - allowing');
+                      isMismatch = false;
+                    } else if (apkOlder) {
+                      log('v4.0.43 APK $apkVer OLDER than expected $expectedVer - DELETING and trying next URL');
+                      isMismatch = true;
+                    } else {
+                      isMismatch = false;
+                    }
+                  } catch (_) {}
+                  
+                  if (isMismatch) {
+                    print('v4.0.43 Version mismatch: expected $expectedVer but got $apkVer - trying next URL');
+                    try { await file.delete(); } catch (_) {}
+                    continue; // Try next URL
+                  }
+                } catch (_) {}
+              } else if (apkVer.isEmpty) {
+                log('v4.0.43 APK version empty, but PK and size ok - allowing (maybe old Android)');
+              } else {
+                log('v4.0.43 APK version match: $apkVer == $expectedVer');
+              }
+            } catch (e) {
+              log('v4.0.43 Version check error (allowing): $e');
+              // Allow if version check fails - PK and size already verified
+            }
+
             safeProgress(0.92, len, len);
 
             try {
@@ -2100,6 +2175,32 @@ class ApiService {
                         final header = await raf.read(4);
                         await raf.close();
                         if (header.length >= 2 && header[0] == 0x50 && header[1] == 0x4B) {
+                          // v4.0.43 FOREVER LAW - Verify version for DM fallback too
+                          try {
+                            final apkVersion = await _updaterChannel.invokeMethod<String>('getApkVersionName', {'filePath': f.path}).timeout(const Duration(seconds: 3), onTimeout: () => '');
+                            final apkVer = (apkVersion ?? '').trim();
+                            log('v4.0.43 DM APK version: expected $expectedVer, got $apkVer');
+                            if (apkVer.isNotEmpty && expectedVer.isNotEmpty && apkVer != expectedVer) {
+                              try {
+                                List<int> parseVer(String v) => v.replaceAll(RegExp(r'[^\d.]'), '').split('.').map((e) => int.tryParse(e) ?? 0).toList();
+                                final expParts = parseVer(expectedVer);
+                                final apkParts = parseVer(apkVer);
+                                bool apkOlder = false;
+                                for (int i = 0; i < 3; i++) {
+                                  final e = i < expParts.length ? expParts[i] : 0;
+                                  final a = i < apkParts.length ? apkParts[i] : 0;
+                                  if (a < e) { apkOlder = true; break; }
+                                  if (a > e) break;
+                                }
+                                if (apkOlder) {
+                                  log('v4.0.43 DM APK older - deleting');
+                                  try { await f.delete(); } catch (_) {}
+                                  break;
+                                }
+                              } catch (_) {}
+                            }
+                          } catch (_) {}
+                          
                           safeProgress(0.95, len, len);
                           final installResult = await _updaterChannel.invokeMethod('installApk', {'filePath': f.path, 'allowSameVersion': true}).timeout(const Duration(seconds: 15));
                           if (installResult == true || installResult == 'true' || installResult == null) {

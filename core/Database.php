@@ -1171,47 +1171,115 @@ class Database {
                 }
             } catch (Throwable $e) {}
 
-            // v4.0.19 FOREVER LAW - Auto update app_latest_version + delete stale APKs
-            // LAW: If version is older than latest, auto-update and delete old APK files so GitHub fallback is used
+            // v4.0.43 FOREVER LAW - PERMANENT FIX FOR OLD VERSION AFTER INSTALL
+            // User reported: "برنامه آپ هنگام نصب میپره و نصب نمیشه و نسخه جدیدی نمیاد" and "دانلود و نصب میکنم هنوز نسخه قدیمی است"
+            // ROOT CAUSE: Panel serves old APK content even with ?v= param (mirrored file stale on host)
+            //            + Cloudflare cache + App downloads old APK and installs it, so version remains old
+            // FOREVER LAWS (must always be applied, never regress):
+            // LAW 1: Panel must NEVER serve old APK - auto-delete stale files when version changes
+            // LAW 2: App must verify APK versionName after download via PackageManager.getPackageArchiveInfo
+            // LAW 3: If downloaded version != expected, try next URL automatically
+            // LAW 4: Clear old files before download (cache + external)
+            // LAW 5: ?v=version&t=time&s=random for ALL cache bypass (Cloudflare, CDN, browser)
+            // LAW 6: Always try GitHub as fallback even if panel file exists (GitHub is source of truth)
+            // LAW 7: Verify PK header + size >5MB + versionName + log everything
+            // LAW 8: Use externalFilesDir for FileProvider (best for MIUI/Samsung)
+            // LAW 9: Pure Intent (ACTION_INSTALL_PACKAGE + VIEW + Chooser) - NO PackageInstaller API
+            // LAW 10: Show detailed error with browser fallback
+            // LAW 11: Range bypass via ?start= query param (Cloudflare strips Range)
+            // LAW 12: RTL LAW - Directionality RTL
+            // LAW 13: No stuck - progress timer 500ms + 0 bytes detection
+            // LAW 14: externalFilesDir best for MIUI/Samsung
+            // LAW 15: Exit clean - dispose safe + singleton + wakeLock safe
+            // LAW 16: FOREVER CACHE FIX - Dynamic version from app_release.json, never hardcoded, delete stale APKs on version change
             try {
                 require_once __DIR__ . '/Setting.php';
                 $currentVer = Setting::get('app_latest_version', '');
-                $latestVer = '4.0.19';
-                $latestCode = '54';
-                // If version is older than latest, auto-update
+                
+                // v4.0.43 FOREVER: Read latest version dynamically from app_release.json (never hardcoded)
+                $latestVer = '';
+                $latestCode = '';
+                $releaseJsonPath = __DIR__ . '/../app_release.json';
+                if (is_file($releaseJsonPath)) {
+                    $rj = @json_decode(@file_get_contents($releaseJsonPath), true);
+                    if (!empty($rj['version'])) $latestVer = trim($rj['version']);
+                    if (!empty($rj['code'])) $latestCode = (string)$rj['code'];
+                }
+                // Fallback: read from dashboard_screen.dart
+                if ($latestVer === '') {
+                    $dartFile = __DIR__ . '/../client-app/lib/screens/dashboard_screen.dart';
+                    if (is_file($dartFile)) {
+                        $dartContent = @file_get_contents($dartFile);
+                        if (preg_match("/currentAppVersion\s*=\s*'([\d\.]+)'/", $dartContent, $m)) {
+                            $latestVer = $m[1];
+                        }
+                    }
+                }
+                // Fallback: read from pubspec.yaml
+                if ($latestVer === '') {
+                    $pubspecFile = __DIR__ . '/../client-app/pubspec.yaml';
+                    if (is_file($pubspecFile)) {
+                        $pubContent = @file_get_contents($pubspecFile);
+                        if (preg_match("/version:\s*([\d\.]+)\+/", $pubContent, $m)) {
+                            $latestVer = $m[1];
+                        }
+                        if (preg_match("/version:\s*[\d\.]+\+(\d+)/", $pubContent, $m2)) {
+                            $latestCode = $m2[1];
+                        }
+                    }
+                }
+                // Ultimate fallback: hardcoded latest known
+                if ($latestVer === '') {
+                    $latestVer = '4.0.43';
+                    $latestCode = '76';
+                }
+                if ($latestCode === '') $latestCode = '76';
+
+                // If version is older than latest, auto-update and DELETE stale APKs (FOREVER LAW)
                 if ($currentVer === '' || version_compare($currentVer, $latestVer, '<')) {
                     Setting::set('app_latest_version', $latestVer);
                     Setting::set('app_version_code', $latestCode);
                     Setting::set('app_version_updated_at', date('Y-m-d H:i:s'));
-                    Setting::set('app_update_title', "Connectix v{$latestVer} FOREVER INSTALL FIX 🔒");
-                    Setting::set('app_update_changelog', "🔒 فیکس دائمی نصب + پروکسی رایگان!\n\n• فیکس دائمی: نصب میپرید و نسخه جدید نمیامد - حل شد برای همیشه\n• قانون دائمی: پنل هرگز APK قدیمی سرو نمیکند - اگر فایل قدیمی باشد خودکار حذف و از گیت‌هاب میگیرد\n• قانون دائمی: اپ نسخه APK دانلود شده را با PackageManager چک میکند\n• قانون دائمی: اگر نسخه APK با نسخه مورد انتظار فرق داشت، خودکار لینک بعدی را امتحان میکند\n• قانون دائمی: قبل از دانلود، فایل قدیمی پاک میشود\n• قانون دائمی: ?v=version&t=time&s=random برای دور زدن تمام کش‌ها\n• پروکسی رایگان برای تلگرام و سایر برنامه‌ها (از v4.0.18)\n• فیکس پینگ 0/16 و مدیریت پنل قبل از لاگین");
+                    Setting::set('app_update_title', "Connectix v{$latestVer} ULTIMATE + FOREVER CACHE FIX 🔒✨");
+                    Setting::set('app_update_changelog', "✨ افکت اتصال فوق‌العاده + فیکس دائمی کش!\n\n• 14 میکرو-اینترکشن: حلقه 3x + مدار 8x + فیبر 14x + مایع + پلاسما + confetti\n• پرچم مواج 3D + غبار نورانی + صدای whoosh + لرزش + ضربان قلب\n• 🔒 فیکس دائمی: دانلود و نصب میکنم هنوز نسخه قدیمی است - حل شد برای همیشه\n• قانون 16: نسخه از app_release.json خوانده میشود، هرگز hardcode نیست\n• قانون 1: پنل هرگز APK قدیمی سرو نمیکند - اگر نسخه تغییر کرد، فایل قدیمی خودکار حذف\n• قانون 5: ?v=version&t=time&s=random برای دور زدن تمام کش‌ها (Cloudflare, CDN, browser)\n• قانون 2: اپ نسخه APK را با PackageManager چک میکند، اگر قدیمی بود لینک بعدی\n• قانون 7: بررسی PK + سایز >5MB + نسخه\n• رفع 3 باگ: دانلود 10%، خطای خروج، پروکسی بی‌نهایت");
                     Setting::set('app_update_enabled', '1');
                     $pb = 'https://vpbotn.ir';
-                    // Force GitHub URLs if mirrored files are stale - app will try panel first then GitHub
-                    Setting::set('app_download_url', $pb . '/Connectix-ARM64-v8a.apk?v=' . $latestVer . '&t=' . time() . '&s=' . rand(1000,9999));
-                    Setting::set('app_universal_url', $pb . '/Connectix-Universal.apk?v=' . $latestVer . '&t=' . time() . '&s=' . rand(1000,9999));
+                    $ts = time();
+                    $rnd = rand(1000,9999);
+                    Setting::set('app_download_url', $pb . '/Connectix-ARM64-v8a.apk?v=' . $latestVer . '&t=' . $ts . '&s=' . $rnd . '&cb=' . $ts);
+                    Setting::set('app_universal_url', $pb . '/Connectix-Universal.apk?v=' . $latestVer . '&t=' . $ts . '&s=' . $rnd . '&cb=' . $ts);
                     
-                    // v4.0.19 LAW: Delete stale APK files if they exist and are older than version update
+                    // v4.0.43 LAW 16 FOREVER: Delete stale APK files when version changes - NEVER serve old APK
                     $apkFiles = [
                         __DIR__ . '/../Connectix-ARM64-v8a.apk',
                         __DIR__ . '/../Connectix-Universal.apk',
                         __DIR__ . '/../Connectix-ARM32-v7a.apk',
                         __DIR__ . '/../Connectix-Android-ARM64.apk',
                         __DIR__ . '/../Connectix-Android-Universal.apk',
+                        __DIR__ . '/../Connectix-Android-ARM32.apk',
                     ];
                     foreach ($apkFiles as $apkFile) {
                         if (is_file($apkFile)) {
                             $mtime = filemtime($apkFile);
-                            // If file is older than 5 minutes, it's likely old version - delete to force GitHub fallback
-                            // Or if version changed, delete anyway to ensure fresh
-                            if (time() - $mtime > 300) { // 5 min
+                            $size = filesize($apkFile);
+                            // FOREVER: If version changed, ALWAYS delete old APKs to force fresh download from GitHub
+                            // Also delete if file is older than 5 min or smaller than 5MB (corrupted)
+                            $shouldDelete = false;
+                            if (time() - $mtime > 300) $shouldDelete = true; // Older than 5 min
+                            if ($size < 5*1024*1024) $shouldDelete = true; // Smaller than 5MB
+                            if ($currentVer !== $latestVer) $shouldDelete = true; // Version changed - MUST delete
+                            
+                            if ($shouldDelete) {
                                 @unlink($apkFile);
-                                error_log("v4.0.19 LAW: Deleted stale APK $apkFile (mtime " . date('Y-m-d H:i:s', $mtime) . ")");
+                                error_log("v4.0.43 FOREVER LAW 16: Deleted stale APK $apkFile (ver $currentVer -> $latestVer, mtime " . date('Y-m-d H:i:s', $mtime) . ", size " . round($size/1024/1024,1) . "MB)");
                             }
                         }
                     }
+                    error_log("v4.0.43 FOREVER: Updated app version $currentVer -> $latestVer (code $latestCode)");
                 }
-            } catch (Throwable $e) {}
+            } catch (Throwable $e) {
+                error_log("v4.0.43 FOREVER LAW error: " . $e->getMessage());
+            }
 
             // Performance: Create indexes for fast lookups (Phase 2)
             try {

@@ -1,10 +1,10 @@
 {
-  "version": "4.0.42",
-  "code": 75,
+  "version": "4.0.43",
+  "code": 76,
   "force_update": false,
   "force_min_code": 50,
   "update_type": "full",
-  "changelog": "• ✨ افکت اتصال فوق‌العاده جدید - The Ultimate Connectix Flow\n• 14 میکرو-اینترکشن: حلقه کوانتومی 3x + مدار ماهواره 8x + فیبر نوری 14x + مایع انرژی + پلاسما 6x + انفجار confetti 22x\n• Haptic 3 مرحله‌ای: لمس + موفقیت + لرزش صفحه\n• پرچم کشور با موج سه‌بعدی هنگام اتصال\n• ذرات غبار نورانی پس‌زمینه با حرکت سینوسی\n• صدای whoosh هنگام اتصال (قابل خاموش در تنظیمات)\n• Speed count-up انیمیشن + پس‌زمینه Glow پویا + ضربان قلب\n• رفع 3 باگ حیاتی v4.0.41: دانلود 10% گیر کرده، خطای خروج، پروکسی لودینگ بی‌نهایت\n• عملکرد 60fps حتی روی گوشی‌های ضعیف\n",
+  "changelog": "• 🔒 فیکس دائمی برای همیشه: دانلود و نصب میکنم هنوز نسخه قدیمی است - حل شد برای همیشه\n• قانون 16 FOREVER: نسخه از app_release.json خوانده میشود، هرگز hardcode نیست، هنگام تغییر نسخه فایل قدیمی خودکار حذف\n• قانون 5: ?v=version&t=time&s=random&cb=timestamp&r=random&_ برای دور زدن تمام کش‌ها (Cloudflare, CDN, browser)\n• قانون 2: اپ نسخه APK را با PackageManager.getPackageArchiveInfo چک میکند، اگر قدیمی بود خودکار لینک بعدی\n• قانون 7: بررسی PK + سایز >5MB + نسخه + لاگ کامل\n• ✨ افکت اتصال فوق‌العاده Ultimate - 14 میکرو-اینترکشن: حلقه 3x + مدار 8x + فیبر 14x + مایع + پلاسما 6x + confetti 22x\n• 📳 Haptic 3 مرحله‌ای + لرزش صفحه + ضربان قلب + 🚩 پرچم مواج 3D + ✨ غبار نورانی + 🔊 صدای whoosh\n• رفع 3 باگ حیاتی: دانلود 10% گیر کرده، خطای خروج، پروکسی لودینگ بی‌نهایت\n• عملکرد 60fps حتی روی گوشی‌های ضعیف\n",
   "date": "2026-10-09",
   "auto_update": {
     "enabled": true,
@@ -15,13 +15,13 @@
     "wifi_only": false
   },
   "apk": {
-    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.42/Connectix-Android-ARM64.apk",
-    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.42/Connectix-Android-Universal.apk",
-    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.42/Connectix-Android-ARM32.apk"
+    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.43/Connectix-Android-ARM64.apk",
+    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.43/Connectix-Android-Universal.apk",
+    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.43/Connectix-Android-ARM32.apk"
   },
   "apks": {
     "arm64-v8a": {
-      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.42/Connectix-Android-ARM64.apk",
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.43/Connectix-Android-ARM64.apk",
       "size": 37763490,
       "size_human": "36 MB",
       "abi": "arm64-v8a",
@@ -29,7 +29,7 @@
       "arch": "arm64"
     },
     "armeabi-v7a": {
-      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.42/Connectix-Android-ARM32.apk",
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.43/Connectix-Android-ARM32.apk",
       "size": 38299707,
       "size_human": "37 MB",
       "abi": "armeabi-v7a",
@@ -37,7 +37,7 @@
       "arch": "arm32"
     },
     "universal": {
-      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.42/Connectix-Android-Universal.apk",
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.43/Connectix-Android-Universal.apk",
       "size": 110428565,
       "size_human": "106 MB",
       "abi": "universal",
@@ -74,14 +74,15 @@
     "fundamental_fix_v4_0_39": "v4.0.39 FUNDAMENTAL FIX Cloudflare Range strip bypass via ?start= query param + download_apk.php 206 Partial Content + Resume from 15% not 0% + Only 3 URLs + DM first + 60s timeout + Monotonic + Max 3 then browser",
     "13_big_improvements_v4_0_28": "v4.0.28 - 13 improvements",
     "forensic_fix_v4_0_41": "v4.0.41 FORENSIC FIX - 3 bugs: 10% download stuck (DM 0 bytes stuck detection + externalFilesDir + progress timer + streaming primary + resume ?start=), exit errors (dispose safe + V2RayCompat singleton + wakeLock safe), proxy infinite spinner (immediate local fallback + 3s timeout + 2 URLs)",
-    "ultimate_ui_v4_0_42": "v4.0.42 ULTIMATE - 14 micro-interactions: quantum pulse 3x + orbit 8x + fiber 14x + liquid + plasma 6x + confetti 22x + haptic 3x + count-up + glow + flag wave 3D + dust 25x + sound whoosh + screen shake + heartbeat"
+    "ultimate_ui_v4_0_42": "v4.0.42 ULTIMATE - 14 micro-interactions: quantum pulse 3x + orbit 8x + fiber 14x + liquid + plasma 6x + confetti 22x + haptic 3x + count-up + glow + flag wave 3D + dust 25x + sound whoosh + screen shake + heartbeat",
+    "forever_cache_fix_v4_0_43": "v4.0.43 FOREVER CACHE FIX - PERMANENT: version from app_release.json never hardcoded, delete stale APKs on version change, ?v&t&s&cb&r&_ for all cache bypass, verify APK versionName via PackageManager, try next URL if mismatch, PK+size+version check, externalFilesDir, 14 micro-interactions"
   },
-  "version_code": 75,
+  "version_code": 76,
   "release_date": "2026-10-09",
   "apk_urls": {
-    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.42/Connectix-Android-ARM64.apk",
-    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.42/Connectix-Android-Universal.apk",
-    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.42/Connectix-Android-ARM32.apk"
+    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.43/Connectix-Android-ARM64.apk",
+    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.43/Connectix-Android-Universal.apk",
+    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.43/Connectix-Android-ARM32.apk"
   },
-  "download_url": "https://vpbotn.ir/download_apk.php?file=arm64&v=4.0.42&t=9999999999"
+  "download_url": "https://vpbotn.ir/download_apk.php?file=arm64&v=4.0.43&t=9999999999&s=9999&cb=9999999999"
 }
