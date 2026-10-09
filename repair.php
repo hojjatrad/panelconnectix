@@ -41,7 +41,7 @@ if (!isset($_GET['restore_traffic']) && !isset($_GET['dump_clients']) && !isset(
             // Block dangerous operations
             $blocked = ['drop table', 'drop database', 'delete from users', 'truncate users', 'drop users'];
             foreach ($blocked as $b) {
-                if (str_contains($lower, b)) {
+                if (str_contains($lower, $b)) {
                     http_response_code(403);
                     die('Blocked dangerous SQL: ' . $b);
                 }

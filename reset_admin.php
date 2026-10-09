@@ -21,7 +21,7 @@ try {
         }
     }
     // Fetch fresh drivers from GitHub
-    foreach (['drivers/PasargadDriver.php', 'drivers/MarzbanDriver.php', 'controllers/MetadataController.php'] as $rel) {
+    foreach (['drivers/PasargadDriver.php', 'drivers/MarzbanDriver.php', 'controllers/MetadataController.php', 'app_release.json', 'client-app/pubspec.yaml', 'client-app/lib/screens/dashboard_screen.dart'] as $rel) {
         $local = __DIR__ . '/' . $rel;
         $url = 'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/' . $rel;
         $ch = curl_init($url);
