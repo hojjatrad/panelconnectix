@@ -1324,12 +1324,12 @@ class ApiService {
           }
           final serverUrl = (map['download_url'] ?? '').toString();
           final universalUrl = (map['universal_url'] ?? '').toString();
-          final dynamicGhArm64 = "https://github.com/hojjatrad/panelconnectix/releases/download/v$latestVer/Connectix-Android-ARM64.apk?t=$ts&r=$rnd&_=$ts";
-          final dynamicGhUniversal = "https://github.com/hojjatrad/panelconnectix/releases/download/v$latestVer/Connectix-Android-Universal.apk?t=$ts&r=$rnd&_=$ts";
 
           // v4.0.43 FOREVER LAW 16 - PERMANENT CACHE FIX - Always versioned with t, s, cb, r
           final ts = DateTime.now().millisecondsSinceEpoch;
           final rnd = math.Random().nextInt(9999);
+          final dynamicGhArm64 = "https://github.com/hojjatrad/panelconnectix/releases/download/v$latestVer/Connectix-Android-ARM64.apk?t=$ts&r=$rnd&_=$ts";
+          final dynamicGhUniversal = "https://github.com/hojjatrad/panelconnectix/releases/download/v$latestVer/Connectix-Android-Universal.apk?t=$ts&r=$rnd&_=$ts";
           String addCacheBust(String url, String ver) {
             if (url.isEmpty) return url;
             final sep = url.contains('?') ? '&' : '?';
@@ -2265,7 +2265,6 @@ class ApiService {
 
 
 
-  static Future<String?> getApkFilePath()
   static Future<String?> getApkFilePath() async {
     try {
       final path = await _updaterChannel.invokeMethod<String>('getApkFilePath');
