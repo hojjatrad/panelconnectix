@@ -30,66 +30,35 @@ try {
 
     echo "✅ Settings updated: app_latest_version=4.0.40 code=73\n";
 
-    // Try to download APKs from GitHub release v4.0.40 if not present or outdated
+    // v4.0.40: Skip GitHub download on server (Iran outbound blocked) - keep existing APKs if present, else note to upload via mirror
+    // Server in Iran cannot reach github.com, so we only check existing files and ensure alt copies exist
     $apks = [
         'arm64' => [
             'local' => __DIR__ . '/Connectix-ARM64-v8a.apk',
-            'url' => 'https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.40/Connectix-Android-ARM64.apk',
             'alt_local' => __DIR__ . '/Connectix-Android-ARM64.apk'
         ],
         'universal' => [
             'local' => __DIR__ . '/Connectix-Universal.apk',
-            'url' => 'https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.40/Connectix-Android-Universal.apk',
             'alt_local' => __DIR__ . '/Connectix-Android-Universal.apk'
         ],
         'arm32' => [
             'local' => __DIR__ . '/Connectix-ARM32-v7a.apk',
-            'url' => 'https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.40/Connectix-Android-ARM32.apk',
             'alt_local' => __DIR__ . '/Connectix-Android-ARM32.apk'
         ]
     ];
 
     foreach ($apks as $key => $info) {
         $local = $info['local'];
-        $needDownload = true;
         if (file_exists($local) && filesize($local) > 10*1024*1024) {
-            // Check if file is recent (within 7 days) and size matches expected for v4.0.40
-            $size = filesize($local);
-            // Expected sizes: ARM64 ~37.7MB, Universal ~110MB, ARM32 ~38MB
-            if ($key === 'arm64' && $size > 37*1024*1024 && $size < 39*1024*1024) {
-                $needDownload = false;
-            } elseif ($key === 'universal' && $size > 100*1024*1024 && $size < 115*1024*1024) {
-                $needDownload = false;
-            } elseif ($key === 'arm32' && $size > 37*1024*1024 && $size < 40*1024*1024) {
-                $needDownload = false;
-            }
-        }
-        if ($needDownload) {
-            echo "Downloading $key from {$info['url']} ...\n";
-            $ch = curl_init($info['url']);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 120);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($ch, CURLOPT_USERAGENT, 'Connectix-Updater/4.0.40');
-            $data = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
-            if ($data && strlen($data) > 10*1024*1024 && $httpCode < 400) {
-                file_put_contents($local, $data);
-                if (file_exists($info['alt_local'])) @unlink($info['alt_local']);
-                copy($local, $info['alt_local']);
-                echo "✅ Downloaded $key: " . round(strlen($data)/1024/1024,1) . " MB\n";
-            } else {
-                echo "⚠️ Failed to download $key: HTTP $httpCode size " . strlen($data ?? '') . " - will try direct proxy or keep existing\n";
-                // Try via direct.vpbotn.ir as fallback? Or keep existing file
+            echo "✅ $key exists: " . round(filesize($local)/1024/1024,1) . " MB (kept, no GitHub download due to Iran filter)\n";
+            if (!file_exists($info['alt_local'])) {
+                @copy($local, $info['alt_local']);
+                echo "  -> Copied to alt: {$info['alt_local']}\n";
             }
         } else {
-            echo "✅ $key already exists and size OK: " . round(filesize($local)/1024/1024,1) . " MB\n";
-            // Ensure alt copy exists
-            if (!file_exists($info['alt_local']) && file_exists($local)) {
-                copy($local, $info['alt_local']);
-            }
+            echo "⚠️ $key missing or small - will be mirrored via app/apk-mirror or manual upload. Current: " . (file_exists($local) ? filesize($local) : 0) . " bytes\n";
+            // Do NOT attempt GitHub download here - server outbound blocked, would timeout 120s
+            // APKs will be served via GitHub direct URL fallback in check-update API
         }
     }
 
