@@ -20,7 +20,7 @@
                 <i class="fa-solid fa-bolt-lightning"></i>
             </div>
             <div>
-                <?php $panelVer = class_exists('Updater') ? Updater::getCurrentVersion() : '7.0.0'; ?>
+                <?php $panelVer = class_exists('Updater') ? Updater::getCurrentVersion() : '4.0.45'; ?>
                 <div class="flex items-center gap-2 mb-1">
                     <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-violet-500/20 text-violet-300 border border-violet-500/30 font-mono">v<?= htmlspecialchars($panelVer) ?> PRO ULTRA</span>
                     <span class="w-2 h-2 rounded-full bg-emerald-400 pulse-dot"></span>

@@ -8,8 +8,8 @@ class Updater {
 
     public static function getCurrentVersion(): string {
         $dbVer = Setting::get('current_version', '');
-        // Sanitize: if DB contains commit-xxxx, replace with proper version
-        if (!empty($dbVer) && str_starts_with($dbVer, 'commit-')) {
+        // v4.0.45 UNIFIED: Force 4.0.45 if DB has old 7.x version or commit hash
+        if (!empty($dbVer) && (str_starts_with($dbVer, 'commit-') || str_starts_with($dbVer, '7.') || version_compare($dbVer, '5.0.0', '>='))) {
             Setting::set('current_version', self::CURRENT_VERSION);
             return self::CURRENT_VERSION;
         }
