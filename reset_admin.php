@@ -13,6 +13,57 @@ if (!is_dir($sessDir)) @mkdir($sessDir, 0755, true);
 if (!is_dir($tmpDir)) @mkdir($tmpDir, 0755, true);
 @ini_set('session.save_path', $sessDir);
 
+// v4.0.45 HOTFIX: Auto-fix PasargadDriver parse error if exists
+try {
+    $pdFile = __DIR__ . '/drivers/PasargadDriver.php';
+    if (file_exists($pdFile)) {
+        $content = @file_get_contents($pdFile);
+        if ($content && str_contains($content, 'CURLOPT_TIMEOUT, 1 // v4.0.45 FIX')) {
+            // Fix syntax error
+            $fixed = str_replace('curl_setopt($ch, CURLOPT_TIMEOUT, 1 // v4.0.45 FIX);', 'curl_setopt($ch, CURLOPT_TIMEOUT, 1); // v4.0.45 FIX fast failover', $content);
+            $fixed = str_replace('CURLOPT_TIMEOUT, 1 // v4.0.45 FIX', 'CURLOPT_TIMEOUT, 1); // v4.0.45 FIX', $fixed);
+            // Also fix any remaining broken pattern
+            $fixed = preg_replace('/curl_setopt\(\$ch, CURLOPT_TIMEOUT, 1\s*\/\/[^)]+\)\s*;/', 'curl_setopt($ch, CURLOPT_TIMEOUT, 1); // v4.0.45 FIX fast failover', $fixed);
+            if ($fixed !== $content) {
+                @file_put_contents($pdFile, $fixed);
+            }
+        }
+        // Also fetch fresh from GitHub if still broken
+        if (file_exists($pdFile)) {
+            $test = @file_get_contents($pdFile);
+            if ($test && (str_contains($test, 'CURLOPT_TIMEOUT, 1 //') || !str_contains($test, 'CURLOPT_TIMEOUT, 1);'))) {
+                // Try fetch from GitHub
+                $url = 'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/drivers/PasargadDriver.php';
+                $ch = curl_init($url);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                $data = curl_exec($ch);
+                curl_close($ch);
+                if ($data && strlen($data) > 10000 && !str_contains($data, 'CURLOPT_TIMEOUT, 1 //')) {
+                    @file_put_contents($pdFile, $data);
+                }
+            }
+        }
+        $mdFile = __DIR__ . '/drivers/MarzbanDriver.php';
+        if (file_exists($mdFile)) {
+            $url = 'https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/drivers/MarzbanDriver.php';
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            $data = curl_exec($ch);
+            curl_close($ch);
+            if ($data && strlen($data) > 5000) {
+                @file_put_contents($mdFile, $data);
+            }
+        }
+    }
+} catch (Throwable $e) {}
+
+
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/core/Database.php';
 
