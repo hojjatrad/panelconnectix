@@ -250,6 +250,11 @@ if (isset($_GET['restore_index'])) {
         "https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/core/Helpers.php" => __DIR__ . "/core/Helpers.php",
         "https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/quick_update.php" => __DIR__ . "/quick_update.php",
         "https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/reset_admin.php" => __DIR__ . "/reset_admin.php",
+        "https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/drivers/PasargadDriver.php" => __DIR__ . "/drivers/PasargadDriver.php",
+        "https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/drivers/MarzbanDriver.php" => __DIR__ . "/drivers/MarzbanDriver.php",
+        "https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/core/Database.php" => __DIR__ . "/core/Database.php",
+        "https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/fix_445_forever.php" => __DIR__ . "/fix_445_forever.php",
+
     ];
     foreach ($files as $url => $dest) {
         $ch = curl_init($url);
