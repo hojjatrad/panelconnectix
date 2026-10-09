@@ -1,11 +1,11 @@
 {
-  "version": "4.0.39",
-  "code": 72,
+  "version": "4.0.40",
+  "code": 73,
   "force_update": false,
   "force_min_code": 50,
   "update_type": "full",
-  "changelog": "• FUNDAMENTAL FIX 15% LOOP - Cloudflare strips Range header! Fixed via ?start= query param + download_apk.php with 206 Partial Content + Resume from 15% not 0% + Only 3 URLs + DM first + 60s timeout + Monotonic + Max 3 then browser + Accept-Ranges + LAW 6 + 11 laws",
-  "date": "2026-10-08",
+  "changelog": "• LAW 12 RTL FIX - Fix buttons flip left->right on connect + non-functional bug: Added Directionality RTL at MaterialApp builder + Dashboard body + All 33 Rows textDirection RTL + Speed chip split Persian/English with LTR Directionality + FittedBox to prevent overflow blocking hit area + GestureDetector opaque + Center + FUNDAMENTAL FIX 4.0.39 retained (Cloudflare ?start= 206 resume)",
+  "date": "2026-10-09",
   "auto_update": {
     "enabled": true,
     "background_check_hours": 6,
@@ -15,30 +15,30 @@
     "wifi_only": false
   },
   "apk": {
-    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.39/Connectix-Android-ARM64.apk",
-    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.39/Connectix-Android-Universal.apk",
-    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.39/Connectix-Android-ARM32.apk"
+    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.40/Connectix-Android-ARM64.apk",
+    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.40/Connectix-Android-Universal.apk",
+    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.40/Connectix-Android-ARM32.apk"
   },
   "apks": {
     "arm64-v8a": {
-      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.39/Connectix-Android-ARM64.apk",
-      "size": 37754800,
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.40/Connectix-Android-ARM64.apk",
+      "size": 37763490,
       "size_human": "36 MB",
       "abi": "arm64-v8a",
       "recommended": true,
       "arch": "arm64"
     },
     "armeabi-v7a": {
-      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.39/Connectix-Android-ARM32.apk",
-      "size": 38289172,
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.40/Connectix-Android-ARM32.apk",
+      "size": 38299707,
       "size_human": "37 MB",
       "abi": "armeabi-v7a",
       "recommended": false,
       "arch": "arm32"
     },
     "universal": {
-      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.39/Connectix-Android-Universal.apk",
-      "size": 110398144,
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.40/Connectix-Android-Universal.apk",
+      "size": 110428565,
       "size_human": "106 MB",
       "abi": "universal",
       "recommended": false,
@@ -70,19 +70,16 @@
     "multiplex"
   ],
   "fixes": {
-    "13_big_improvements_v4_0_28": "v4.0.28 - 13 بهبود بزرگ: 1) Stealth Mode (DPI bypass), 2) Data Saver 30%, 3) Speed Graph live, 4) Server Health (load/uptime/history), 5) Offline Mode (5 last configs), 6) Widget Pro 3 sizes + live speed notif, 7) Multiplex + 0-RTT (3x faster connect 0.8s), 8) Smart server always fastest + auto-switch, 9) DNS cache + DoH + pre-connect (40% faster sites), 10) Baseline Profile (2x faster startup 1.2s + 30% less RAM), 11) AI learning pattern + auto best server/protocol, 12) Xray 1.8.23 + port fix forever, 13) Improved auto-update arch detection (36MB vs 110MB)",
-    "improved_auto_update_v4_0_27": "v4.0.27 - Architecture auto-detection, force/optional/patch, background auto-download every 6h",
-    "xray_core_1_8_23_v4_0_27": "v4.0.27 - Xray 1.8.23, port fix forever",
-    "proxy_qr_hotspot_v4_0_27": "v4.0.27 - Proxy QR + hotspot auto IP",
-    "material_you_v4_0_27": "v4.0.27 - Material You theme + animation",
-    "smart_routing_v4_0_27": "v4.0.27 - Smart routing 3 modes + adblock + LAN bypass"
+    "rtl_fix_v4_0_40": "v4.0.40 LAW 12 RTL FIX - Buttons flip left->right on connect + non-functional: MaterialApp builder Directionality RTL + Dashboard body Directionality RTL + All 33 Rows textDirection RTL + Speed chip split Persian/English LTR Directionality + FittedBox scaleDown to prevent overflow blocking hit area + GestureDetector opaque + Center stable",
+    "fundamental_fix_v4_0_39": "v4.0.39 FUNDAMENTAL FIX Cloudflare Range strip bypass via ?start= query param + download_apk.php 206 Partial Content + Resume from 15% not 0% + Only 3 URLs + DM first + 60s timeout + Monotonic + Max 3 then browser",
+    "13_big_improvements_v4_0_28": "v4.0.28 - 13 improvements"
   },
-  "version_code": 72,
+  "version_code": 73,
   "release_date": "2026-10-09",
   "apk_urls": {
-    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.39/Connectix-Android-ARM64.apk",
-    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.39/Connectix-Android-Universal.apk",
-    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.39/Connectix-Android-ARM32.apk"
+    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.40/Connectix-Android-ARM64.apk",
+    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.40/Connectix-Android-Universal.apk",
+    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.40/Connectix-Android-ARM32.apk"
   },
-  "download_url": "https://vpbotn.ir/Connectix-ARM64-v8a.apk?v=4.0.36&t=1791479773"
+  "download_url": "https://vpbotn.ir/download_apk.php?file=arm64&v=4.0.40&t=1791479773"
 }

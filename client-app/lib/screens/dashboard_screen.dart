@@ -991,7 +991,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           borderRadius: BorderRadius.circular(24),
           side: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
         ),
-        title: Row(
+        title: Row(textDirection: TextDirection.rtl, 
           children: [
             Container(
               padding: const EdgeInsets.all(8),
@@ -1036,7 +1036,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           // Wi-Fi-only toggle (data-saver for cellular plans)
           SizedBox(
             width: double.infinity,
-            child: Row(
+            child: Row(textDirection: TextDirection.rtl, 
               children: [
                 Expanded(
                   child: Text(
@@ -1190,7 +1190,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Row(
+                  Row(textDirection: TextDirection.rtl, 
                     children: [
                       Container(
                         padding: const EdgeInsets.all(10),
@@ -1244,7 +1244,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   if (isFailed)
                     Column(
                       children: [
-                        Row(
+                        Row(textDirection: TextDirection.rtl, 
                           children: [
                             Expanded(
                               child: OutlinedButton(
@@ -1300,7 +1300,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         ),
                         const SizedBox(height: 16),
                         // v4.0.10: Manual fallback buttons
-                        Row(
+                        Row(textDirection: TextDirection.rtl, 
                           children: [
                             Expanded(
                               child: OutlinedButton.icon(
@@ -1965,7 +1965,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 ),
               ),
               const SizedBox(height: 18),
-              Row(
+              Row(textDirection: TextDirection.rtl, 
                 children: [
                   Container(
                     padding: const EdgeInsets.all(10),
@@ -2005,7 +2005,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 ),
                 child: Column(
                   children: [
-                    Row(
+                    Row(textDirection: TextDirection.rtl, 
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: const [
                         Text('پورت پروکسی HTTP:', style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 13)),
@@ -2013,7 +2013,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       ],
                     ),
                     const Divider(color: Color(0xFF334155), height: 20),
-                    Row(
+                    Row(textDirection: TextDirection.rtl, 
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: const [
                         Text('پورت پروکسی SOCKS5:', style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 13)),
@@ -2021,7 +2021,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       ],
                     ),
                     const Divider(color: Color(0xFF334155), height: 20),
-                    Row(
+                    Row(textDirection: TextDirection.rtl, 
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: const [
                         Text('آدرس IP دستگاه شما:', style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 13)),
@@ -2135,7 +2135,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       ),
                     ),
                     const SizedBox(height: 18),
-                    Row(
+                    Row(textDirection: TextDirection.rtl, 
                       children: [
                         const Icon(Icons.notifications_active_rounded, color: Color(0xFF38BDF8), size: 24),
                         const SizedBox(width: 10),
@@ -2185,7 +2185,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
+                            Row(textDirection: TextDirection.rtl, 
                               children: [
                                 Container(
                                   padding: const EdgeInsets.all(8),
@@ -2200,7 +2200,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Row(
+                                      Row(textDirection: TextDirection.rtl, 
                                         children: [
                                           const Text(
                                             'نگارش جدید برنامه',
@@ -2465,6 +2465,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
   }
 
+  // LAW 12 v4.0.40: Fixed RTL flip bug - split Persian label and English speed to prevent bidi flip on connect
   Widget _buildSpeedChip({
     required IconData icon,
     required String label,
@@ -2480,16 +2481,32 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         border: Border.all(color: color.withOpacity(0.3)),
       ),
       child: Row(
+        textDirection: TextDirection.rtl,
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 14, color: color),
           const SizedBox(width: 4),
+          // Persian label RTL
           Text(
-            '$label: $speedText',
+            '$label: ',
+            textDirection: TextDirection.rtl,
             style: TextStyle(
               color: color,
               fontSize: 11,
               fontWeight: FontWeight.bold,
+            ),
+          ),
+          // English speed LTR - fixed direction to prevent flip
+          Directionality(
+            textDirection: TextDirection.ltr,
+            child: Text(
+              speedText,
+              textDirection: TextDirection.ltr,
+              style: TextStyle(
+                color: color,
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],
@@ -2517,7 +2534,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: Row(
+        title: Row(textDirection: TextDirection.rtl, 
           children: [
             Container(
               width: 10,
@@ -2657,11 +2674,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           ),
         ],
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-          child: Column(
-            children: [
+      // LAW 12: Force RTL for entire dashboard - prevents flip left->right on connect + buttons non-functional
+      body: Directionality(
+        textDirection: TextDirection.rtl,
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            child: Column(
+              children: [
               // Global / Reseller Announcement Banner
               if (widget.branding.announcement.isNotEmpty)
                 Container(
@@ -2672,7 +2692,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: widget.branding.accentColor.withOpacity(0.35)),
                   ),
-                  child: Row(
+                  child: Row(textDirection: TextDirection.rtl, 
                     children: [
                       Icon(Icons.campaign_rounded, color: widget.branding.accentColor, size: 18),
                       const SizedBox(width: 10),
@@ -2703,7 +2723,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       ),
                     ],
                   ),
-                  child: Row(
+                  child: Row(textDirection: TextDirection.rtl, 
                     children: [
                       const Icon(Icons.rocket_launch, color: Colors.amber, size: 22),
                       const SizedBox(width: 10),
@@ -2763,7 +2783,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 ),
                 child: Column(
                   children: [
-                    Row(
+                    Row(textDirection: TextDirection.rtl, 
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Column(
@@ -2804,7 +2824,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     ),
                     const SizedBox(height: 16),
                     // Circular Gauge
-                    Row(
+                    Row(textDirection: TextDirection.rtl, 
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
                         CircularPercentIndicator(
@@ -2869,7 +2889,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: const Color(0xFFF97316).withOpacity(0.4)),
                   ),
-                  child: Row(
+                  child: Row(textDirection: TextDirection.rtl, 
                     children: [
                       Container(
                         padding: const EdgeInsets.all(6),
@@ -2935,7 +2955,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(color: const Color(0xFF4338CA)),
                       ),
-                      child: Row(
+                      child: Row(textDirection: TextDirection.rtl, 
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           _isSmartConnecting
@@ -2970,7 +2990,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.3)),
                       ),
-                      child: Row(
+                      child: Row(textDirection: TextDirection.rtl, 
                         mainAxisSize: MainAxisSize.min,
                         children: const [
                           Icon(Icons.security_rounded, color: Color(0xFF38BDF8), size: 16),
@@ -2996,7 +3016,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
                       ),
-                      child: Row(
+                      child: Row(textDirection: TextDirection.rtl, 
                         mainAxisSize: MainAxisSize.min,
                         children: const [
                           Icon(Icons.location_on_rounded, color: Color(0xFF10B981), size: 16),
@@ -3020,7 +3040,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(color: const Color(0xFF334155)),
                       ),
-                      child: Row(
+                      child: Row(textDirection: TextDirection.rtl, 
                         mainAxisSize: MainAxisSize.min,
                         children: const [
                           Icon(Icons.wifi_tethering_rounded, color: Color(0xFF34D399), size: 16),
@@ -3038,63 +3058,70 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
               const SizedBox(height: 24),
 
-              // Connect Button with Glowing Rings
-              GestureDetector(
-                onTap: _toggleConnection,
-                child: Container(
-                  width: 165,
-                  height: 165,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        statusColor.withOpacity(0.3),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                  child: Center(
+              // Connect Button with Glowing Rings - LAW 12 v4.0.40: Ensure RTL stable + hitTestBehavior opaque to prevent non-functional bug
+              Center(
+                child: Directionality(
+                  textDirection: TextDirection.rtl,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: _toggleConnection,
                     child: Container(
-                      width: 125,
-                      height: 125,
+                      width: 165,
+                      height: 165,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: const Color(0xFF0F172A),
-                        border: Border.all(color: statusColor, width: 3),
-                        boxShadow: [
-                          BoxShadow(
-                            color: statusColor.withOpacity(0.4),
-                            blurRadius: 30,
-                            spreadRadius: 2,
-                          ),
-                        ],
+                        gradient: RadialGradient(
+                          colors: [
+                            statusColor.withOpacity(0.3),
+                            Colors.transparent,
+                          ],
+                        ),
                       ),
                       child: Center(
-                        child: _isConnecting
-                            ? SizedBox(
-                                width: 36,
-                                height: 36,
-                                child: CircularProgressIndicator(color: statusColor, strokeWidth: 3),
-                              )
-                            : Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.power_settings_new_rounded,
-                                    size: 44,
-                                    color: statusColor,
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    _isConnected ? 'متصل شد' : 'اتصال',
-                                    style: TextStyle(
-                                      color: statusColor,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ],
+                        child: Container(
+                          width: 125,
+                          height: 125,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: const Color(0xFF0F172A),
+                            border: Border.all(color: statusColor, width: 3),
+                            boxShadow: [
+                              BoxShadow(
+                                color: statusColor.withOpacity(0.4),
+                                blurRadius: 30,
+                                spreadRadius: 2,
                               ),
+                            ],
+                          ),
+                          child: Center(
+                            child: _isConnecting
+                                ? SizedBox(
+                                    width: 36,
+                                    height: 36,
+                                    child: CircularProgressIndicator(color: statusColor, strokeWidth: 3),
+                                  )
+                                : Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.power_settings_new_rounded,
+                                        size: 44,
+                                        color: statusColor,
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        _isConnected ? 'متصل شد' : 'اتصال',
+                                        textDirection: TextDirection.rtl,
+                                        style: TextStyle(
+                                          color: statusColor,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -3112,28 +3139,37 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               ),
 
               // Live Real-Time Speed Badges (Upload / Download)
+              // LAW 12 v4.0.40: Wrap speed chips in FittedBox + Directionality to prevent RTL flip and overflow blocking buttons
               if (_isConnected) ...[
                 const SizedBox(height: 10),
                 ValueListenableBuilder<V2RayStatus>(
                   valueListenable: _v2rayStatus,
                   builder: (context, status, _) {
-                    return Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _buildSpeedChip(
-                          icon: Icons.arrow_downward_rounded,
-                          label: 'دانلود',
-                          bytes: status.downloadSpeed,
-                          color: const Color(0xFF10B981),
+                    return Directionality(
+                      textDirection: TextDirection.rtl,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Row(
+                          textDirection: TextDirection.rtl,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _buildSpeedChip(
+                              icon: Icons.arrow_downward_rounded,
+                              label: 'دانلود',
+                              bytes: status.downloadSpeed,
+                              color: const Color(0xFF10B981),
+                            ),
+                            const SizedBox(width: 10),
+                            _buildSpeedChip(
+                              icon: Icons.arrow_upward_rounded,
+                              label: 'آپلود',
+                              bytes: status.uploadSpeed,
+                              color: const Color(0xFF6366F1),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 10),
-                        _buildSpeedChip(
-                          icon: Icons.arrow_upward_rounded,
-                          label: 'آپلود',
-                          bytes: status.uploadSpeed,
-                          color: const Color(0xFF6366F1),
-                        ),
-                      ],
+                      ),
                     );
                   },
                 ),
@@ -3153,7 +3189,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
+                      Row(textDirection: TextDirection.rtl, 
                         children: [
                           const Icon(Icons.router_rounded,
                               size: 16, color: Color(0xFF9333EA)),
@@ -3163,7 +3199,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         ],
                       ),
                       const SizedBox(height: 8),
-                      Row(
+                      Row(textDirection: TextDirection.rtl, 
                         children: [
                           Expanded(
                             child: _winModeChip(
@@ -3251,7 +3287,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(color: const Color(0xFF1E293B)),
                     ),
-                    child: Row(
+                    child: Row(textDirection: TextDirection.rtl, 
                       children: [
                         Text(
                           _selectedServer?.flag ?? '🌐',
@@ -3313,7 +3349,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       borderRadius: BorderRadius.circular(18),
                       border: Border.all(color: const Color(0xFF1E293B)),
                     ),
-                    child: Row(
+                    child: Row(textDirection: TextDirection.rtl, 
                       children: [
                         Container(
                           padding: const EdgeInsets.all(10),
@@ -3328,7 +3364,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
+                              Row(textDirection: TextDirection.rtl, 
                                 children: [
                                   const Text('تنظیمات پیشرفته', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
                                   const SizedBox(width: 8),
@@ -3363,7 +3399,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               // App Version & Support Footer
               Container(
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Row(
+                child: Row(textDirection: TextDirection.rtl, 
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
@@ -3378,7 +3414,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             : 'https://t.me/${widget.branding.telegramSupport.replaceAll('@', '')}';
                         launchUrl(Uri.parse(link), mode: LaunchMode.externalApplication);
                       },
-                      child: Row(
+                      child: Row(textDirection: TextDirection.rtl, 
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           const Icon(Icons.support_agent_rounded, size: 12, color: Color(0xFF475569)),
@@ -3397,6 +3433,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             ],
           ),
         ),
+      ),
       ),
     );
   }
@@ -3417,7 +3454,7 @@ class _QuotaMetricRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Row(textDirection: TextDirection.rtl, 
       children: [
         Icon(icon, size: 14, color: valueColor),
         const SizedBox(width: 6),
@@ -3448,7 +3485,7 @@ class _GuideStep extends StatelessWidget {
         color: const Color(0xFF1E293B),
         borderRadius: BorderRadius.circular(14),
       ),
-      child: Row(
+      child: Row(textDirection: TextDirection.rtl, 
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, size: 22, color: const Color(0xFF38BDF8)),

@@ -340,6 +340,13 @@ class _ConnectixAppState extends State<ConnectixApp> {
             return MaterialApp(
               debugShowCheckedModeBanner: false,
               theme: buildConnectixTheme(),
+              // LAW 12: Force RTL for entire app - prevents flip from left to right on connect
+              builder: (context, child) {
+                return Directionality(
+                  textDirection: TextDirection.rtl,
+                  child: child!,
+                );
+              },
               home: _CrashScreen(
                 info: crash,
                 onDismiss: () => _dismiss(crash),
@@ -359,6 +366,13 @@ class _ConnectixAppState extends State<ConnectixApp> {
               Locale('fa', 'IR'),
             ],
             locale: const Locale('fa', 'IR'),
+            // LAW 12: Force RTL for entire app - prevents flip from left to right on connect (user report: all buttons go left->right and become non-functional)
+            builder: (context, child) {
+              return Directionality(
+                textDirection: TextDirection.rtl,
+                child: child!,
+              );
+            },
             home: const SplashScreen(),
           );
         },
