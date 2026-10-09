@@ -1,0 +1,8 @@
+Connectix v4.0.42 QR Codes
+==========================
+
+qr_v442_main: https://vpbotn.ir/download_apk.php?file=arm64&v=4.0.42&t=9999999999
+qr_v442_direct: https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.42&t=9999999999
+qr_v442_github: https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.42/Connectix-Android-ARM64.apk
+qr_v442_qrpage: https://vpbotn.ir/qr_download.html?v=4.0.42
+qr_v442_universal: https://vpbotn.ir/download_apk.php?file=universal&v=4.0.42

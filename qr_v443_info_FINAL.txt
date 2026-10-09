@@ -1,0 +1,9 @@
+Connectix v4.0.43 QR Codes - FOREVER FIX FINAL
+Generated: Fri Oct  9 11:57:37 2026
+Timestamp: 1791547056 Random: 3981
+
+main: https://vpbotn.ir/download_apk.php?file=arm64&v=4.0.43&t=1791547056&s=3981&cb=17915470563981&r=3981&_=1791547056
+direct: https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.43&t=1791547056&s=3981&cb=17915470563981
+github: https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.43/Connectix-Android-ARM64.apk
+universal_github: https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.43/Connectix-Android-Universal.apk
+qrpage: https://vpbotn.ir/qr_download.html?v=4.0.43&t=1791547056
