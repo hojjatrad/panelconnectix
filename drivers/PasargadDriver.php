@@ -11,7 +11,7 @@ class PasargadDriver implements PanelDriverInterface {
     private string $apiPrefix = '/api';
     private bool $isPasarGuard = true; // Modern PasarGuard (FastAPI) vs legacy Pasargad
     private ?string $lastError = null;
-    private int $timeout = 5;
+    private int $timeout = 1; // v4.0.45 FIX fast failover
 
     public function __construct(string $baseUrl, ?string $username = null, ?string $password = null, ?string $token = null, ?string $subDomain = null) {
         $clean = rtrim(trim($baseUrl), '/');
@@ -541,7 +541,7 @@ class PasargadDriver implements PanelDriverInterface {
                 if (empty($links) && !empty($subUrl) && !Helpers::isPanelSubUrl($subUrl)) {
                     $ch = curl_init($subUrl);
                     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                    curl_setopt($ch, CURLOPT_TIMEOUT, 1 // v4.0.45 FIX);
+                    curl_setopt($ch, CURLOPT_TIMEOUT, 1); // v4.0.45 FIX fast failover
                     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
                     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
                     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
@@ -589,7 +589,7 @@ class PasargadDriver implements PanelDriverInterface {
                 if (empty($links) && !empty($subUrl) && !Helpers::isPanelSubUrl($subUrl)) {
                     $ch = curl_init($subUrl);
                     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                    curl_setopt($ch, CURLOPT_TIMEOUT, 1 // v4.0.45 FIX);
+                    curl_setopt($ch, CURLOPT_TIMEOUT, 1); // v4.0.45 FIX fast failover
                     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
                     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
                     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);

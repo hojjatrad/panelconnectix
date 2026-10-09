@@ -9,7 +9,7 @@ class MarzbanDriver implements PanelDriverInterface {
     private string $apiPrefix = '/api';
     private ?string $lastError = null;
     private ?string $subDomain = null;
-    private int $timeout = 5;
+    private int $timeout = 1; // v4.0.45 FIX fast failover
 
     public function __construct(string $baseUrl, ?string $username, ?string $password, ?string $token = null, ?string $subDomain = null) {
         // Clean URL: remove trailing slashes, /dashboard, /admin, /api
