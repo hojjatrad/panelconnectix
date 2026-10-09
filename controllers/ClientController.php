@@ -77,15 +77,21 @@ class ClientController {
         if ($quickFilter === 'unused') {
             $where[] = "(c.traffic_used_bytes = 0 OR c.traffic_used_bytes IS NULL)";
         } elseif ($quickFilter === 'expired_7d') {
-            $where[] = "(c.expire_at IS NOT NULL AND c.expire_at <= '{$sevenDaysAgo}')";
+            $where[] = "(c.expire_at IS NOT NULL AND c.expire_at <= ?)";
+            $params[] = $sevenDaysAgo;
         } elseif ($quickFilter === 'expired_14d') {
-            $where[] = "(c.expire_at IS NOT NULL AND c.expire_at <= '{$fourteenDaysAgo}')";
+            $where[] = "(c.expire_at IS NOT NULL AND c.expire_at <= ?)";
+            $params[] = $fourteenDaysAgo;
         } elseif ($quickFilter === 'expired_30d') {
-            $where[] = "(c.expire_at IS NOT NULL AND c.expire_at <= '{$thirtyDaysAgo}')";
+            $where[] = "(c.expire_at IS NOT NULL AND c.expire_at <= ?)";
+            $params[] = $thirtyDaysAgo;
         } elseif ($quickFilter === 'expired_all') {
-            $where[] = "(c.status = 'expired' OR (c.expire_at IS NOT NULL AND c.expire_at <= '{$now}'))";
+            $where[] = "(c.status = 'expired' OR (c.expire_at IS NOT NULL AND c.expire_at <= ?))";
+            $params[] = $now;
         } elseif ($quickFilter === 'trials') {
-            $where[] = "(c.custom_note LIKE '%تست%' OR c.custom_note LIKE '%trial%' OR p.is_free = 1)";
+            $where[] = "(c.custom_note LIKE ? OR c.custom_note LIKE ? OR p.is_free = 1)";
+            $params[] = '%تست%';
+            $params[] = '%trial%';
         }
 
         $whereSql = implode(' AND ', $where);
@@ -106,15 +112,17 @@ class ClientController {
 
         // Optimizer Live Stats
         $baseOwnerWhere = $isAdmin ? "1=1" : "reseller_id = " . intval($userId);
-        $stmtOpt = $pdo->query("SELECT 
+        $stmtOpt = $pdo->prepare("SELECT 
             COUNT(*) as total,
             SUM(CASE WHEN traffic_used_bytes = 0 OR traffic_used_bytes IS NULL THEN 1 ELSE 0 END) as count_unused,
-            SUM(CASE WHEN expire_at IS NOT NULL AND expire_at <= '{$sevenDaysAgo}' THEN 1 ELSE 0 END) as count_expired_7d,
-            SUM(CASE WHEN expire_at IS NOT NULL AND expire_at <= '{$fourteenDaysAgo}' THEN 1 ELSE 0 END) as count_expired_14d,
-            SUM(CASE WHEN expire_at IS NOT NULL AND expire_at <= '{$thirtyDaysAgo}' THEN 1 ELSE 0 END) as count_expired_30d,
-            SUM(CASE WHEN status = 'expired' OR (expire_at IS NOT NULL AND expire_at <= '{$now}') THEN 1 ELSE 0 END) as count_expired_all,
-            SUM(CASE WHEN (custom_note LIKE '%تست%' OR custom_note LIKE '%trial%') AND (expire_at IS NOT NULL AND expire_at <= '{$now}') THEN 1 ELSE 0 END) as count_expired_trials
-            FROM clients WHERE {$baseOwnerWhere}")->fetch(PDO::FETCH_ASSOC);
+            SUM(CASE WHEN expire_at IS NOT NULL AND expire_at <= ? THEN 1 ELSE 0 END) as count_expired_7d,
+            SUM(CASE WHEN expire_at IS NOT NULL AND expire_at <= ? THEN 1 ELSE 0 END) as count_expired_14d,
+            SUM(CASE WHEN expire_at IS NOT NULL AND expire_at <= ? THEN 1 ELSE 0 END) as count_expired_30d,
+            SUM(CASE WHEN status = 'expired' OR (expire_at IS NOT NULL AND expire_at <= ?) THEN 1 ELSE 0 END) as count_expired_all,
+            SUM(CASE WHEN (custom_note LIKE ? OR custom_note LIKE ?) AND (expire_at IS NOT NULL AND expire_at <= ?) THEN 1 ELSE 0 END) as count_expired_trials
+            FROM clients WHERE {$baseOwnerWhere}");
+        $stmtOpt->execute([$sevenDaysAgo, $fourteenDaysAgo, $thirtyDaysAgo, $now, '%تست%', '%trial%', $now]);
+        $stmtOpt = $stmtOpt->fetch(PDO::FETCH_ASSOC);
 
         $optimizerStats = [
             'unused' => (int)($stmtOpt['count_unused'] ?? 0),

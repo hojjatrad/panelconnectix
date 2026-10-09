@@ -541,7 +541,7 @@ class PasargadDriver implements PanelDriverInterface {
                 if (empty($links) && !empty($subUrl) && !Helpers::isPanelSubUrl($subUrl)) {
                     $ch = curl_init($subUrl);
                     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                    curl_setopt($ch, CURLOPT_TIMEOUT, 3);
+                    curl_setopt($ch, CURLOPT_TIMEOUT, 1 // v4.0.45 FIX);
                     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
                     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
                     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
@@ -589,7 +589,7 @@ class PasargadDriver implements PanelDriverInterface {
                 if (empty($links) && !empty($subUrl) && !Helpers::isPanelSubUrl($subUrl)) {
                     $ch = curl_init($subUrl);
                     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                    curl_setopt($ch, CURLOPT_TIMEOUT, 3);
+                    curl_setopt($ch, CURLOPT_TIMEOUT, 1 // v4.0.45 FIX);
                     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
                     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
                     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);

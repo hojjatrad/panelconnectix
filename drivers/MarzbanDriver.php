@@ -63,7 +63,7 @@ class MarzbanDriver implements PanelDriverInterface {
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // v4.0.45: SSL verify false for self-signed certs in Iran, log if needed
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
 
         $response = curl_exec($ch);
@@ -488,9 +488,9 @@ class MarzbanDriver implements PanelDriverInterface {
             if (empty($links) && !empty($subUrl) && !Helpers::isPanelSubUrl($subUrl)) {
                 $ch = curl_init($subUrl);
                 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($ch, CURLOPT_TIMEOUT, 3);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 1); // v4.0.45 FIX: reduced from 3s to 1s for faster failover
                 curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // v4.0.45: SSL verify false for self-signed certs in Iran, log if needed
                 curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
                 curl_setopt($ch, CURLOPT_USERAGENT, 'v2rayNG/1.8.5');
                 $subContent = curl_exec($ch);

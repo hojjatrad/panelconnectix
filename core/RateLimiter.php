@@ -19,8 +19,18 @@ class RateLimiter {
         
         $data = ['attempts' => [], 'blocked_until' => 0];
         if (is_file($file)) {
-            $content = @file_get_contents($file);
-            $data = json_decode($content, true) ?: $data;
+            // v4.0.45 FIX: Use LOCK_SH for reading to prevent race condition
+            $fp = @fopen($file, 'r');
+            if ($fp) {
+                @flock($fp, LOCK_SH);
+                $content = @file_get_contents($file);
+                @flock($fp, LOCK_UN);
+                @fclose($fp);
+                $data = json_decode($content, true) ?: $data;
+            } else {
+                $content = @file_get_contents($file);
+                $data = json_decode($content, true) ?: $data;
+            }
         }
         
         // Check if blocked
@@ -39,7 +49,7 @@ class RateLimiter {
         
         if (count($data['attempts']) >= $maxAttempts) {
             $data['blocked_until'] = $now + self::BLOCK_SECONDS;
-            @file_put_contents($file, json_encode($data));
+            @file_put_contents($file, json_encode($data), LOCK_EX);
             return [
                 'allowed' => false,
                 'reason' => 'rate_limited',
@@ -61,15 +71,25 @@ class RateLimiter {
         
         $data = ['attempts' => [], 'blocked_until' => 0];
         if (is_file($file)) {
-            $content = @file_get_contents($file);
-            $data = json_decode($content, true) ?: $data;
+            // v4.0.45 FIX: Use LOCK_SH for reading to prevent race condition
+            $fp = @fopen($file, 'r');
+            if ($fp) {
+                @flock($fp, LOCK_SH);
+                $content = @file_get_contents($file);
+                @flock($fp, LOCK_UN);
+                @fclose($fp);
+                $data = json_decode($content, true) ?: $data;
+            } else {
+                $content = @file_get_contents($file);
+                $data = json_decode($content, true) ?: $data;
+            }
         }
         
         $data['attempts'][] = $now;
         // Keep only last 10
         $data['attempts'] = array_slice($data['attempts'], -10);
         
-        @file_put_contents($file, json_encode($data));
+        @file_put_contents($file, json_encode($data), LOCK_EX);
     }
     
     public static function clear(string $key): void {

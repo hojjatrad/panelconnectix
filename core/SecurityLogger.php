@@ -39,6 +39,11 @@ class SecurityLogger {
             if (!is_dir($logDir)) @mkdir($logDir, 0777, true);
             $logFile = $logDir . '/security_' . date('Y-m-d') . '.log';
             $line = date('Y-m-d H:i:s') . " | IP: $ip | User: " . ($userId ?? 'guest') . " | Action: $action | Details: $details\n";
+            // v4.0.45 FIX: Log rotation
+            if (is_file($logFile) && filesize($logFile) > 5*1024*1024) {
+                @unlink($logFile . '.old');
+                @rename($logFile, $logFile . '.old');
+            }
             @file_put_contents($logFile, $line, FILE_APPEND);
             
             // Critical actions -> Telegram alert

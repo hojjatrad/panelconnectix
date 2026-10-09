@@ -315,38 +315,60 @@ if (!$zipData) {
     exit;
 }
 
-// v6.8.11 FIX: Robust tmp with multiple fallbacks + disk quota check
+// v4.0.45 FIX: Robust tmp - ALWAYS use __DIR__/data/tmp first, clean it, fallback to __DIR__ directly
+// Previous version used sys_get_temp_dir() which has quota on cPanel, causing FAIL
+// Now: clean data/tmp completely, use __DIR__/data/tmp as primary, __DIR__ as secondary, no sys_get_temp_dir
 $__tmpCandidates = [
     __DIR__ . '/data/tmp',
-    sys_get_temp_dir(),
-    '/tmp',
     __DIR__ . '/cache',
+    __DIR__,
 ];
 $__tmpBase = '';
+// Emergency clean data/tmp first
+$__dataTmp = __DIR__ . '/data/tmp';
+if (is_dir($__dataTmp)) {
+    $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($__dataTmp, RecursiveDirectoryIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST);
+    foreach ($it as $file) {
+        if ($file->isFile()) @unlink($file->getPathname());
+        else @rmdir($file->getPathname());
+    }
+}
+if (!is_dir($__dataTmp)) @mkdir($__dataTmp, 0777, true);
+@chmod($__dataTmp, 0777);
+
 foreach ($__tmpCandidates as $cand) {
     if (!is_dir($cand)) @mkdir($cand, 0777, true);
-    if (is_dir($cand) && is_writable($cand) && @disk_free_space($cand) > 20*1024*1024) {
-        $__tmpBase = $cand;
-        break;
+    @chmod($cand, 0777);
+    if (is_dir($cand) && is_writable($cand)) {
+        // Try to ensure at least 25MB free, but don't fail if disk_free_space returns false
+        $free = @disk_free_space($cand);
+        if ($free === false || $free > 25*1024*1024) {
+            $__tmpBase = $cand;
+            break;
+        }
     }
 }
 if (empty($__tmpBase)) {
     $__tmpBase = __DIR__ . '/data/tmp';
     @mkdir($__tmpBase, 0777, true);
+    @chmod($__tmpBase, 0777);
 }
 $tmpZip = $__tmpBase . '/cx_upd_' . uniqid() . '.zip';
 $tmpExt = $__tmpBase . '/cx_ext_' . uniqid();
 @mkdir($tmpExt, 0755, true);
+@chmod($tmpExt, 0777);
 $written = @file_put_contents($tmpZip, $zipData);
 if ($written === false || $written < 1000) {
-    // Try alternative base
+    // Try alternative base - including __DIR__ directly
     foreach ($__tmpCandidates as $cand) {
         if ($cand === $__tmpBase) continue;
         if (!is_dir($cand)) @mkdir($cand, 0777, true);
+        @chmod($cand, 0777);
         if (is_dir($cand) && is_writable($cand)) {
             $tmpZip = $cand . '/cx_upd_' . uniqid() . '.zip';
             $tmpExt = $cand . '/cx_ext_' . uniqid();
             @mkdir($tmpExt, 0755, true);
+            @chmod($tmpExt, 0777);
             $written = @file_put_contents($tmpZip, $zipData);
             if ($written && $written > 1000) {
                 $__tmpBase = $cand;
@@ -356,7 +378,17 @@ if ($written === false || $written < 1000) {
     }
 }
 if ($written === false || $written < 1000) {
-    logStep("خطا: نوشتن ZIP روی دیسک ناموفق - فضای آزاد: " . round(@disk_free_space(__DIR__)/1024/1024) . "MB - Disk quota؟", 'error');
+    // Last resort: try __DIR__ . '/tmp.zip' directly
+    $tmpZip = __DIR__ . '/tmp_update_' . uniqid() . '.zip';
+    $tmpExt = __DIR__ . '/data/tmp/cx_ext_' . uniqid();
+    @mkdir($tmpExt, 0777, true);
+    $written = @file_put_contents($tmpZip, $zipData);
+    if ($written && $written > 1000) {
+        $__tmpBase = __DIR__;
+    }
+}
+if ($written === false || $written < 1000) {
+    logStep("خطا: نوشتن ZIP روی دیسک ناموفق - فضای آزاد: " . round(@disk_free_space(__DIR__)/1024/1024) . "MB - Disk quota؟ آخرین تلاش در " . $__tmpBase . " - لطفاً data/tmp را دستی پاک کنید", 'error');
     echo "</div></div></body></html>";
     exit;
 }

@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/PanelDriverInterface.php';
+require_once __DIR__ . '/../core/Encryption.php';
 require_once __DIR__ . '/MarzbanDriver.php';
 require_once __DIR__ . '/PasargadDriver.php';
 require_once __DIR__ . '/XUiDriver.php';
@@ -27,8 +28,8 @@ class DriverFactory {
 
         $url = $server['api_url'] ?? '';
         $user = $server['api_username'] ?? '';
-        $pass = $server['api_password'] ?? '';
-        $token = $server['api_token'] ?? '';
+        $pass = Encryption::decrypt($server['api_password'] ?? '');
+        $token = Encryption::decrypt($server['api_token'] ?? '');
         $subDomain = $server['sub_domain'] ?? $server['server_sub_domain'] ?? null;
 
         switch ($driver) {

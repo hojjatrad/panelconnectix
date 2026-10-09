@@ -60,13 +60,24 @@ class TelegramBot {
         curl_close($ch);
 
         if ($err || !$response) {
-            @file_put_contents(__DIR__ . '/../data/telegram_api.log', date('[Y-m-d H:i:s] ') . "Curl error: {$err}\n", FILE_APPEND);
+            // v4.0.45 FIX: Log rotation - max 5MB
+            $logFile = __DIR__ . '/../data/telegram_api.log';
+            if (is_file($logFile) && filesize($logFile) > 5*1024*1024) {
+                @unlink($logFile . '.old');
+                @rename($logFile, $logFile . '.old');
+            }
+            @file_put_contents($logFile, date('[Y-m-d H:i:s] ') . "Curl error: {$err}\n", FILE_APPEND);
             return null;
         }
 
         $decoded = json_decode($response, true);
         if (isset($decoded['ok']) && $decoded['ok'] === false) {
-            @file_put_contents(__DIR__ . '/../data/telegram_api.log', date('[Y-m-d H:i:s] ') . "Method: {$method} | Error: " . ($decoded['description'] ?? 'unknown') . "\nPayload: " . json_encode($params, JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND);
+            $logFile = __DIR__ . '/../data/telegram_api.log';
+            if (is_file($logFile) && filesize($logFile) > 5*1024*1024) {
+                @unlink($logFile . '.old');
+                @rename($logFile, $logFile . '.old');
+            }
+            @file_put_contents($logFile, date('[Y-m-d H:i:s] ') . "Method: {$method} | Error: " . ($decoded['description'] ?? 'unknown') . "\nPayload: " . json_encode($params, JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND);
         }
 
         return $decoded;

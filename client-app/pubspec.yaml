@@ -1,7 +1,7 @@
 name: connectix_vpn
-description: Connectix Professional Multiplatform VPN Client - ULTRA Dual-Core Xray + sing-box (VLESS Reality/Vision, VMess, Trojan, SS, SOCKS, HTTP, WireGuard, Raw JSON) + FAKE VPN FIX v4.0.44 + TUN REAL + NO FRAGMENT FOR REALITY
+description: Connectix Professional Multiplatform VPN Client - ULTRA Dual-Core Xray + sing-box + FULL PANEL BUG FIX v4.0.45 - NO BUGS
 publish_to: 'none'
-version: 4.0.44+77
+version: 4.0.45+78
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

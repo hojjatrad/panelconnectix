@@ -971,6 +971,18 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
             ], 'نسخه شما به‌روز است.');
         }
 
+        // v4.0.45 FIX: version_code fallback to app_release.json, not hardcoded 54
+        $versionCode = (int)Setting::get('app_version_code', '0');
+        if ($versionCode === 0) {
+            $releaseJsonPath = __DIR__ . '/../app_release.json';
+            if (is_file($releaseJsonPath)) {
+                $rj = @json_decode(@file_get_contents($releaseJsonPath), true);
+                if (!empty($rj['code'])) $versionCode = (int)$rj['code'];
+                elseif (!empty($rj['version_code'])) $versionCode = (int)$rj['version_code'];
+            }
+        }
+        if ($versionCode === 0) $versionCode = 77; // fallback to latest known
+
         self::jsonSuccess([
             'current_version' => '3.0.0',
             'latest_version' => $latest,
@@ -983,7 +995,7 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
             'github_arm64' => $githubArm64,
             'github_universal' => $githubUniversal,
             'release_date' => date('Y-m-d'),
-            'version_code' => (int)Setting::get('app_version_code', '54'),
+            'version_code' => $versionCode,
             'cache_buster' => time()
         ], 'نگارش جدید سامانه آماده دریافت است.');
     }

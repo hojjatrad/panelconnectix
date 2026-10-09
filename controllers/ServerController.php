@@ -3,6 +3,7 @@ require_once __DIR__ . '/../core/Auth.php';
 require_once __DIR__ . '/../core/Database.php';
 require_once __DIR__ . '/../core/Helpers.php';
 require_once __DIR__ . '/../drivers/DriverFactory.php';
+require_once __DIR__ . '/../core/Encryption.php';
 
 class ServerController {
     public function index(): void {
@@ -91,8 +92,16 @@ class ServerController {
 
         $pdo = Database::getConnection();
         if ($categoryId) {
-            $catSlug = $pdo->query("SELECT slug FROM categories WHERE id = " . $categoryId)->fetchColumn();
+            $catSlug = $pdo->query("SELECT slug FROM categories WHERE id = " . (int)$categoryId)->fetchColumn();
             if ($catSlug) $serverGroup = $catSlug;
+        }
+        // v4.0.45 FIX: Ensure sub_domain fallback to api_url host if empty
+        if (empty($subDomain) && !empty($apiUrl)) {
+            $parsed = parse_url($apiUrl);
+            $subDomain = $parsed['host'] ?? '';
+            if (!empty($subDomain)) {
+                $subDomain = 'https://' . $subDomain;
+            }
         }
 
                 $isVip = !empty($_POST['is_vip']) ? 1 : 0;
@@ -131,6 +140,7 @@ class ServerController {
         try {
             require_once __DIR__ . '/../core/Provisioner.php';
             require_once __DIR__ . '/../drivers/DriverFactory.php';
+require_once __DIR__ . '/../core/Encryption.php';
             $tempServer = [
                 'name' => $name,
                 'driver' => $driver,
@@ -181,7 +191,9 @@ class ServerController {
         $stmt = $pdo->prepare("INSERT INTO server_nodes (name, driver, api_url, api_username, api_password, api_token, server_group, category_id, sub_domain, max_clients, config_template, selected_inbounds, is_vip, auto_import_plans, auto_import_clients, auto_import_categories, price_multiplier, region, seller_code) 
                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $sellerCode = $autoDetected['seller_code'] ?? null;
-        $stmt->execute([$name, $driver, $apiUrl, $username, $password, $token, $serverGroup, $categoryId, $subDomain, $maxClients, $configTemplate, $selectedInbounds, $isVip, $autoImport, $autoImportClients, $autoImportCategories, $priceMultiplier, $region ?: ($autoDetected['region'] ?? null), $sellerCode]);
+        $encPassword = Encryption::encrypt($password);
+        $encToken = Encryption::encrypt($token);
+        $stmt->execute([$name, $driver, $apiUrl, $username, $encPassword, $encToken, $serverGroup, $categoryId, $subDomain, $maxClients, $configTemplate, $selectedInbounds, $isVip, $autoImport, $autoImportClients, $autoImportCategories, $priceMultiplier, $region ?: ($autoDetected['region'] ?? null), $sellerCode]);
         $newServerId = (int)$pdo->lastInsertId();
 
         // v6.8.20: Global kill switch - respect auto_import_disabled setting
@@ -378,8 +390,16 @@ class ServerController {
 
         $pdo = Database::getConnection();
         if ($categoryId) {
-            $catSlug = $pdo->query("SELECT slug FROM categories WHERE id = " . $categoryId)->fetchColumn();
+            $catSlug = $pdo->query("SELECT slug FROM categories WHERE id = " . (int)$categoryId)->fetchColumn();
             if ($catSlug) $serverGroup = $catSlug;
+        }
+        // v4.0.45 FIX: Ensure sub_domain fallback to api_url host if empty
+        if (empty($subDomain) && !empty($apiUrl)) {
+            $parsed = parse_url($apiUrl);
+            $subDomain = $parsed['host'] ?? '';
+            if (!empty($subDomain)) {
+                $subDomain = 'https://' . $subDomain;
+            }
         }
 
         $isVip = !empty($_POST['is_vip']) ? 1 : 0;
@@ -413,7 +433,9 @@ class ServerController {
 
         if (!empty($password)) {
             $stmt = $pdo->prepare("UPDATE server_nodes SET name = ?, driver = ?, api_url = ?, api_username = ?, api_password = ?, api_token = ?, server_group = ?, category_id = ?, sub_domain = ?, max_clients = ?, config_template = ?, selected_inbounds = ?, is_vip = ?, auto_import_plans = ?, auto_import_clients = ?, auto_import_categories = ? WHERE id = ?");
-            $stmt->execute([$name, $driver, $apiUrl, $username, $password, $token, $serverGroup, $categoryId, $subDomain, $maxClients, $configTemplate, $selectedInbounds, $isVip, $autoImport, $autoImportClients, $autoImportCategories, $id]);
+            $encPassword = Encryption::encrypt($password);
+        $encToken = Encryption::encrypt($token);
+        $stmt->execute([$name, $driver, $apiUrl, $username, $encPassword, $encToken, $serverGroup, $categoryId, $subDomain, $maxClients, $configTemplate, $selectedInbounds, $isVip, $autoImport, $autoImportClients, $autoImportCategories, $id]);
         } else {
             $stmt = $pdo->prepare("UPDATE server_nodes SET name = ?, driver = ?, api_url = ?, api_username = ?, api_token = ?, server_group = ?, category_id = ?, sub_domain = ?, max_clients = ?, config_template = ?, selected_inbounds = ?, is_vip = ?, auto_import_plans = ?, auto_import_clients = ?, auto_import_categories = ? WHERE id = ?");
             $stmt->execute([$name, $driver, $apiUrl, $username, $token, $serverGroup, $categoryId, $subDomain, $maxClients, $configTemplate, $selectedInbounds, $isVip, $autoImport, $autoImportClients, $autoImportCategories, $id]);

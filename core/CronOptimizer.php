@@ -85,7 +85,13 @@ class CronOptimizer {
         // Log to file
         $logDir = __DIR__ . '/../cache/logs';
         if (!is_dir($logDir)) @mkdir($logDir, 0777, true);
-        @file_put_contents($logDir . '/cron_' . date('Y-m-d') . '.log', 
+        // v4.0.45 FIX: Log rotation
+        $logFile = $logDir . '/cron_' . date('Y-m-d') . '.log';
+        if (is_file($logFile) && filesize($logFile) > 5*1024*1024) {
+            @unlink($logFile . '.old');
+            @rename($logFile, $logFile . '.old');
+        }
+        @file_put_contents($logFile, 
             date('Y-m-d H:i:s') . " | " . json_encode($results, JSON_UNESCAPED_UNICODE) . "\n", 
             FILE_APPEND
         );

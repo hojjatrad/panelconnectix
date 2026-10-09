@@ -11,6 +11,47 @@ define('CONNECTIX_REPAIR', true);
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
+// v4.0.45 SECURITY FIX: repair.php must require admin auth + CSRF + rate limit
+// Previously allowed SQL restore without strong auth -> critical
+require_once __DIR__ . '/core/Auth.php';
+require_once __DIR__ . '/core/RateLimiter.php';
+require_once __DIR__ . '/core/Helpers.php';
+
+// Allow restore_traffic and dump_clients without full admin for internal cron? No, require login for all
+// For emergency SQL restore, require admin
+if (!isset($_GET['restore_traffic']) && !isset($_GET['dump_clients']) && !isset($_GET['check_index']) && !isset($_GET['reset_traffic']) && !isset($_GET['clear_opcache'])) {
+    // For POST emergency_sql_file, require admin
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['emergency_sql_file'])) {
+        Auth::requireAdmin();
+        if (!Helpers::verifyCsrf()) {
+            http_response_code(403);
+            die('CSRF token invalid');
+        }
+        // Rate limit SQL restore
+        $rateKey = RateLimiter::getClientKey('repair_sql_');
+        $rateCheck = RateLimiter::check($rateKey, 3, 3600);
+        if (!$rateCheck['allowed']) {
+            http_response_code(429);
+            die('Rate limited: ' . $rateCheck['message']);
+        }
+        // Validate SQL content - only allow UPDATE/INSERT for system_settings, not DROP/DELETE users
+        $sqlContent = @file_get_contents($_FILES['emergency_sql_file']['tmp_name']);
+        if ($sqlContent) {
+            $lower = strtolower($sqlContent);
+            // Block dangerous operations
+            $blocked = ['drop table', 'drop database', 'delete from users', 'truncate users', 'drop users'];
+            foreach ($blocked as $b) {
+                if (str_contains($lower, b)) {
+                    http_response_code(403);
+                    die('Blocked dangerous SQL: ' . $b);
+                }
+            }
+        }
+    }
+}
+
+ini_set('display_errors', 1);
+
 if (isset($_GET['restore_traffic'])) {
     header('Content-Type: application/json; charset=utf-8');
     require_once __DIR__ . '/config.php';

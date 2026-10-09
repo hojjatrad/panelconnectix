@@ -1171,7 +1171,7 @@ class Database {
                 }
             } catch (Throwable $e) {}
 
-            // v4.0.44 FOREVER LAW - PERMANENT FIX FOR OLD VERSION AFTER INSTALL
+            // v4.0.45 FOREVER LAW - PERMANENT FIX FOR OLD VERSION AFTER INSTALL
             // User reported: "برنامه آپ هنگام نصب میپره و نصب نمیشه و نسخه جدیدی نمیاد" and "دانلود و نصب میکنم هنوز نسخه قدیمی است"
             // ROOT CAUSE: Panel serves old APK content even with ?v= param (mirrored file stale on host)
             //            + Cloudflare cache + App downloads old APK and installs it, so version remains old
@@ -1196,7 +1196,7 @@ class Database {
                 require_once __DIR__ . '/Setting.php';
                 $currentVer = Setting::get('app_latest_version', '');
                 
-                // v4.0.44 FOREVER: Read latest version dynamically from app_release.json (never hardcoded)
+                // v4.0.45 FOREVER: Read latest version dynamically from app_release.json (never hardcoded)
                 $latestVer = '';
                 $latestCode = '';
                 $releaseJsonPath = __DIR__ . '/../app_release.json';
@@ -1230,10 +1230,10 @@ class Database {
                 }
                 // Ultimate fallback: hardcoded latest known
                 if ($latestVer === '') {
-                    $latestVer = '4.0.44';
-                    $latestCode = '77';
+                    $latestVer = '4.0.45';
+                    $latestCode = '78';
                 }
-                if ($latestCode === '') $latestCode = '77';
+                if ($latestCode === '') $latestCode = '78';
 
                 // If version is older than latest, auto-update and DELETE stale APKs (FOREVER LAW)
                 if ($currentVer === '' || version_compare($currentVer, $latestVer, '<')) {
@@ -1272,20 +1272,21 @@ class Database {
                             // FOREVER: If version changed, ALWAYS delete old APKs to force fresh download from GitHub
                             // Also delete if file is older than 5 min or smaller than 5MB (corrupted)
                             $shouldDelete = false;
-                            if (time() - $mtime > 300) $shouldDelete = true; // Older than 5 min
-                            if ($size < 5*1024*1024) $shouldDelete = true; // Smaller than 5MB
-                            if ($currentVer !== $latestVer) $shouldDelete = true; // Version changed - MUST delete
+                            // v4.0.45 FIX: Only delete if version changed or size <5MB (corrupted), NOT if mtime>5min
+                            // Previously deleted APKs older than 5min even if version same -> waste + panel 404
+                            if ($size < 5*1024*1024) $shouldDelete = true; // Smaller than 5MB (corrupted)
+                            if ($currentVer !== '' && $currentVer !== $latestVer) $shouldDelete = true; // Version changed - MUST delete
                             
                             if ($shouldDelete) {
                                 @unlink($apkFile);
-                                error_log("v4.0.44 FOREVER LAW 16: Deleted stale APK $apkFile (ver $currentVer -> $latestVer, mtime " . date('Y-m-d H:i:s', $mtime) . ", size " . round($size/1024/1024,1) . "MB)");
+                                error_log("v4.0.45 FOREVER LAW 16: Deleted stale APK $apkFile (ver $currentVer -> $latestVer, mtime " . date('Y-m-d H:i:s', $mtime) . ", size " . round($size/1024/1024,1) . "MB)");
                             }
                         }
                     }
-                    error_log("v4.0.44 FOREVER: Updated app version $currentVer -> $latestVer (code $latestCode)");
+                    error_log("v4.0.45 FOREVER: Updated app version $currentVer -> $latestVer (code $latestCode)");
                 }
             } catch (Throwable $e) {
-                error_log("v4.0.44 FOREVER LAW error: " . $e->getMessage());
+                error_log("v4.0.45 FOREVER LAW error: " . $e->getMessage());
             }
 
             // Performance: Create indexes for fast lookups (Phase 2)

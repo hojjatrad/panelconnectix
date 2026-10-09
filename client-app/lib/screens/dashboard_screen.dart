@@ -74,11 +74,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Map<String, dynamic>? _updateInfo;
   bool _isCheckingUpdate = false;
 
-  static const String currentAppVersion = '4.0.44';
-  static String _actualInstalledVersion = '4.0.44'; // Will be updated from PackageManager
-  static int _actualInstalledCode = 77;
+  static const String currentAppVersion = '4.0.45';
+  static String _actualInstalledVersion = '4.0.45'; // Will be updated from PackageManager
+  static int _actualInstalledCode = 78;
 
-  // v4.0.44 FOREVER LAW: Get ACTUAL installed version from PackageManager, not hardcoded
+  // v4.0.45 FOREVER LAW: Get ACTUAL installed version from PackageManager, not hardcoded
   static Future<void> loadActualInstalledVersion() async {
     try {
       const channel = MethodChannel('com.connectix.vpn/updater');
@@ -88,14 +88,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         final verCode = (result['versionCode'] ?? '').toString();
         if (verName.isNotEmpty) {
           _actualInstalledVersion = verName;
-          print('v4.0.44 Actual installed version: $verName ($verCode)');
+          print('v4.0.45 Actual installed version: $verName ($verCode)');
         }
         if (verCode.isNotEmpty) {
-          _actualInstalledCode = int.tryParse(verCode) ?? 77;
+          _actualInstalledCode = int.tryParse(verCode) ?? 78;
         }
       }
     } catch (e) {
-      print('v4.0.44 loadActualInstalledVersion error: $e - using hardcoded $currentAppVersion');
+      print('v4.0.45 loadActualInstalledVersion error: $e - using hardcoded $currentAppVersion');
     }
   }
 
@@ -1494,7 +1494,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         return;
       }
 
-      // v4.0.44 FAKE VPN FIX: TUN mode must be TRUE on Android for real VPN
+      // v4.0.45 FAKE VPN FIX: TUN mode must be TRUE on Android for real VPN
       // Previously tunMode was only for Windows, causing proxyOnly:false but maybe not full TUN on some flutter_vless versions
       // Now: Android always TUN (real VPN), Windows depends on setting
       final tunMode = Platform.isAndroid ? true : (Platform.isWindows && _winTunnelMode == 'tun');
@@ -1793,14 +1793,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
   }
 
-  // v4.0.44 FAKE VPN FIX: Enhance Xray config with SAFE anti-filter + speed + stability
+  // v4.0.45 FAKE VPN FIX: Enhance Xray config with SAFE anti-filter + speed + stability
   // PREVIOUS v4.0.36 had fragment for ALL non-Reality which breaks many servers -> FAKE VPN symptom
-  // NEW v4.0.44: No fragment for Reality/Vision, mux only 4 concurrency, DNS plain (no DoH direct), no DoH direct routing
+  // NEW v4.0.45: No fragment for Reality/Vision, mux only 4 concurrency, DNS plain (no DoH direct), no DoH direct routing
   String _enhanceWithZeroCostAntiFilter(String configJson) {
     try {
       final Map<String, dynamic> cfg = jsonDecode(configJson) as Map<String, dynamic>;
       
-      // 1. DNS - v4.0.44 FIX: Use plain DNS, not DoH direct (DoH often filtered in Iran via direct route)
+      // 1. DNS - v4.0.45 FIX: Use plain DNS, not DoH direct (DoH often filtered in Iran via direct route)
       // DoH via direct causes DNS fail -> filtered apps don't open
       // Use 8.8.8.8, 1.1.1.1, 1.0.0.1, 8.8.4.4 with UseIP strategy, no DoH
       cfg['dns'] = {
@@ -1864,7 +1864,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             sockopt['tcpFastOpen'] = true;
             sockopt['mark'] = 0;
             
-            // v4.0.44 FIX: NO FRAGMENT for Reality and Vision - fragment breaks them and causes FAKE VPN
+            // v4.0.45 FIX: NO FRAGMENT for Reality and Vision - fragment breaks them and causes FAKE VPN
             // Fragment was causing silent outbound failure on many servers
             // Only add fragment for plain TLS non-Vision if needed, and even then make it optional (disabled by default)
             // For now: NO fragment at all to ensure real connection - user can enable via setting later if needed
@@ -1878,7 +1878,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             streamSettings['sockopt'] = sockopt;
             ob['streamSettings'] = streamSettings;
             
-            // S4: Mux - v4.0.44 FIX: Disable mux for Reality/Vision (they have their own), enable with concurrency 4 (not 8) for others
+            // S4: Mux - v4.0.45 FIX: Disable mux for Reality/Vision (they have their own), enable with concurrency 4 (not 8) for others
             // Concurrency 8 was rejected by some servers causing speed 0
             if (isReality || isVision) {
               // For Reality/Vision, disable mux (Xray docs: mux not recommended with Vision)
@@ -1894,7 +1894,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   : <String, dynamic>{};
               if (!mux.containsKey('enabled')) {
                 mux['enabled'] = true;
-                mux['concurrency'] = 4; // v4.0.44: reduced from 8 to 4 for compatibility
+                mux['concurrency'] = 4; // v4.0.45: reduced from 8 to 4 for compatibility
                 mux['xudpConcurrency'] = 4;
                 mux['xudpProxyUDP443'] = 'reject';
               } else {
@@ -1912,7 +1912,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         }
       }
       
-      // 3. v4.0.44 FIX: Remove DoH direct routing rule - DoH direct causes DNS fail in Iran
+      // 3. v4.0.45 FIX: Remove DoH direct routing rule - DoH direct causes DNS fail in Iran
       // Previously we added rule for cloudflare-dns.com, dns.google -> direct, but DoH is filtered
       // Now DNS is plain 8.8.8.8 etc., no need for DoH direct rule
       // Also ensure existing DoH direct rules are removed if present

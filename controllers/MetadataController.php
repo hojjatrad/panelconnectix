@@ -66,19 +66,47 @@ class MetadataController {
             Setting::set('sublink_custom_domain', trim($_POST['sublink_custom_domain']));
 
             // ---- Upload new APK builds to the panel web root (fast in-app updates) ----
+            // v4.0.45 SECURITY FIX: Check MIME type + PK header + size >5MB to prevent RCE
             $apkNotes = [];
             if (!empty($_FILES['apk_file']['name']) && $_FILES['apk_file']['error'] === UPLOAD_ERR_OK) {
-                if (move_uploaded_file($_FILES['apk_file']['tmp_name'], __DIR__ . '/../Connectix-ARM64-v8a.apk')) {
-                    $apkNotes[] = 'APK نسخه ARM64 روی هاست پنل جایگزین شد.';
+                $tmpPath = $_FILES['apk_file']['tmp_name'];
+                $size = filesize($tmpPath);
+                $mime = @mime_content_type($tmpPath) ?: '';
+                $header = @file_get_contents($tmpPath, false, null, 0, 2);
+                $isApk = ($size > 5*1024*1024) && ($header === 'PK') && (str_contains($mime, 'zip') || str_contains($mime, 'octet-stream') || $mime === '' || str_contains($_FILES['apk_file']['name'], '.apk'));
+                if (!$isApk) {
+                    $apkNotes[] = 'خطا: فایل APK نامعتبر (باید >5MB و PK header داشته باشد).';
                 } else {
-                    $apkNotes[] = 'خطا در آپلود APK نسخه ARM64.';
+                    if (move_uploaded_file($tmpPath, __DIR__ . '/../Connectix-ARM64-v8a.apk')) {
+                        $apkNotes[] = 'APK نسخه ARM64 روی هاست پنل جایگزین شد (بررسی امنیتی OK).';
+                        // Ensure .htaccess denies PHP execution in APK
+                        $htPath = __DIR__ . '/../.htaccess';
+                        if (is_file($htPath)) {
+                            $htContent = @file_get_contents($htPath);
+                            if (!str_contains($htContent, 'Connectix-ARM64')) {
+                                // Add rule to prevent PHP execution in APK files
+                                @file_put_contents($htPath, "\n<FilesMatch "\\.apk$">\n  SetHandler default-handler\n  Header set Content-Type application/vnd.android.package-archive\n</FilesMatch>\n", FILE_APPEND);
+                            }
+                        }
+                    } else {
+                        $apkNotes[] = 'خطا در آپلود APK نسخه ARM64.';
+                    }
                 }
             }
             if (!empty($_FILES['apk_universal_file']['name']) && $_FILES['apk_universal_file']['error'] === UPLOAD_ERR_OK) {
-                if (move_uploaded_file($_FILES['apk_universal_file']['tmp_name'], __DIR__ . '/../Connectix-Universal.apk')) {
-                    $apkNotes[] = 'APK نسخه Universal روی هاست پنل جایگزین شد.';
+                $tmpPath = $_FILES['apk_universal_file']['tmp_name'];
+                $size = filesize($tmpPath);
+                $mime = @mime_content_type($tmpPath) ?: '';
+                $header = @file_get_contents($tmpPath, false, null, 0, 2);
+                $isApk = ($size > 5*1024*1024) && ($header === 'PK') && (str_contains($mime, 'zip') || str_contains($mime, 'octet-stream') || $mime === '' || str_contains($_FILES['apk_universal_file']['name'], '.apk'));
+                if (!$isApk) {
+                    $apkNotes[] = 'خطا: فایل Universal APK نامعتبر.';
                 } else {
-                    $apkNotes[] = 'خطا در آپلود APK نسخه Universal.';
+                    if (move_uploaded_file($tmpPath, __DIR__ . '/../Connectix-Universal.apk')) {
+                        $apkNotes[] = 'APK نسخه Universal روی هاست پنل جایگزین شد (بررسی امنیتی OK).';
+                    } else {
+                        $apkNotes[] = 'خطا در آپلود APK نسخه Universal.';
+                    }
                 }
             }
 

@@ -294,8 +294,24 @@ class SublinkControllerV2 {
                             $sub = curl_exec($ch);
                             curl_close($ch);
                             if (!empty($sub)) {
-                                $decoded = base64_decode(trim($sub), true) ?: $sub;
-                                $lines = array_filter(array_map('trim', explode("\n", $decoded)));
+                                // v4.0.45 FIX: Validate base64 and reject HTML/error pages
+                                $trimmed = trim($sub);
+                                // If contains HTML tags, it's error page not sub
+                                if (stripos($trimmed, '<html') !== false || stripos($trimmed, '<!DOCTYPE') !== false || stripos($trimmed, '<body') !== false) {
+                                    error_log("Sublink fetch returned HTML, not configs: " . substr($trimmed, 0, 200));
+                                } else {
+                                    $decoded = base64_decode($trimmed, true);
+                                    // If base64 decode fails, check if raw contains valid links, else invalid
+                                    if ($decoded === false) {
+                                        // Raw is not base64, check if it contains valid links directly
+                                        if (!preg_match('/^(vless|vmess|trojan|ss):\/\//m', $trimmed)) {
+                                            error_log("Sublink not base64 and no valid links: " . substr($trimmed, 0, 200));
+                                            $decoded = '';
+                                        } else {
+                                            $decoded = $trimmed;
+                                        }
+                                    }
+                                    $lines = array_filter(array_map('trim', explode("\n", $decoded)));
                                 $out = [];
                                 foreach ($lines as $i => $l) {
                                     if (preg_match('/^(vless|vmess|trojan|ss|shadowsocks|hysteria2|hy2|tuic|wireguard):\/\//i', $l)) {
@@ -306,6 +322,7 @@ class SublinkControllerV2 {
                             @file_put_contents($cacheFile, json_encode(['configs' => $out, 'ts' => time()]));
                             return $out;
                         }
+                                }
                             }
                         }
                     }
@@ -349,8 +366,20 @@ class SublinkControllerV2 {
                     $sub = curl_exec($ch);
                     curl_close($ch);
                     if (!empty($sub)) {
-                        $decoded = base64_decode(trim($sub), true) ?: $sub;
-                        $lines = array_filter(array_map('trim', preg_split("/\r\n|\n|\r/", $decoded)));
+                        // v4.0.45 FIX: Validate base64 and reject HTML
+                        $trimmed = trim($sub);
+                        if (stripos($trimmed, '<html') !== false || stripos($trimmed, '<!DOCTYPE') !== false) {
+                            error_log("Sublink fetch returned HTML: " . substr($trimmed, 0, 200));
+                        } else {
+                            $decoded = base64_decode($trimmed, true);
+                            if ($decoded === false) {
+                                if (!preg_match('/^(vless|vmess|trojan|ss):\/\//m', $trimmed)) {
+                                    $decoded = '';
+                                } else {
+                                    $decoded = $trimmed;
+                                }
+                            }
+                            $lines = array_filter(array_map('trim', preg_split("/\r\n|\n|\r/", $decoded)));
                         $out = [];
                         foreach ($lines as $i => $l) {
                             if (preg_match('/^(vless|vmess|trojan|ss|shadowsocks|hysteria2|hy2|tuic|wireguard):\/\//i', $l)) {
@@ -361,6 +390,7 @@ class SublinkControllerV2 {
                             @file_put_contents($cacheFile, json_encode(['configs' => $out, 'ts' => time()]));
                             return $out;
                         }
+                            }
                     }
                 } catch (Throwable $e) {}
             }
