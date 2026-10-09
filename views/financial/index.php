@@ -9,7 +9,7 @@
                 <h1 class="text-xl font-black text-white flex items-center gap-3">
                     <span class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center text-white"><i class="fa-solid fa-chart-pie"></i></span>
                     گزارش مالی پیشرفته
-                    <span class="text-[10px] bg-emerald-500/20 text-emerald-300 px-2.5 py-1 rounded-full border border-emerald-500/30">PRO v4.0.45</span>
+                    <span class="text-[10px] bg-emerald-500/20 text-emerald-300 px-2.5 py-1 rounded-full border border-emerald-500/30">PRO v4.0.46</span>
                 </h1>
                 <p class="text-xs text-slate-400 mt-2">درآمد، سود خالص، هزینه سرورها، پرفروش‌ترین پلن‌ها - همه در یک نگاه</p>
             </div>

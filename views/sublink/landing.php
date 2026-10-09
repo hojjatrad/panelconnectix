@@ -73,7 +73,7 @@ $themeColor = $client['theme_color'] ?? 'violet';
             <p class="text-[11px] text-slate-400 mt-1"><?= htmlspecialchars($client['welcome_message'] ?? 'سرویس فوق سریع و ضد فیلتر - اتصال پایدار') ?></p>
             <div class="mt-3 flex justify-center gap-2">
                 <span class="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold flex items-center gap-1.5"><span class="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span> آنلاین و فعال</span>
-                <span class="px-2.5 py-1 rounded-full bg-violet-500/10 text-violet-300 border border-violet-500/20 text-[10px] font-bold">v4.0.45</span>
+                <span class="px-2.5 py-1 rounded-full bg-violet-500/10 text-violet-300 border border-violet-500/20 text-[10px] font-bold">v4.0.46</span>
             </div>
         </div>
 
@@ -222,7 +222,7 @@ $themeColor = $client['theme_color'] ?? 'violet';
                 <?php if (!empty($client['telegram_support'])): ?><a href="https://t.me/<?= ltrim($client['telegram_support'], '@') ?>" target="_blank" class="px-4 py-2.5 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/20 rounded-xl text-xs font-bold flex items-center gap-2 transition"><i class="fa-brands fa-telegram"></i> پشتیبانی تلگرام</a><?php endif; ?>
                 <?php if (!empty($client['whatsapp_support'])): ?><a href="https://wa.me/<?= preg_replace('/[^0-9]/','',$client['whatsapp_support']) ?>" target="_blank" class="px-4 py-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 rounded-xl text-xs font-bold flex items-center gap-2 transition"><i class="fa-brands fa-whatsapp"></i> واتساپ</a><?php endif; ?>
             </div>
-            <div class="mt-4 text-[10px] text-slate-600 font-mono">Powered by <?= $brandName ?> • v4.0.45 • ضد فیلتر هوشمند</div>
+            <div class="mt-4 text-[10px] text-slate-600 font-mono">Powered by <?= $brandName ?> • v4.0.46 • ضد فیلتر هوشمند</div>
         </div>
     </div>
 

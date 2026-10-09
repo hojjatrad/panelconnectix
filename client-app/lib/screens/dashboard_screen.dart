@@ -16,8 +16,9 @@ import 'login_screen.dart';
 import 'server_list_modal.dart';
 import 'bypass_apps_screen.dart';
 import 'advanced_settings_screen.dart';
-import 'proxy_screen.dart';
-import 'gps_spoof_screen.dart';
+// v4.0.46 NO-SCROLL: Proxy and GPS moved to AdvancedSettingsScreen (gear), removed from dashboard to prevent scroll
+// import 'proxy_screen.dart'; // now accessed via gear settings
+// import 'gps_spoof_screen.dart'; // now accessed via gear settings
 
 class DashboardScreen extends StatefulWidget {
   final ClientModel client;
@@ -2985,128 +2986,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 ),
               ],
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
 
-              // Smart Connect & Quick Controls Row - v4.0.34 FIX: Wrap RTL + FittedBox to prevent overflow & flipping
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                textDirection: TextDirection.rtl,
-                alignment: WrapAlignment.start,
-                children: [
-                  // 1-Tap Smart Connect - Flexible width
-                  InkWell(
-                    onTap: _smartConnect,
-                    borderRadius: BorderRadius.circular(16),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1E1B4B),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFF4338CA)),
-                      ),
-                      child: Row(textDirection: TextDirection.rtl, 
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _isSmartConnecting
-                              ? const SizedBox(
-                                  width: 14,
-                                  height: 14,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF818CF8)),
-                                )
-                              : const Icon(Icons.bolt_rounded, color: Colors.amber, size: 16),
-                          const SizedBox(width: 6),
-                          const FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text(
-                              'اتصال هوشمند',
-                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  // Proxy Button - v4.0.18 NEW - Compact
-                  InkWell(
-                    onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const ProxyScreen()));
-                    },
-                    borderRadius: BorderRadius.circular(16),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1E293B),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.3)),
-                      ),
-                      child: Row(textDirection: TextDirection.rtl, 
-                        mainAxisSize: MainAxisSize.min,
-                        children: const [
-                          Icon(Icons.security_rounded, color: Color(0xFF38BDF8), size: 16),
-                          SizedBox(width: 4),
-                          FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text('پروکسی', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.bold)),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  // GPS Spoof Button - v4.0.28 NEW - Compact
-                  InkWell(
-                    onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const GpsSpoofScreen()));
-                    },
-                    borderRadius: BorderRadius.circular(16),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1E293B),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
-                      ),
-                      child: Row(textDirection: TextDirection.rtl, 
-                        mainAxisSize: MainAxisSize.min,
-                        children: const [
-                          Icon(Icons.location_on_rounded, color: Color(0xFF10B981), size: 16),
-                          SizedBox(width: 4),
-                          FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text('GPS', style: TextStyle(color: Color(0xFF10B981), fontSize: 11, fontWeight: FontWeight.bold)),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  // Hotspot & Proxy Sharing Modal Trigger - Compact
-                  InkWell(
-                    onTap: _openHotspotProxySharingSheet,
-                    borderRadius: BorderRadius.circular(16),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0F172A),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFF334155)),
-                      ),
-                      child: Row(textDirection: TextDirection.rtl, 
-                        mainAxisSize: MainAxisSize.min,
-                        children: const [
-                          Icon(Icons.wifi_tethering_rounded, color: Color(0xFF34D399), size: 16),
-                          SizedBox(width: 4),
-                          FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text('TV', style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 11)),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              // v4.0.45 NO-SCROLL OPTIMIZATION: Removed Wrap (Smart Connect, Proxy, GPS, TV) from main page
+              // All moved to AdvancedSettingsScreen (gear) per user request for first-page no-scroll
+              // Only Connect button + Server selector remain on first page
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 8),
 
               // v4.0.42 ULTIMATE FULL - کامل با پرچم مواج + غبار + صدا + لرزش + ضربان قلب
               // 14 میکرو-اینترکشن: حلقه 3x + مدار 8x + فیبر 14x + مایع + پلاسما 6x + confetti 22x + haptic 3x + count-up + glow + flag wave + dust 25x + sound + shake + heartbeat
@@ -3337,66 +3223,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 ),
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
 
-              // Clean Advanced Settings Entry (replaces crowded Pro Settings on main page)
-              Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: _openAdvancedSettings,
-                  borderRadius: BorderRadius.circular(18),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0F172A),
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: const Color(0xFF1E293B)),
-                    ),
-                    child: Row(textDirection: TextDirection.rtl, 
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF6366F1).withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(Icons.tune_rounded, color: Color(0xFF818CF8), size: 20),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(textDirection: TextDirection.rtl, 
-                                children: [
-                                  const Text('تنظیمات پیشرفته', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
-                                  const SizedBox(width: 8),
-                                  if (_splitTunnelingEnabled)
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(color: const Color(0xFF10B981).withOpacity(0.2), borderRadius: BorderRadius.circular(6)),
-                                      child: const Text('فعال', style: TextStyle(color: Color(0xFF10B981), fontSize: 9, fontWeight: FontWeight.bold)),
-                                    ),
-                                ],
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                _splitTunnelingEnabled ? 'عبور مستقیم بانک‌ها فعال • مدیریت برنامه‌ها' : 'مدیریت عبور مستقیم، اتصال خودکار، حالت ویندوز',
-                                style: const TextStyle(color: Color(0xFF64748B), fontSize: 11),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF64748B)),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // v4.0.37 LAW: Removed duplicate bottom speed indicator - only one speed display under connect button (user request)
+              // v4.0.45 NO-SCROLL: Removed bottom advanced settings card - moved to gear (top AppBar)
+              // Per user request: first page should not scroll, only quota + connect + server selector + version
+              // v4.0.37 LAW: Removed duplicate bottom speed indicator - only one speed display under connect button
               // Previously had duplicate: one under connect button (_buildSpeedChip) and one at bottom (this block)
               // Now only _buildSpeedChip under connect button shows speed - single source of truth
               // App Version & Support Footer

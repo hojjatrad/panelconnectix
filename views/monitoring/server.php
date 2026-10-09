@@ -5,7 +5,7 @@
         <h1 class="text-xl font-black text-white flex items-center gap-3">
             <span class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center text-white"><i class="fa-solid fa-chart-line"></i></span>
             مانیتورینگ سرور: <?= htmlspecialchars($server['name']) ?>
-            <span class="text-[10px] bg-emerald-500/20 text-emerald-300 px-2.5 py-1 rounded-full border border-emerald-500/30">v4.0.45 • CPU/RAM</span>
+            <span class="text-[10px] bg-emerald-500/20 text-emerald-300 px-2.5 py-1 rounded-full border border-emerald-500/30">v4.0.46 • CPU/RAM</span>
         </h1>
         <a href="<?= Helpers::url('monitoring') ?>" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold border border-slate-700">بازگشت</a>
     </div>

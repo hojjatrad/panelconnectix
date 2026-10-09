@@ -1,5 +1,5 @@
 <?php
-$pageTitle = 'وضعیت سرورها LIVE - v4.0.45';
+$pageTitle = 'وضعیت سرورها LIVE - v4.0.46';
 require __DIR__ . '/../layout/header.php';
 ?>
 <div class="space-y-6">
@@ -8,7 +8,7 @@ require __DIR__ . '/../layout/header.php';
             <h1 class="text-lg font-bold text-white flex items-center gap-2">
                 <i class="fa-solid fa-server text-emerald-400"></i>
                 <span>وضعیت سرورها LIVE - مانیتورینگ ریل‌تایم</span>
-                <span class="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full text-[10px]">v4.0.45 RESYNC</span>
+                <span class="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full text-[10px]">v4.0.46 RESYNC</span>
             </h1>
             <p class="text-xs text-slate-400 mt-1">مشاهده لحظه‌ای سلامت، تاخیر، CPU و RAM تمام سرورهای فعال - فقط خواندنی برای ریسلر</p>
         </div>

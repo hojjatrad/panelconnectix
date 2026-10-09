@@ -6,7 +6,7 @@
         <div class="absolute -bottom-20 -left-20 w-72 h-72 bg-cyan-600/20 rounded-full blur-[60px]"></div>
         <div class="relative z-10">
             <div class="w-20 h-20 rounded-[1.5rem] bg-gradient-to-br from-violet-600 to-indigo-600 mx-auto flex items-center justify-center text-white text-3xl shadow-xl mb-4">🚀</div>
-            <h1 class="text-2xl font-black text-white">به Connectix v4.0.45 خوش آمدی!</h1>
+            <h1 class="text-2xl font-black text-white">به Connectix v4.0.46 خوش آمدی!</h1>
             <p class="text-sm text-slate-400 mt-2">راه‌اندازی پنل در 4 مرحله ساده - کمتر از 2 دقیقه</p>
             <div class="mt-6 flex justify-center gap-2">
                 <?php for($i=0;$i<4;$i++): $active = $i <= ($progress['step'] ?? 0); ?>

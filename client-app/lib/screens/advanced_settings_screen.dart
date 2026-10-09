@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'bypass_apps_screen.dart';
+import 'proxy_screen.dart';
+import 'gps_spoof_screen.dart';
+import '../services/api_service.dart';
 
 class AdvancedSettingsScreen extends StatefulWidget {
   final List<String> defaultBypassList;
@@ -92,7 +95,96 @@ class _AdvancedSettingsScreenState extends State<AdvancedSettingsScreen> {
         body: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            // Info banner
+            // v4.0.45 NO-SCROLL OPTIMIZATION: Top quick tools moved from dashboard
+            // Info banner for gear settings
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(colors: [Color(0xFF1E1B4B), Color(0xFF0F172A)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFF6366F1).withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(color: const Color(0xFF6366F1).withOpacity(0.2), borderRadius: BorderRadius.circular(10)),
+                    child: const Icon(Icons.tune_rounded, color: Color(0xFF818CF8), size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('تنظیمات پیشرفته - همه ابزارها اینجا', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                        SizedBox(height: 2),
+                        Text('پروکسی، GPS، هات‌اسپات TV و تنظیمات عبور مستقیم', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11, height: 1.4)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // v4.0.45: Proxy Section - Moved from dashboard Wrap
+            _buildQuickToolCard(
+              context: context,
+              icon: Icons.security_rounded,
+              iconColor: const Color(0xFF38BDF8),
+              title: 'پروکسی برای تلگرام و برنامه‌ها',
+              subtitle: 'SOCKS5 / HTTP / MTProto - رایگان برای شما',
+              badge: 'رایگان',
+              badgeColor: const Color(0xFF10B981),
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProxyScreen())),
+            ),
+            const SizedBox(height: 10),
+
+            // v4.0.45: GPS Section - Moved from dashboard Wrap
+            _buildQuickToolCard(
+              context: context,
+              icon: Icons.location_on_rounded,
+              iconColor: const Color(0xFF10B981),
+              title: 'جعل GPS - مخفی کردن کشور',
+              subtitle: 'برای متا، بازی‌ها و برنامه‌های مکان‌محور',
+              badge: 'جدید',
+              badgeColor: const Color(0xFF9333EA),
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GpsSpoofScreen())),
+            ),
+            const SizedBox(height: 10),
+
+            // v4.0.45: TV / Hotspot Section - Moved from dashboard Wrap
+            _buildQuickToolCard(
+              context: context,
+              icon: Icons.wifi_tethering_rounded,
+              iconColor: const Color(0xFF34D399),
+              title: 'اشتراک با تلویزیون و کنسول (TV)',
+              subtitle: 'HTTP 10809 / SOCKS 10808 - هات‌اسپات',
+              badge: 'TV',
+              badgeColor: const Color(0xFFF59E0B),
+              onTap: () => _showHotspotSheet(context),
+            ),
+            const SizedBox(height: 10),
+
+            // v4.0.45: Smart Connect moved here too
+            _buildQuickToolCard(
+              context: context,
+              icon: Icons.bolt_rounded,
+              iconColor: Colors.amber,
+              title: 'اتصال هوشمند - بهترین سرور',
+              subtitle: 'انتخاب خودکار سریع‌ترین سرور',
+              badge: 'هوشمند',
+              badgeColor: const Color(0xFF6366F1),
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('از صفحه اصلی دکمه اتصال را بزنید - هوشمند خودکار فعال است')));
+                Navigator.pop(context);
+              },
+            ),
+            const SizedBox(height: 20),
+            const Divider(color: Color(0xFF1E293B), height: 1),
+            const SizedBox(height: 16),
+
+            // Info banner for split tunneling
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
@@ -410,6 +502,115 @@ class _AdvancedSettingsScreenState extends State<AdvancedSettingsScreen> {
                 textAlign: TextAlign.center,
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // v4.0.45 Helper: Quick tool card for Proxy/GPS/TV moved from dashboard
+  static Widget _buildQuickToolCard({
+    required BuildContext context,
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+    required String badge,
+    required Color badgeColor,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F172A),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFF1E293B)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: iconColor.withOpacity(0.15), borderRadius: BorderRadius.circular(12)),
+                child: Icon(icon, color: iconColor, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(child: Text(title, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(color: badgeColor.withOpacity(0.15), borderRadius: BorderRadius.circular(6), border: Border.all(color: badgeColor.withOpacity(0.3))),
+                          child: Text(badge, style: TextStyle(color: badgeColor, fontSize: 8, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(subtitle, style: const TextStyle(color: Color(0xFF64748B), fontSize: 10, height: 1.3)),
+                  ],
+                ),
+              ),
+              const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: Color(0xFF475569)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showHotspotSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0F172A),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xFF334155), borderRadius: BorderRadius.circular(4)))),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: const Color(0xFF10B981).withOpacity(0.15), borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.wifi_tethering_rounded, color: Color(0xFF34D399), size: 26)),
+                const SizedBox(width: 14),
+                const Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('اشتراک اینترنت با تلویزیون و کنسول', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                    SizedBox(height: 4),
+                    Text('VPN Hotspot & Local Proxy Sharing', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
+                  ]),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(color: const Color(0xFF1E293B), borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFF334155))),
+              child: const Column(children: [
+                Row(textDirection: TextDirection.rtl, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('پورت پروکسی HTTP:', style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 13)), Text('10809', style: TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.bold, fontSize: 14))]),
+                Divider(color: Color(0xFF334155), height: 20),
+                Row(textDirection: TextDirection.rtl, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('پورت پروکسی SOCKS5:', style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 13)), Text('10808', style: TextStyle(color: Color(0xFF34D399), fontWeight: FontWeight.bold, fontSize: 14))]),
+                Divider(color: Color(0xFF334155), height: 20),
+                Row(textDirection: TextDirection.rtl, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('آدرس IP دستگاه شما:', style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 13)), Text('192.168.43.1 (هات‌اسپات)', style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 13))]),
+              ]),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(onPressed: () => ApiService.openHotspotSettings(), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366F1), padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))), icon: const Icon(Icons.settings_input_antenna, size: 20), label: const Text('روشن کردن هات‌اسپات گوشی (Hotspot)')),
+            ),
+            const SizedBox(height: 16),
           ],
         ),
       ),

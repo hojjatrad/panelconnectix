@@ -4,7 +4,7 @@ require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Setting.php';
 
 class Updater {
-    public const CURRENT_VERSION = '4.0.45'; // v4.0.45 Panel - Unified Versioning - Path Independence, Well-Known discovery, Smart Resolver, QR fallback
+    public const CURRENT_VERSION = '4.0.46'; // v4.0.46 Panel - NO-SCROLL Dashboard + Gear Settings (Proxy/GPS/TV) + Update Fix "ارتباط برقرار نشد"
 
     public static function getCurrentVersion(): string {
         $dbVer = Setting::get('current_version', '');

@@ -1,5 +1,5 @@
 <?php
-$pageTitle = 'مصرف و تاریخچه کلاینت‌ها - v4.0.45';
+$pageTitle = 'مصرف و تاریخچه کلاینت‌ها - v4.0.46';
 require __DIR__ . '/../layout/header.php';
 ?>
 <div class="space-y-6">
@@ -8,7 +8,7 @@ require __DIR__ . '/../layout/header.php';
             <h1 class="text-lg font-bold text-white flex items-center gap-2">
                 <i class="fa-solid fa-chart-area text-cyan-400"></i>
                 <span>مصرف و تاریخچه - ULTRA</span>
-                <span class="px-2 py-0.5 bg-cyan-500/20 text-cyan-400 rounded-full text-[10px]">RESYNC v4.0.45</span>
+                <span class="px-2 py-0.5 bg-cyan-500/20 text-cyan-400 rounded-full text-[10px]">RESYNC v4.0.46</span>
             </h1>
             <p class="text-xs text-slate-400 mt-1">نمودار مصرف، تاریخچه اتصال و ترافیک کلاینت‌های شما</p>
         </div>

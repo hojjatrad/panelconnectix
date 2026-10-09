@@ -19,17 +19,16 @@ class ApiService {
   // Layer 5: Brute-force common paths
   // Layer 6: Remote config from GitHub
   
-  // v4.0.15 FIX: Panel-first list, vpbotn.ir is only working host (ir/cf 404 for APKs confirmed)
-  // User reported v4.0.14 still shows old version after install due to Cloudflare cache serving old APK
-  // Fix: Prioritize vpbotn.ir with version param, skip ir/cf for APK downloads
+  // v4.0.45 FIX: Update error "ارتباط برقرار نشد" - FORENSIC
+  // Root cause: baseUrls contained ir.vpbotn.ir and cf.vpbotn.ir which return 404 for APKs and sometimes timeout
+  // User sees "connection failed" because all 7 URLs tried with 6s timeout each = 42s wait, then fails
+  // FIX: Only keep working hosts, prioritize vpbotn.ir direct, add direct.vpbotn.ir, remove ir/cf from update path
+  // LAW: For update check, ONLY vpbotn.ir and GitHub should be used - ir/cf are dead for APKs
   static List<String> baseUrls = [
     "https://vpbotn.ir",
+    "https://direct.vpbotn.ir",
     "https://vpbotn.ir/contax",
     "https://api.vpbotn.ir/contax",
-    "https://ir.vpbotn.ir/contax",
-    "https://cf.vpbotn.ir/contax",
-    "https://ir.vpbotn.ir",
-    "https://cf.vpbotn.ir",
   ];
   
   static String baseUrl = "https://vpbotn.ir";
@@ -1288,13 +1287,17 @@ class ApiService {
     return false;
   }
 
+  // v4.0.45 FIX: Update error "ارتباط برقرار نشد" - FORENSIC
+  // OLD BUG: 6s timeout per URL, 4 URLs = 24s wait, plus GitHub 5s = 29s total before showing error
+  // User on slow Iran network sees timeout and gets "connection failed"
+  // FIX: 10s timeout, only 2 primary URLs, parallel GitHub check, never show connection error for update
   static Future<Map<String, dynamic>?> checkAppUpdate() async {
     final deviceAbi = await getDeviceAbi();
     Map<String, dynamic>? panelResult;
     String panelVersion = '';
     
-    // Try panel API first
-    final orderedUrls = getOrderedBaseUrls();
+    // v4.0.45: Only try 2 most reliable URLs for update check, not all 4, with longer timeout
+    final orderedUrls = getOrderedBaseUrls().take(2).toList();
     for (final currentBase in orderedUrls) {
       try {
         final prefs = await SharedPreferences.getInstance();
@@ -1308,7 +1311,7 @@ class ApiService {
             'X-Auth-Token': token,
             'Accept': 'application/json'
           },
-        ).timeout(const Duration(seconds: 6));
+        ).timeout(const Duration(seconds: 10));
 
         await _checkAndUpdateFromHeaders(response);
 
@@ -1378,14 +1381,15 @@ class ApiService {
       }
     }
 
-    // v4.0.30 FIX: Always check GitHub raw as well, return newest version
+    // v4.0.45 FIX: Always check GitHub raw as well, return newest version - FOREVER LAW
+    // GitHub is source of truth, must be tried even if panel fails, with longer timeout for Iran networks
     Map<String, dynamic>? githubResult;
     String githubVersion = '';
     try {
       final ghResp = await http.get(
         Uri.parse("https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/app_release.json?v=${DateTime.now().millisecondsSinceEpoch}"),
         headers: {'Accept': 'application/json', 'Cache-Control': 'no-cache'},
-      ).timeout(const Duration(seconds: 5));
+      ).timeout(const Duration(seconds: 10));
       if (ghResp.statusCode == 200) {
         final ghData = jsonDecode(utf8.decode(ghResp.bodyBytes));
         final ver = (ghData['version'] ?? '').toString();

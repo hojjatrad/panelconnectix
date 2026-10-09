@@ -1,7 +1,7 @@
 name: connectix_vpn
-description: Connectix Professional Multiplatform VPN Client - ULTRA Dual-Core Xray + sing-box + FULL PANEL BUG FIX v4.0.45 - NO BUGS
+description: Connectix Professional Multiplatform VPN Client - ULTRA Dual-Core Xray + sing-box + FULL PANEL BUG FIX v4.0.46 - NO-SCROLL OPTIMIZED
 publish_to: 'none'
-version: 4.0.45+78
+version: 4.0.46+79
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
