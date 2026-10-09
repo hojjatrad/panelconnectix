@@ -85,7 +85,11 @@ class MetadataController {
                             $htContent = @file_get_contents($htPath);
                             if (!str_contains($htContent, 'Connectix-ARM64')) {
                                 // Add rule to prevent PHP execution in APK files
-                                @file_put_contents($htPath, "\n<FilesMatch "\\.apk$">\n  SetHandler default-handler\n  Header set Content-Type application/vnd.android.package-archive\n</FilesMatch>\n", FILE_APPEND);
+                                @file_put_contents($htPath, "
+" . '<FilesMatch "\.apk$">' . "
+  SetHandler default-handler
+</FilesMatch>
+", FILE_APPEND);
                             }
                         }
                     } else {
