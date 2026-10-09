@@ -11,7 +11,7 @@ import '../models/client_model.dart';
 import '../models/server_model.dart';
 import '../services/api_service.dart';
 import '../services/v2ray_compat.dart';
-import '../widgets/connect_button_v2.dart';
+import '../widgets/connect_button_ultimate.dart';
 import 'login_screen.dart';
 import 'server_list_modal.dart';
 import 'bypass_apps_screen.dart';
@@ -3078,28 +3078,26 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
               const SizedBox(height: 24),
 
-              // v4.0.42 ULTIMATE CONNECT BUTTON - The Ultimate Connectix Flow
-              // ترکیبی نهایی: حلقه کوانتومی + مدار ماهواره + فیبر نوری + مایع انرژی + پلاسما + انفجار موفقیت
-              // میکرو-اینترکشن‌ها: Haptic, Confetti, Liquid Wave, Speed Count-up, Background Glow
+              // v4.0.42 ULTIMATE FULL - کامل با پرچم مواج + غبار + صدا + لرزش + ضربان قلب
+              // 14 میکرو-اینترکشن: حلقه 3x + مدار 8x + فیبر 14x + مایع + پلاسما 6x + confetti 22x + haptic 3x + count-up + glow + flag wave + dust 25x + sound + shake + heartbeat
               Center(
-                child: ConnectBackground(
+                child: ConnectButtonUltimate(
                   state: _isConnected
-                      ? ConnectButtonState.connected
+                      ? UltimateConnectState.connected
                       : _isConnecting
-                          ? ConnectButtonState.connecting
-                          : ConnectButtonState.disconnected,
-                  child: ConnectButtonV2(
-                    state: _isConnected
-                        ? ConnectButtonState.connected
-                        : _isConnecting
-                            ? ConnectButtonState.connecting
-                            : ConnectButtonState.disconnected,
-                    size: 135,
-                    enableHaptic: true,
-                    enableConfetti: true,
-                    enablePlasma: true,
-                    onTap: _toggleConnection,
-                  ),
+                          ? UltimateConnectState.connecting
+                          : UltimateConnectState.disconnected,
+                  size: 142,
+                  countryFlag: _selectedServer?.flag ?? '🌐',
+                  serverName: _selectedServer?.name ?? 'Connectix',
+                  enableHaptic: true,
+                  enableConfetti: true,
+                  enablePlasma: true,
+                  enableSound: true,
+                  enableFlagWave: true,
+                  enableDust: true,
+                  enableScreenShake: true,
+                  onTap: _toggleConnection,
                 ),
               ),
 

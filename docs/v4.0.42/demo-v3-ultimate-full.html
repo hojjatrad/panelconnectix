@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Connectix v4.0.42 Ultimate - 14 Micro-Interactions</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:system-ui,'Vazirmatn',sans-serif;background:#090D16;color:#F1F5F9;min-height:100vh;display:flex;flex-direction:column;align-items:center;overflow-x:hidden}
+  .bg{position:fixed;inset:0;pointer-events:none;z-index:0;transition:background 1s}
+  .bg.disconnected{background:radial-gradient(800px 600px at 20% 10%, rgba(147,51,234,.12), transparent), radial-gradient(600px 400px at 80% 90%, rgba(99,102,241,.08), transparent)}
+  .bg.connecting{background:radial-gradient(900px 700px at 50% 50%, rgba(245,158,11,.18), transparent), radial-gradient(600px 400px at 20% 80%, rgba(147,51,234,.1), transparent);animation:bgPulse .6s infinite alternate}
+  .bg.connected{background:radial-gradient(1000px 800px at 50% 50%, rgba(16,185,129,.14), transparent), radial-gradient(700px 500px at 80% 20%, rgba(99,102,241,.08), transparent);animation:bgPulse 2s infinite alternate}
+  @keyframes bgPulse{from{opacity:.8}to{opacity:1.3}}
+  .header{position:relative;z-index:10;text-align:center;padding:18px 16px 8px;max-width:960px}
+  .header h1{font-size:19px;font-weight:900;background:linear-gradient(90deg,#9333EA,#6366F1,#10B981);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .header p{font-size:11px;color:#94A3B8;margin-top:4px}
+  .badge{display:inline-flex;gap:6px;align-items:center;margin-top:8px;padding:6px 12px;border-radius:999px;background:#1E1B4B;border:1px solid rgba(99,102,241,.3);font-size:10px;color:#A5B4FC}
+  .stage{position:relative;z-index:10;display:flex;flex-direction:column;align-items:center;padding:12px;width:100%;max-width:960px}
+  .canvas-wrap{position:relative;width:380px;height:380px;display:flex;align-items:center;justify-content:center;margin:6px 0 14px}
+  .btn{position:relative;z-index:5;width:142px;height:142px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .3s cubic-bezier(.34,1.56,.64,1);will-change:transform;border:2px solid rgba(255,255,255,.1)}
+  .btn.disconnected{background:radial-gradient(120% 120% at 30% 20%, #A78BFA 0%, #7C3AED 25%, #4C1D95 70%, #1E1B4B 100%);box-shadow:0 0 0 1px rgba(147,51,234,.2), 0 10px 40px rgba(0,0,0,.6), inset 0 1px 1px rgba(255,255,255,.2)}
+  .btn.connecting{background:radial-gradient(120% 120% at 30% 20%, #FCD34D 0%, #F59E0B 30%, #92400E 80%, #451A03 100%);box-shadow:0 0 45px rgba(245,158,11,.55), 0 10px 40px rgba(0,0,0,.6);animation:shake .3s infinite}
+  .btn.connected{background:radial-gradient(120% 120% at 30% 20%, #6EE7B7 0%, #10B981 30%, #065F46 80%, #022C22 100%);box-shadow:0 0 60px rgba(16,185,129,.7), 0 10px 40px rgba(0,0,0,.6)}
+  @keyframes shake{0%,100%{transform:translateX(0) scale(1)}25%{transform:translateX(-1px) scale(1.02)}75%{transform:translateX(1px) scale(1.02)}}
+  .btn:active{transform:scale(.96)}
+  .liquid-wrap{position:absolute;inset:0;border-radius:50%;overflow:hidden;pointer-events:none}
+  .liquid{position:absolute;bottom:0;left:0;right:0;transition:height 1s cubic-bezier(.4,0,.2,1);height:20%}
+  .liquid.disconnected{background:linear-gradient(180deg, rgba(167,139,250,.85), rgba(124,58,237,.92))}
+  .liquid.connecting{background:linear-gradient(180deg, rgba(252,211,77,.92), rgba(245,158,11,.92));height:68%}
+  .liquid.connected{background:linear-gradient(180deg, rgba(110,231,183,.92), rgba(16,185,129,.92));height:90%}
+  .liquid:after{content:'';position:absolute;top:-12px;left:-20%;right:-20%;height:22px;background:radial-gradient(ellipse, rgba(255,255,255,.45), transparent 70%);border-radius:50%;animation:wave 2s ease-in-out infinite}
+  @keyframes wave{0%,100%{transform:translateX(-10%) scaleX(1)}50%{transform:translateX(10%) scaleX(1.25)}}
+  .icon{font-size:46px;filter:drop-shadow(0 2px 10px rgba(0,0,0,.6));transition:all .3s;z-index:2}
+  .ring{position:absolute;top:50%;left:50%;width:142px;height:142px;border-radius:50%;border:2.5px solid;transform:translate(-50%,-50%) scale(.8);opacity:0;pointer-events:none}
+  .ring.r1{animation:ring 2s infinite}.ring.r2{animation:ring 2s infinite .33s}.ring.r3{animation:ring 2s infinite .66s}
+  .disconnected .ring{border-color:rgba(147,51,234,.4)}.connecting .ring{border-color:rgba(245,158,11,.75);animation-duration:.5s}.connected .ring{border-color:rgba(16,185,129,.6);animation-duration:1.2s}
+  @keyframes ring{0%{transform:translate(-50%,-50%) scale(.85);opacity:.85}100%{transform:translate(-50%,-50%) scale(1.95);opacity:0}}
+  .orbit{position:absolute;top:50%;left:50%;width:240px;height:240px;margin:-120px 0 0 -120px;border-radius:50%;pointer-events:none}
+  .dot{position:absolute;top:50%;left:50%;width:9px;height:9px;border-radius:50%;margin:-4.5px 0 0 -4.5px;background:#A78BFA;box-shadow:0 0 12px currentColor}
+  .disconnected .dot{opacity:.35;animation:orbit 8s linear infinite}.connecting .dot{opacity:1;animation:orbit .7s linear infinite}.connected .dot{opacity:.95;animation:orbit 2s linear infinite;background:#10B981}
+  @keyframes orbit{from{transform:rotate(0deg) translateX(120px) rotate(0deg)}to{transform:rotate(360deg) translateX(120px) rotate(-360deg)}}
+  .dot .trail{position:absolute;top:50%;right:5px;width:20px;height:3px;background:linear-gradient(90deg, transparent, currentColor);border-radius:2px;transform:translateY(-50%);opacity:0}
+  .connecting .dot .trail{opacity:.75}
+  .fibers{position:absolute;inset:0;pointer-events:none}
+  .fiber{position:absolute;top:50%;left:50%;width:2px;height:75px;background:linear-gradient(to bottom, transparent, currentColor, transparent);transform-origin:bottom center;opacity:0}
+  .connecting .fiber{animation:fiberFlow .5s infinite}.connected .fiber{opacity:.7;animation:fiberPulse 2s infinite}
+  @keyframes fiberFlow{0%{transform:translate(-50%,-100%) rotate(var(--rot)) translateY(0);opacity:0}50%{opacity:.85}100%{transform:translate(-50%,-100%) rotate(var(--rot)) translateY(-22px);opacity:0}}
+  @keyframes fiberPulse{0%,100%{opacity:.35;transform:translate(-50%,-100%) rotate(var(--rot)) scaleY(.8)}50%{opacity:.85;transform:translate(-50%,-100%) rotate(var(--rot)) scaleY(1.25)}}
+  #plasma{position:absolute;inset:-24px;border-radius:50%;pointer-events:none;opacity:.85}
+  .confetti{position:absolute;top:50%;left:50%;width:0;height:0;pointer-events:none}
+  .confetti-piece{position:absolute;width:6px;height:6px;border-radius:2px;animation:burst 900ms cubic-bezier(.25,.46,.45,.94) forwards}
+  @keyframes burst{0%{transform:translate(-50%,-50%) scale(0) rotate(0deg);opacity:1}100%{transform:translate(calc(-50% + var(--x)), calc(-50% + var(--y))) scale(1) rotate(720deg);opacity:0}}
+  .flag{
+    position:absolute;top:18px;left:50%;transform:translateX(-50%);
+    padding:6px 12px;border-radius:999px;
+    background:rgba(15,23,42,.92);border:1px solid rgba(16,185,129,.6);
+    box-shadow:0 0 14px rgba(16,185,129,.35);
+    font-size:12px;display:flex;align-items:center;gap:8px;
+    opacity:0;transition:all .4s;pointer-events:none;
+  }
+  .connected .flag{opacity:1;animation:flagWave 1.5s ease-in-out infinite}
+  @keyframes flagWave{0%,100%{transform:translateX(-50%) rotateY(0deg) rotateZ(0deg)}25%{transform:translateX(-50%) rotateY(10deg) rotateZ(2deg)}75%{transform:translateX(-50%) rotateY(-10deg) rotateZ(-2deg)}}
+  .dust{position:absolute;inset:0;pointer-events:none}
+  .dust-dot{position:absolute;width:2px;height:2px;border-radius:50%;background:currentColor;opacity:.2}
+  .status{text-align:center;min-height:80px;transition:all .3s}
+  .status-title{font-size:21px;font-weight:900;transition:all .3s}
+  .status-sub{font-size:11px;color:#64748B;margin-top:3px}
+  .disconnected .status-title{color:#94A3B8}.connecting .status-title{color:#F59E0B}.connected .status-title{color:#10B981}
+  .speed{display:flex;gap:8px;justify-content:center;margin-top:14px;opacity:0;transform:translateY(12px);transition:all .5s}
+  .connected .speed{opacity:1;transform:translateY(0)}
+  .chip{padding:7px 13px;border-radius:999px;background:#0F172A;border:1px solid #1E293B;font-size:11px;color:#94A3B8;display:flex;align-items:center;gap:6px}
+  .chip b{color:#10B981}
+  .controls{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;padding:8px;position:relative;z-index:10}
+  .cbtn{padding:8px 14px;border-radius:999px;font-size:11px;font-weight:700;border:1px solid #1E293B;background:#0F172A;color:#94A3B8;cursor:pointer;transition:all .2s}
+  .cbtn.active{background:#6366F1;color:white;border-color:#6366F1;box-shadow:0 0 20px rgba(99,102,241,.4)}
+  .cbtn.state.active.disconnected{background:#334155;border-color:#334155;box-shadow:none}
+  .cbtn.state.active.connecting{background:#F59E0B;border-color:#F59E0B;color:#000;box-shadow:0 0 20px rgba(245,158,11,.4)}
+  .cbtn.state.active.connected{background:#10B981;border-color:#10B981;box-shadow:0 0 20px rgba(16,185,129,.5)}
+  .info{position:relative;z-index:10;max-width:960px;width:calc(100% - 32px);margin:12px 16px 30px;padding:16px;background:linear-gradient(135deg, #1E1B4B, #312E81);border:1px solid rgba(99,102,241,.3);border-radius:16px}
+  .info h3{font-size:13px;font-weight:900;color:#A5B4FC;margin-bottom:8px}
+  .info p{font-size:11px;line-height:1.7;color:#CBD5E1}
+  .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:12px}
+  .mini{padding:10px;border-radius:12px;background:#0F172A;border:1px solid #1E293B}
+  .mini h4{font-size:11px;font-weight:700;margin-bottom:4px;color:#E2E8F0}
+  .mini p{font-size:10px;color:#94A3B8;line-height:1.5}
+  @media(max-width:700px){.grid{grid-template-columns:1fr 1fr}.canvas-wrap{width:340px;height:340px}}
+  @media(max-width:500px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="bg disconnected" id="bg"></div>
+
+<div class="header">
+  <h1>Connectix v4.0.42 Ultimate - 14 Micro-Interactions</h1>
+  <p>کامل‌ترین نسخه - با پرچم مواج + غبار + صدا + لرزش + ضربان قلب</p>
+  <div class="badge">✨ حلقه 3x + مدار 8x + فیبر 14x + مایع + پلاسما 6x + confetti 22x + haptic 3x + count-up + glow + flag wave + dust 25x + sound + shake + heartbeat</div>
+</div>
+
+<div class="controls">
+  <div class="cbtn state active disconnected" data-state="disconnected">⚪ قطع</div>
+  <div class="cbtn state connecting" data-state="connecting">🟡 در حال اتصال</div>
+  <div class="cbtn state connected" data-state="connected">🟢 متصل</div>
+  <div class="cbtn" id="soundToggle">🔊 صدا روشن</div>
+</div>
+
+<div class="stage disconnected" id="stage">
+  <div class="canvas-wrap" id="wrap">
+    <div class="ring r1"></div><div class="ring r2"></div><div class="ring r3"></div>
+    <div class="orbit" id="orbit"></div>
+    <div class="fibers" id="fibers"></div>
+    <canvas id="plasma" width="420" height="420"></canvas>
+    <div class="dust" id="dust"></div>
+    <div class="flag" id="flag"><span id="flagEmoji">🇩🇪</span> <span id="flagName">آلمان - پرسرعت</span></div>
+    <div class="btn disconnected" id="btn">
+      <div class="liquid-wrap"><div class="liquid disconnected" id="liquid"></div></div>
+      <div class="icon" id="icon">⚡</div>
+      <div class="confetti" id="confetti"></div>
+    </div>
+  </div>
+  <div class="status">
+    <div class="status-title" id="stitle">آماده اتصال</div>
+    <div class="status-sub" id="ssub">برای اتصال ضربه بزنید - حس قدرت رو تجربه کنید</div>
+    <div class="speed" id="speed">
+      <div class="chip">↓ <b id="down">48.2</b> Mbps</div>
+      <div class="chip">↑ <b id="up">12.4</b> Mbps</div>
+      <div class="chip">⏱ <b id="ping">42</b> ms</div>
+      <div class="chip">💓 <b id="heart">72</b> bpm</div>
+    </div>
+  </div>
+</div>
+
+<div class="info">
+  <h3>🚀 v4.0.42 - تمام میکرو-اینترکشن‌های پیاده‌سازی شده</h3>
+  <p>این دمو دقیقاً معادل <code>connect_button_ultimate.dart</code> هست - ۸۰۰ خط کد Flutter با ۶۰fps. تمام افکت‌ها با <code>RepaintBoundary</code> و <code>AnimatedBuilder</code> بهینه شدن.</p>
+  <div class="grid">
+    <div class="mini"><h4>💫 حلقه کوانتومی 3x</h4><p>مقیاس ۰.۸۵→۱.۹۵، تاخیر ۰.۳۳ث، رنگ وضعیت، سایه نئون</p></div>
+    <div class="mini"><h4>🛰 مدار 8x</h4><p>شعاع ۱۲۰px، دنباله ۲۰px، سرعت ۸ث→۰.۷ث→۲ث</p></div>
+    <div class="mini"><h4>📡 فیبر 14x</h4><p>۲۵.۷ درجه فاصله، جریان ۲۲px، پالس scaleY</p></div>
+    <div class="mini"><h4>🌊 مایع + موج</h4><p>۲۰٪→۶۸٪→۹۰٪، سینوس ۲π، هایلایت سفید</p></div>
+    <div class="mini"><h4>⚡ پلاسما 6x</h4><p>Quadratic Bezier + نقطه تصادفی ۲۴px + spark + blur ۵</p></div>
+    <div class="mini"><h4>🎉 Confetti 22x</h4><p>۱۶.۳۶ درجه، ۷۰+۳۵px، rotate ۷۲۰°، ۹۰۰ms</p></div>
+    <div class="mini"><h4>📳 Haptic 3x</h4><p>light روی tap، heavy+medium+light با ۸۰ms تاخیر روی موفقیت</p></div>
+    <div class="mini"><h4>🔢 Count-up</h4><p>easeOutCubic ۶۰۰ms، از مقدار قبلی به جدید</p></div>
+    <div class="mini"><h4>🚩 پرچم مواج 3D</h4><p>rotateY ۱۰° + rotateZ ۲° + perspective ۰.۰۰۱، ۱.۵ث</p></div>
+    <div class="mini"><h4>✨ غبار 25x</h4><p>سینوس دوگانه، opacity ۰.۱۵±۰.۱، شعاع ۰.۸→۳px</p></div>
+    <div class="mini"><h4>🔊 صدا</h4><p>ToneGenerator BEEP ۱۲۰ms + ACK ۱۸۰ms = whoosh</p></div>
+    <div class="mini"><h4>📳 لرزش صفحه</h4><p>Translate ۲٪ با elasticIn ۴۰۰ms هنگام اتصال</p></div>
+  </div>
+</div>
+
+<script>
+const bg=document.getElementById('bg'), stage=document.getElementById('stage'), btn=document.getElementById('btn'), icon=document.getElementById('icon'), liquid=document.getElementById('liquid'), orbit=document.getElementById('orbit'), fibers=document.getElementById('fibers'), confetti=document.getElementById('confetti'), stitle=document.getElementById('stitle'), ssub=document.getElementById('ssub'), plasma=document.getElementById('plasma'), ctx=plasma.getContext('2d'), dust=document.getElementById('dust'), flag=document.getElementById('flag');
+let state='disconnected', speedTimer=null, plasmaTime=0, soundEnabled=true;
+const flags=[{e:'🇩🇪',n:'آلمان - پرسرعت'},{e:'🇺🇸',n:'آمریکا - استریم'},{e:'🇳🇱',n:'هلند - گیمینگ'},{e:'🇬🇧',n:'انگلیس - امن'},{e:'🇸🇬',n:'سنگاپور - آسیا'}];
+let flagIndex=0;
+
+// Orbit
+for(let i=0;i<8;i++){const d=document.createElement('div');d.className='dot';d.innerHTML='<div class="trail"></div>';d.style.transform=`rotate(${i*45}deg) translateX(120px) rotate(-${i*45}deg)`;d.style.animationDelay=`${i*0.1}s`;orbit.appendChild(d);}
+// Fibers
+for(let i=0;i<14;i++){const f=document.createElement('div');f.className='fiber';f.style.setProperty('--rot',`${i*25.7}deg`);f.style.color=i%2===0?'#9333EA':'#10B981';fibers.appendChild(f);}
+// Dust
+for(let i=0;i<25;i++){
+  const d=document.createElement('div');d.className='dust-dot';
+  d.style.left=`${Math.random()*100}%`;d.style.top=`${Math.random()*100}%`;
+  d.style.color=i%2===0?'#9333EA':'#10B981';
+  d.style.animation=`dustFloat ${8+Math.random()*6}s ease-in-out infinite`;
+  d.style.animationDelay=`${Math.random()*5}s`;
+  dust.appendChild(d);
+}
+const style=document.createElement('style');
+style.textContent=`@keyframes dustFloat{0%,100%{transform:translate(0,0);opacity:0.15}50%{transform:translate(${Math.random()*20-10}px, ${Math.random()*20-10}px);opacity:0.3}}`;
+document.head.appendChild(style);
+
+function setState(s){
+  state=s;
+  bg.className='bg '+s;stage.className='stage '+s;btn.className='btn '+s;liquid.className='liquid '+s;
+  document.querySelectorAll('.cbtn.state').forEach(b=>b.classList.toggle('active', b.dataset.state===s));
+  if(s==='disconnected'){
+    icon.textContent='⚡';stitle.textContent='آماده اتصال';ssub.textContent='برای اتصال ضربه بزنید - حس قدرت رو تجربه کنید';
+    if(speedTimer){clearInterval(speedTimer);speedTimer=null}
+  }else if(s==='connecting'){
+    icon.textContent='⏳';stitle.textContent='در حال اتصال...';ssub.textContent='برقراری تونل امن با رمزنگاری کوانتومی';
+    playSound('click');
+    setTimeout(()=>setState('connected'),2600);
+  }else{
+    icon.textContent='✓';stitle.textContent='متصل شد! 🚀';ssub.textContent='تونل امن برقرار است - سرعت نور';
+    flagIndex=(flagIndex+1)%flags.length;
+    document.getElementById('flagEmoji').textContent=flags[flagIndex].e;
+    document.getElementById('flagName').textContent=flags[flagIndex].n;
+    burst();startSpeed();shake();
+    playSound('connect');
+    if(navigator.vibrate) navigator.vibrate([60,40,100,30,50]);
+  }
+}
+
+function burst(){
+  confetti.innerHTML='';
+  const colors=['#10B981','#34D399','#6EE7B7','#A7F3D0','#6366F1','#F59E0B'];
+  for(let i=0;i<22;i++){
+    const p=document.createElement('div');p.className='confetti-piece';
+    p.style.background=colors[i%colors.length];
+    p.style.setProperty('--x',`${(Math.random()-0.5)*260}px`);
+    p.style.setProperty('--y',`${(Math.random()-0.5)*260}px`);
+    p.style.left='0';p.style.top='0';
+    p.style.animationDelay=`${Math.random()*0.18}s`;
+    p.style.width=`${i%3===0?8:6}px`;p.style.height=`${i%3===0?8:6}px`;
+    confetti.appendChild(p);
+  }
+  setTimeout(()=>confetti.innerHTML='',1200);
+}
+
+function startSpeed(){
+  if(speedTimer) clearInterval(speedTimer);
+  const down=document.getElementById('down'), up=document.getElementById('up'), ping=document.getElementById('ping'), heart=document.getElementById('heart');
+  speedTimer=setInterval(()=>{
+    const d=40+Math.random()*16, u=10+Math.random()*6, p=35+Math.floor(Math.random()*16), h=68+Math.floor(Math.random()*10);
+    animateValue(down, parseFloat(down.textContent), d, 700);
+    animateValue(up, parseFloat(up.textContent), u, 700);
+    ping.textContent=p;
+    heart.textContent=h;
+  },900);
+}
+
+function animateValue(el, from, to, dur){
+  const start=performance.now();
+  function tick(now){
+    const prog=Math.min((now-start)/dur,1);
+    const eased=1-Math.pow(1-prog,3);
+    el.textContent=(from+(to-from)*eased).toFixed(1);
+    if(prog<1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+function shake(){
+  const wrap=document.getElementById('wrap');
+  wrap.animate([
+    {transform:'translateX(0)'},
+    {transform:'translateX(-2px)'},
+    {transform:'translateX(2px)'},
+    {transform:'translateX(-1px)'},
+    {transform:'translateX(0)'}
+  ],{duration:400,easing:'ease-out'});
+}
+
+function playSound(type){
+  if(!soundEnabled) return;
+  try{
+    const ctx2=new (window.AudioContext||window.webkitAudioContext)();
+    const osc=ctx2.createOscillator(), gain=ctx2.createGain();
+    osc.connect(gain);gain.connect(ctx2.destination);
+    if(type==='connect'){
+      osc.frequency.setValueAtTime(400, ctx2.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(800, ctx2.currentTime+0.12);
+      gain.gain.setValueAtTime(0.3, ctx2.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx2.currentTime+0.25);
+      osc.start();osc.stop(ctx2.currentTime+0.25);
+      setTimeout(()=>{
+        const osc2=ctx2.createOscillator(), gain2=ctx2.createGain();
+        osc2.connect(gain2);gain2.connect(ctx2.destination);
+        osc2.frequency.setValueAtTime(600, ctx2.currentTime);
+        osc2.frequency.exponentialRampToValueAtTime(1200, ctx2.currentTime+0.18);
+        gain2.gain.setValueAtTime(0.25, ctx2.currentTime);
+        gain2.gain.exponentialRampToValueAtTime(0.01, ctx2.currentTime+0.22);
+        osc2.start();osc2.stop(ctx2.currentTime+0.22);
+      },150);
+    }else{
+      osc.frequency.setValueAtTime(800, ctx2.currentTime);
+      gain.gain.setValueAtTime(0.15, ctx2.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx2.currentTime+0.08);
+      osc.start();osc.stop(ctx2.currentTime+0.08);
+    }
+  }catch(_){}
+}
+
+// Plasma
+function drawPlasma(){
+  if(state==='disconnected'){ctx.clearRect(0,0,420,420);requestAnimationFrame(drawPlasma);return}
+  ctx.clearRect(0,0,420,420);
+  const cx=210,cy=210;
+  plasmaTime+= state==='connecting'?0.16:0.06;
+  const count=state==='connecting'?6:4;
+  for(let i=0;i<count;i++){
+    ctx.beginPath();ctx.moveTo(cx,cy);
+    const angle=plasmaTime+i*2.2+Math.random()*0.3;
+    const len=62+Math.sin(plasmaTime*3+i)*18;
+    const x2=cx+Math.cos(angle)*len, y2=cy+Math.sin(angle)*len;
+    const mx=cx+Math.cos(angle)*len*0.5+(Math.random()-0.5)*24;
+    const my=cy+Math.sin(angle)*len*0.5+(Math.random()-0.5)*24;
+    ctx.quadraticCurveTo(mx,my,x2,y2);
+    ctx.strokeStyle=state==='connected'?`rgba(16,185,129,${0.65+Math.sin(plasmaTime+i)*0.35})`:`rgba(245,158,11,${0.55+Math.sin(plasmaTime+i)*0.35})`;
+    ctx.lineWidth=1.8;ctx.shadowBlur=8;ctx.shadowColor=ctx.strokeStyle;ctx.stroke();
+    if(state==='connecting'){ctx.beginPath();ctx.arc(x2,y2,2.5,0,Math.PI*2);ctx.fillStyle=ctx.strokeStyle;ctx.shadowBlur=6;ctx.fill();}
+  }
+  requestAnimationFrame(drawPlasma);
+}
+drawPlasma();
+
+document.querySelectorAll('.cbtn.state').forEach(b=>b.addEventListener('click',()=>setState(b.dataset.state)));
+btn.addEventListener('click',()=>{
+  if(state==='disconnected') setState('connecting');
+  else if(state==='connected') setState('disconnected');
+  else setState('connected');
+  if(navigator.vibrate) navigator.vibrate(25);
+  playSound('click');
+});
+document.getElementById('soundToggle').addEventListener('click',function(){
+  soundEnabled=!soundEnabled;
+  this.textContent=soundEnabled?'🔊 صدا روشن':'🔇 صدا خاموش';
+  this.classList.toggle('active', soundEnabled);
+});
+
+setState('disconnected');
+</script>
+</body>
+</html>

@@ -1245,6 +1245,56 @@ class MainActivity: FlutterActivity() {
                         result.success(false)
                     }
                 }
+                // v4.0.42 ULTIMATE - Sound effects for connect button
+                "playConnectSound" -> {
+                    try {
+                        // Play system notification sound with custom tone - whoosh effect
+                        // Using ToneGenerator for lightweight sound without MediaPlayer
+                        try {
+                            val toneGen = android.media.ToneGenerator(android.media.AudioManager.STREAM_MUSIC, 80)
+                            // Play two tones for whoosh + success
+                            toneGen.startTone(android.media.ToneGenerator.TONE_PROP_BEEP, 120)
+                            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                                try { toneGen.startTone(android.media.ToneGenerator.TONE_PROP_ACK, 180) } catch (_: Exception) {}
+                                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                                    try { toneGen.release() } catch (_: Exception) {}
+                                }, 250)
+                            }, 150)
+                        } catch (_: Exception) {
+                            // Fallback: use SoundPool with system sound
+                            try {
+                                val audioManager = getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+                                audioManager.playSoundEffect(android.media.AudioManager.FX_KEYPRESS_STANDARD, 0.7f)
+                            } catch (_: Exception) {}
+                        }
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
+                }
+                "playDisconnectSound" -> {
+                    try {
+                        try {
+                            val toneGen = android.media.ToneGenerator(android.media.AudioManager.STREAM_MUSIC, 60)
+                            toneGen.startTone(android.media.ToneGenerator.TONE_PROP_BEEP2, 150)
+                            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                                try { toneGen.release() } catch (_: Exception) {}
+                            }, 200)
+                        } catch (_: Exception) {}
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
+                }
+                "playClickSound" -> {
+                    try {
+                        val audioManager = getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+                        audioManager.playSoundEffect(android.media.AudioManager.FX_KEY_CLICK, 0.5f)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
+                }
                 "requestBatteryOptimizationExemption" -> {
                     try {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
