@@ -13,9 +13,16 @@ import 'xray_service.dart';
 typedef V2RayStatus = VlessStatus;
 
 class V2RayCompat {
+  static V2RayCompat? _instance;
+  
+  static V2RayCompat? getInstanceOrNull() {
+    return _instance;
+  }
+
   V2RayCompat({void Function(VlessStatus)? onStatusChanged}) {
     _onStatusChanged = onStatusChanged ?? _noop;
     _xray.onStatusChanged = (s) => _onStatusChanged(s);
+    _instance = this;
   }
 
   late final void Function(VlessStatus) _onStatusChanged;
@@ -126,6 +133,24 @@ class V2RayCompat {
       try { await _xray.disposeOnExit(); } catch (_) {}
       try { await _vless?.stopVless(); } catch (_) {}
     }
+  }
+
+  // v4.0.41 FORENSIC FIX: Safe shutdown that never throws, checks instance exists
+  Future<void> shutdownSafe() async {
+    try {
+      if (isWindows) {
+        try { 
+          await _xray.disposeOnExit().timeout(const Duration(seconds: 2), onTimeout: () {}); 
+        } catch (_) {}
+        try { 
+          await _vless?.stopVless().timeout(const Duration(seconds: 2), onTimeout: () {}); 
+        } catch (_) {}
+      } else {
+        try {
+          await _vless?.stopVless().timeout(const Duration(seconds: 2), onTimeout: () {});
+        } catch (_) {}
+      }
+    } catch (_) {}
   }
 
   // ============ ULTRA: Universal parser supporting all requested protocols ============

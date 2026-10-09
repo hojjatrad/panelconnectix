@@ -21,63 +21,58 @@ class _ProxyScreenState extends State<ProxyScreen> {
     _loadProxies();
   }
 
+  // v4.0.41 FORENSIC FIX: Immediate local fallback + async refresh - no infinite spinner
+  // OLD BUG: _isLoading true until getProxies returns (up to 56s), UI shows spinner forever
+  // FIX: Show local proxies instantly (0s), then try to fetch real proxies in background, update if success
+  Map<String, dynamic> _getLocalFallback() {
+    return {
+      'local': {
+        'socks': {'url': 'socks5://127.0.0.1:10808', 'host': '127.0.0.1', 'port': 10808},
+        'http': {'url': 'http://127.0.0.1:10809', 'host': '127.0.0.1', 'port': 10809},
+      },
+      'dedicated': {
+        'socks': {'url': '', 'host': 'vpbotn.ir', 'port': 1080, 'username': '', 'password': ''},
+        'http': {'url': '', 'host': 'vpbotn.ir', 'port': 8080, 'username': '', 'password': ''},
+      },
+      'mtproto': {'url': 'https://t.me/proxy?server=vpbotn.ir&port=443&secret=ee00000000000000000000000000000000', 'host': 'vpbotn.ir', 'port': 443, 'secret': ''},
+      'client': {'username': 'شما', 'server_name': 'Connectix'},
+    };
+  }
+
   Future<void> _loadProxies() async {
-    setState(() {
-      _isLoading = true;
-      _error = '';
-    });
+    // v4.0.41: Show local immediately - no spinner waiting
+    if (mounted) {
+      setState(() {
+        _isLoading = false; // v4.0.41: Never show infinite spinner, show local instantly
+        _proxies = _getLocalFallback();
+        _error = '';
+      });
+    }
+    
     try {
-      // v4.0.26 FIX: Add timeout and fallback to local proxies to prevent infinite spinning
-      final data = await ApiService.getProxies().timeout(const Duration(seconds: 10), onTimeout: () {
-        ApiService.log('getProxies timeout after 10s, using fallback local');
+      // v4.0.41: Try to get real proxies in background with 6s total timeout (2 URLs * 3s)
+      final data = await ApiService.getProxies().timeout(const Duration(seconds: 6), onTimeout: () {
+        ApiService.log('v4.0.41 getProxies timeout after 6s, keeping local fallback');
         return null;
       });
-      if (mounted) {
+      if (mounted && data != null) {
         setState(() {
+          _proxies = data;
           _isLoading = false;
-          if (data != null) {
-            _proxies = data;
-          } else {
-            // Fallback to local proxies (free, when VPN connected) - prevents spinning forever
-            _proxies = {
-              'local': {
-                'socks': {'url': 'socks5://127.0.0.1:10808', 'host': '127.0.0.1', 'port': 10808},
-                'http': {'url': 'http://127.0.0.1:10809', 'host': '127.0.0.1', 'port': 10809},
-              },
-              'dedicated': {
-                'socks': {'url': '', 'host': 'vpbotn.ir', 'port': 1080, 'username': '', 'password': ''},
-                'http': {'url': '', 'host': 'vpbotn.ir', 'port': 8080, 'username': '', 'password': ''},
-              },
-              'mtproto': {'url': 'https://t.me/proxy?server=vpbotn.ir&port=443&secret=ee00000000000000000000000000000000', 'host': 'vpbotn.ir', 'port': 443, 'secret': ''},
-              'client': {'username': 'شما', 'server_name': 'Connectix'},
-            };
-            // Show info but not error - local proxies work when VPN connected
-            _error = '';
-            ApiService.log('getProxies fallback local used');
-          }
-        });
-      }
-    } catch (e, st) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          // v4.0.26: Fallback to local even on error to prevent spinning
-          _proxies = {
-            'local': {
-              'socks': {'url': 'socks5://127.0.0.1:10808', 'host': '127.0.0.1', 'port': 10808},
-              'http': {'url': 'http://127.0.0.1:10809', 'host': '127.0.0.1', 'port': 10809},
-            },
-            'dedicated': {
-              'socks': {'url': '', 'host': 'vpbotn.ir', 'port': 1080},
-              'http': {'url': '', 'host': 'vpbotn.ir', 'port': 8080},
-            },
-            'mtproto': {'url': '', 'host': 'vpbotn.ir', 'port': 443},
-            'client': {'username': 'شما'},
-          };
           _error = '';
         });
+        ApiService.log('v4.0.41 getProxies real data loaded');
       }
-      try { ApiService.log('proxy load error: $e'); } catch (_) {}
+    } catch (e, st) {
+      // Keep local fallback, don't show error
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _error = '';
+          _proxies ??= _getLocalFallback();
+        });
+      }
+      try { ApiService.log('v4.0.41 proxy load error (keeping local): $e'); } catch (_) {}
     }
   }
 

@@ -180,16 +180,33 @@ class _SessionMarkerState extends State<_SessionMarker>
     } catch (_) {}
   }
 
+  // v4.0.41 FORENSIC FIX: Safe exit handling - no MissingPluginException, no new instance crash
+  // OLD BUG: V2RayCompat().shutdown() creates NEW instance with _vless null -> exception on exit
+  // OLD BUG: SharedPreferences + MethodChannel after engine detached -> MissingPluginException
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.detached) {
       try {
+        // v4.0.41: Safe clean exit marker with try/catch for engine detached
         unawaited(SharedPreferences.getInstance().then((p) async {
-          await p.setString(
-              'session_clean_exit_at', DateTime.now().toIso8601String());
+          try {
+            await p.setString('session_clean_exit_at', DateTime.now().toIso8601String());
+          } catch (_) {}
         }).catchError((_) {}));
-        // Windows: restore the system proxy + stop the Xray core on exit.
-        unawaited(V2RayCompat().shutdown().catchError((_) {}));
+        // v4.0.41: Don't create new V2RayCompat instance on exit - safe no-op
+        // Only try to shutdown if already initialized, with full error handling
+        try {
+          // Use static safe shutdown that checks if instance exists
+          unawaited(Future.delayed(Duration.zero, () async {
+            try {
+              // Try to get existing instance safely, don't create new one
+              final compat = V2RayCompat.getInstanceOrNull();
+              if (compat != null) {
+                await compat.shutdownSafe().catchError((_) {});
+              }
+            } catch (_) {}
+          }).catchError((_) {}));
+        } catch (_) {}
       } catch (_) {}
     }
   }

@@ -73,7 +73,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Map<String, dynamic>? _updateInfo;
   bool _isCheckingUpdate = false;
 
-  static const String currentAppVersion = '4.0.39';
+  static const String currentAppVersion = '4.0.41';
 
   // "Download over Wi-Fi only" for update packages
   bool _updateWifiOnly = false;
@@ -2514,11 +2514,30 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     );
   }
 
+  // v4.0.41 FORENSIC FIX: Proper dispose to prevent exit errors
+  // OLD BUG: Only canceled timers, left V2Ray running + MethodChannel handler + ValueNotifier -> crash on exit
+  // FIX: Cancel timers, stop V2Ray safely, remove MethodChannel handler, dispose notifier, all with try/catch
   @override
   void dispose() {
-    _timer?.cancel();
-    _foregroundCheckTimer?.cancel();
-    super.dispose();
+    try { _timer?.cancel(); } catch (_) {}
+    try { _foregroundCheckTimer?.cancel(); } catch (_) {}
+    _timer = null;
+    _foregroundCheckTimer = null;
+    try {
+      // Remove MethodChannel handler safely
+      const channel = MethodChannel('com.connectix.vpn/updater');
+      channel.setMethodCallHandler(null);
+    } catch (_) {}
+    try {
+      // Stop V2Ray safely without awaiting (dispose can't be async)
+      _flutterV2ray.stopV2Ray().catchError((_) {});
+    } catch (_) {}
+    try {
+      _v2rayStatus.dispose();
+    } catch (_) {}
+    try {
+      super.dispose();
+    } catch (_) {}
   }
 
   @override

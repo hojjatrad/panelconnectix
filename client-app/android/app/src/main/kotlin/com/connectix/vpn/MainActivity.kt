@@ -174,6 +174,24 @@ class MainActivity: FlutterActivity() {
                         }
                     }
                 }
+                "getExternalFilesDir" -> {
+                    try {
+                        // v4.0.41 FORENSIC FIX: Explicit externalFilesDir handler - best for MIUI/Samsung FileProvider
+                        val extDir = context.getExternalFilesDir(null)
+                        if (extDir != null) {
+                            if (!extDir.exists()) extDir.mkdirs()
+                            result.success(extDir.absolutePath)
+                        } else {
+                            result.success(context.cacheDir.absolutePath)
+                        }
+                    } catch (e: Exception) {
+                        try {
+                            result.success(context.cacheDir.absolutePath)
+                        } catch (e2: Exception) {
+                            result.error("EXT_DIR_ERROR", e.message, null)
+                        }
+                    }
+                }
                 "canInstallPackages" -> {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                         result.success(context.packageManager.canRequestPackageInstalls())
@@ -1206,11 +1224,24 @@ class MainActivity: FlutterActivity() {
                 }
                 "releaseWakeLock" -> {
                     try {
-                        wakeLock?.let { if (it.isHeld) it.release() }
-                        wifiLock?.let { if (it.isHeld) it.release() }
-                        android.util.Log.i("ConnectixKeepAlive", "WakeLocks released")
+                        // v4.0.41 FORENSIC FIX: Safe release - check isHeld safely, handle already released
+                        try {
+                            wakeLock?.let { 
+                                try { if (it.isHeld) it.release() } catch (_: Exception) {}
+                            }
+                        } catch (_: Exception) {}
+                        try {
+                            wifiLock?.let { 
+                                try { if (it.isHeld) it.release() } catch (_: Exception) {}
+                            }
+                        } catch (_: Exception) {}
+                        try { wakeLock = null } catch (_: Exception) {}
+                        try { wifiLock = null } catch (_: Exception) {}
+                        android.util.Log.i("ConnectixKeepAlive", "v4.0.41 WakeLocks released safely")
                         result.success(true)
                     } catch (e: Exception) {
+                        try { wakeLock = null } catch (_: Exception) {}
+                        try { wifiLock = null } catch (_: Exception) {}
                         result.success(false)
                     }
                 }
