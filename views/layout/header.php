@@ -461,7 +461,7 @@ if (!function_exists('isActiveRoute')) {
                     </a>
                     <?php if (Auth::isAdmin()): ?>
                     <a href="<?= Helpers::url('updater') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('updater', $currentUri) ? 'bg-teal-600/15 text-teal-300 font-bold border-r-2 border-teal-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
-                        <i class="fa-brands fa-github w-4 text-center text-purple-400"></i>
+                        <i class="fa-solid fa-server w-4 text-center text-purple-400"></i>
                         <span>به‌روزرسانی پنل</span>
                     </a>
                     <a href="<?= Helpers::url('settings/api-tokens') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('api-tokens', $currentUri) ? 'bg-amber-600/15 text-amber-300 font-bold border-r-2 border-amber-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
@@ -504,7 +504,7 @@ if (!function_exists('isActiveRoute')) {
             $panelVersion = Updater::CURRENT_VERSION;
             ?>
             <div class="mt-2 flex items-center justify-center gap-1.5 text-[10px] text-slate-500" title="پنل به‌صورت خودکار به‌روز می‌شود — همه‌ی پنل‌ها (اصلی و نماینده‌ها) همگام‌اند">
-                <i class="fa-brands fa-github text-[10px]"></i>
+                <i class="fa-solid fa-server text-[10px]"></i>
                 <span>نسخه پنل</span>
                 <span class="font-mono font-bold text-slate-300" dir="ltr">v<?= htmlspecialchars($panelVersion) ?></span>
                 <span class="text-emerald-500">●</span>

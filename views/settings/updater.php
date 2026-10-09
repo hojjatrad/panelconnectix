@@ -5,7 +5,7 @@ require __DIR__ . '/../layout/header.php';
 <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/80 border border-slate-800 p-5 rounded-2xl shadow-sm mb-6">
     <div>
         <h2 class="text-lg font-bold text-white flex items-center gap-2">
-            <i class="fa-brands fa-github text-purple-400"></i>
+            <i class="fa-solid fa-server text-purple-400"></i>
             <span>مرکز به‌روزرسانی و همگام‌سازی</span>
         </h2>
         <p class="text-xs text-slate-400 mt-1">استعلام خودکار نسخه جدید از سرور اصلی و ارتقای ۱ کلیکه فایل‌های پنل</p>
