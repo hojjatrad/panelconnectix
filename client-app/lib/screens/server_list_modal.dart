@@ -1,13 +1,16 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../models/server_model.dart';
+import '../models/account_model.dart';
 import '../services/api_service.dart';
+import '../services/account_manager.dart';
 
 class ServerListModal extends StatefulWidget {
   final List<ServerModel> servers;
   final ServerModel? selectedServer;
   final VoidCallback? onRefresh;
   final Future<int?> Function(String uri)? pingFunction;
+  final List<AccountServerEntry>? unifiedEntries;
 
   const ServerListModal({
     Key? key,
@@ -15,6 +18,7 @@ class ServerListModal extends StatefulWidget {
     required this.selectedServer,
     this.onRefresh,
     this.pingFunction,
+    this.unifiedEntries,
   }) : super(key: key);
 
   @override
@@ -23,6 +27,8 @@ class ServerListModal extends StatefulWidget {
 
 class _ServerListModalState extends State<ServerListModal> {
   late List<ServerModel> _list;
+  List<AccountServerEntry> _unified = [];
+  bool _isUnified = false;
   bool _isPingingAll = false;
   int _pingProgress = 0;
   bool _sortByPing = false;
@@ -32,9 +38,31 @@ class _ServerListModalState extends State<ServerListModal> {
   void initState() {
     super.initState();
     _list = widget.servers.where((s) => !s.isInfoBanner && s.configUri.isNotEmpty).toList();
+    if (widget.unifiedEntries != null && widget.unifiedEntries!.isNotEmpty) {
+      _unified = widget.unifiedEntries!;
+      _isUnified = true;
+      // Also populate _list from unified for ping logic
+      _list = _unified.map((e) => e.server as ServerModel).toList();
+    }
     _calculateBestServer();
     if (_list.isEmpty) {
       _loadFromCacheIfEmpty();
+    }
+    _checkUnifiedSetting();
+  }
+
+  Future<void> _checkUnifiedSetting() async {
+    final unifiedEnabled = await AccountManager.isUnifiedEnabled();
+    if (unifiedEnabled && widget.unifiedEntries == null) {
+      final entries = await ApiService.getAllAccountsServers();
+      if (mounted && entries.isNotEmpty) {
+        setState(() {
+          _unified = entries;
+          _isUnified = true;
+          _list = entries.map((e) => e.server as ServerModel).toList();
+          _calculateBestServer();
+        });
+      }
     }
   }
 
@@ -469,12 +497,23 @@ class _ServerListModalState extends State<ServerListModal> {
                       ),
                     )
                   : ListView.separated(
-                      itemCount: _list.length,
+                      itemCount: _isUnified ? _unified.length : _list.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 8),
                       itemBuilder: (context, index) {
-                        final s = _list[index];
+                        ServerModel s;
+                        AccountServerEntry? entry;
+                        if (_isUnified) {
+                          entry = _unified[index];
+                          s = entry.server as ServerModel;
+                        } else {
+                          s = _list[index];
+                        }
                         final isSelected = (s.id == widget.selectedServer?.id);
                         final hasConfig = s.configUri.isNotEmpty;
+
+                        Color _hexToColor(String hex) {
+                          try { var h = hex.replaceAll('#',''); if (h.length==6) h='FF$h'; return Color(int.parse(h, radix: 16)); } catch(_){ return const Color(0xFF8B5CF6); }
+                        }
 
                         return Container(
                           decoration: BoxDecoration(
@@ -501,9 +540,18 @@ class _ServerListModalState extends State<ServerListModal> {
                                 child: Text(s.flag, style: const TextStyle(fontSize: 22)),
                               ),
                             ),
-                            title: Text(
-                              s.name,
-                              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                            title: Row(
+                              children: [
+                                Expanded(child: Text(s.name, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                                if (_isUnified && entry != null) ...[
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(color: _hexToColor(entry.accountColor).withOpacity(0.2), borderRadius: BorderRadius.circular(6), border: Border.all(color: _hexToColor(entry.accountColor).withOpacity(0.4))),
+                                    child: Row(mainAxisSize: MainAxisSize.min, children: [Text(entry.accountAvatar, style: const TextStyle(fontSize: 10)), const SizedBox(width: 3), Text(entry.accountName, style: TextStyle(color: _hexToColor(entry.accountColor), fontSize: 9, fontWeight: FontWeight.bold))]),
+                                  ),
+                                ],
+                              ],
                             ),
                             subtitle: Padding(
                               padding: const EdgeInsets.only(top: 4.0),
@@ -521,9 +569,13 @@ class _ServerListModalState extends State<ServerListModal> {
                                     ),
                                   ),
                                   const SizedBox(width: 6),
-                                  Text(
-                                    s.operatorName,
-                                    style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                                  Expanded(
+                                    child: Text(
+                                      s.operatorName,
+                                      style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
                                 ],
                               ),

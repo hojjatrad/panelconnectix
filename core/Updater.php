@@ -4,7 +4,11 @@ require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Setting.php';
 
 class Updater {
-    public const CURRENT_VERSION = '4.0.46'; // v4.0.46 Panel - NO-SCROLL Dashboard + Gear Settings (Proxy/GPS/TV) + Update Fix "ارتباط برقرار نشد"
+<<<<<<< HEAD
+    public const CURRENT_VERSION = '4.0.48'; // v4.0.47 Panel - Reseller Sync Auto + Permissions All Menus + Multi-Account Unlimited
+=======
+    public const CURRENT_VERSION = '4.0.48'; // v4.0.48 Panel - FIX RAPID REFRESH + 5 PATHS FAILED + Reseller Sync + Permissions + Multi-Account
+>>>>>>> 65898d9 (v4.0.48 FIX RAPID REFRESH + 5 PATHS FAILED)
 
     public static function getCurrentVersion(): string {
         $dbVer = Setting::get('current_version', '');
@@ -985,6 +989,16 @@ class Updater {
             $panelRoot = realpath(__DIR__ . '/..');
             if ($panelRoot) {
                 self::syncRootLanding($panelRoot);
+            }
+            // v4.0.47 AUTO SYNC RESELLERS
+            try {
+                require_once __DIR__ . '/ResellerSyncManager.php';
+                require_once __DIR__ . '/ResellerPermissionManager.php';
+                ResellerPermissionManager::seedDefaultTemplates();
+                $prevVer = Setting::get('reseller_last_synced_version', '0');
+                ResellerSyncManager::syncAllResellers($prevVer, self::CURRENT_VERSION);
+            } catch (Throwable $e) {
+                error_log("Updater reseller sync error: " . $e->getMessage());
             }
         } catch (Throwable $e) {}
     }

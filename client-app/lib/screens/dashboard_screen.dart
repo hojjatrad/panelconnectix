@@ -9,13 +9,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/client_model.dart';
 import '../models/server_model.dart';
+import '../models/account_model.dart';
 import '../services/api_service.dart';
+import '../services/account_manager.dart';
 import '../services/v2ray_compat.dart';
 import '../widgets/connect_button_ultimate.dart';
 import 'login_screen.dart';
 import 'server_list_modal.dart';
 import 'bypass_apps_screen.dart';
 import 'advanced_settings_screen.dart';
+import 'manage_accounts_screen.dart';
 // v4.0.46 NO-SCROLL: Proxy and GPS moved to AdvancedSettingsScreen (gear), removed from dashboard to prevent scroll
 // import 'proxy_screen.dart'; // now accessed via gear settings
 // import 'gps_spoof_screen.dart'; // now accessed via gear settings
@@ -75,9 +78,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Map<String, dynamic>? _updateInfo;
   bool _isCheckingUpdate = false;
 
-  static const String currentAppVersion = '4.0.46';
-  static String _actualInstalledVersion = '4.0.46'; // Will be updated from PackageManager
-  static int _actualInstalledCode = 80;
+  // v4.0.47 MULTI-ACCOUNT
+  List<VpnAccount> _accounts = [];
+  VpnAccount? _activeAccount;
+  bool _unifiedEnabled = false;
+
+  static const String currentAppVersion = '4.0.47';
+  static String _actualInstalledVersion = '4.0.47'; // Will be updated from PackageManager
+  static int _actualInstalledCode = 81;
 
   // v4.0.46 FOREVER CACHE FIX - PERMANENT LAW - NEVER REGRESS
   // LAW 1: Panel must NEVER serve old APK (auto-delete stale files)
@@ -108,7 +116,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         }
       }
     } catch (e) {
-      print('v4.0.46 loadActualInstalledVersion error: $e - using hardcoded $currentAppVersion');
+      print('v4.0.47 loadActualInstalledVersion error: $e - using hardcoded $currentAppVersion');
     }
   }
 
@@ -336,11 +344,27 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       }
     }
     _loadSettings();
+    _loadAccounts();
     _initV2Ray();
     _loadServers();
     _refreshProfile();
     _loadAnnouncements();
     _autoCheckUpdateInBackground();
+  }
+
+  Future<void> _loadAccounts() async {
+    try {
+      final accounts = await AccountManager.getAccounts();
+      final active = await AccountManager.getActiveAccount();
+      final unified = await AccountManager.isUnifiedEnabled();
+      if (mounted) {
+        setState(() {
+          _accounts = accounts;
+          _activeAccount = active;
+          _unifiedEnabled = unified;
+        });
+      }
+    } catch (_) {}
   }
 
   void _loadSettings() async {
@@ -352,6 +376,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         _autoPauseForBankingEnabled = prefs.getBool('auto_pause_for_banking_enabled') ?? false;
         _updateWifiOnly = prefs.getBool('update_wifi_only') ?? false;
         _winTunnelMode = prefs.getString('windows_tunnel_mode') ?? 'proxy';
+        _unifiedEnabled = prefs.getBool('unified_servers_enabled') ?? false;
       });
     }
     if (_autoPauseForBankingEnabled && _isConnected) {
@@ -2420,8 +2445,152 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     );
     // Reload settings after returning from advanced screen (auto-pause may have changed)
     _loadSettings();
+    _loadAccounts();
     if (_autoPauseForBankingEnabled && _isConnected) {
       _startForegroundAppMonitoring();
+    }
+  }
+
+  // v4.0.47 MULTI-ACCOUNT: Helper to parse hex color
+  Color _hexToColor(String hex) {
+    try {
+      var h = hex.replaceAll('#', '');
+      if (h.length == 6) h = 'FF$h';
+      return Color(int.parse(h, radix: 16));
+    } catch (_) {
+      return const Color(0xFF8B5CF6);
+    }
+  }
+
+  // v4.0.47 MULTI-ACCOUNT: Show Telegram-like bottom sheet account switcher
+  void _showAccountSwitcher() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0F172A),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      isScrollControlled: true,
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.4,
+        maxChildSize: 0.85,
+        expand: false,
+        builder: (context, scrollController) => Container(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xFF334155), borderRadius: BorderRadius.circular(4)))),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: const Color(0xFF6366F1).withOpacity(0.15), borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.switch_account_rounded, color: Color(0xFF818CF8), size: 22)),
+                  const SizedBox(width: 10),
+                  const Expanded(child: Text('مدیریت حساب‌ها - چند اکانتی', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15))),
+                  Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3), decoration: BoxDecoration(color: const Color(0xFF10B981).withOpacity(0.15), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFF10B981))), child: Text('${_accounts.length} حساب', style: const TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold))),
+                ],
+              ),
+              const SizedBox(height: 16),
+              // Unified toggle
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(color: const Color(0xFF1E293B), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFF334155))),
+                child: Row(
+                  children: [
+                    const Icon(Icons.merge_type_rounded, color: Color(0xFF38BDF8), size: 18),
+                    const SizedBox(width: 8),
+                    const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('نمایش یکپارچه همه سرورها', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)), Text('همه سرورهای همه حساب‌ها در یک لیست با برچسب', style: TextStyle(color: Color(0xFF64748B), fontSize: 10))])),
+                    Switch(value: _unifiedEnabled, activeColor: const Color(0xFF10B981), onChanged: (v) async { await AccountManager.setUnifiedEnabled(v); if (mounted) setState(() => _unifiedEnabled = v); ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(v ? 'حالت یکپارچه فعال شد' : 'حالت یکپارچه غیرفعال شد'))); }),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: ListView.separated(
+                  controller: scrollController,
+                  itemCount: _accounts.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (context, idx) {
+                    final acc = _accounts[idx];
+                    final isActive = _activeAccount?.id == acc.id;
+                    return InkWell(
+                      onTap: isActive ? null : () async { Navigator.pop(ctx); await _switchAccount(acc); },
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: isActive ? _hexToColor(acc.colorHex).withOpacity(0.15) : const Color(0xFF1E293B),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: isActive ? _hexToColor(acc.colorHex) : const Color(0xFF334155), width: isActive ? 1.5 : 1),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(width: 48, height: 48, decoration: BoxDecoration(color: _hexToColor(acc.colorHex).withOpacity(0.25), borderRadius: BorderRadius.circular(14), border: Border.all(color: _hexToColor(acc.colorHex).withOpacity(0.4))), child: Center(child: Text(acc.avatarEmoji, style: const TextStyle(fontSize: 22)))),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                Row(children: [Expanded(child: Text(acc.effectiveName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis)), if (isActive) Container(margin: const EdgeInsets.only(right: 6), padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: const Color(0xFF10B981), borderRadius: BorderRadius.circular(6)), child: const Text('فعال', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)))]),
+                                const SizedBox(height: 2),
+                                Text('${acc.username} • ${acc.shortPanel}', style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                const SizedBox(height: 2),
+                                Row(children: [Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1), decoration: BoxDecoration(color: const Color(0xFF334155), borderRadius: BorderRadius.circular(6)), child: Text('${acc.serverCount} سرور', style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 9))), const SizedBox(width: 6), if (acc.planTitle.isNotEmpty) Flexible(child: Text(acc.planTitle, style: const TextStyle(color: Color(0xFF64748B), fontSize: 9), maxLines: 1, overflow: TextOverflow.ellipsis))]),
+                              ]),
+                            ),
+                            if (!isActive) const Icon(Icons.swap_horiz_rounded, color: Color(0xFF64748B), size: 20) else const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 22),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(child: OutlinedButton.icon(onPressed: () { Navigator.pop(ctx); Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageAccountsScreen())).then((_) => _loadAccounts()); }, icon: const Icon(Icons.settings_rounded, size: 16), label: const Text('مدیریت حساب‌ها', style: TextStyle(fontSize: 12)), style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF94A3B8), side: const BorderSide(color: Color(0xFF334155)), padding: const EdgeInsets.symmetric(vertical: 12)))),
+                  const SizedBox(width: 10),
+                  Expanded(child: ElevatedButton.icon(onPressed: () { Navigator.pop(ctx); Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageAccountsScreen(isAdding: true))).then((_) => _loadAccounts()); }, icon: const Icon(Icons.person_add_rounded, size: 18), label: const Text('افزودن حساب', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366F1), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))))),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _switchAccount(VpnAccount account) async {
+    if (_isConnected) {
+      try { await _flutterV2ray.stopV2Ray(); } catch (_) {}
+      _timer?.cancel();
+      setState(() { _isConnected = false; _isConnecting = false; });
+    }
+    if (!mounted) return;
+    showDialog(context: context, barrierDismissible: false, builder: (_) => const Center(child: CircularProgressIndicator(color: Color(0xFF6366F1))));
+    try {
+      final res = await ApiService.switchToAccount(account);
+      if (!mounted) return;
+      Navigator.pop(context);
+      if (res != null && res['client'] != null) {
+        final newClient = res['client'] as ClientModel;
+        final servers = (res['servers'] as List<ServerModel>?) ?? [];
+        setState(() {
+          _client = newClient;
+          _activeAccount = account;
+          if (servers.isNotEmpty) {
+            _servers = servers;
+            _syncActiveServer(servers);
+          }
+        });
+        await _loadAccounts();
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('✅ به حساب ${account.effectiveName} سوئیچ شد'), backgroundColor: const Color(0xFF10B981)));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ سوئیچ حساب ناموفق - رمز عبور را چک کنید'), backgroundColor: Color(0xFFEF4444)));
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
+      }
     }
   }
 
@@ -2650,6 +2819,42 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           ],
         ),
         actions: [
+          // v4.0.47 MULTI-ACCOUNT SWITCHER BUTTON (Telegram-like)
+          if (_accounts.length > 1 || _activeAccount != null)
+            GestureDetector(
+              onTap: _showAccountSwitcher,
+              child: Container(
+                margin: const EdgeInsets.only(left: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _activeAccount != null ? _hexToColor(_activeAccount!.colorHex).withOpacity(0.15) : const Color(0xFF1E293B),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _activeAccount != null ? _hexToColor(_activeAccount!.colorHex).withOpacity(0.4) : const Color(0xFF334155)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(_activeAccount?.avatarEmoji ?? '👤', style: const TextStyle(fontSize: 14)),
+                    const SizedBox(width: 4),
+                    Text(
+                      _activeAccount?.effectiveName ?? _client.username,
+                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(width: 2),
+                    const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF94A3B8), size: 14),
+                    if (_accounts.length > 1)
+                      Container(
+                        margin: const EdgeInsets.only(right: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(color: const Color(0xFF6366F1), borderRadius: BorderRadius.circular(6)),
+                        child: Text('${_accounts.length}', style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
+                      ),
+                  ],
+                ),
+              ),
+            ),
           // New Version Available Badge Button
           if (_hasAppUpdate)
             IconButton(
@@ -3160,7 +3365,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
               const SizedBox(height: 22),
 
-              // Server Selector Card
+              // Server Selector Card - v4.0.47 MULTI-ACCOUNT UNIFIED
               Material(
                 color: Colors.transparent,
                 child: InkWell(
@@ -3169,6 +3374,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       await _loadServers();
                     }
                     if (!mounted) return;
+                    List<AccountServerEntry> unifiedEntries = [];
+                    if (_unifiedEnabled) {
+                      unifiedEntries = await ApiService.getAllAccountsServers();
+                    }
                     final selected = await showModalBottomSheet<ServerModel>(
                       context: context,
                       backgroundColor: Colors.transparent,
@@ -3178,6 +3387,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         child: ServerListModal(
                           servers: _servers,
                           selectedServer: _selectedServer,
+                          unifiedEntries: unifiedEntries.isNotEmpty ? unifiedEntries : null,
                           onRefresh: _manualRefresh,
                           pingFunction: (uri) async {
                             try {
@@ -3191,6 +3401,18 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       ),
                     );
                     if (selected != null && mounted) {
+                      // If unified, find which account this server belongs to and switch if needed
+                      if (_unifiedEnabled) {
+                        try {
+                          final allEntries = unifiedEntries.isNotEmpty ? unifiedEntries : await ApiService.getAllAccountsServers();
+                          final matching = allEntries.where((e) => (e.server as ServerModel).id == selected.id).toList();
+                          if (matching.isNotEmpty && _activeAccount?.id != matching.first.accountId) {
+                            final targetAcc = _accounts.firstWhere((a) => a.id == matching.first.accountId, orElse: () => _accounts.first);
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('سوئیچ به حساب ${targetAcc.effectiveName} برای سرور ${selected.name}'), backgroundColor: const Color(0xFF6366F1)));
+                            await _switchAccount(targetAcc);
+                          }
+                        } catch (_) {}
+                      }
                       try {
                         final prefs = await SharedPreferences.getInstance();
                         await prefs.setString('last_working_server_id', selected.id);
@@ -3203,7 +3425,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         _measureSelectedServerPing();
                       }
                       if (_isConnected) {
-                        // Seamlessly reconnect with newly selected server
                         try {
                           await _flutterV2ray.stopV2Ray();
                         } catch (_) {}

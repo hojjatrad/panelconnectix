@@ -15,8 +15,10 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _panelUrlController = TextEditingController(text: 'https://vpbotn.ir');
   bool _isLoading = false;
   String _errorMessage = '';
+  List<dynamic> _existingAccounts = [];
 
   @override
   void initState() {
@@ -29,10 +31,20 @@ class _LoginScreenState extends State<LoginScreen> {
     final prefs = await SharedPreferences.getInstance();
     final u = prefs.getString('saved_username');
     final p = prefs.getString('saved_password');
+    final panel = prefs.getString('api_base_url_working') ?? prefs.getString('api_base_url') ?? 'https://vpbotn.ir';
     if (u != null && p != null) {
       _usernameController.text = u;
       _passwordController.text = p;
     }
+    _panelUrlController.text = panel;
+    // Load existing accounts for quick switch
+    try {
+      final accStr = prefs.getString('multi_accounts');
+      if (accStr != null && accStr.isNotEmpty) {
+        final List list = jsonDecode(accStr);
+        if (mounted) setState(() => _existingAccounts = list);
+      }
+    } catch (_) {}
   }
 
   bool _isVersionNewer(String latest, String current) {
@@ -101,6 +113,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void _doLogin() async {
     final u = _usernameController.text.trim();
     final p = _passwordController.text.trim();
+    final panelUrl = _panelUrlController.text.trim().isNotEmpty ? _panelUrlController.text.trim() : 'https://vpbotn.ir';
 
     if (u.isEmpty || p.isEmpty) {
       setState(() {
@@ -113,6 +126,10 @@ class _LoginScreenState extends State<LoginScreen> {
       _isLoading = true;
       _errorMessage = '';
     });
+
+    // v4.0.47 MULTI-SERVICE: Set baseUrl to user-provided panel before login
+    ApiService.baseUrl = panelUrl;
+    ApiService.baseUrls = [panelUrl, ...ApiService.baseUrls.where((url) => url != panelUrl)];
 
     final res = await ApiService.login(u, p);
 
@@ -246,6 +263,65 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 16),
+                // v4.0.47 MULTI-SERVICE: Panel URL field
+                TextField(
+                  controller: _panelUrlController,
+                  style: const TextStyle(color: Colors.white, fontSize: 13, fontFamily: 'monospace'),
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: const Color(0xFF0F172A),
+                    hintText: 'آدرس پنل (Panel URL) - مثلا https://vpbotn.ir',
+                    hintStyle: const TextStyle(color: Color(0xFF475569), fontSize: 11),
+                    prefixIcon: const Icon(Icons.link_rounded, color: Color(0xFF38BDF8)),
+                    suffixIcon: _existingAccounts.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.switch_account_rounded, color: Color(0xFF8B5CF6), size: 20),
+                            onPressed: () {
+                              showModalBottomSheet(
+                                context: context,
+                                backgroundColor: const Color(0xFF0F172A),
+                                shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+                                builder: (ctx) => Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Text('حساب‌های ذخیره شده', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                                      const SizedBox(height: 12),
+                                      ..._existingAccounts.map((acc) {
+                                        final username = acc['username'] ?? '';
+                                        final panel = acc['panelUrl'] ?? acc['panel_url'] ?? '';
+                                        return ListTile(
+                                          leading: Text(acc['avatarEmoji'] ?? '👤', style: const TextStyle(fontSize: 20)),
+                                          title: Text(username, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                                          subtitle: Text(panel, style: const TextStyle(color: Color(0xFF64748B), fontSize: 10)),
+                                          onTap: () {
+                                            _usernameController.text = username;
+                                            _panelUrlController.text = panel;
+                                            Navigator.pop(ctx);
+                                          },
+                                        );
+                                      }).toList(),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          )
+                        : null,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: const BorderSide(color: Color(0xFF1E293B)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: const BorderSide(color: Color(0xFF38BDF8), width: 1.5),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text('💡 می‌توانید از پنل‌های مختلف حساب اضافه کنید - نامحدود multi-service', style: TextStyle(color: Color(0xFF475569), fontSize: 10)),
                 const SizedBox(height: 12),
                 if (_errorMessage.isNotEmpty)
                   Padding(

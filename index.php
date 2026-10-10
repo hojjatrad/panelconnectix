@@ -584,6 +584,12 @@ $router->get('resellers/applications', [ResellerController::class, 'applications
 $router->post('resellers/applications/approve', [ResellerController::class, 'approveApplication']);
 $router->post('resellers/applications/reject', [ResellerController::class, 'rejectApplication']);
 
+// v4.0.47: Reseller Permissions & Sync
+$router->get('resellers/permissions', [ResellerPermissionController::class, 'index']);
+$router->post('resellers/permissions/save', [ResellerPermissionController::class, 'save']);
+$router->post('resellers/permissions/apply-template', [ResellerPermissionController::class, 'applyTemplate']);
+$router->post('resellers/sync', [ResellerPermissionController::class, 'syncAll']);
+
 // Reseller Dedicated Portal
 $router->get('reseller/bot', [ResellerPortalController::class, 'bot']);
 $router->post('reseller/bot', [ResellerPortalController::class, 'saveBot']);

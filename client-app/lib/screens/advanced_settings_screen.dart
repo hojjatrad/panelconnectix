@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'bypass_apps_screen.dart';
 import 'proxy_screen.dart';
 import 'gps_spoof_screen.dart';
+import 'manage_accounts_screen.dart';
 import '../services/api_service.dart';
 
 class AdvancedSettingsScreen extends StatefulWidget {
@@ -163,6 +164,21 @@ class _AdvancedSettingsScreenState extends State<AdvancedSettingsScreen> {
               badge: 'TV',
               badgeColor: const Color(0xFFF59E0B),
               onTap: () => _showHotspotSheet(context),
+            ),
+            const SizedBox(height: 10),
+
+            // v4.0.47 MULTI-ACCOUNT: Manage Accounts
+            _buildQuickToolCard(
+              context: context,
+              icon: Icons.switch_account_rounded,
+              iconColor: const Color(0xFF8B5CF6),
+              title: 'مدیریت حساب‌ها - چند اکانتی نامحدود',
+              subtitle: 'افزودن حساب از پنل‌های مختلف (multi-service)',
+              badge: 'نامحدود',
+              badgeColor: const Color(0xFF10B981),
+              onTap: () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageAccountsScreen())).then((_) => setState(() {}));
+              },
             ),
             const SizedBox(height: 10),
 
