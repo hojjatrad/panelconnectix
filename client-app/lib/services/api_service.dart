@@ -83,6 +83,11 @@ class ApiService {
       final savedWorking = prefs.getString('api_base_url_working') ?? '';
       final legacy = prefs.getString('api_base_url') ?? '';
       final savedDomain = prefs.getString('panel_domain') ?? '';
+      final savedApiKey = prefs.getString('saved_api_key') ?? '';
+      if (savedApiKey.isNotEmpty) {
+        _customApiKey = savedApiKey;
+        log('v4.0.50 initBaseUrl: loaded saved_api_key: ${savedApiKey.substring(0, savedApiKey.length > 8 ? 8 : savedApiKey.length)}...');
+      }
       
       log('v8.0 initBaseUrl start: savedWorking=$savedWorking savedDomain=$savedDomain');
       
@@ -841,28 +846,48 @@ class ApiService {
     }
 
     // v4.0.47 MULTI-ACCOUNT: save to account manager
-    // v4.0.49 MANAGED MODE + API KEY
+    // v4.0.49 MANAGED MODE + API KEY + v4.0.50 AUTO API KEY FROM PANEL
     try {
+      // v4.0.50: Extract API key from server response (set by admin in web panel)
+      final serverApiKey = clientMap['api_key']?.toString() ?? brandingMap['api_key']?.toString() ?? '';
+      final serverPanelUrl = brandingMap['panel_url']?.toString() ?? clientMap['panel_url']?.toString() ?? '';
+      if (serverApiKey.isNotEmpty) {
+        _customApiKey = serverApiKey;
+        await prefs.setString('saved_api_key', serverApiKey);
+        log('v4.0.50 AUTO API KEY from panel: ${serverApiKey.substring(0, serverApiKey.length > 8 ? 8 : serverApiKey.length)}... saved to prefs');
+      }
+      // v4.0.50: If server returns custom panel_url (set by admin), use it automatically
+      if (serverPanelUrl.isNotEmpty && serverPanelUrl.startsWith('http')) {
+        // Only update if different and valid
+        if (serverPanelUrl != currentBase) {
+          await prefs.setString('api_base_url_working', serverPanelUrl);
+          await prefs.setString('api_base_url', serverPanelUrl);
+          baseUrl = serverPanelUrl;
+          log('v4.0.50 AUTO PANEL URL from admin: $serverPanelUrl applied');
+        }
+      }
       // Check if branding has hide config or managed mode flags
-      final hideConfig = brandingMap['hide_app_config'] == true || brandingMap['hide_config'] == true || brandingMap['managed_mode'] == true;
-      final managedMode = brandingMap['managed_mode'] == true || brandingMap['app_managed_mode'] == true;
-      if (hideConfig) await AccountManager.setHideConfig(true);
-      if (managedMode) await AccountManager.setManagedMode(true);
-      // Also check client flags
-      final clientHide = clientMap['hide_app_config'] == true || clientMap['is_reseller'] == true;
-      if (clientHide) {
-        // If user is reseller, check if admin wants to hide config
-        // This will be controlled via reseller permissions
+      final hideConfig = brandingMap['hide_app_config'] == true || brandingMap['hide_config'] == true || brandingMap['managed_mode'] == true || clientMap['hide_app_config'] == true;
+      final managedMode = brandingMap['managed_mode'] == true || brandingMap['app_managed_mode'] == true || clientMap['managed_mode'] == true;
+      if (hideConfig) {
+        await AccountManager.setHideConfig(true);
+        await prefs.setBool('hide_app_config', true);
+        log('v4.0.50 AUTO HIDE CONFIG enabled from panel');
+      }
+      if (managedMode) {
+        await AccountManager.setManagedMode(true);
+        await prefs.setBool('app_managed_mode', true);
+        log('v4.0.50 AUTO MANAGED MODE enabled from panel');
       }
       
       final account = await AccountManager.addOrUpdateAccount(
         username: username,
         password: password,
-        panelUrl: currentBase,
+        panelUrl: serverPanelUrl.isNotEmpty ? serverPanelUrl : currentBase,
         serverCount: initialServers.length,
         planTitle: clientMap['plan_title']?.toString() ?? clientMap['plan']?.toString() ?? '',
         displayName: clientMap['customer_name']?.toString() ?? '',
-        apiKey: clientMap['api_key']?.toString() ?? brandingMap['api_key']?.toString() ?? '',
+        apiKey: serverApiKey,
       );
       await AccountManager.saveAccountToken(account.id, token);
       if (clientMap.isNotEmpty) await AccountManager.saveAccountClient(account.id, clientMap);

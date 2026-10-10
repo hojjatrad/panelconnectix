@@ -29,12 +29,17 @@ class _LoginScreenState extends State<LoginScreen> {
     _checkUpdateBeforeLogin();
   }
 
+  bool _isManagedFromPanel = false;
+  bool _hidePanelUrl = false;
+
   void _loadSavedCredentials() async {
     final prefs = await SharedPreferences.getInstance();
     final u = prefs.getString('saved_username');
     final p = prefs.getString('saved_password');
     final panel = prefs.getString('api_base_url_working') ?? prefs.getString('api_base_url') ?? 'https://vpbotn.ir';
     final apiKey = prefs.getString('saved_api_key') ?? '';
+    final isManaged = prefs.getBool('app_managed_mode') ?? false;
+    final hideConfig = prefs.getBool('hide_app_config') ?? false;
     if (u != null && p != null) {
       _usernameController.text = u;
       _passwordController.text = p;
@@ -42,6 +47,16 @@ class _LoginScreenState extends State<LoginScreen> {
     _panelUrlController.text = panel;
     _apiKeyController.text = apiKey;
     if (apiKey.isNotEmpty) _showApiKeyField = true;
+    if (mounted) {
+      setState(() {
+        _isManagedFromPanel = isManaged;
+        _hidePanelUrl = hideConfig || isManaged;
+        // v4.0.50: If managed mode, hide API key field (admin sets it)
+        if (_hidePanelUrl) {
+          _showApiKeyField = false;
+        }
+      });
+    }
     // Load existing accounts for quick switch
     try {
       final accStr = prefs.getString('multi_accounts');
@@ -278,7 +293,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                // v4.0.47 MULTI-SERVICE: Panel URL field
+                // v4.0.47 MULTI-SERVICE: Panel URL field - v4.0.50 HIDE WHEN MANAGED (admin sets from web panel)
+                if (!_hidePanelUrl) ...[
                 TextField(
                   controller: _panelUrlController,
                   style: const TextStyle(color: Colors.white, fontSize: 13, fontFamily: 'monospace'),
@@ -334,10 +350,17 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ),
+                ],
                 const SizedBox(height: 6),
-                const Text('💡 می‌توانید از پنل‌های مختلف حساب اضافه کنید - نامحدود multi-service', style: TextStyle(color: Color(0xFF475569), fontSize: 10)),
+                if (!_hidePanelUrl) const Text('💡 می‌توانید از پنل‌های مختلف حساب اضافه کنید - نامحدود multi-service', style: TextStyle(color: Color(0xFF475569), fontSize: 10)),
+                if (_hidePanelUrl) Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: const Color(0xFF1E293B), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFF8B5CF6).withOpacity(0.3))),
+                  child: Row(children: const [Icon(Icons.verified_user_rounded, color: Color(0xFF8B5CF6), size: 16), SizedBox(width: 8), Expanded(child: Text('🔒 حالت مدیریتی: تنظیمات پنل توسط ادمین از وب پنل تنظیم شده و به صورت خودکار اعمال می‌شود - نیازی به تنظیم دستی نیست', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 10)))]),
+                ),
                 const SizedBox(height: 12),
-                // v4.0.49 API KEY FIELD - Toggle
+                // v4.0.49 API KEY FIELD - Toggle - v4.0.50 HIDE WHEN MANAGED (admin sets from web panel)
+                if (!_hidePanelUrl) ...[
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -350,7 +373,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ],
                 ),
-                if (_showApiKeyField) ...[
+                ],
+                if (_showApiKeyField && !_hidePanelUrl) ...[
                   const SizedBox(height: 8),
                   TextField(
                     controller: _apiKeyController,
@@ -445,7 +469,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  'نسخه ${DashboardScreen.currentAppVersion}',
+                  'نسخه ${DashboardScreen.actualVersion} (کد ${DashboardScreen.actualCode}) - ${DashboardScreen.currentAppVersion}',
                   style: const TextStyle(color: Color(0xFF475569), fontSize: 10),
                 ),
               ],

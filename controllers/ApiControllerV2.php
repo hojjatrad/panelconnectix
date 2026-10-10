@@ -392,7 +392,8 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
                     $managedMode = (int)($reseller['app_managed_mode'] ?? 0) === 1;
                     $resellerApiKey = $reseller['reseller_api_key'] ?? '';
                 }
-                // Check reseller_app_config table
+                // Check reseller_app_config table - v4.0.50 AUTO API KEY + PANEL URL FROM WEB PANEL
+                $panelUrlFromConfig = '';
                 $stmtAppCfg = $pdo->prepare("SELECT * FROM reseller_app_config WHERE reseller_id = ? LIMIT 1");
                 $stmtAppCfg->execute([(int)$client['reseller_id']]);
                 $appCfg = $stmtAppCfg->fetch(PDO::FETCH_ASSOC);
@@ -400,6 +401,7 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
                     if ((int)($appCfg['hide_app_config'] ?? 0) === 1) $hideAppConfig = true;
                     if ((int)($appCfg['managed_mode'] ?? 0) === 1) $managedMode = true;
                     if (!empty($appCfg['api_key'])) $resellerApiKey = $appCfg['api_key'];
+                    if (!empty($appCfg['panel_url'])) $panelUrlFromConfig = $appCfg['panel_url'];
                 }
             }
             // Check API key from request header
@@ -432,6 +434,7 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
                 'hide_app_config' => $hideAppConfig,
                 'managed_mode' => $managedMode,
                 'api_key' => $resellerApiKey,
+                'panel_url' => $panelUrlFromConfig ?: 'https://vpbotn.ir',
             ],
             'servers' => self::extractServerList($client, $pdo),
             'branding' => array_merge(self::appBrandingPayload($client), [
@@ -439,6 +442,7 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
                 'managed_mode' => $managedMode,
                 'app_managed_mode' => $managedMode,
                 'api_key' => $resellerApiKey,
+                'panel_url' => $panelUrlFromConfig ?: 'https://vpbotn.ir',
                 'is_reseller' => $isReseller,
             ])
         ], 'ورود به اپلیکیشن با موفقیت انجام شد.');
