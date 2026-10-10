@@ -737,30 +737,57 @@ if (!function_exists('isActiveRoute')) {
 
     // PWA Service Worker registration v4.0.46 ULTRA - FIXED: No more Ctrl+F5 needed + dashboard click bug
     if ('serviceWorker' in navigator) {
-        // v4.0.30 FIX: Force unregister old SW v4.0.46 that causes dashboard click to show old banner
+        // v4.0.47 FIX: Service Worker version handling - dynamic version, no infinite reload
+        // OLD BUG v4.0.46: hardcoded check for v4.0.46 caused infinite reload on v4.0.47 (isOld = !includes v4.0.46)
         (async () => {
             try {
+                const currentVer = '<?= $assetVer ?? Updater::CURRENT_VERSION ?? "4.0.47" ?>';
+                const currentVerDash = currentVer.replace(/\./g, '-');
                 const regs = await navigator.serviceWorker.getRegistrations();
                 for (const reg of regs) {
                     const url = reg.active?.scriptURL || reg.installing?.scriptURL || '';
-                    // If old SW without version or with old cache name, unregister
                     if (url.includes('sw.js')) {
-                        const isOld = !url.includes('v4.0.46') && !url.includes('v=4.0.46') && !url.includes('v=4.0.46');
-                        // Also check cache names
+                        // Only consider OLD if version is significantly older (not just different)
+                        // Check if SW URL version is older than current by parsing version
+                        const urlMatch = url.match(/v=([\d\.]+)/);
+                        const urlVer = urlMatch ? urlMatch[1] : '';
+                        let isOld = false;
+                        if (urlVer && currentVer) {
+                            // Compare versions - if urlVer < currentVer, it's old
+                            const parseVer = (v) => v.split('.').map(n => parseInt(n)||0);
+                            const curParts = parseVer(currentVer);
+                            const urlParts = parseVer(urlVer);
+                            for (let i=0; i<3; i++) {
+                                const c = curParts[i]||0, u = urlParts[i]||0;
+                                if (u < c) { isOld = true; break; }
+                                if (u > c) break;
+                            }
+                        }
+                        // Also check for very old cache names (v4-0-40 to v4-0-45)
                         const cacheNames = await caches.keys();
-                        const hasOldCache = cacheNames.some(n => n.includes('v4-0-46') || n.includes('v4.0.46'));
-                        if (isOld || hasOldCache) {
-                            console.log('Found old SW/cache, unregistering...', url, cacheNames);
-                            // Delete all old caches
+                        const hasVeryOldCache = cacheNames.some(n => {
+                            // Only delete caches older than v4.0.46, not current
+                            return (n.includes('v4-0-4') && !n.includes(currentVerDash) && !n.includes('v4-0-46') && !n.includes('v4-0-47')) || 
+                                   (n.includes('v4.0.4') && !n.includes(currentVer));
+                        });
+                        if (isOld || hasVeryOldCache) {
+                            console.log('Found old SW/cache, unregistering...', url, 'urlVer:', urlVer, 'current:', currentVer);
                             for (const name of cacheNames) {
-                                if (name.includes('v4-0-46') || name.includes('v4.0.46') || name !== 'connectix-ultra-v4-0-46' && name !== 'connectix-static-v4-0-46') {
-                                    await caches.delete(name);
-                                    console.log('Deleted old cache:', name);
+                                if (name.includes('v4-0-4') && !name.includes(currentVerDash) && name !== `connectix-ultra-v${currentVerDash}` && name !== `connectix-static-v${currentVerDash}`) {
+                                    // Only delete if older than current
+                                    const nameMatch = name.match(/v4-0-(\d+)/);
+                                    if (nameMatch) {
+                                        const nameMinor = parseInt(nameMatch[1]);
+                                        const curMinor = parseInt(currentVerDash.split('-').pop()||'47');
+                                        if (nameMinor < curMinor) {
+                                            await caches.delete(name);
+                                            console.log('Deleted old cache:', name);
+                                        }
+                                    }
                                 }
                             }
                             await reg.unregister();
                             console.log('Unregistered old SW, reloading...');
-                            // Force reload without cache
                             window.location.reload(true);
                             return;
                         }
@@ -770,22 +797,22 @@ if (!function_exists('isActiveRoute')) {
                 console.log('SW cleanup error:', e);
             }
             
-            // Register new SW
-            const swUrl = '<?= $base ?>/sw.js?v=<?= $assetVer ?? Updater::CURRENT_VERSION ?? "4.0.46" ?>';
+            // Register new SW with current version
+            const swUrl = '<?= $base ?>/sw.js?v=<?= $assetVer ?? Updater::CURRENT_VERSION ?? "4.0.47" ?>';
             const reg = await navigator.serviceWorker.register(swUrl);
-            console.log('PWA SW registered v4.0.46');
+            console.log('PWA SW registered', '<?= $assetVer ?? Updater::CURRENT_VERSION ?? "4.0.47" ?>');
             
-            // Check for updates every 2 minutes (more frequent)
+            // Check for updates every 5 minutes (not 2, to reduce reload spam)
             setInterval(() => {
                 reg.update().then(() => console.log('SW update checked'));
-            }, 2*60*1000);
+            }, 5*60*1000);
             
-            // If new SW found, auto-reload
+            // If new SW found, ask user before reload (not auto)
             reg.addEventListener('updatefound', () => {
                 const newWorker = reg.installing;
                 newWorker.addEventListener('statechange', () => {
                     if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                        console.log('New SW available, reloading...');
+                        console.log('New SW available');
                         if (confirm('نسخه جدید پنل موجود است. بروزرسانی شود؟')) {
                             window.location.reload();
                         }
@@ -794,9 +821,15 @@ if (!function_exists('isActiveRoute')) {
             });
         })();
         
-        // Force reload if SW controller changes
+        // v4.0.47 FIX: Prevent infinite reload loop - only reload if user confirms or after 1 time per session
+        let hasReloadedForSW = sessionStorage.getItem('sw_reloaded') === '1';
         navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (hasReloadedForSW) {
+                console.log('SW controller changed but already reloaded this session, skipping');
+                return;
+            }
             console.log('SW controller changed, reloading...');
+            sessionStorage.setItem('sw_reloaded', '1');
             window.location.reload();
         });
         

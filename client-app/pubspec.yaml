@@ -1,7 +1,11 @@
 name: connectix_vpn
-description: Connectix Professional Multiplatform VPN Client - ULTRA Dual-Core Xray + sing-box + v4.0.47 RESELLER SYNC + PERMISSIONS ALL MENUS + MULTI-ACCOUNT UNLIMITED + FOREVER CACHE FIX
+description: Connectix Professional Multiplatform VPN Client - ULTRA Dual-Core Xray + sing-box + v4.0.48 FIX RAPID REFRESH + 5 PATHS FAILED + RESELLER SYNC + PERMISSIONS + MULTI-ACCOUNT
 publish_to: 'none'
+version: 4.0.48+82
 version: 4.0.47+81
+=======
+version: 4.0.48+82
+>>>>>>> 65898d9 (v4.0.48 FIX RAPID REFRESH + 5 PATHS FAILED)
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

@@ -1856,7 +1856,7 @@ class ApiService {
     bool wakeLockAcquired = false;
     double lastProgress = 0.0;
     int totalAttempts = 0;
-    const int maxTotalAttempts = 5;
+    const int maxTotalAttempts = 8; // v4.0.47 FIX: increased from 5 to 8 for more resilience
     Timer? progressTimer;
     int lastReceivedForTimer = 0;
     DateTime lastChunkTime = DateTime.now();
@@ -1910,11 +1910,20 @@ class ApiService {
       }
 
       final ts = DateTime.now().millisecondsSinceEpoch;
-      addUrl('https://vpbotn.ir/download_apk.php?file=arm64&v=$expectedVer&t=$ts');
-      addUrl('https://direct.vpbotn.ir/download_apk.php?file=arm64&v=$expectedVer&t=$ts');
-      addUrl(addVersionParam('https://vpbotn.ir/Connectix-ARM64-v8a.apk'));
+      // v4.0.47 FIX: More resilient URL list, direct.vpbotn.ir first (less Cloudflare), then vpbotn.ir, then GitHub, then universal as last resort
+      // Panel proxy (now with GitHub fallback if file missing)
+      addUrl('https://direct.vpbotn.ir/download_apk.php?file=arm64&v=$expectedVer&t=$ts&r=${ts % 10000}');
+      addUrl('https://vpbotn.ir/download_apk.php?file=arm64&v=$expectedVer&t=$ts&r=${ts % 10000}');
+      // Direct APK files (if present on panel)
       addUrl(addVersionParam('https://direct.vpbotn.ir/Connectix-ARM64-v8a.apk'));
+      addUrl(addVersionParam('https://vpbotn.ir/Connectix-ARM64-v8a.apk'));
+      // GitHub releases (may be filtered in Iran, but try)
       addUrl('https://github.com/hojjatrad/panelconnectix/releases/download/v$expectedVer/Connectix-Android-ARM64.apk?t=$ts');
+      addUrl('https://github.com/hojjatrad/panelconnectix/releases/download/v$expectedVer/Connectix-ARM64-v8a.apk?t=$ts');
+      // Universal as fallback (larger but works on all devices)
+      addUrl('https://direct.vpbotn.ir/download_apk.php?file=universal&v=$expectedVer&t=$ts');
+      addUrl('https://vpbotn.ir/download_apk.php?file=universal&v=$expectedVer&t=$ts');
+      addUrl('https://github.com/hojjatrad/panelconnectix/releases/download/v$expectedVer/Connectix-Android-Universal.apk?t=$ts');
       if (!allUrls.contains(downloadUrl)) {
         addUrl(downloadUrl);
       }
@@ -2343,8 +2352,8 @@ class ApiService {
         }
       }
 
-      print('v4.0.41 All $totalAttempts attempts failed, browser fallback');
-      log('v4.0.41 All failed, browser fallback');
+      print('v4.0.47 All $totalAttempts attempts failed, browser fallback');
+      log('v4.0.47 All failed, browser fallback');
       progressTimer?.cancel();
       if (wakeLockAcquired) {
         try { await releaseWakeLock(); } catch (_) {}
@@ -2355,7 +2364,8 @@ class ApiService {
         await _updaterChannel.invokeMethod('openBrowser', {'url': directUrl});
       } catch (_) {}
 
-      onError('❌ دانلود درون‌برنامه‌ای بعد از $totalAttempts تلاش ناموفق بود\n\n✅ راه حل فوری (100% کار میکنه):\n\n1️⃣ مرورگر مستقیم:\nhttps://direct.vpbotn.ir/download_apk.php?file=arm64&v=$expectedVer\n\n2️⃣ QR کد:\nhttps://vpbotn.ir/qr_download.html\n\n3️⃣ گیت‌هاب:\nhttps://github.com/hojjatrad/panelconnectix/releases/download/v$expectedVer/Connectix-Android-ARM64.apk\n\n💡 نکته: دانلود مستقیم از مرورگر همیشه کار میکنه');
+      onError('❌ دانلود درون‌برنامه‌ای بعد از $totalAttempts مسیر ناموفق بود (v4.0.47 FIX: 5→8 مسیر)\\n\\n🔍 علت: APK روی هاست نیست یا فیلتر گیت‌هاب\\n\\n✅ راه حل:\\n1️⃣ https://direct.vpbotn.ir/download_apk.php?file=arm64&v=$expectedVer\\n2️⃣ https://vpbotn.ir/download_apk.php?file=arm64&v=$expectedVer\\n3️⃣ https://vpbotn.ir/qr_download.html\\n4️⃣ https://github.com/hojjatrad/panelconnectix/releases/download/v$expectedVer/Connectix-Android-ARM64.apk\\n\\n💡 ابتدا fix_447 و quick_update را اجرا کنید');
+
 
     } catch (e, stack) {
       print('v4.0.41 FATAL: $e $stack');

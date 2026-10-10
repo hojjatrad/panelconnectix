@@ -27,9 +27,52 @@ if (!file_exists($filePath)) {
 }
 
 if (!file_exists($filePath)) {
+    // v4.0.47 PROXY FALLBACK: If local file missing, proxy from GitHub releases
+    // This ensures update works even if quick_update hasn't downloaded yet
+    $ver = $version ?: '4.0.47';
+    // Sanitize version
+    $ver = preg_replace('/[^0-9\.]/', '', $ver);
+    if (empty($ver)) $ver = '4.0.47';
+    
+    $githubMap = [
+        'arm64' => "https://github.com/hojjatrad/panelconnectix/releases/download/v{$ver}/Connectix-Android-ARM64.apk",
+        'arm64-v8a' => "https://github.com/hojjatrad/panelconnectix/releases/download/v{$ver}/Connectix-ARM64-v8a.apk",
+        'universal' => "https://github.com/hojjatrad/panelconnectix/releases/download/v{$ver}/Connectix-Android-Universal.apk",
+        'arm32' => "https://github.com/hojjatrad/panelconnectix/releases/download/v{$ver}/Connectix-Android-ARM32.apk",
+        'arm32-v7a' => "https://github.com/hojjatrad/panelconnectix/releases/download/v{$ver}/Connectix-ARM32-v7a.apk",
+    ];
+    $githubUrl = $githubMap[$fileParam] ?? $githubMap['arm64'];
+    
+    // Try to proxy from GitHub
+    try {
+        $ch = curl_init($githubUrl);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, false);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 0);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_USERAGENT, 'Connectix-Proxy/4.0.47');
+        // Handle Range
+        if ($startParam !== '' && is_numeric($startParam)) {
+            curl_setopt($ch, CURLOPT_HTTPHEADER, ["Range: bytes={$startParam}-"]);
+        } elseif (!empty($_SERVER['HTTP_RANGE'])) {
+            curl_setopt($ch, CURLOPT_HTTPHEADER, ["Range: {$_SERVER['HTTP_RANGE']}"]);
+        }
+        // Stream directly
+        header("Content-Type: application/vnd.android.package-archive");
+        header("Content-Disposition: attachment; filename=\"Connectix-{$fileParam}-v{$ver}.apk\"");
+        header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+        header("Pragma: no-cache");
+        header("cf-cache-status: BYPASS");
+        curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        if ($code >= 200 && $code < 400) exit;
+    } catch (Throwable $e) {}
+    
     http_response_code(404);
     header('Content-Type: application/json');
-    echo json_encode(['error' => 'APK not found', 'file' => $fileParam]);
+    echo json_encode(['error' => 'APK not found locally and GitHub proxy failed', 'file' => $fileParam, 'version' => $ver, 'tried' => $githubUrl]);
     exit;
 }
 

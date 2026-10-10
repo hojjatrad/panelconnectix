@@ -86,8 +86,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   VpnAccount? _activeAccount;
   bool _unifiedEnabled = false;
 
-  static const String currentAppVersion = '4.0.47';
-  static String _actualInstalledVersion = '4.0.47'; // Will be updated from PackageManager
+  static const String currentAppVersion = '4.0.48';
+  static String _actualInstalledVersion = '4.0.48'; // Will be updated from PackageManager
   static int _actualInstalledCode = 81;
 
   // v4.0.46 FOREVER CACHE FIX - PERMANENT LAW - NEVER REGRESS
