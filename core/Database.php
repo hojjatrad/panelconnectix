@@ -774,6 +774,36 @@ class Database {
                 )");
             } catch (Throwable $e) {}
 
+            // v4.0.51 NEW: App Global Config - All app settings from web panel
+            try {
+                $pdo->exec("CREATE TABLE IF NOT EXISTS app_global_config (
+                    id $autoInc,
+                    config_key VARCHAR(128) NOT NULL,
+                    config_value TEXT NULL,
+                    description VARCHAR(255) NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(config_key),
+                    INDEX idx_config_key (config_key)
+                )");
+                // Seed default configs if not exists
+                $defaults = [
+                    ['default_panel_url', 'https://vpbotn.ir', 'آدرس پیش‌فرض پنل برای تمام اپ‌ها - اپ خودکار این را می‌خواند'],
+                    ['hide_manual_panel_url', '1', 'مخفی کردن فیلد آدرس پنل از تمام اپ‌ها (1=مخفی، 0=نمایش) - پیشنهاد: 1'],
+                    ['hide_manual_api_key', '1', 'مخفی کردن فیلد کلید API از تمام اپ‌ها - پیشنهاد: 1 (ادمین از وب تنظیم می‌کند)'],
+                    ['force_managed_mode', '0', 'اجبار حالت مدیریتی برای تمام اپ‌ها حتی ادمین (1=فعال)'],
+                    ['auto_fetch_servers', '1', 'دریافت خودکار لیست سرورها از پنل وب (1=فعال) - وقتی سرور جدید اضافه می‌شود خودکار به اپ می‌آید'],
+                    ['default_api_key', '', 'کلید API پیش‌فرض برای تمام اپ‌ها (اختیاری)'],
+                    ['app_settings_json', '{"split_tunneling": true, "auto_reconnect": true, "smart_connect": true, "show_speed": true}', 'تنظیمات پیش‌فرض اپ به صورت JSON'],
+                ];
+                foreach ($defaults as $def) {
+                    try {
+                        $stmt = $pdo->prepare("INSERT IGNORE INTO app_global_config (config_key, config_value, description) VALUES (?, ?, ?)");
+                        $stmt->execute([$def[0], $def[1], $def[2]]);
+                    } catch (Throwable $e) {}
+                }
+            } catch (Throwable $e) {}
+
             // v4.0.49: Add columns to users for quick access
             try {
                 $cols = $pdo->query("SHOW COLUMNS FROM users")->fetchAll(PDO::FETCH_COLUMN);

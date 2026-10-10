@@ -1,7 +1,7 @@
 name: connectix_vpn
-description: Connectix Professional Multiplatform VPN Client - ULTRA Dual-Core Xray + sing-box + v4.0.50 FIX VERSION DISPLAY + AUTO API KEY FROM WEB PANEL
+description: Connectix Professional Multiplatform VPN Client - ULTRA Dual-Core Xray + sing-box + v4.0.51 GLOBAL APP CONFIG FROM WEB PANEL - NO MANUAL PATHS
 publish_to: 'none'
-version: 4.0.50+84
+version: 4.0.51+85
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

@@ -1,5 +1,6 @@
 <?php
 $pageTitle = 'تنظیمات اپ نماینده - ' . htmlspecialchars($reseller['username']);
+require __DIR__ . '/../layout/header.php';
 $currentUri = $_SERVER['REQUEST_URI'] ?? '';
 ?>
 <div class="max-w-4xl mx-auto space-y-6">
@@ -86,3 +87,7 @@ $currentUri = $_SERVER['REQUEST_URI'] ?? '';
         </div>
     </div>
 </div>
+
+<?php
+require __DIR__ . '/../layout/footer.php';
+?>

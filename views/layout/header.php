@@ -455,6 +455,11 @@ if (!function_exists('isActiveRoute')) {
                 </button>
                 <div id="content-system" class="accordion-content space-y-0.5 mt-0.5 pr-2">
                     <?php if (Auth::isAdmin()): ?>
+                    <a href="<?= Helpers::url('settings/app-config') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('app-config', $currentUri) ? 'bg-violet-600/15 text-violet-300 font-bold border-r-2 border-violet-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
+                        <i class="fa-solid fa-mobile-screen-button w-4 text-center text-violet-400"></i>
+                        <span>تنظیمات مرکزی اپ (v4.0.51)</span>
+                        <span class="mr-auto text-[9px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300 border border-violet-500/30">جدید</span>
+                    </a>
                     <a href="<?= Helpers::url('settings/app-api') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('app-api', $currentUri) ? 'bg-cyan-600/15 text-cyan-300 font-bold border-r-2 border-cyan-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
                         <i class="fa-solid fa-code w-4 text-center text-cyan-400"></i>
                         <span>وب‌سرویس و اپلیکیشن اختصاصی</span>

@@ -4,7 +4,7 @@ require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Setting.php';
 
 class Updater {
-    public const CURRENT_VERSION = '4.0.50'; // v4.0.50 Panel - FIX VERSION DISPLAY + AUTO API KEY FROM WEB PANEL + Hide Config Auto
+    public const CURRENT_VERSION = '4.0.51'; // v4.0.51 Panel - GLOBAL APP CONFIG FROM WEB PANEL + NO MANUAL PATHS + Fix Reseller App Config Style
 
     public static function getCurrentVersion(): string {
         $dbVer = Setting::get('current_version', '');

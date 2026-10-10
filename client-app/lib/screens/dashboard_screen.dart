@@ -89,9 +89,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   bool _isManagedMode = false;
   bool _hideConfig = false;
 
-  static const String currentAppVersion = '4.0.50';
-  static String _actualInstalledVersion = '4.0.50'; // Will be updated from PackageManager
-  static int _actualInstalledCode = 84;
+  static const String currentAppVersion = '4.0.51';
+  static String _actualInstalledVersion = '4.0.51'; // Will be updated from PackageManager
+  static int _actualInstalledCode = 85;
 
   // v4.0.46 FOREVER CACHE FIX - PERMANENT LAW - NEVER REGRESS
   // LAW 1: Panel must NEVER serve old APK (auto-delete stale files)

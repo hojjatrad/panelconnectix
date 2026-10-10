@@ -1,6 +1,6 @@
-// Service Worker for Connectix PWA ULTRA v4.0.50 - FIXED: No infinite reload loop
-const CACHE_NAME = 'connectix-ultra-v4-0-50';
-const STATIC_CACHE = 'connectix-static-v4-0-50';
+// Service Worker for Connectix PWA ULTRA v4.0.51 - FIXED: No infinite reload loop
+const CACHE_NAME = 'connectix-ultra-v4-0-51';
+const STATIC_CACHE = 'connectix-static-v4-0-51';
 const urlsToCache = [
   '/assets/css/fontawesome.min.css',
   '/assets/css/vazirmatn.css',

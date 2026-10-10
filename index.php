@@ -902,6 +902,11 @@ $router->get('api/v1/client/info', [ApiControllerV2::class, 'getClientInfo']);
 
 // Dedicated Client Mobile & Desktop App Endpoints (v1)
 $router->get('settings/app-api', [ApiControllerV2::class, 'showAppApiDoc']);
+
+// v4.0.51: Global App Config - Central Management from Web Panel
+$router->get('settings/app-config', [AppConfigController::class, 'index']);
+$router->post('settings/app-config/save', [AppConfigController::class, 'save']);
+$router->get('api/v1/app/global-config', [AppConfigController::class, 'getGlobalConfig']);
 $router->post('api/v1/app/login', [ApiControllerV2::class, 'appLogin']);
 $router->get('api/v1/app/profile', [ApiControllerV2::class, 'appProfile']);
 $router->post('api/v1/app/profile', [ApiControllerV2::class, 'appProfile']);

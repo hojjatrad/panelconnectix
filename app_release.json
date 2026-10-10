@@ -1,10 +1,10 @@
 {
-  "version": "4.0.50",
-  "code": 84,
+  "version": "4.0.51",
+  "code": 85,
   "force_update": false,
   "force_min_code": 50,
   "update_type": "full",
-  "changelog": "✅ v4.0.50 FIX VERSION DISPLAY + AUTO API KEY FROM WEB PANEL:\n\n• 🔧 فیکس نمایش نسخه قدیمی در اپ - currentAppVersion از 4.0.47 به 4.0.50 آپدیت شد (actualVersion از PackageManager)\n• 🔑 تنظیم خودکار کلید API از پنل وب - ادمین در resellers/app-config کلید API را تنظیم می‌کند، اپ به صورت خودکار آن را دریافت و ذخیره می‌کند (X-API-Key header)\n• 👁️ مخفی شدن خودکار فیلد آدرس پنل و کلید API در حالت مدیریتی - نماینده نیازی به تنظیم دستی مسیر ندارد، هرچی ادمین ذخیره کرده اپ استفاده می‌کند\n• 📱 پنل URL خودکار از وب پنل - اگر ادمین panel_url را تنظیم کند، اپ خودکار آن را اعمال می‌کند\n• 🔒 حالت مدیریتی کامل - وقتی hide_app_config فعال باشد، نماینده بخش تنظیمات را نمی‌بیند\n• 🛡️ بقیه قابلیت‌ها: Multi-Account Unlimited + Smart Connect اول صفحه + Reseller Sync + Permissions + Fix Rapid Refresh + 5 Paths",
+  "changelog": "✅ v4.0.51 GLOBAL APP CONFIG FROM WEB PANEL - NO MANUAL PATHS:\n\n• 🔧 فیکس صفحه تنظیمات آپ نماینده نامرتب - اضافه شدن header/footer و استایل کامل\n• 🌐 تنظیمات سراسری اپ از پنل وب - صفحه جدید settings/app-config برای مدیریت مرکزی تمام اپ‌ها\n• 🚫 حذف تنظیمات دستی مسیرها از اپ - وقتی hide_manual_panel_url فعال باشد، فیلد آدرس پنل کلا مخفی می‌شود و اپ خودکار از پنل وب می‌خواند\n• 🔄 دریافت خودکار سرورها - وقتی سرور جدید اضافه می‌کنید، اپ خودکار لیست را از پنل می‌گیرد (auto_fetch_servers)\n• 🔑 کلید API خودکار - ادمین یکبار در وب تنظیم می‌کند، تمام اپ‌ها خودکار دریافت می‌کنند\n• 👁️ پیشنهاد شما: تمام تنظیمات حتی برای مدیر ارشد از پنل وب - با force_managed_mode حتی ادمین هم تنظیمات را از وب می‌گیرد\n• 📱 نسخه قبلی: Fix Version Display + Auto API Key همچنان فعال",
   "date": "2026-10-10",
   "auto_update": {
     "enabled": true,
@@ -15,13 +15,13 @@
     "wifi_only": false
   },
   "apk": {
-    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.50/Connectix-ARM64-v8a.apk",
-    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.50/Connectix-Universal.apk",
-    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.50/Connectix-ARM32-v7a.apk"
+    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-ARM64-v8a.apk",
+    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-Universal.apk",
+    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-ARM32-v7a.apk"
   },
   "apks": {
     "arm64-v8a": {
-      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.50/Connectix-ARM64-v8a.apk",
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-ARM64-v8a.apk",
       "size": 37599373,
       "size_human": "36 MB",
       "abi": "arm64-v8a",
@@ -29,7 +29,7 @@
       "arch": "arm64"
     },
     "armeabi-v7a": {
-      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.50/Connectix-ARM32-v7a.apk",
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-ARM32-v7a.apk",
       "size": 38145412,
       "size_human": "36 MB",
       "abi": "armeabi-v7a",
@@ -37,7 +37,7 @@
       "arch": "arm32"
     },
     "universal": {
-      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.50/Connectix-Universal.apk",
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-Universal.apk",
       "size": 110469109,
       "size_human": "105 MB",
       "abi": "universal",
@@ -46,8 +46,8 @@
     }
   },
   "windows": {
-    "version": "4.0.50",
-    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.50/Connectix-Windows-x64.zip"
+    "version": "4.0.51",
+    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-Windows-x64.zip"
   },
   "ultra": true,
   "core": "xray_1.8.23 + sing-box + multiplex + 0rtt + stealth + FULL BUG FIX",
@@ -69,12 +69,12 @@
     "stealth",
     "multiplex"
   ],
-  "version_code": 84,
+  "version_code": 85,
   "release_date": "2026-10-10",
   "apk_urls": {
-    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.50/Connectix-ARM64-v8a.apk",
-    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.50/Connectix-Universal.apk",
-    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.50/Connectix-ARM32-v7a.apk"
+    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-ARM64-v8a.apk",
+    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-Universal.apk",
+    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-ARM32-v7a.apk"
   },
-  "download_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.50/Connectix-Android-ARM64.apk"
+  "download_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-Android-ARM64.apk"
 }

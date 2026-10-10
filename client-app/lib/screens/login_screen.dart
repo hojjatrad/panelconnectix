@@ -27,10 +27,36 @@ class _LoginScreenState extends State<LoginScreen> {
     super.initState();
     _loadSavedCredentials();
     _checkUpdateBeforeLogin();
+    _fetchGlobalConfigFromWeb();
+  }
+
+  void _fetchGlobalConfigFromWeb() async {
+    try {
+      // v4.0.51: Fetch global config from web panel - all settings from web
+      final cfg = await ApiService.fetchGlobalAppConfig();
+      if (cfg != null && mounted) {
+        final hidePanel = cfg['hide_manual_panel_url'] == true;
+        final hideApiKey = cfg['hide_manual_api_key'] == true;
+        final forceManaged = cfg['force_managed_mode'] == true;
+        final panelUrl = cfg['default_panel_url']?.toString() ?? cfg['panel_url']?.toString() ?? '';
+        setState(() {
+          if (hidePanel || forceManaged) {
+            _hidePanelUrl = true;
+            _isManagedFromPanel = true;
+          }
+          if (panelUrl.isNotEmpty) {
+            _panelUrlController.text = panelUrl;
+          }
+        });
+        print('v4.0.51 Global config applied in login: hidePanel=$hidePanel panelUrl=$panelUrl');
+      }
+    } catch (e) {
+      print('v4.0.51 fetch global config in login failed: $e');
+    }
   }
 
   bool _isManagedFromPanel = false;
-  bool _hidePanelUrl = false;
+  bool _hidePanelUrl = true; // v4.0.51 DEFAULT HIDE - all paths from web panel, no manual
 
   void _loadSavedCredentials() async {
     final prefs = await SharedPreferences.getInstance();
@@ -39,7 +65,9 @@ class _LoginScreenState extends State<LoginScreen> {
     final panel = prefs.getString('api_base_url_working') ?? prefs.getString('api_base_url') ?? 'https://vpbotn.ir';
     final apiKey = prefs.getString('saved_api_key') ?? '';
     final isManaged = prefs.getBool('app_managed_mode') ?? false;
-    final hideConfig = prefs.getBool('hide_app_config') ?? false;
+    final hideConfig = prefs.getBool('hide_app_config') ?? true; // v4.0.51 default hide
+    final hideManualPanel = prefs.getBool('hide_manual_panel_url') ?? true; // v4.0.51 default hide manual
+    final hideManualApi = prefs.getBool('hide_manual_api_key') ?? true;
     if (u != null && p != null) {
       _usernameController.text = u;
       _passwordController.text = p;

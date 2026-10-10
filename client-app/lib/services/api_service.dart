@@ -91,6 +91,11 @@ class ApiService {
       
       log('v8.0 initBaseUrl start: savedWorking=$savedWorking savedDomain=$savedDomain');
       
+      // v4.0.51: First fetch global config from web panel - central management
+      try {
+        await fetchGlobalAppConfig();
+      } catch (_) {}
+      
       // 1. Try saved working URL first (fastest path)
       if (savedWorking.isNotEmpty) {
         if (await _testUrlWorks(savedWorking)) {
@@ -134,6 +139,80 @@ class ApiService {
       log('initBaseUrl error: $e');
       baseUrl = baseUrls[0];
     }
+  }
+
+  // v4.0.51: Fetch global app config from web panel - Central management
+  static Map<String, dynamic>? _globalAppConfig;
+  static Map<String, dynamic>? get globalAppConfig => _globalAppConfig;
+
+  static Future<Map<String, dynamic>?> fetchGlobalAppConfig() async {
+    try {
+      // Try to fetch from current baseUrl + /api/v1/app/global-config
+      final urlsToTry = [
+        '$baseUrl/api/v1/app/global-config',
+        'https://vpbotn.ir/api/v1/app/global-config',
+        'https://vpbotn.ir/api/app/global-config',
+      ];
+      for (final url in urlsToTry) {
+        try {
+          final resp = await http.get(Uri.parse(url), headers: {'Accept': 'application/json'}).timeout(const Duration(seconds: 5));
+          if (resp.statusCode == 200) {
+            final data = jsonDecode(resp.body);
+            if (data is Map && data['success'] == true && data['data'] != null) {
+              _globalAppConfig = Map<String, dynamic>.from(data['data']);
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setString('global_app_config', jsonEncode(_globalAppConfig));
+              log('v4.0.51 Global app config fetched from $url: ${_globalAppConfig}');
+              // Auto-apply panel URL and API key from global config
+              final panelUrl = _globalAppConfig!['default_panel_url']?.toString() ?? _globalAppConfig!['panel_url']?.toString() ?? '';
+              final apiKey = _globalAppConfig!['default_api_key']?.toString() ?? _globalAppConfig!['api_key']?.toString() ?? '';
+              final hidePanel = _globalAppConfig!['hide_manual_panel_url'] == true;
+              final hideApiKey = _globalAppConfig!['hide_manual_api_key'] == true;
+              final forceManaged = _globalAppConfig!['force_managed_mode'] == true;
+              if (panelUrl.isNotEmpty && panelUrl.startsWith('http')) {
+                baseUrl = panelUrl;
+                await prefs.setString('api_base_url_working', panelUrl);
+                await prefs.setString('api_base_url', panelUrl);
+                log('v4.0.51 AUTO panel_url from global config: $panelUrl');
+              }
+              if (apiKey.isNotEmpty) {
+                _customApiKey = apiKey;
+                await prefs.setString('saved_api_key', apiKey);
+                log('v4.0.51 AUTO api_key from global config: ${apiKey.substring(0, apiKey.length > 8 ? 8 : apiKey.length)}...');
+              }
+              if (hidePanel) {
+                await prefs.setBool('hide_manual_panel_url', true);
+                await prefs.setBool('hide_app_config', true);
+              }
+              if (hideApiKey) {
+                await prefs.setBool('hide_manual_api_key', true);
+              }
+              if (forceManaged) {
+                await prefs.setBool('app_managed_mode', true);
+                await prefs.setBool('force_managed_mode', true);
+              }
+              return _globalAppConfig;
+            }
+          }
+        } catch (e) {
+          log('v4.0.51 fetchGlobalAppConfig failed for $url: $e');
+          continue;
+        }
+      }
+      // Try loading from prefs cache
+      final prefs = await SharedPreferences.getInstance();
+      final cached = prefs.getString('global_app_config');
+      if (cached != null && cached.isNotEmpty) {
+        try {
+          _globalAppConfig = jsonDecode(cached) as Map<String, dynamic>;
+          log('v4.0.51 Global app config loaded from cache');
+          return _globalAppConfig;
+        } catch (_) {}
+      }
+    } catch (e) {
+      log('v4.0.51 fetchGlobalAppConfig error: $e');
+    }
+    return null;
   }
 
   // v8.0: Test if a URL works (quick ping)
