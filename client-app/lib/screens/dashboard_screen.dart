@@ -31,6 +31,9 @@ class DashboardScreen extends StatefulWidget {
   /// Public app version (mirrors the State constant) so other screens
   /// (login footer, support sheet) can display it.
   static const String currentAppVersion = _DashboardScreenState.currentAppVersion;
+  static String get actualVersion => _DashboardScreenState.actualVersion;
+  static int get actualCode => _DashboardScreenState.actualCode;
+  static Future<void> loadActualInstalledVersion() => _DashboardScreenState.loadActualInstalledVersion();
 
   const DashboardScreen({
     Key? key,
