@@ -691,13 +691,13 @@ try {
         Setting::set('app_latest_version', $latestAppVersion);
         Setting::set('app_version_code', $latestAppCode);
         Setting::set('app_version_updated_at', date('Y-m-d H:i:s'));
-        Setting::set('app_update_title', "Connectix v{$latestAppVersion} FOREVER INSTALL FIX 🔒");
-        Setting::set('app_update_changelog', "🔒 فیکس دائمی نصب + پروکسی رایگان!\n\n• فیکس دائمی: نصب میپرید و نسخه جدید نمیامد - حل شد برای همیشه\n• قانون 1: پنل هرگز APK قدیمی سرو نمیکند - اگر فایل قدیمی باشد خودکار حذف و از سرور اصلی میگیرد\n• قانون 2: اپ نسخه APK دانلود شده را با PackageManager چک میکند\n• قانون 3: اگر نسخه APK با انتظار فرق داشت، خودکار لینک بعدی\n• قانون 4: قبل از دانلود فایل قدیمی پاک میشود\n• قانون 5: ?v=version&t=time&s=random برای دور زدن تمام کش‌ها\n• قانون 6: همیشه سرور پشتیبان به عنوان fallback حتی اگر فایل پنل موجود باشد\n• پروکسی رایگان برای تلگرام (از v4.0.18)\n• فیکس پینگ 0/16 و مدیریت پنل قبل لاگین");
+        Setting::set('app_update_title', "Connectix v{$latestAppVersion} MULTI-ACCOUNT UNLIMITED 🚀");
+        Setting::set('app_update_changelog', "✅ v{$latestAppVersion} RESELLER SYNC AUTO + PERMISSIONS ALL MENUS + MULTI-ACCOUNT UNLIMITED:\n\n• 🔄 همگام‌سازی خودکار نماینده‌ها بعد هر بروزرسانی + cron هر 6 ساعت\n• 🛡️ سطح دسترسی کامل برای همه منوها (11 منو + 8 قابلیت) با 3 حالت: فعال / غیرفعال / مخفی\n• 📱 چند اکانتی نامحدود: Telegram-like Switcher + حالت یکپارچه Unified با برچسب\n• پشتیبانی multi-service: حساب از پنل‌های مختلف + SecureStorage\n• دکمه سوئیچر در AppBar + مدیریت در چرخ‌دنده → مدیریت حساب‌ها\n• صفحه اول بدون اسکرول + اتصال هوشمند در مرکز (قانون شما)\n• FOREVER CACHE FIX: نسخه واقعی از PackageManager، ?v&t&s&cb&r&_، حذف APK قدیمی، تایید PK\n• قانون دائمی: پنل هرگز APK قدیمی سرو نمیکند");
         Setting::set('app_update_enabled', '1');
         $panelBase = 'https://vpbotn.ir';
         Setting::set('app_download_url', $panelBase . '/Connectix-ARM64-v8a.apk?v=' . $latestAppVersion . '&t=' . time() . '&s=' . rand(1000,9999));
         Setting::set('app_universal_url', $panelBase . '/Connectix-Universal.apk?v=' . $latestAppVersion . '&t=' . time() . '&s=' . rand(1000,9999));
-        logStep("✅ نسخه اپ به {$latestAppVersion} FOREVER FIX آپدیت شد", 'success');
+        logStep("✅ نسخه اپ به {$latestAppVersion} MULTI-ACCOUNT UNLIMITED آپدیت شد", 'success');
         $needsApkDownload = true;
     }
 
