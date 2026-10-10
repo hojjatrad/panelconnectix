@@ -22,7 +22,7 @@
   "apks": {
     "arm64-v8a": {
       "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.49/Connectix-ARM64-v8a.apk",
-      "size": 37800000,
+      "size": 37598074,
       "size_human": "36 MB",
       "abi": "arm64-v8a",
       "recommended": true,
@@ -30,16 +30,16 @@
     },
     "armeabi-v7a": {
       "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.49/Connectix-ARM32-v7a.apk",
-      "size": 38300000,
-      "size_human": "37 MB",
+      "size": 38143629,
+      "size_human": "36 MB",
       "abi": "armeabi-v7a",
       "recommended": false,
       "arch": "arm32"
     },
     "universal": {
       "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.49/Connectix-Universal.apk",
-      "size": 110600000,
-      "size_human": "106 MB",
+      "size": 110464168,
+      "size_human": "105 MB",
       "abi": "universal",
       "recommended": false,
       "arch": "universal"
