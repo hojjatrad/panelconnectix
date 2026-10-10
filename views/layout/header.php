@@ -2,8 +2,35 @@
 require_once __DIR__ . '/../../core/Auth.php';
 require_once __DIR__ . '/../../core/Helpers.php';
 require_once __DIR__ . '/../../core/Database.php';
+require_once __DIR__ . '/../../core/ResellerPermissionManager.php';
 
 $currentUser = Auth::user();
+$resellerPermsCache = null;
+if (Auth::isReseller()) {
+    try { $resellerPermsCache = ResellerPermissionManager::getPermissionsForReseller(Auth::id()); } catch (Throwable $e) { $resellerPermsCache = []; }
+}
+if (!function_exists('resellerPermState')) {
+    function resellerPermState(string $key): array {
+        global $resellerPermsCache;
+        if (!Auth::isReseller()) return ['visible'=>1,'enabled'=>1];
+        if (Auth::id() === 1) return ['visible'=>1,'enabled'=>1];
+        if ($resellerPermsCache === null) return ['visible'=>1,'enabled'=>1];
+        $p = $resellerPermsCache[$key] ?? ['visible'=>1,'enabled'=>1];
+        return ['visible'=> (int)($p['visible']??1), 'enabled'=> (int)($p['enabled']??1)];
+    }
+}
+if (!function_exists('resellerCanSee')) {
+    function resellerCanSee(string $key): bool {
+        $s = resellerPermState($key);
+        return $s['visible'] === 1;
+    }
+}
+if (!function_exists('resellerCanUse')) {
+    function resellerCanUse(string $key): bool {
+        $s = resellerPermState($key);
+        return $s['visible'] === 1 && $s['enabled'] === 1;
+    }
+}
 $theme = $currentUser['theme_color'] ?? 'violet';
 $themeClasses = [
     'violet' => ['primary' => 'bg-purple-600', 'hover' => 'hover:bg-purple-700', 'text' => 'text-purple-400', 'border' => 'border-purple-500'],
@@ -184,18 +211,24 @@ if (!function_exists('isActiveRoute')) {
                     <i id="chevron-main" class="fa-solid fa-chevron-down chevron-icon text-[9px] text-slate-500"></i>
                 </button>
                 <div id="content-main" class="accordion-content space-y-0.5 mt-0.5 pr-2">
-                    <a href="<?= Helpers::url('dashboard') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('dashboard', $currentUri) ? 'bg-purple-600/15 text-purple-300 font-bold border-r-2 border-purple-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
-                        <i class="fa-solid fa-chart-pie w-4 text-center text-purple-400"></i>
-                        <span>داشبورد و آمار</span>
+                    <?php
+                    $mainMenus = [
+                        'dashboard' => ['route'=>'dashboard','icon'=>'fa-chart-pie','color'=>'text-purple-400','label'=>'داشبورد و آمار','key'=>'dashboard'],
+                        'clients' => ['route'=>'clients','icon'=>'fa-users-gear','color'=>'text-cyan-400','label'=>'مدیریت کلاینت‌ها','key'=>'clients'],
+                        'plans' => ['route'=>'plans','icon'=>'fa-box-open','color'=>'text-amber-400','label'=>'پلن‌ها و تعرفه‌ها','key'=>'plans'],
+                    ];
+                    foreach ($mainMenus as $m):
+                        if (!resellerCanSee($m['key'])) continue;
+                        $canUse = resellerCanUse($m['key']);
+                        $active = isActiveRoute($m['route'], $currentUri) ? 'bg-purple-600/15 text-purple-300 font-bold border-r-2 border-purple-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60';
+                        if (!$canUse) $active = 'text-slate-500 bg-slate-800/30 cursor-not-allowed opacity-60';
+                    ?>
+                    <a href="<?= $canUse ? Helpers::url($m['route']) : 'javascript:void(0)' ?>" <?= !$canUse ? 'onclick="return false"' : '' ?> class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= $active ?>">
+                        <i class="fa-solid <?= $m['icon'] ?> w-4 text-center <?= $m['color'] ?>"></i>
+                        <span><?= $m['label'] ?></span>
+                        <?php if (!$canUse): ?><span class="mr-auto text-[8px] bg-slate-700 text-slate-400 px-1 py-0.5 rounded">غیرفعال</span><?php endif; ?>
                     </a>
-                    <a href="<?= Helpers::url('clients') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('clients', $currentUri) ? 'bg-purple-600/15 text-purple-300 font-bold border-r-2 border-purple-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
-                        <i class="fa-solid fa-users-gear w-4 text-center text-cyan-400"></i>
-                        <span>مدیریت کلاینت‌ها</span>
-                    </a>
-                    <a href="<?= Helpers::url('plans') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('plans', $currentUri) ? 'bg-purple-600/15 text-purple-300 font-bold border-r-2 border-purple-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
-                        <i class="fa-solid fa-box-open w-4 text-center text-amber-400"></i>
-                        <span>پلن‌ها و تعرفه‌ها</span>
-                    </a>
+                    <?php endforeach; ?>
                 </div>
             </div>
 
@@ -292,56 +325,39 @@ if (!function_exists('isActiveRoute')) {
                             <span class="mr-auto text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded-full border border-amber-500/30">LOYALTY</span>
                         </a>
                     <?php else: ?>
-                        <a href="<?= Helpers::url('reseller/orders') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('reseller/orders', $currentUri) ? 'bg-indigo-600/15 text-indigo-300 font-bold border-r-2 border-indigo-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
-                            <i class="fa-solid fa-cart-shopping w-4 text-center text-cyan-400"></i>
-                            <span>سفارشات ربات من</span>
+                        <?php
+                        // Reseller permission-aware rendering
+                        $permMenuMap = [
+                            'reseller/orders' => ['key'=>'orders','icon'=>'fa-cart-shopping','color'=>'text-cyan-400','label'=>'سفارشات ربات من'],
+                            'reseller/invoice' => ['key'=>'financial','icon'=>'fa-file-invoice-dollar','color'=>'text-emerald-400','label'=>'صورت‌حساب و فاکتور ماهانه من'],
+                            'reseller/plans' => ['key'=>'plans','icon'=>'fa-tags','color'=>'text-indigo-400','label'=>'تعرفه‌ها و دسته‌های من'],
+                            'reseller/bot' => ['key'=>'bot','icon'=>'fa-telegram','color'=>'text-sky-400','label'=>'ربات اختصاصی من','brand'=>true],
+                            'reseller/banking' => ['key'=>'banking','icon'=>'fa-credit-card','color'=>'text-emerald-400','label'=>'حساب بانکی و درگاه من'],
+                            'reseller/branding' => ['key'=>'branding','icon'=>'fa-palette','color'=>'text-fuchsia-400','label'=>'برندینگ و لوگو من'],
+                            'reseller/sub-resellers' => ['key'=>'sub_resellers','icon'=>'fa-sitemap','color'=>'text-purple-400','label'=>'ساب‌نمایندگان و شبکه فروش'],
+                            'reseller/ai' => ['key'=>'ai','icon'=>'fa-robot','color'=>'text-violet-400','label'=>'دستیار هوشمند (شارژ)'],
+                            'reseller/monitoring' => ['key'=>'monitoring','icon'=>'fa-heart-pulse','color'=>'text-emerald-400','label'=>'مانیتورینگ LIVE','pulse'=>true],
+                            'reseller/financial' => ['key'=>'financial','icon'=>'fa-chart-line','color'=>'text-amber-400','label'=>'گزارش مالی ULTRA'],
+                            'reseller/usage' => ['key'=>'usage','icon'=>'fa-chart-area','color'=>'text-cyan-400','label'=>'مصرف و تاریخچه'],
+                            'reseller/points' => ['key'=>'points','icon'=>'fa-trophy','color'=>'text-amber-400','label'=>'امتیاز و جایزه من','badge'=>'LOYALTY'],
+                        ];
+                        foreach ($permMenuMap as $route => $meta):
+                            $k = $meta['key'];
+                            if (!resellerCanSee($k)) continue;
+                            $canUse = resellerCanUse($k);
+                            $activeClass = isActiveRoute($route, $currentUri) ? 'bg-indigo-600/15 text-indigo-300 font-bold border-r-2 border-indigo-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60';
+                            if (!$canUse) $activeClass = 'text-slate-500 bg-slate-800/30 cursor-not-allowed opacity-60';
+                            $href = $canUse ? Helpers::url($route) : 'javascript:void(0)';
+                            $iconClass = ($meta['brand'] ?? false) ? 'fa-brands' : 'fa-solid';
+                        ?>
+                        <a href="<?= $href ?>" <?= !$canUse ? 'onclick="return false" title="این بخش توسط مدیر غیرفعال شده"' : '' ?> class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= $activeClass ?>">
+                            <i class="<?= $iconClass ?> <?= $meta['icon'] ?> w-4 text-center <?= $meta['color'] ?>"></i>
+                            <span><?= $meta['label'] ?></span>
+                            <?php if (!empty($meta['pulse']) && $canUse): ?><span class="mr-auto w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span><?php endif; ?>
+                            <?php if (!empty($meta['badge'])): ?><span class="mr-auto text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded-full border border-amber-500/30"><?= $meta['badge'] ?></span><?php endif; ?>
+                            <?php if (!$canUse): ?><span class="mr-auto text-[8px] bg-slate-700 text-slate-400 px-1.5 py-0.5 rounded">غیرفعال</span><?php endif; ?>
                         </a>
-                        <a href="<?= Helpers::url('reseller/invoice') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('reseller/invoice', $currentUri) ? 'bg-indigo-600/15 text-indigo-300 font-bold border-r-2 border-indigo-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
-                            <i class="fa-solid fa-file-invoice-dollar w-4 text-center text-emerald-400"></i>
-                            <span>صورت‌حساب و فاکتور ماهانه من</span>
-                        </a>
-                        <a href="<?= Helpers::url('reseller/plans') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('reseller/plans', $currentUri) ? 'bg-indigo-600/15 text-indigo-300 font-bold border-r-2 border-indigo-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
-                            <i class="fa-solid fa-tags w-4 text-center text-indigo-400"></i>
-                            <span>تعرفه‌ها و دسته‌های من</span>
-                        </a>
-                        <a href="<?= Helpers::url('reseller/bot') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('reseller/bot', $currentUri) ? 'bg-indigo-600/15 text-indigo-300 font-bold border-r-2 border-indigo-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
-                            <i class="fa-brands fa-telegram w-4 text-center text-sky-400"></i>
-                            <span>ربات اختصاصی من</span>
-                        </a>
-                        <a href="<?= Helpers::url('reseller/banking') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('reseller/banking', $currentUri) ? 'bg-indigo-600/15 text-indigo-300 font-bold border-r-2 border-indigo-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
-                            <i class="fa-solid fa-credit-card w-4 text-center text-emerald-400"></i>
-                            <span>حساب بانکی و درگاه من</span>
-                        </a>
-                        <a href="<?= Helpers::url('reseller/branding') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('reseller/branding', $currentUri) ? 'bg-indigo-600/15 text-indigo-300 font-bold border-r-2 border-indigo-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
-                            <i class="fa-solid fa-palette w-4 text-center text-fuchsia-400"></i>
-                            <span>برندینگ و لوگو من</span>
-                        </a>
-                        <a href="<?= Helpers::url('reseller/sub-resellers') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('reseller/sub-resellers', $currentUri) ? 'bg-indigo-600/15 text-indigo-300 font-bold border-r-2 border-indigo-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
-                            <i class="fa-solid fa-sitemap w-4 text-center text-purple-400"></i>
-                            <span>ساب‌نمایندگان و شبکه فروش</span>
-                        </a>
-                        <a href="<?= Helpers::url('reseller/ai') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('reseller/ai', $currentUri) ? 'bg-indigo-600/15 text-indigo-300 font-bold border-r-2 border-indigo-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
-                            <i class="fa-solid fa-robot w-4 text-center text-violet-400"></i>
-                            <span>دستیار هوشمند (شارژ)</span>
-                        </a>
-                        <a href="<?= Helpers::url('reseller/monitoring') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('reseller/monitoring', $currentUri) ? 'bg-emerald-600/15 text-emerald-300 font-bold border-r-2 border-emerald-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
-                            <i class="fa-solid fa-heart-pulse w-4 text-center text-emerald-400"></i>
-                            <span>مانیتورینگ LIVE</span>
-                            <span class="mr-auto w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span>
-                        </a>
-                        <a href="<?= Helpers::url('reseller/financial') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('reseller/financial', $currentUri) ? 'bg-amber-600/15 text-amber-300 font-bold border-r-2 border-amber-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
-                            <i class="fa-solid fa-chart-line w-4 text-center text-amber-400"></i>
-                            <span>گزارش مالی ULTRA</span>
-                        </a>
-                        <a href="<?= Helpers::url('reseller/usage') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('reseller/usage', $currentUri) ? 'bg-cyan-600/15 text-cyan-300 font-bold border-r-2 border-cyan-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
-                            <i class="fa-solid fa-chart-area w-4 text-center text-cyan-400"></i>
-                            <span>مصرف و تاریخچه</span>
-                        </a>
-                        <a href="<?= Helpers::url('reseller/points') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('reseller/points', $currentUri) ? 'bg-amber-600/15 text-amber-300 font-bold border-r-2 border-amber-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
-                            <i class="fa-solid fa-trophy w-4 text-center text-amber-400"></i>
-                            <span>امتیاز و جایزه من</span>
-                            <span class="mr-auto text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded-full border border-amber-500/30">LOYALTY</span>
-                        </a>
+                        <?php endforeach; ?>
                     <?php endif; ?>
                 </div>
             </div>
@@ -396,30 +412,35 @@ if (!function_exists('isActiveRoute')) {
                     </div>
                 </button>
                 <div id="content-finance" class="accordion-content space-y-0.5 mt-0.5 pr-2">
-                    <a href="<?= Helpers::url('billing') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('billing', $currentUri) ? 'bg-emerald-600/15 text-emerald-300 font-bold border-r-2 border-emerald-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
-                        <i class="fa-solid fa-credit-card w-4 text-center text-emerald-400"></i>
-                        <span>کیف پول و تراکنش‌ها</span>
-                    </a>
-                    <a href="<?= Helpers::url('financial') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('financial', $currentUri) ? 'bg-emerald-600/15 text-emerald-300 font-bold border-r-2 border-emerald-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
-                        <i class="fa-solid fa-chart-pie w-4 text-center text-violet-400"></i>
-                        <span>گزارش مالی پیشرفته</span>
-                        <span class="mr-auto text-[9px] bg-violet-500/20 text-violet-300 px-1.5 py-0.5 rounded-full border border-violet-500/30">ULTRA</span>
-                    </a>
-                    <?php if (Auth::isAdmin()): ?>
-                    <a href="<?= Helpers::url('settings/bank-verification') ?>" class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition <?= isActiveRoute('bank-verification', $currentUri) ? 'bg-emerald-600/15 text-emerald-300 font-bold border-r-2 border-emerald-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
-                        <i class="fa-solid fa-building-columns w-4 text-center text-emerald-400"></i>
-                        <span>تایید خودکار بانکی 🤖</span>
-                    </a>
-                    <?php endif; ?>
-                    <a href="<?= Helpers::url('tickets') ?>" class="flex items-center justify-between px-3 py-1.5 rounded-lg transition <?= isActiveRoute('tickets', $currentUri) ? 'bg-emerald-600/15 text-emerald-300 font-bold border-r-2 border-emerald-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' ?>">
+                    <?php
+                    $financeMenus = [
+                        ['route'=>'billing','icon'=>'fa-credit-card','color'=>'text-emerald-400','label'=>'کیف پول و تراکنش‌ها','key'=>'banking','adminOnly'=>false],
+                        ['route'=>'financial','icon'=>'fa-chart-pie','color'=>'text-violet-400','label'=>'گزارش مالی پیشرفته','key'=>'financial','badge'=>'ULTRA','adminOnly'=>false],
+                        ['route'=>'settings/bank-verification','icon'=>'fa-building-columns','color'=>'text-emerald-400','label'=>'تایید خودکار بانکی 🤖','key'=>null,'adminOnly'=>true],
+                        ['route'=>'tickets','icon'=>'fa-headset','color'=>'text-rose-400','label'=>'تیکت‌ها و پشتیبانی','key'=>null,'adminOnly'=>false],
+                    ];
+                    foreach ($financeMenus as $fm):
+                        if ($fm['adminOnly'] && !Auth::isAdmin()) continue;
+                        if ($fm['key'] && !resellerCanSee($fm['key'])) continue;
+                        $canUse = $fm['key'] ? resellerCanUse($fm['key']) : true;
+                        $active = isActiveRoute($fm['route'], $currentUri) ? 'bg-emerald-600/15 text-emerald-300 font-bold border-r-2 border-emerald-500' : 'text-slate-400 hover:text-white hover:bg-slate-800/60';
+                        if (!$canUse) $active = 'text-slate-500 bg-slate-800/30 cursor-not-allowed opacity-60';
+                    ?>
+                    <a href="<?= $canUse ? Helpers::url($fm['route']) : 'javascript:void(0)' ?>" <?= !$canUse ? 'onclick="return false"' : '' ?> class="flex items-center <?= isset($fm['route']) && $fm['route']=='tickets' ? 'justify-between' : 'gap-2.5' ?> px-3 py-1.5 rounded-lg transition <?= $active ?>">
+                        <?php if ($fm['route']=='tickets'): ?>
                         <span class="flex items-center gap-2.5">
-                            <i class="fa-solid fa-headset w-4 text-center text-rose-400"></i>
-                            <span>تیکت‌ها و پشتیبانی</span>
+                            <i class="fa-solid <?= $fm['icon'] ?> w-4 text-center <?= $fm['color'] ?>"></i>
+                            <span><?= $fm['label'] ?></span>
                         </span>
-                        <?php if ($headerOpenTickets > 0): ?>
-                            <span class="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-rose-500 text-white font-mono"><?= $headerOpenTickets ?></span>
+                        <?php if ($headerOpenTickets > 0): ?><span class="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-rose-500 text-white font-mono"><?= $headerOpenTickets ?></span><?php endif; ?>
+                        <?php else: ?>
+                            <i class="fa-solid <?= $fm['icon'] ?> w-4 text-center <?= $fm['color'] ?>"></i>
+                            <span><?= $fm['label'] ?></span>
+                            <?php if (!empty($fm['badge'])): ?><span class="mr-auto text-[9px] bg-violet-500/20 text-violet-300 px-1.5 py-0.5 rounded-full border border-violet-500/30"><?= $fm['badge'] ?></span><?php endif; ?>
                         <?php endif; ?>
+                        <?php if (!$canUse): ?><span class="mr-auto text-[8px] bg-slate-700 text-slate-400 px-1 py-0.5 rounded">غیرفعال</span><?php endif; ?>
                     </a>
+                    <?php endforeach; ?>
                 </div>
             </div>
 
@@ -716,30 +737,47 @@ if (!function_exists('isActiveRoute')) {
 
     // PWA Service Worker registration v4.0.46 ULTRA - FIXED: No more Ctrl+F5 needed + dashboard click bug
     if ('serviceWorker' in navigator) {
-        // v4.0.30 FIX: Force unregister old SW v4.0.46 that causes dashboard click to show old banner
+        // v4.0.48 FIX: Service Worker infinite loop - old code hardcoded v4.0.46 caused rapid refresh on v4.0.47+
         (async () => {
             try {
+                const currentVer = '<?= $assetVer ?? Updater::CURRENT_VERSION ?? "4.0.48" ?>';
+                const currentVerDash = currentVer.replace(/\./g, '-');
                 const regs = await navigator.serviceWorker.getRegistrations();
                 for (const reg of regs) {
                     const url = reg.active?.scriptURL || reg.installing?.scriptURL || '';
-                    // If old SW without version or with old cache name, unregister
                     if (url.includes('sw.js')) {
-                        const isOld = !url.includes('v4.0.46') && !url.includes('v=4.0.46') && !url.includes('v=4.0.46');
-                        // Also check cache names
+                        const urlMatch = url.match(/v=([\d\.]+)/);
+                        const urlVer = urlMatch ? urlMatch[1] : '';
+                        let isOld = false;
+                        if (urlVer && currentVer) {
+                            const parseVer = (v) => v.split('.').map(n => parseInt(n)||0);
+                            const curParts = parseVer(currentVer);
+                            const urlParts = parseVer(urlVer);
+                            for (let i=0; i<3; i++) {
+                                const c = curParts[i]||0, u = urlParts[i]||0;
+                                if (u < c) { isOld = true; break; }
+                                if (u > c) break;
+                            }
+                        }
                         const cacheNames = await caches.keys();
-                        const hasOldCache = cacheNames.some(n => n.includes('v4-0-46') || n.includes('v4.0.46'));
-                        if (isOld || hasOldCache) {
-                            console.log('Found old SW/cache, unregistering...', url, cacheNames);
-                            // Delete all old caches
+                        const hasVeryOldCache = cacheNames.some(n => {
+                            return (n.includes('v4-0-4') && !n.includes(currentVerDash) && !n.includes('v4-0-46') && !n.includes('v4-0-47') && !n.includes('v4-0-48'));
+                        });
+                        if (isOld || hasVeryOldCache) {
+                            console.log('Old SW found, cleaning...', urlVer, currentVer);
                             for (const name of cacheNames) {
-                                if (name.includes('v4-0-46') || name.includes('v4.0.46') || name !== 'connectix-ultra-v4-0-46' && name !== 'connectix-static-v4-0-46') {
-                                    await caches.delete(name);
-                                    console.log('Deleted old cache:', name);
+                                if (name.includes('v4-0-4') && !name.includes(currentVerDash)) {
+                                    const nameMatch = name.match(/v4-0-(\d+)/);
+                                    if (nameMatch) {
+                                        const nameMinor = parseInt(nameMatch[1]);
+                                        const curMinor = parseInt(currentVerDash.split('-').pop()||'48');
+                                        if (nameMinor < curMinor) {
+                                            await caches.delete(name);
+                                        }
+                                    }
                                 }
                             }
                             await reg.unregister();
-                            console.log('Unregistered old SW, reloading...');
-                            // Force reload without cache
                             window.location.reload(true);
                             return;
                         }
@@ -748,23 +786,17 @@ if (!function_exists('isActiveRoute')) {
             } catch (e) {
                 console.log('SW cleanup error:', e);
             }
-            
-            // Register new SW
-            const swUrl = '<?= $base ?>/sw.js?v=<?= $assetVer ?? Updater::CURRENT_VERSION ?? "4.0.46" ?>';
+            const swUrl = '<?= $base ?>/sw.js?v=<?= $assetVer ?? Updater::CURRENT_VERSION ?? "4.0.48" ?>';
             const reg = await navigator.serviceWorker.register(swUrl);
-            console.log('PWA SW registered v4.0.46');
-            
-            // Check for updates every 2 minutes (more frequent)
+            console.log('PWA SW registered', '<?= $assetVer ?? Updater::CURRENT_VERSION ?? "4.0.48" ?>');
             setInterval(() => {
                 reg.update().then(() => console.log('SW update checked'));
-            }, 2*60*1000);
-            
-            // If new SW found, auto-reload
+            }, 5*60*1000);
             reg.addEventListener('updatefound', () => {
                 const newWorker = reg.installing;
                 newWorker.addEventListener('statechange', () => {
                     if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                        console.log('New SW available, reloading...');
+                        console.log('New SW available');
                         if (confirm('نسخه جدید پنل موجود است. بروزرسانی شود؟')) {
                             window.location.reload();
                         }
@@ -773,9 +805,14 @@ if (!function_exists('isActiveRoute')) {
             });
         })();
         
-        // Force reload if SW controller changes
+        let hasReloadedForSW = sessionStorage.getItem('sw_reloaded') === '1';
         navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (hasReloadedForSW) {
+                console.log('SW controller changed but already reloaded, skipping');
+                return;
+            }
             console.log('SW controller changed, reloading...');
+            sessionStorage.setItem('sw_reloaded', '1');
             window.location.reload();
         });
         

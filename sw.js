@@ -1,6 +1,6 @@
-// Service Worker for Connectix PWA ULTRA v7.3.0 - FIXED: No more Ctrl+F5 needed
-const CACHE_NAME = 'connectix-ultra-v7-3-0';
-const STATIC_CACHE = 'connectix-static-v7-3-0';
+// Service Worker for Connectix PWA ULTRA v4.0.48 - FIXED: No infinite reload loop
+const CACHE_NAME = 'connectix-ultra-v4-0-48';
+const STATIC_CACHE = 'connectix-static-v4-0-48';
 const urlsToCache = [
   '/assets/css/fontawesome.min.css',
   '/assets/css/vazirmatn.css',
