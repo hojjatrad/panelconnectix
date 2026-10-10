@@ -143,6 +143,9 @@ $pendingCount = $pendingAppsCount ?? 0;
                         </td>
                         <td class="p-3.5 text-center whitespace-nowrap">
                             <div class="flex items-center justify-center gap-1.5">
+                                <a href="<?= Helpers::url('resellers/permissions?reseller_id=' . $r['id']) ?>" class="w-8 h-8 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 transition flex items-center justify-center text-xs" title="سطح دسترسی و منوها (Permissions)">
+                                    <i class="fa-solid fa-user-shield"></i>
+                                </a>
                                 <button onclick="openAdjustModal(<?= $r['id'] ?>, '<?= htmlspecialchars($r['username']) ?>')" class="w-8 h-8 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition flex items-center justify-center text-xs" title="شارژ یا کسر موجودی کیف پول">
                                     <i class="fa-solid fa-wallet"></i>
                                 </button>

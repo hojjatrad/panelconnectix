@@ -687,6 +687,76 @@ class Database {
                 )");
             } catch (Throwable $e) {}
 
+            // v4.0.47 NEW: Reseller Permissions System
+            try {
+                $pdo->exec("CREATE TABLE IF NOT EXISTS reseller_permissions (
+                    id $autoInc,
+                    reseller_id INT NOT NULL,
+                    permission_key VARCHAR(100) NOT NULL,
+                    is_visible TINYINT(1) DEFAULT 1,
+                    is_enabled TINYINT(1) DEFAULT 1,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(reseller_id, permission_key),
+                    INDEX idx_reseller_perm_reseller (reseller_id),
+                    INDEX idx_reseller_perm_key (permission_key)
+                )");
+            } catch (Throwable $e) {
+                // MySQL fallback without IF NOT EXISTS for indexes
+                try {
+                    $pdo->exec("CREATE TABLE IF NOT EXISTS reseller_permissions (
+                        id $autoInc,
+                        reseller_id INT NOT NULL,
+                        permission_key VARCHAR(100) NOT NULL,
+                        is_visible TINYINT(1) DEFAULT 1,
+                        is_enabled TINYINT(1) DEFAULT 1,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                    )");
+                    $pdo->exec("CREATE UNIQUE INDEX unique_reseller_perm ON reseller_permissions(reseller_id, permission_key)");
+                } catch (Throwable $e2) {}
+            }
+
+            try {
+                $pdo->exec("CREATE TABLE IF NOT EXISTS permission_templates (
+                    id $autoInc,
+                    name VARCHAR(100) NOT NULL,
+                    description TEXT NULL,
+                    permissions_json TEXT NOT NULL,
+                    is_default TINYINT(1) DEFAULT 0,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )");
+            } catch (Throwable $e) {}
+
+            // v4.0.47 NEW: Reseller Sync Tracking
+            try {
+                $pdo->exec("CREATE TABLE IF NOT EXISTS reseller_sync_log (
+                    id $autoInc,
+                    reseller_id INT NOT NULL,
+                    from_version VARCHAR(20) NULL,
+                    to_version VARCHAR(20) NOT NULL,
+                    synced_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    status VARCHAR(32) DEFAULT 'success',
+                    details TEXT NULL,
+                    INDEX idx_sync_reseller (reseller_id),
+                    INDEX idx_sync_version (to_version)
+                )");
+            } catch (Throwable $e) {}
+
+            // v4.0.47 NEW: Client multi-account tracking (panel side log)
+            try {
+                $pdo->exec("CREATE TABLE IF NOT EXISTS client_account_links (
+                    id $autoInc,
+                    primary_client_id INT NOT NULL,
+                    linked_client_id INT NOT NULL,
+                    link_type VARCHAR(32) DEFAULT 'secondary',
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(primary_client_id, linked_client_id),
+                    INDEX idx_link_primary (primary_client_id),
+                    INDEX idx_link_linked (linked_client_id)
+                )");
+            } catch (Throwable $e) {}
+
 
             $planCols = [
                 'show_in_bot' => 'TINYINT(1) DEFAULT 1',

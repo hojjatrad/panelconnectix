@@ -10,6 +10,7 @@ import 'models/server_model.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/login_screen.dart';
 import 'services/api_service.dart';
+import 'services/account_manager.dart';
 import 'services/v2ray_compat.dart';
 
 // ---------------- Global crash capture ----------------
@@ -534,9 +535,46 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   void _checkSavedSessionAndNavigate() async {
-    // v4.0.23 FIX: Prevent white screen hang - add timeout and try-catch, always navigate
+    // v4.0.47 MULTI-ACCOUNT: Check active account first
     try {
       await Future.delayed(const Duration(milliseconds: 350));
+      // Load actual version for footer law 7
+      try { await DashboardScreen.loadActualInstalledVersion(); } catch (_) {}
+      
+      final activeAccount = await AccountManager.getActiveAccount().timeout(const Duration(seconds: 2), onTimeout: () => null);
+      if (activeAccount != null) {
+        // Set baseUrl to active account's panel
+        ApiService.baseUrl = activeAccount.panelUrl;
+        ApiService.baseUrls = [activeAccount.panelUrl, ...ApiService.baseUrls.where((u) => u != activeAccount.panelUrl)];
+        final token = await AccountManager.getAccountToken(activeAccount.id);
+        final clientJson = await AccountManager.getAccountClient(activeAccount.id);
+        final serversCache = await AccountManager.getAccountServerCache(activeAccount.id);
+        if (clientJson != null && token != null) {
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('auth_token', token);
+            await prefs.setString('cached_client', serversCache.isNotEmpty ? '' : ''); // will be overwritten
+            // Try quick profile refresh, but use cache for instant
+            final session = await ApiService.checkSavedSession().timeout(const Duration(seconds: 3), onTimeout: () => null);
+            if (session != null) {
+              if (!mounted) return;
+              Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => DashboardScreen(client: session['client'], branding: session['branding'], initialServers: session['servers'] is List<ServerModel> && (session['servers'] as List<ServerModel>).isNotEmpty ? (session['servers'] as List<ServerModel>) : null)));
+              return;
+            }
+            // Fallback to cached client
+            final client = ClientModel.fromJson(clientJson);
+            final branding = BrandingModel.fromJson({});
+            List<ServerModel> servers = [];
+            if (serversCache.isNotEmpty) {
+              servers = serversCache.map((e) => ServerModel.fromJson(Map<String, dynamic>.from(e))).toList();
+            }
+            if (!mounted) return;
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => DashboardScreen(client: client, branding: branding, initialServers: servers)));
+            return;
+          } catch (_) {}
+        }
+      }
+      
       final session = await ApiService.checkSavedSession().timeout(const Duration(seconds: 5), onTimeout: () => null);
       if (!mounted) return;
       if (session != null) {
@@ -561,7 +599,6 @@ class _SplashScreenState extends State<SplashScreen> {
     } catch (e, st) {
       try { _captureCrash('SplashError', e, st); } catch (_) {}
       if (!mounted) return;
-      // Fallback to login on any error to avoid white screen
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const LoginScreen()),

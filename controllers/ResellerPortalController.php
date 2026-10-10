@@ -6,6 +6,7 @@ require_once __DIR__ . '/../core/Setting.php';
 require_once __DIR__ . '/../core/TelegramBot.php';
 require_once __DIR__ . '/../core/Provisioner.php';
 require_once __DIR__ . '/TelegramBotController.php';
+require_once __DIR__ . '/../core/ResellerPermissionManager.php';
 
 class ResellerPortalController {
 
@@ -14,11 +15,25 @@ class ResellerPortalController {
         return (int)Auth::id();
     }
 
+    private static function checkPermission(string $key): void {
+        $userId = (int)Auth::id();
+        if ($userId === 1) return;
+        if (!ResellerPermissionManager::canUse($userId, $key)) {
+            if (!ResellerPermissionManager::canSee($userId, $key)) {
+                Helpers::flash('error', '⛔ دسترسی به این بخش ندارید. این منو توسط مدیر مخفی شده است.');
+            } else {
+                Helpers::flash('error', '⛔ این بخش توسط مدیر غیرفعال شده است.');
+            }
+            Helpers::redirect('dashboard');
+        }
+    }
+
     /**
      * Reseller Bot Settings
      */
     public function bot(): void {
         $userId = self::checkResellerAccess();
+        self::checkPermission('bot');
         $pdo = Database::getConnection();
 
         $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
@@ -41,6 +56,7 @@ class ResellerPortalController {
      */
     public function saveBot(): void {
         $userId = self::checkResellerAccess();
+        self::checkPermission('bot');
         if (!Helpers::verifyCsrf()) {
             Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
             Helpers::redirect('reseller/bot');
@@ -87,6 +103,7 @@ class ResellerPortalController {
      */
     public function banking(): void {
         $userId = self::checkResellerAccess();
+        self::checkPermission('banking');
         $pdo = Database::getConnection();
 
         $stmt = $pdo->prepare("SELECT card_number, card_holder, card_shaba, zarinpal_merchant FROM users WHERE id = ?");
@@ -101,6 +118,7 @@ class ResellerPortalController {
      */
     public function saveBanking(): void {
         $userId = self::checkResellerAccess();
+        self::checkPermission('banking');
         if (!Helpers::verifyCsrf()) {
             Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
             Helpers::redirect('reseller/banking');
@@ -124,6 +142,7 @@ class ResellerPortalController {
      */
     public function branding(): void {
         $userId = self::checkResellerAccess();
+        self::checkPermission('branding');
         $pdo = Database::getConnection();
 
         $stmt = $pdo->prepare("SELECT brand_name, logo_url, theme_color, support_username, welcome_message, custom_domain FROM users WHERE id = ?");
@@ -138,6 +157,7 @@ class ResellerPortalController {
      */
     public function saveBranding(): void {
         $userId = self::checkResellerAccess();
+        self::checkPermission('branding');
         if (!Helpers::verifyCsrf()) {
             Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
             Helpers::redirect('reseller/branding');
@@ -164,6 +184,7 @@ class ResellerPortalController {
      */
     public function plans(): void {
         $userId = self::checkResellerAccess();
+        self::checkPermission('plans');
         $pdo = Database::getConnection();
 
         // Ensure extended columns exist
@@ -234,6 +255,7 @@ class ResellerPortalController {
      */
     public function savePlans(): void {
         $userId = self::checkResellerAccess();
+        self::checkPermission('plans');
         if (!Helpers::verifyCsrf()) {
             Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
             Helpers::redirect('reseller/plans');
@@ -285,6 +307,7 @@ class ResellerPortalController {
      */
     public function createCustomPlan(): void {
         $userId = self::checkResellerAccess();
+        self::checkPermission('plans');
         if (!Helpers::verifyCsrf()) {
             Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
             Helpers::redirect('reseller/plans');
@@ -354,6 +377,7 @@ class ResellerPortalController {
      */
     public function updateCustomPlan(): void {
         $userId = self::checkResellerAccess();
+        self::checkPermission('plans');
         if (!Helpers::verifyCsrf()) {
             Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
             Helpers::redirect('reseller/plans');
@@ -391,6 +415,7 @@ class ResellerPortalController {
      */
     public function deleteCustomPlan(): void {
         $userId = self::checkResellerAccess();
+        self::checkPermission('plans');
         if (!Helpers::verifyCsrf()) {
             Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
             Helpers::redirect('reseller/plans');
@@ -411,6 +436,7 @@ class ResellerPortalController {
      */
     public function orders(): void {
         $userId = self::checkResellerAccess();
+        self::checkPermission('orders');
         $pdo = Database::getConnection();
 
         $status = $_GET['status'] ?? 'all';
@@ -451,6 +477,7 @@ class ResellerPortalController {
      */
     public function approveOrder(): void {
         $userId = self::checkResellerAccess();
+        self::checkPermission('orders');
         if (!Helpers::verifyCsrf()) {
             Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
             Helpers::redirect('reseller/orders');
@@ -484,6 +511,7 @@ class ResellerPortalController {
      */
     public function rejectOrder(): void {
         $userId = self::checkResellerAccess();
+        self::checkPermission('orders');
         if (!Helpers::verifyCsrf()) {
             Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
             Helpers::redirect('reseller/orders');
@@ -510,6 +538,7 @@ class ResellerPortalController {
      */
     public function subResellers(): void {
         $userId = self::checkResellerAccess();
+        self::checkPermission('sub_resellers');
         $pdo = Database::getConnection();
 
         $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
@@ -530,6 +559,7 @@ class ResellerPortalController {
 
     public function storeSubReseller(): void {
         $userId = self::checkResellerAccess();
+        self::checkPermission('sub_resellers');
         if (!Helpers::verifyCsrf()) {
             Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
             Helpers::redirect('reseller/sub-resellers');
@@ -591,6 +621,7 @@ class ResellerPortalController {
 
     public function transferCredit(): void {
         $userId = self::checkResellerAccess();
+        self::checkPermission('sub_resellers');
         if (!Helpers::verifyCsrf()) {
             Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
             Helpers::redirect('reseller/sub-resellers');
@@ -648,6 +679,7 @@ class ResellerPortalController {
      */
     public function ai(): void {
         $userId = self::checkResellerAccess();
+        self::checkPermission('ai');
         $pdo = Database::getConnection();
         require_once __DIR__ . '/../core/AiService.php';
 
@@ -725,6 +757,7 @@ class ResellerPortalController {
      */
     public function aiRequest(): void {
         $userId = self::checkResellerAccess();
+        self::checkPermission('ai');
         if (Auth::isAdmin()) {
             Helpers::redirect('settings/ai/resellers');
         }
@@ -765,6 +798,7 @@ class ResellerPortalController {
      */
     public function invoice(): void {
         $resellerId = self::checkResellerAccess();
+        self::checkPermission('financial');
         $pdo = Database::getConnection();
 
         $month = trim($_GET['month'] ?? date('Y-m'));
@@ -861,6 +895,7 @@ class ResellerPortalController {
      */
     public function monitoring(): void {
         $resellerId = self::checkResellerAccess();
+        self::checkPermission('monitoring');
         $pdo = Database::getConnection();
         try {
             require_once __DIR__ . '/../core/ServerMonitor.php';
@@ -887,6 +922,7 @@ class ResellerPortalController {
      */
     public function financial(): void {
         $resellerId = self::checkResellerAccess();
+        self::checkPermission('financial');
         $pdo = Database::getConnection();
         $stmt = $pdo->prepare("SELECT * FROM users WHERE id=?");
         $stmt->execute([$resellerId]);
@@ -918,6 +954,7 @@ class ResellerPortalController {
      */
     public function usage(): void {
         $resellerId = self::checkResellerAccess();
+        self::checkPermission('usage');
         $pdo = Database::getConnection();
         try {
             $stmt = $pdo->prepare("SELECT c.username, c.traffic_used_bytes, c.traffic_limit_bytes, c.expire_at, c.status, s.name as server_name, p.title as plan_title FROM clients c LEFT JOIN server_nodes s ON s.id=c.server_id LEFT JOIN plans p ON p.id=c.plan_id WHERE c.reseller_id=? ORDER BY c.traffic_used_bytes DESC LIMIT 50");
@@ -939,6 +976,7 @@ class ResellerPortalController {
      */
     public function exportInvoiceCsv(): void {
         $resellerId = self::checkResellerAccess();
+        self::checkPermission('financial');
         $pdo = Database::getConnection();
 
         $month = trim($_GET['month'] ?? date('Y-m'));

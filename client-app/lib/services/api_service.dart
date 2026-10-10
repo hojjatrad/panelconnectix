@@ -9,6 +9,8 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/client_model.dart';
 import '../models/server_model.dart';
+import '../models/account_model.dart';
+import 'account_manager.dart';
 
 class ApiService {
   // v8.0 PRO MAX: Intelligent Panel Location Resolver
@@ -744,19 +746,24 @@ class ApiService {
   static Future<Map<String, dynamic>> _handleLoginSuccess(Map<String, dynamic> data, String currentBase, String username, String password) async {
     await _saveWorkingUrl(currentBase);
     final prefs = await SharedPreferences.getInstance();
+    final token = data['data']['auth_token'] ?? '';
     await prefs.setBool('is_logged_in', true);
-    await prefs.setString('auth_token', data['data']['auth_token'] ?? '');
+    await prefs.setString('auth_token', token);
     await prefs.setString('saved_username', username);
     await prefs.setString('saved_password', password);
 
+    Map<String, dynamic> clientMap = {};
+    Map<String, dynamic> brandingMap = {};
     if (data['data']['client'] != null) {
-      await prefs.setString('cached_client', jsonEncode(data['data']['client']));
-      if (data['data']['client']['sub_url'] != null) {
-        await prefs.setString('sub_url', data['data']['client']['sub_url'].toString());
+      clientMap = Map<String, dynamic>.from(data['data']['client']);
+      await prefs.setString('cached_client', jsonEncode(clientMap));
+      if (clientMap['sub_url'] != null) {
+        await prefs.setString('sub_url', clientMap['sub_url'].toString());
       }
     }
     if (data['data']['branding'] != null) {
-      await prefs.setString('cached_branding', jsonEncode(data['data']['branding']));
+      brandingMap = Map<String, dynamic>.from(data['data']['branding']);
+      await prefs.setString('cached_branding', jsonEncode(brandingMap));
     }
 
     List<ServerModel> initialServers = [];
@@ -775,6 +782,26 @@ class ApiService {
       await saveCachedServers(initialServers);
     }
 
+    // v4.0.47 MULTI-ACCOUNT: save to account manager
+    try {
+      final account = await AccountManager.addOrUpdateAccount(
+        username: username,
+        password: password,
+        panelUrl: currentBase,
+        serverCount: initialServers.length,
+        planTitle: clientMap['plan_title']?.toString() ?? clientMap['plan']?.toString() ?? '',
+        displayName: clientMap['customer_name']?.toString() ?? '',
+      );
+      await AccountManager.saveAccountToken(account.id, token);
+      if (clientMap.isNotEmpty) await AccountManager.saveAccountClient(account.id, clientMap);
+      if (brandingMap.isNotEmpty) await AccountManager.saveAccountBranding(account.id, brandingMap);
+      if (initialServers.isNotEmpty) {
+        await AccountManager.saveAccountServerCache(account.id, initialServers.map((s) => s.toJson()).toList());
+      }
+    } catch (e) {
+      log('account manager save error: $e');
+    }
+
     log('login SUCCESS via $currentBase');
     return {
       'success': true,
@@ -782,6 +809,90 @@ class ApiService {
       'branding': BrandingModel.fromJson(data['data']['branding']),
       'servers': initialServers,
     };
+  }
+
+  // v4.0.47 MULTI-ACCOUNT: Switch active account
+  static Future<Map<String, dynamic>?> switchToAccount(VpnAccount account) async {
+    try {
+      final password = await AccountManager.getPassword(account.id);
+      final token = await AccountManager.getAccountToken(account.id);
+      final prefs = await SharedPreferences.getInstance();
+      
+      // Set baseUrl to account's panelUrl
+      baseUrl = account.panelUrl;
+      baseUrls = [account.panelUrl, ...baseUrls.where((u) => u != account.panelUrl)];
+      await prefs.setString('api_base_url_working', account.panelUrl);
+      await prefs.setString('api_base_url', account.panelUrl);
+      await prefs.setString('saved_username', account.username);
+      if (password.isNotEmpty) await prefs.setString('saved_password', password);
+      if (token != null && token.isNotEmpty) await prefs.setString('auth_token', token);
+      await AccountManager.setActiveAccount(account.id);
+      
+      // Load cached client/branding for instant UI
+      final clientJson = await AccountManager.getAccountClient(account.id);
+      final cachedServersList = await AccountManager.getAccountServerCache(account.id);
+      List<ServerModel> cachedServers = [];
+      if (cachedServersList.isNotEmpty) {
+        cachedServers = cachedServersList.map((e) => ServerModel.fromJson(Map<String, dynamic>.from(e))).toList();
+        await saveCachedServers(cachedServers);
+        await prefs.setString('cached_servers', jsonEncode(cachedServersList));
+      }
+      if (clientJson != null) {
+        await prefs.setString('cached_client', jsonEncode(clientJson));
+      }
+      final brandingJson = await prefs.getString('cached_branding'); // will be overwritten by profile fetch
+      // Try to refresh profile with current token
+      final profile = await getProfile();
+      if (profile != null) {
+        return {
+          'client': profile,
+          'servers': cachedServers.isNotEmpty ? cachedServers : await getCachedServers(),
+          'account': account,
+        };
+      }
+      // If token invalid, try login with password
+      if (password.isNotEmpty) {
+        final loginRes = await login(account.username, password);
+        if (loginRes['success'] == true) {
+          return loginRes;
+        }
+      }
+      // Fallback to cached
+      if (clientJson != null) {
+        return {
+          'client': ClientModel.fromJson(clientJson),
+          'servers': cachedServers,
+          'account': account,
+        };
+      }
+      return null;
+    } catch (e) {
+      log('switchToAccount error: $e');
+      return null;
+    }
+  }
+
+  // v4.0.47 MULTI-ACCOUNT: Get all servers from all accounts (unified mode)
+  static Future<List<AccountServerEntry>> getAllAccountsServers() async {
+    final accounts = await AccountManager.getAccounts();
+    final List<AccountServerEntry> result = [];
+    for (final acc in accounts) {
+      final cache = await AccountManager.getAccountServerCache(acc.id);
+      for (final sJson in cache) {
+        try {
+          final server = ServerModel.fromJson(Map<String, dynamic>.from(sJson));
+          if (server.isInfoBanner || server.configUri.isEmpty) continue;
+          result.add(AccountServerEntry(
+            accountId: acc.id,
+            accountName: acc.effectiveName,
+            accountColor: acc.colorHex,
+            accountAvatar: acc.avatarEmoji,
+            server: server,
+          ));
+        } catch (_) {}
+      }
+    }
+    return result;
   }
 
   /**

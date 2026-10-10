@@ -109,6 +109,55 @@ require __DIR__ . '/../layout/header.php';
                 </div>
             <?php endif; ?>
 
+            <!-- Reseller Sync Status v4.0.47 -->
+            <?php
+            try {
+                require_once __DIR__ . '/../../core/ResellerSyncManager.php';
+                $syncInfo = ResellerSyncManager::getLastSyncInfo();
+                $syncLogs = ResellerSyncManager::getSyncLogs(5);
+            } catch (Throwable $e) { $syncInfo = null; $syncLogs = []; }
+            if ($syncInfo !== null):
+            ?>
+            <div class="bg-slate-950/60 border border-indigo-800/40 rounded-2xl p-4 space-y-3">
+                <div class="flex items-center justify-between">
+                    <h4 class="text-xs font-bold text-white flex items-center gap-2"><i class="fa-solid fa-users-gear text-indigo-400"></i> همگام‌سازی نماینده‌ها</h4>
+                    <span class="text-[10px] px-2 py-1 rounded-full <?= $syncInfo['needs_sync'] ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' ?>">
+                        <?= $syncInfo['needs_sync'] ? 'نیاز به همگام‌سازی' : 'همگام' ?> (<?= $syncInfo['synced_resellers'] ?>/<?= $syncInfo['total_resellers'] ?>)
+                    </span>
+                </div>
+                <div class="grid grid-cols-3 gap-2 text-[11px]">
+                    <div class="bg-slate-900 rounded-xl p-2.5 border border-slate-800">
+                        <div class="text-slate-400">آخرین نسخه همگام</div>
+                        <div class="font-mono font-bold text-white">v<?= htmlspecialchars($syncInfo['version']) ?></div>
+                    </div>
+                    <div class="bg-slate-900 rounded-xl p-2.5 border border-slate-800">
+                        <div class="text-slate-400">زمان آخرین Sync</div>
+                        <div class="font-bold text-white"><?= htmlspecialchars($syncInfo['time_human']) ?></div>
+                    </div>
+                    <div class="bg-slate-900 rounded-xl p-2.5 border border-slate-800">
+                        <div class="text-slate-400">نمایندگان</div>
+                        <div class="font-bold text-indigo-300"><?= $syncInfo['total_resellers'] ?> نماینده</div>
+                    </div>
+                </div>
+                <?php if (!empty($syncLogs)): ?>
+                <div class="text-[11px] space-y-1 max-h-28 overflow-y-auto">
+                    <?php foreach ($syncLogs as $log): ?>
+                        <div class="flex items-center justify-between bg-slate-900/50 rounded-lg px-2.5 py-1.5 border border-slate-800/50">
+                            <span class="text-slate-300"><?= htmlspecialchars($log['username'] ?? 'ID '.$log['reseller_id']) ?> → <?= htmlspecialchars($log['to_version']) ?></span>
+                            <span class="<?= $log['status']=='success' ? 'text-emerald-400' : 'text-rose-400' ?> text-[10px]"><?= $log['status'] ?></span>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+                <?php endif; ?>
+                <form method="POST" action="<?= Helpers::url('resellers/sync') ?>" class="flex gap-2">
+                    <?= Helpers::csrfField() ?>
+                    <input type="hidden" name="from_version" value="<?= htmlspecialchars($syncInfo['version']) ?>">
+                    <input type="hidden" name="to_version" value="<?= htmlspecialchars($displayCurrent) ?>">
+                    <button type="submit" class="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-[11px]">🔄 همگام‌سازی دستی همه نماینده‌ها به v<?= htmlspecialchars($displayCurrent) ?></button>
+                </form>
+            </div>
+            <?php endif; ?>
+
             <!-- Safety Notice -->
             <div class="text-slate-400 text-[11px] space-y-1.5 pt-2">
                 <div class="font-semibold text-slate-300 flex items-center gap-1.5">

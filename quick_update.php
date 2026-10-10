@@ -749,6 +749,20 @@ try {
     Setting::set('update_check_cache', '');
     Setting::set('update_check_time', '0');
 
+    // v4.0.47 AUTO SYNC RESELLERS after every update
+    try {
+        require_once __DIR__ . '/core/ResellerSyncManager.php';
+        require_once __DIR__ . '/core/ResellerPermissionManager.php';
+        $prevVer = Setting::get('reseller_last_synced_version', '0');
+        $syncRes = ResellerSyncManager::syncAllResellers($prevVer, '4.0.47');
+        logStep("✅ همگام‌سازی نماینده‌ها: {$syncRes['synced']} موفق، {$syncRes['failed']} ناموفق (v4.0.47)", 'success');
+        foreach (array_slice($syncRes['details'] ?? [], 0, 5) as $d) {
+            logStep($d, 'info');
+        }
+    } catch (Throwable $e) {
+        logStep("⚠️ خطا در همگام‌سازی نماینده‌ها: " . $e->getMessage(), 'warn');
+    }
+
     $dateTime = date('Y-m-d H:i:s');
     $tgMsg = "🚀 <b>بروزرسانی موفق پنل با آخرین نسخه</b>\n\n"
            . "📅 <b>زمان:</b> <code>{$dateTime}</code>\n"
