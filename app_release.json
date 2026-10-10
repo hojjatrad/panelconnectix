@@ -1,10 +1,10 @@
 {
-  "version": "4.0.51",
-  "code": 85,
+  "version": "4.0.52",
+  "code": 86,
   "force_update": false,
   "force_min_code": 50,
   "update_type": "full",
-  "changelog": "✅ v4.0.51 GLOBAL APP CONFIG FROM WEB PANEL - NO MANUAL PATHS:\n\n• 🔧 فیکس صفحه تنظیمات آپ نماینده نامرتب - اضافه شدن header/footer و استایل کامل\n• 🌐 تنظیمات سراسری اپ از پنل وب - صفحه جدید settings/app-config برای مدیریت مرکزی تمام اپ‌ها\n• 🚫 حذف تنظیمات دستی مسیرها از اپ - وقتی hide_manual_panel_url فعال باشد، فیلد آدرس پنل کلا مخفی می‌شود و اپ خودکار از پنل وب می‌خواند\n• 🔄 دریافت خودکار سرورها - وقتی سرور جدید اضافه می‌کنید، اپ خودکار لیست را از پنل می‌گیرد (auto_fetch_servers)\n• 🔑 کلید API خودکار - ادمین یکبار در وب تنظیم می‌کند، تمام اپ‌ها خودکار دریافت می‌کنند\n• 👁️ پیشنهاد شما: تمام تنظیمات حتی برای مدیر ارشد از پنل وب - با force_managed_mode حتی ادمین هم تنظیمات را از وب می‌گیرد\n• 📱 نسخه قبلی: Fix Version Display + Auto API Key همچنان فعال",
+  "changelog": "✅ v4.0.52 BOT BUTTONS + SOFT DELETE + RESYNC FROM MAIN SERVER:\n\n• 🔧 فیکس اصلی: غیرفعال کردن دکمه در پنل حالا واقعا در ربات هم غیرفعال می‌شود - قبلا btn_monitoring, btn_financial, btn_points, btn_usage در updateSettings ذخیره نمی‌شد (باگ $buttonKeys ناقص بود)\n• 🔒 امنیت: حتی اگر کاربر دکمه قدیمی شیشه‌ای داشته باشد، callback handler چک می‌کند و پیغام 'این بخش غیرفعال است' می‌دهد\n• 📊 فیکس دکمه‌های وضعیت سرور و گزارش مالی - دکمه‌های Reply Keyboard (ثابت پایین) هندلر نداشتند، فقط Inline (شیشه‌ای) کار می‌کرد - الان processMessage هم monitoring, financial, points, usage را هندل می‌کند\n• 🗑️ حذف محلی (Soft Delete): دکمه جدید 'حذف محلی (فقط پنل)' - کلاینت فقط از پنل حذف می‌شود و در سرور اصلی باقی می‌ماند، قابل بازگردانی از فیلتر 'حذف شده‌ها'\n• 🔄 بازخوانی از سرور اصلی (Re-read/Resync): دکمه جدید در هر کلاینت و در هر سرور - مصرف، انقضا، وضعیت را مستقیم از سرور اصلی دوباره می‌خواند\n• ♻️ بازگردانی گروهی و تکی از حذف محلی\n• 📱 بهبود: گروه‌ها هم شامل دکمه‌های جدید شدند تا در سوپرگروه کیبورد حذف شود\n• 🛠️ اسکریپت ترمیم fix_452_bot_buttons_resync_softdelete.php برای دیتابیس قدیمی\n\n• نسخه قبلی: v4.0.51 GLOBAL APP CONFIG FROM WEB PANEL همچنان فعال",
   "date": "2026-10-10",
   "auto_update": {
     "enabled": true,
@@ -15,13 +15,13 @@
     "wifi_only": false
   },
   "apk": {
-    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-ARM64-v8a.apk",
-    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-Universal.apk",
-    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-ARM32-v7a.apk"
+    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.52/Connectix-ARM64-v8a.apk",
+    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.52/Connectix-Universal.apk",
+    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.52/Connectix-ARM32-v7a.apk"
   },
   "apks": {
     "arm64-v8a": {
-      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-ARM64-v8a.apk",
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.52/Connectix-ARM64-v8a.apk",
       "size": 37603235,
       "size_human": "36 MB",
       "abi": "arm64-v8a",
@@ -29,7 +29,7 @@
       "arch": "arm64"
     },
     "armeabi-v7a": {
-      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-ARM32-v7a.apk",
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.52/Connectix-ARM32-v7a.apk",
       "size": 38148563,
       "size_human": "36 MB",
       "abi": "armeabi-v7a",
@@ -37,7 +37,7 @@
       "arch": "arm32"
     },
     "universal": {
-      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-Universal.apk",
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.52/Connectix-Universal.apk",
       "size": 110479370,
       "size_human": "105 MB",
       "abi": "universal",
@@ -46,8 +46,8 @@
     }
   },
   "windows": {
-    "version": "4.0.51",
-    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-Windows-x64.zip"
+    "version": "4.0.52",
+    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.52/Connectix-Windows-x64.zip"
   },
   "ultra": true,
   "core": "xray_1.8.23 + sing-box + multiplex + 0rtt + stealth + FULL BUG FIX",
@@ -69,12 +69,12 @@
     "stealth",
     "multiplex"
   ],
-  "version_code": 85,
+  "version_code": 86,
   "release_date": "2026-10-10",
   "apk_urls": {
-    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-ARM64-v8a.apk",
-    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-Universal.apk",
-    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-ARM32-v7a.apk"
+    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.52/Connectix-ARM64-v8a.apk",
+    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.52/Connectix-Universal.apk",
+    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.52/Connectix-ARM32-v7a.apk"
   },
-  "download_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-Android-ARM64.apk"
+  "download_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.52/Connectix-Android-ARM64.apk"
 }

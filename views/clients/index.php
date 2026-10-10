@@ -30,7 +30,7 @@ function initials($name,$user){
                 <span class="px-2.5 py-0.5 rounded-full bg-purple-900/30 border border-purple-700/40 text-[11px] text-purple-300 font-mono"><?= count($clients) ?> کاربر</span>
                 <span class="px-2 py-0.5 rounded-full bg-cyan-900/30 border border-cyan-700/40 text-[10px] text-cyan-300">حرفه‌ای - شبیه VIP</span>
             </h2>
-            <p class="text-xs text-slate-400 mt-1">نمایش: <b class="text-white">نام مشتری</b> + یوزرنیم + پسورد قابل کپی + پلن/سرور + مصرف + انقضا — دقیقا مثل پنل VIP Connectix</p>
+            <p class="text-xs text-slate-400 mt-1">نمایش: <b class="text-white">نام مشتری</b> + یوزرنیم + پسورد + پلن/سرور + مصرف + انقضا | <span class="text-cyan-400">v4.0.52 NEW:</span> 🔄 بازخوانی از سرور اصلی + 🗑️ حذف محلی (فقط پنل) + ♻️ بازگردانی</p>
         </div>
     </div>
     <div class="flex items-center gap-2 flex-wrap">
@@ -65,6 +65,7 @@ function initials($name,$user){
         <select name="status" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white"><option value="">همه وضعیت‌ها</option><option value="active" <?= ($_GET['status']??'')==='active'?'selected':'' ?>>فعال</option><option value="expired" <?= ($_GET['status']??'')==='expired'?'selected':'' ?>>منقضی</option><option value="disabled" <?= ($_GET['status']??'')==='disabled'?'selected':'' ?>>غیرفعال</option></select>
         <select name="group" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white"><option value="">همه گروه‌ها</option><option value="default">عادی</option><option value="economic">اقتصادی</option><option value="vip">VIP</option></select>
         <select name="plan_id" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white"><option value="">همه پلن‌ها</option><?php foreach($plans as $p): ?><option value="<?= $p['id'] ?>" <?= (int)($_GET['plan_id']??0)===$p['id']?'selected':'' ?>><?= htmlspecialchars($p['title']) ?> (<?= $p['traffic_gb'] ?>GB)</option><?php endforeach; ?></select>
+        <select name="deleted_filter" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white"><option value="">فعال‌ها (پیش‌فرض)</option><option value="only_deleted" <?= ($_GET['deleted_filter']??'')==='only_deleted'?'selected':'' ?>>🗑️ فقط حذف محلی</option><option value="all" <?= ($_GET['deleted_filter']??'')==='all'?'selected':'' ?>>همه (شامل حذف محلی)</option></select>
         <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold flex items-center justify-center gap-1"><i class="fa-solid fa-filter"></i>اعمال فیلتر</button>
     </div>
 </form>
@@ -75,7 +76,7 @@ function initials($name,$user){
 <div class="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-900/60 p-3 rounded-xl border border-slate-800 text-xs">
     <div class="flex items-center gap-2 flex-wrap">
         <span class="text-slate-400 font-semibold">عملیات گروهی:</span>
-        <select name="bulk_action" required class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"><option value="">-- انتخاب --</option><option value="extend_30_days">+30 روز</option><option value="add_10_gb">+10GB</option><option value="disable">غیرفعال</option><option value="enable">فعال</option><option value="delete">حذف</option></select>
+        <select name="bulk_action" required class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"><option value="">-- انتخاب --</option><option value="extend_30_days">+30 روز</option><option value="add_10_gb">+10GB</option><option value="disable">غیرفعال</option><option value="enable">فعال</option><option value="resync">🔄 بازخوانی از سرور اصلی</option><option value="soft_delete">🗑️ حذف محلی (فقط پنل)</option><option value="restore">♻️ بازگردانی از حذف محلی</option><option value="delete">❌ حذف قطعی (از سرور و پنل)</option></select>
         <button type="submit" onclick="var act=this.form.bulk_action.value; if(act==='delete'){return confirm('⚠️ حذف گروهی - اخطار حرفه‌ای:\n\nقبل از حذف، بکاپ خودکار از کلاینت‌های انتخاب شده گرفته می‌شود\n📦 بکاپ شامل ساب‌لینک دقیق + ترافیک + تاریخ انقضا\nقابل بازگردانی از بخش بکاپ‌ها\n\nآیا ادامه می‌دهید؟');} return confirm('اعمال روی انتخاب‌شده‌ها؟')" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg shadow">اعمال</button>
     </div>
     <div class="flex items-center gap-3">
@@ -234,7 +235,9 @@ if(preg_match('/(\d+)\s*روز/', $daysRemText, $m)){
                         <a href="<?= Helpers::url('clients/'.$c['id'].'/usage') ?>" class="w-8 h-8 flex items-center justify-center bg-slate-800 hover:bg-violet-900/40 text-violet-300 hover:text-violet-200 rounded-xl border border-slate-700 hover:border-violet-700/40 transition group/btn" title="تاریخچه مصرف ULTRA"><i class="fa-solid fa-chart-area text-[12px] group-hover/btn:scale-110 transition"></i></a>
 <button type="button" onclick='openEditClientModal(<?= json_encode($c, JSON_HEX_APOS|JSON_HEX_QUOT) ?>)' class="w-8 h-8 flex items-center justify-center bg-slate-800 hover:bg-amber-900/40 text-amber-300 hover:text-amber-200 rounded-xl border border-slate-700 hover:border-amber-700/40 transition group/btn" title="ویرایش نام/یوزر/پسورد"><i class="fa-solid fa-pen text-[11px] group-hover/btn:scale-110 transition"></i></button>
 <button type="button" onclick="openRenewModal(<?= $c['id'] ?>,'<?= htmlspecialchars($c['username']) ?>')" class="w-8 h-8 flex items-center justify-center bg-slate-800 hover:bg-emerald-900/40 text-emerald-400 hover:text-emerald-300 rounded-xl border border-slate-700 hover:border-emerald-700/40 transition group/btn" title="تمدید"><i class="fa-solid fa-rotate text-[11px] group-hover/btn:scale-110 transition"></i></button>
-<button type="button" onclick="if(confirm('حذف <?= htmlspecialchars($c['username']) ?>؟')){document.getElementById('deleteIdInput').value=<?= $c['id'] ?>;document.getElementById('deleteForm').submit();}" class="w-8 h-8 flex items-center justify-center bg-slate-800 hover:bg-rose-900/60 text-rose-400 hover:text-rose-200 rounded-xl border border-slate-700 hover:border-rose-700/40 transition group/btn" title="حذف"><i class="fa-solid fa-trash-can text-[11px] group-hover/btn:scale-110 transition"></i></button>
+<a href="<?= Helpers::url('clients/resync?id=' . $c['id']) ?>" onclick="return confirm('بازخوانی <?= htmlspecialchars($c['username']) ?> از سرور اصلی؟');" class="w-8 h-8 flex items-center justify-center bg-slate-800 hover:bg-cyan-900/40 text-cyan-300 hover:text-cyan-200 rounded-xl border border-slate-700 hover:border-cyan-700/40 transition group/btn" title="🔄 بازخوانی از سرور اصلی (re-read)"><i class="fa-solid fa-rotate text-[11px] group-hover/btn:scale-110 transition"></i></a>
+<button type="button" onclick="if(confirm('حذف محلی <?= htmlspecialchars($c['username']) ?> فقط از پنل؟ (در سرور اصلی باقی می‌ماند)')){document.getElementById('softDeleteIdInput').value=<?= $c['id'] ?>;document.getElementById('softDeleteForm').submit();}" class="w-8 h-8 flex items-center justify-center bg-slate-800 hover:bg-amber-900/40 text-amber-300 hover:text-amber-200 rounded-xl border border-slate-700 hover:border-amber-700/40 transition group/btn" title="🗑️ حذف محلی (فقط پنل، حفظ در سرور)"><i class="fa-solid fa-eye-slash text-[11px] group-hover/btn:scale-110 transition"></i></button>
+<button type="button" onclick="if(confirm('حذف قطعی <?= htmlspecialchars($c['username']) ?> از سرور و پنل؟')){document.getElementById('deleteIdInput').value=<?= $c['id'] ?>;document.getElementById('deleteForm').submit();}" class="w-8 h-8 flex items-center justify-center bg-slate-800 hover:bg-rose-900/60 text-rose-400 hover:text-rose-200 rounded-xl border border-slate-700 hover:border-rose-700/40 transition group/btn" title="❌ حذف قطعی"><i class="fa-solid fa-trash-can text-[11px] group-hover/btn:scale-110 transition"></i></button>
 </div>
 </td>
 </tr>
@@ -246,6 +249,8 @@ if(preg_match('/(\d+)\s*روز/', $daysRemText, $m)){
 </form>
 
 <form id="deleteForm" action="<?= Helpers::url('clients/delete') ?>" method="POST" class="hidden"><?= Helpers::csrfField() ?><input type="hidden" name="client_id" id="deleteIdInput"></form>
+<form id="softDeleteForm" action="<?= Helpers::url('clients/soft-delete') ?>" method="POST" class="hidden"><?= Helpers::csrfField() ?><input type="hidden" name="client_id" id="softDeleteIdInput"></form>
+<form id="restoreForm" action="<?= Helpers::url('clients/restore') ?>" method="POST" class="hidden"><?= Helpers::csrfField() ?><input type="hidden" name="client_id" id="restoreIdInput"></form>
 
 <!-- Modals: Keep original modals (inspect, renew, reserve, edit, test, optimizer) -->
 <?php

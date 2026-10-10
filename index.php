@@ -484,6 +484,12 @@ $router->post('clients/update', [ClientController::class, 'update']);
 $router->post('clients/renew', [ClientController::class, 'renew']);
 $router->post('clients/reserve', [ClientController::class, 'reservePlan']);
 $router->post('clients/delete', [ClientController::class, 'delete']);
+$router->post('clients/soft-delete', [ClientController::class, 'softDelete']);
+$router->post('clients/restore', [ClientController::class, 'restore']);
+$router->get('clients/resync', [ClientController::class, 'resync']);
+$router->post('clients/resync', [ClientController::class, 'resync']);
+$router->post('clients/resync-server', [ClientController::class, 'resyncFromServer']);
+$router->get('clients/resync-server', [ClientController::class, 'resyncFromServer']);
 
 // Plans Management
 $router->get('plans', [PlanController::class, 'index']);

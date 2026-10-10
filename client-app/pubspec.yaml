@@ -1,7 +1,7 @@
 name: connectix_vpn
-description: Connectix Professional Multiplatform VPN Client - ULTRA Dual-Core Xray + sing-box + v4.0.51 GLOBAL APP CONFIG FROM WEB PANEL - NO MANUAL PATHS
+description: Connectix Professional Multiplatform VPN Client - ULTRA Dual-Core Xray + sing-box + v4.0.52 BOT FIX + SOFT DELETE + RESYNC
 publish_to: 'none'
-version: 4.0.51+85
+version: 4.0.52+86
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

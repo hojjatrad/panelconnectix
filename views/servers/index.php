@@ -173,6 +173,15 @@ require __DIR__ . '/../layout/header.php';
                         </button>
                     </form>
 
+                    <form method="POST" action="<?= Helpers::url('clients/resync-server') ?>" class="m-0" onsubmit="return confirm('🔄 بازخوانی کلاینت‌ها از سرور اصلی <?= $serverName ?>؟\n\nهمه کلاینت‌های موجود در سرور اصلی مجددا خوانده و بروزرسانی می‌شوند (مصرف، انقضا، وضعیت). کلاینت‌های جدید اضافه می‌شوند.');">
+                        <?= Helpers::csrfField() ?>
+                        <input type="hidden" name="server_id" value="<?= $s['id'] ?>">
+                        <button type="submit" title="🔄 بازخوانی کلاینت‌ها از سرور اصلی (re-read) - v4.0.52 NEW" class="px-2.5 py-1.5 bg-cyan-900/40 hover:bg-cyan-800/60 text-cyan-300 rounded-lg text-xs font-medium border border-cyan-800/50 transition-colors flex items-center gap-1">
+                            <i class="fa-solid fa-arrows-rotate text-[10px]"></i>
+                            <span>بازخوانی</span>
+                        </button>
+                    </form>
+
                     <a href="<?= Helpers::url('servers/' . (int)$s['id'] . '/node-users') ?>" title="مشاهده و مدیریت کلاینت‌های این سرور (همه کلاینت‌های تعریف‌شده روی پنل سرور)" class="px-2.5 py-1.5 bg-cyan-900/40 hover:bg-cyan-800/60 text-cyan-300 rounded-lg text-xs font-medium border border-cyan-800/50 transition-colors flex items-center gap-1">
                         <i class="fa-solid fa-users text-[10px]"></i>
                         <span>کلاینت‌ها</span>

@@ -462,7 +462,12 @@ class Database {
                 'original_password' => 'VARCHAR(64) NULL',
                 'api_group_name' => 'VARCHAR(64) NULL',
                 'api_plan_name' => 'VARCHAR(128) NULL',
-                'api_created_at' => 'VARCHAR(32) NULL'
+                'api_created_at' => 'VARCHAR(32) NULL',
+                'is_local_deleted' => 'TINYINT(1) DEFAULT 0',
+                'local_deleted_at' => 'DATETIME NULL',
+                'last_synced_at' => 'DATETIME NULL',
+                'sync_error' => 'TEXT NULL',
+                'is_deleted_local' => 'TINYINT(1) DEFAULT 0'
             ];
             foreach ($clientCols as $c => $d) {
                 self::safeAddColumn($pdo, 'clients', $c, $d);

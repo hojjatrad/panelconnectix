@@ -19,7 +19,19 @@ class ClientController {
         $expireFilter = trim($_GET['expire_filter'] ?? '');
         $usageFilter = trim($_GET['usage_filter'] ?? '');
 
+        // v4.0.52: Soft delete - exclude locally deleted unless explicitly requested
+        $showDeleted = isset($_GET['show_deleted']) && $_GET['show_deleted'] === '1';
+        $deletedFilter = trim($_GET['deleted_filter'] ?? '');
         $where = $isAdmin ? ["1=1"] : ["c.reseller_id = " . intval($userId)];
+        if (!$showDeleted) {
+            if ($deletedFilter === 'only_deleted') {
+                $where[] = "(c.is_local_deleted = 1 OR c.is_deleted_local = 1)";
+            } elseif ($deletedFilter === 'all') {
+                // show all, no filter
+            } else {
+                $where[] = "((c.is_local_deleted = 0 OR c.is_local_deleted IS NULL) AND (c.is_deleted_local = 0 OR c.is_deleted_local IS NULL))";
+            }
+        }
         $params = [];
 
         if (!empty($search)) {
@@ -703,6 +715,164 @@ class ClientController {
         Helpers::redirect('clients');
     }
 
+    // v4.0.52 NEW: Soft delete - delete from panel only, keep on main server
+    public function softDelete(): void {
+        Auth::requireLogin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
+            Helpers::redirect('clients');
+        }
+        $clientId = (int)($_POST['client_id'] ?? 0);
+        $pdo = Database::getConnection();
+        $userId = Auth::id();
+        $client = $pdo->query("SELECT * FROM clients WHERE id = $clientId")->fetch();
+        if (!$client) {
+            Helpers::flash('error', 'کاربر یافت نشد.');
+            Helpers::redirect('clients');
+        }
+        if (!Auth::isAdmin() && $client['reseller_id'] != $userId) {
+            Helpers::flash('error', 'دسترسی غیرمجاز.');
+            Helpers::redirect('clients');
+        }
+        try {
+            $pdo->prepare("UPDATE clients SET is_local_deleted = 1, is_deleted_local = 1, local_deleted_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$clientId]);
+        } catch (Throwable $e) {
+            try {
+                $pdo->prepare("UPDATE clients SET is_local_deleted = 1, local_deleted_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$clientId]);
+            } catch (Throwable $e2) {
+                $pdo->prepare("UPDATE clients SET is_deleted_local = 1 WHERE id = ?")->execute([$clientId]);
+            }
+        }
+        Helpers::logActivity('client_soft_delete', "حذف محلی کلاینت {$client['username']} (حفظ در سرور اصلی)", 'client', $clientId);
+        Helpers::flash('success', "کاربر {$client['username']} فقط از پنل حذف شد و در سرور اصلی باقی ماند. می‌توانید از فیلتر 'حذف شده‌ها' بازگردانی کنید.");
+        Helpers::redirect('clients');
+    }
+
+    public function restore(): void {
+        Auth::requireLogin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
+            Helpers::redirect('clients');
+        }
+        $clientId = (int)($_POST['client_id'] ?? 0);
+        $pdo = Database::getConnection();
+        $userId = Auth::id();
+        $client = $pdo->query("SELECT * FROM clients WHERE id = $clientId")->fetch();
+        if (!$client) {
+            Helpers::flash('error', 'کاربر یافت نشد.');
+            Helpers::redirect('clients');
+        }
+        if (!Auth::isAdmin() && $client['reseller_id'] != $userId) {
+            Helpers::flash('error', 'دسترسی غیرمجاز.');
+            Helpers::redirect('clients');
+        }
+        try {
+            $pdo->prepare("UPDATE clients SET is_local_deleted = 0, is_deleted_local = 0, local_deleted_at = NULL WHERE id = ?")->execute([$clientId]);
+        } catch (Throwable $e) {
+            $pdo->prepare("UPDATE clients SET is_local_deleted = 0 WHERE id = ?")->execute([$clientId]);
+        }
+        Helpers::logActivity('client_restore', "بازگردانی کلاینت {$client['username']} از حذف محلی", 'client', $clientId);
+        Helpers::flash('success', "کاربر {$client['username']} بازگردانی شد.");
+        Helpers::redirect('clients?deleted_filter=only_deleted');
+    }
+
+    // v4.0.52 NEW: Resync single client from main server (re-read)
+    public function resync(): void {
+        Auth::requireLogin();
+        $clientId = (int)($_GET['id'] ?? $_POST['client_id'] ?? 0);
+        if ($clientId <= 0) {
+            Helpers::flash('error', 'شناسه کلاینت نامعتبر است.');
+            Helpers::redirect('clients');
+        }
+        $pdo = Database::getConnection();
+        $userId = Auth::id();
+        $stmt = $pdo->prepare("SELECT c.*, s.* FROM clients c LEFT JOIN server_nodes s ON s.id = c.server_id WHERE c.id = ?");
+        $stmt->execute([$clientId]);
+        $row = $stmt->fetch();
+        if (!$row) {
+            Helpers::flash('error', 'کلاینت یافت نشد.');
+            Helpers::redirect('clients');
+        }
+        if (!Auth::isAdmin() && $row['reseller_id'] != $userId) {
+            Helpers::flash('error', 'دسترسی غیرمجاز.');
+            Helpers::redirect('clients');
+        }
+        try {
+            require_once __DIR__ . '/../core/Provisioner.php';
+            require_once __DIR__ . '/../drivers/DriverFactory.php';
+            $server = $pdo->query("SELECT * FROM server_nodes WHERE id = " . intval($row['server_id']))->fetch();
+            if (!$server) throw new Exception("سرور یافت نشد");
+            $driver = DriverFactory::create($server);
+            if (!$driver->authenticate()) throw new Exception("اتصال به سرور اصلی برقرار نشد: " . $driver->getLastError());
+            // Try to get single user
+            $remoteUser = null;
+            if (method_exists($driver, 'getUser')) {
+                $remoteUser = $driver->getUser($row['username']);
+            }
+            if (!$remoteUser) {
+                $users = $driver->listUsers();
+                foreach ($users as $u) {
+                    if (($u['username'] ?? '') === $row['username']) { $remoteUser = $u; break; }
+                }
+            }
+            if (!$remoteUser) {
+                $pdo->prepare("UPDATE clients SET sync_error = ?, last_synced_at = CURRENT_TIMESTAMP WHERE id = ?")->execute(["کاربر در سرور اصلی یافت نشد (شاید حذف شده)", $clientId]);
+                Helpers::flash('error', "کلاینت {$row['username']} در سرور اصلی یافت نشد. شاید قبلاً از سرور حذف شده است.");
+                Helpers::redirect('clients');
+            }
+            $limit = (int)($remoteUser['traffic_limit_bytes'] ?? 0);
+            $used = (int)($remoteUser['traffic_used_bytes'] ?? 0);
+            $status = (string)($remoteUser['status'] ?? 'active');
+            $expireAt = $remoteUser['expire_at'] ?? null;
+            if ($expireAt && is_numeric($expireAt)) {
+                $ts = (int)$expireAt;
+                if ($ts > 20000000000) $ts = (int)round($ts / 1000);
+                $expireAt = $ts > 0 ? date('Y-m-d H:i:s', $ts) : null;
+            }
+            $pdo->prepare("UPDATE clients SET traffic_limit_bytes = ?, traffic_used_bytes = ?, status = ?, expire_at = ?, last_synced_at = CURRENT_TIMESTAMP, sync_error = NULL WHERE id = ?")->execute([$limit ?: $row['traffic_limit_bytes'], $used, $status, $expireAt ?: $row['expire_at'], $clientId]);
+            Helpers::logActivity('client_resync', "بازخوانی کلاینت {$row['username']} از سرور اصلی {$server['name']}", 'client', $clientId);
+            Helpers::flash('success', "کلاینت {$row['username']} با موفقیت از سرور اصلی بازخوانی شد. مصرف: " . Helpers::formatBytes($used) . " / " . Helpers::formatBytes($limit));
+        } catch (Throwable $e) {
+            try { $pdo->prepare("UPDATE clients SET sync_error = ?, last_synced_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$e->getMessage(), $clientId]); } catch (Throwable $e2) {}
+            Helpers::flash('error', 'خطا در بازخوانی از سرور: ' . $e->getMessage());
+        }
+        Helpers::redirect('clients');
+    }
+
+    // v4.0.52 NEW: Resync all clients from a specific server (re-read from main server)
+    public function resyncFromServer(): void {
+        Auth::requireLogin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
+            Helpers::redirect('servers');
+        }
+        $serverId = (int)($_POST['server_id'] ?? $_GET['server_id'] ?? 0);
+        if ($serverId <= 0) {
+            Helpers::flash('error', 'شناسه سرور نامعتبر است.');
+            Helpers::redirect('servers');
+        }
+        $pdo = Database::getConnection();
+        $isAdmin = Auth::isAdmin();
+        if (!$isAdmin) {
+            Helpers::flash('error', 'فقط ادمین می‌تواند همگام‌سازی کلی انجام دهد.');
+            Helpers::redirect('servers');
+        }
+        try {
+            require_once __DIR__ . '/../core/NodeSync.php';
+            $server = $pdo->query("SELECT * FROM server_nodes WHERE id = $serverId")->fetch();
+            if (!$server) throw new Exception("سرور یافت نشد");
+            $result = \NodeSync::syncServer($pdo, $server);
+            $pdo->prepare("UPDATE server_nodes SET last_sync_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$serverId]);
+            Helpers::logActivity('server_resync', "بازخوانی کلی از سرور {$server['name']}: {$result['added']} جدید + {$result['updated']} بروزرسانی", 'server', $serverId);
+            $msg = "بازخوانی از سرور {$server['name']} انجام شد: {$result['added']} کلاینت جدید، {$result['updated']} بروزرسانی.";
+            if (!empty($result['errors'])) $msg .= " خطاها: " . implode(' | ', array_slice($result['errors'],0,3));
+            Helpers::flash('success', $msg);
+        } catch (Throwable $e) {
+            Helpers::flash('error', 'خطا در همگام‌سازی: ' . $e->getMessage());
+        }
+        Helpers::redirect('clients?server_id=' . $serverId);
+    }
+
     public function exportCsv(): void {
         Auth::requireLogin();
         $pdo = Database::getConnection();
@@ -836,6 +1006,73 @@ class ClientController {
         }
 
         $count = 0;
+        // v4.0.52: Handle soft delete/restore/resync without driver
+        if ($action === 'soft_delete') {
+            foreach ($clients as $c) {
+                try {
+                    $pdo->prepare("UPDATE clients SET is_local_deleted = 1, is_deleted_local = 1, local_deleted_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$c['id']]);
+                    $count++;
+                } catch (Throwable $e) {
+                    try { $pdo->prepare("UPDATE clients SET is_deleted_local = 1 WHERE id = ?")->execute([$c['id']]); $count++; } catch (Throwable $e2) {}
+                }
+            }
+            Helpers::logActivity('client_bulk', "حذف محلی گروهی روی {$count} کلاینت (حفظ در سرور)", 'client');
+            Helpers::flash('success', "حذف محلی (فقط از پنل) روی {$count} کاربر اعمال شد. از فیلتر حذف شده‌ها می‌توانید بازگردانی کنید.");
+            Helpers::redirect('clients');
+            return;
+        }
+        if ($action === 'restore') {
+            foreach ($clients as $c) {
+                try {
+                    $pdo->prepare("UPDATE clients SET is_local_deleted = 0, is_deleted_local = 0, local_deleted_at = NULL WHERE id = ?")->execute([$c['id']]);
+                    $count++;
+                } catch (Throwable $e) {
+                    try { $pdo->prepare("UPDATE clients SET is_local_deleted = 0 WHERE id = ?")->execute([$c['id']]); $count++; } catch (Throwable $e2) {}
+                }
+            }
+            Helpers::logActivity('client_bulk', "بازگردانی گروهی {$count} کلاینت از حذف محلی", 'client');
+            Helpers::flash('success', "بازگردانی {$count} کاربر از حذف محلی انجام شد.");
+            Helpers::redirect('clients?deleted_filter=only_deleted');
+            return;
+        }
+        if ($action === 'resync') {
+            require_once __DIR__ . '/../drivers/DriverFactory.php';
+            foreach ($clients as $c) {
+                try {
+                    $server = $pdo->query("SELECT * FROM server_nodes WHERE id = " . intval($c['server_id']))->fetch();
+                    if (!$server) continue;
+                    $driver = DriverFactory::create($server);
+                    if (!$driver->authenticate()) continue;
+                    $remoteUser = null;
+                    if (method_exists($driver, 'getUser')) {
+                        $remoteUser = $driver->getUser($c['username']);
+                    }
+                    if (!$remoteUser) {
+                        $users = $driver->listUsers();
+                        foreach ($users as $u) {
+                            if (($u['username'] ?? '') === $c['username']) { $remoteUser = $u; break; }
+                        }
+                    }
+                    if (!$remoteUser) continue;
+                    $limit = (int)($remoteUser['traffic_limit_bytes'] ?? 0);
+                    $used = (int)($remoteUser['traffic_used_bytes'] ?? 0);
+                    $status = (string)($remoteUser['status'] ?? 'active');
+                    $expireAt = $remoteUser['expire_at'] ?? null;
+                    if ($expireAt && is_numeric($expireAt)) {
+                        $ts = (int)$expireAt;
+                        if ($ts > 20000000000) $ts = (int)round($ts / 1000);
+                        $expireAt = $ts > 0 ? date('Y-m-d H:i:s', $ts) : null;
+                    }
+                    $pdo->prepare("UPDATE clients SET traffic_limit_bytes = ?, traffic_used_bytes = ?, status = ?, expire_at = ?, last_synced_at = CURRENT_TIMESTAMP, sync_error = NULL WHERE id = ?")->execute([$limit ?: $c['traffic_limit_bytes'], $used, $status, $expireAt ?: $c['expire_at'], $c['id']]);
+                    $count++;
+                } catch (Throwable $e) {}
+            }
+            Helpers::logActivity('client_bulk', "بازخوانی گروهی {$count} کلاینت از سرور اصلی", 'client');
+            Helpers::flash('success', "بازخوانی {$count} کاربر از سرور اصلی انجام شد.");
+            Helpers::redirect('clients');
+            return;
+        }
+
         foreach ($clients as $c) {
             try {
                 $driver = DriverFactory::create($c);
@@ -892,7 +1129,10 @@ class ClientController {
             'add_10_gb' => 'افزایش ۱۰ گیگابایت حجم',
             'disable' => 'غیرفعال‌سازی',
             'enable' => 'فعال‌سازی مجدد',
-            'delete' => 'حذف قطعی',
+            'delete' => 'حذف قطعی (از سرور و پنل)',
+            'soft_delete' => 'حذف محلی (فقط از پنل، حفظ در سرور)',
+            'restore' => 'بازگردانی از حذف محلی',
+            'resync' => 'بازخوانی از سرور اصلی',
             'delete_unused' => 'حذف سرویس‌های بدون مصرف',
             'delete_expired' => 'حذف سرویس‌های منقضی‌شده',
             'delete_expired_7d' => 'حذف سرویس‌های منقضی بیش از ۷ روز'

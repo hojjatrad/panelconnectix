@@ -612,6 +612,76 @@ class TelegramBotController {
             return;
         }
 
+        // v4.0.52 FIX: Enforce btn_*_enabled toggles for callback handlers - disabled buttons should not work even via old inline buttons
+        $callbackToggleMap = [
+            'menu_buy' => 'btn_buy_enabled',
+            'menu_renew' => 'btn_renew_enabled',
+            'menu_my_accounts' => 'btn_my_accounts_enabled',
+            'menu_bind' => 'btn_my_accounts_enabled',
+            'menu_guest_status' => 'btn_my_accounts_enabled',
+            'menu_trial' => 'btn_trial_enabled',
+            'menu_wheel' => 'btn_wheel_enabled',
+            'menu_wallet' => 'btn_wallet_enabled',
+            'menu_referral' => 'btn_referral_enabled',
+            'menu_apps' => 'btn_apps_enabled',
+            'menu_support' => 'btn_support_enabled',
+            'menu_reseller_apply' => 'btn_reseller_enabled',
+            'menu_panel_credentials' => 'btn_panel_login_enabled',
+            'link_panel_account' => 'btn_panel_login_enabled',
+            'menu_monitoring' => 'btn_monitoring_enabled',
+            'menu_financial' => 'btn_financial_enabled',
+            'menu_points' => 'btn_points_enabled',
+            'menu_usage' => 'btn_usage_enabled',
+            'menu_buy' => 'btn_buy_enabled',
+        ];
+        if (isset($callbackToggleMap[$data])) {
+            $toggleKey = $callbackToggleMap[$data];
+            if (Setting::get($toggleKey, '1') !== '1') {
+                TelegramBot::answerCallbackQuery($cbId, '⛔️ این بخش در حال حاضر توسط مدیریت غیرفعال شده است.', true, $cbToken);
+                // Also refresh main menu to hide disabled button
+                if ($messageId) {
+                    TelegramBot::editMessageText("⛔️ این قابلیت غیرفعال است.\n\n".Setting::get('bot_welcome_text','به منوی اصلی بازگشتید.'), $chatId, $messageId, self::getMainMenuInlineKeyboard($pdo, $fromId), $ctxCb['bot_token'] ?? null);
+                } else {
+                    TelegramBot::sendMessage("⛔️ این قابلیت غیرفعال است.", $chatId, self::getMainMenuInlineKeyboard($pdo, $fromId), $ctxCb['bot_token'] ?? null);
+                }
+                return;
+            }
+        }
+        // Also check prefix-based callbacks like buy_plan_, select_plan_, etc - if parent disabled, block
+        $prefixToggleMap = [
+            'menu_buy' => 'btn_buy_enabled',
+            'buy_plan_' => 'btn_buy_enabled',
+            'select_plan_' => 'btn_buy_enabled',
+            'select_custom_plan_' => 'btn_buy_enabled',
+            'menu_renew' => 'btn_renew_enabled',
+            'renew_acc_' => 'btn_renew_enabled',
+            'select_renew_plan_' => 'btn_renew_enabled',
+            'select_custom_renew_plan_' => 'btn_renew_enabled',
+            'menu_trial' => 'btn_trial_enabled',
+            'menu_wheel' => 'btn_wheel_enabled',
+            'menu_wallet' => 'btn_wallet_enabled',
+            'wallet_topup_' => 'btn_wallet_enabled',
+            'pay_wallet_' => 'btn_wallet_enabled',
+            'menu_referral' => 'btn_referral_enabled',
+            'menu_apps' => 'btn_apps_enabled',
+            'menu_support' => 'btn_support_enabled',
+            'menu_reseller_apply' => 'btn_reseller_enabled',
+            'menu_panel_credentials' => 'btn_panel_login_enabled',
+            'menu_monitoring' => 'btn_monitoring_enabled',
+            'menu_financial' => 'btn_financial_enabled',
+            'menu_points' => 'btn_points_enabled',
+            'menu_usage' => 'btn_usage_enabled',
+        ];
+        foreach ($prefixToggleMap as $prefix => $toggleKey) {
+            if (str_starts_with($data, $prefix)) {
+                if (Setting::get($toggleKey, '1') !== '1') {
+                    TelegramBot::answerCallbackQuery($cbId, '⛔️ این بخش غیرفعال است.', true, $cbToken);
+                    return;
+                }
+                break;
+            }
+        }
+
         // Return to main menu
         if ($data === 'menu_main') {
             self::clearSession($pdo, $fromId);
@@ -1491,13 +1561,23 @@ class TelegramBotController {
             $appsText = Setting::get('btn_apps_text', '📱 دانلود و آموزش');
             $supportText = Setting::get('btn_support_text', '☎️ پشتیبانی');
             $resellerText = Setting::get('btn_reseller_text', '💼 اخذ نمایندگی');
+            $monitoringTextG = Setting::get('btn_monitoring_text', '📊 وضعیت سرورها LIVE');
+            $financialTextG = Setting::get('btn_financial_text', '💹 گزارش مالی');
+            $pointsTextG = Setting::get('btn_points_text', '🏆 امتیاز و جایزه');
+            $usageTextG = Setting::get('btn_usage_text', '📈 مصرف و تاریخچه');
+            $walletTextG = Setting::get('btn_wallet_text', '💳 کیف‌پول و شارژ');
+            $wheelTextG = Setting::get('btn_wheel_text', '🎰 گردونه شانس و هدیه');
+            $panelLoginTextG = Setting::get('btn_panel_login_text', '🔐 ورود به پنل وب');
 
             $knownBotButtons = [
                 $buyText, $renewText, $myAccText, $trialText, $refText, $appsText, $supportText, $resellerText,
+                $monitoringTextG, $financialTextG, $pointsTextG, $usageTextG, $walletTextG, $wheelTextG, $panelLoginTextG,
                 '🛒 خرید اشتراک جدید', '🛒 خرید اشتراک', '🔄 تمدید اشتراک', '👤 حساب‌های من', '🎁 تست رایگان',
                 '🎁 دریافت تست رایگان', '/test', 'تست رایگان', '🤝 زیرمجموعه‌گیری و درآمد', '🤝 کسب درآمد',
                 '📱 دانلود نرم‌افزارها', '☎️ پشتیبانی تلگرام', '💼 اخذ نمایندگی', '🔐 ورود به پنل وب',
-                '🔗 ورود و اتصال حساب', 'پنل', 'ورود به پنل', '/panel', '/login'
+                '🔗 ورود و اتصال حساب', 'پنل', 'ورود به پنل', '/panel', '/login',
+                '📊 وضعیت سرورها LIVE', '💹 گزارش مالی', '🏆 امتیاز و جایزه', '📈 مصرف و تاریخچه',
+                '💳 کیف‌پول و شارژ', '🎰 گردونه شانس و هدیه', 'وضعیت سرورها', 'گزارش مالی'
             ];
 
             if (str_starts_with($text, '/start') || str_starts_with($text, '/menu') || in_array($text, $knownBotButtons)) {
@@ -1714,61 +1794,93 @@ class TelegramBotController {
         $appsText = Setting::get('btn_apps_text', '📱 دانلود و آموزش');
         $supportText = Setting::get('btn_support_text', '☎️ پشتیبانی');
         $resellerText = Setting::get('btn_reseller_text', '💼 اخذ نمایندگی');
+        $monitoringText = Setting::get('btn_monitoring_text', '📊 وضعیت سرورها LIVE');
+        $financialText = Setting::get('btn_financial_text', '💹 گزارش مالی');
+        $pointsText = Setting::get('btn_points_text', '🏆 امتیاز و جایزه');
+        $usageText = Setting::get('btn_usage_text', '📈 مصرف و تاریخچه');
+        $panelLoginText = Setting::get('btn_panel_login_text', '🔐 ورود به پنل وب');
 
+        // v4.0.52 FIX: Enforce disabled toggles + add missing handlers for monitoring/financial/points/usage
         // Quick bottom keyboard shortcuts
-        if ($text === $myAccText || $text === '👤 حساب‌های من') {
+        if (($text === $myAccText || $text === '👤 حساب‌های من') && Setting::get('btn_my_accounts_enabled','1')==='1') {
             self::showMyAccounts($pdo, $chatId, $fromId);
             return;
         }
         if ($text === '🔗 ورود و اتصال حساب') {
+            if (Setting::get('btn_my_accounts_enabled','1') !== '1') {
+                TelegramBot::sendMessage("⛔️ این بخش غیرفعال است.", $chatId, self::getMainMenuInlineKeyboard($pdo, $fromId));
+                return;
+            }
             self::setSession($pdo, $fromId, 'awaiting_bind_username', []);
             TelegramBot::sendMessage("🔗 لطفاً <b>نام کاربری (Username)</b> اشتراک خود را ارسال فرمایید:", $chatId, [
-                'inline_keyboard' => [[['text' => '🔙 انصراف', 'callback_data' => 'menu_main']]]
+                'inline_keyboard' => [['text' => '🔙 انصراف', 'callback_data' => 'menu_main']]
             ]);
             return;
         }
-        if ($text === $buyText || $text === '🛒 خرید اشتراک جدید' || $text === '🛒 خرید اشتراک') {
+        if (($text === $buyText || $text === '🛒 خرید اشتراک جدید' || $text === '🛒 خرید اشتراک') && Setting::get('btn_buy_enabled','1')==='1') {
             self::showPlansMenu($pdo, $chatId, null, null, null, null);
             return;
         }
-        if ($text === $renewText || $text === '🔄 تمدید اشتراک') {
+        if (($text === $renewText || $text === '🔄 تمدید اشتراک') && Setting::get('btn_renew_enabled','1')==='1') {
             self::showRenewChoice($pdo, $chatId, $fromId);
             return;
         }
-        if ($text === $trialText || $text === '🎁 دریافت تست رایگان' || $text === '/test' || $text === 'تست رایگان') {
+        if (($text === $trialText || $text === '🎁 دریافت تست رایگان' || $text === '/test' || $text === 'تست رایگان') && Setting::get('btn_trial_enabled','1')==='1') {
             self::handleFreeTrialRequest($pdo, $chatId, $fromId);
             return;
         }
 
         $wheelText = Setting::get('btn_wheel_text', '🎰 گردونه شانس و هدیه');
-        if ($text === $wheelText || $text === '🎰 گردونه شانس' || $text === 'گردونه شانس' || $text === '/wheel' || $text === 'هدیه روزانه') {
+        if (($text === $wheelText || $text === '🎰 گردونه شانس' || $text === 'گردونه شانس' || $text === '/wheel' || $text === 'هدیه روزانه') && Setting::get('btn_wheel_enabled','1')==='1') {
             self::handleLuckyWheel($pdo, $chatId, $fromId);
             return;
         }
 
         $walletText = Setting::get('btn_wallet_text', '💳 کیف‌پول و شارژ');
-        if ($text === $walletText || $text === '💳 کیف‌پول و شارژ' || $text === '💳 کیف پول' || $text === 'کیف پول' || $text === '/wallet' || $text === 'شارژ حساب') {
+        if (($text === $walletText || $text === '💳 کیف‌پول و شارژ' || $text === '💳 کیف پول' || $text === 'کیف پول' || $text === '/wallet' || $text === 'شارژ حساب') && Setting::get('btn_wallet_enabled','1')==='1') {
             self::showWalletMenu($pdo, $chatId, $fromId);
             return;
         }
 
-        if ($text === $refText || $text === '🤝 زیرمجموعه‌گیری و درآمد' || $text === '🤝 زیرمجموعه‌گیری و درآمدزایی' || $text === '/referral' || $text === 'زیرمجموعه‌گیری') {
+        if (($text === $refText || $text === '🤝 زیرمجموعه‌گیری و درآمد' || $text === '🤝 زیرمجموعه‌گیری و درآمدزایی' || $text === '/referral' || $text === 'زیرمجموعه‌گیری') && Setting::get('btn_referral_enabled','1')==='1') {
             self::showReferralInfo($pdo, $chatId, $fromId);
             return;
         }
-        if ($text === $appsText || $text === '📱 دانلود نرم‌افزارها') {
+        if (($text === $appsText || $text === '📱 دانلود نرم‌افزارها') && Setting::get('btn_apps_enabled','1')==='1') {
             self::showAppsDownload($pdo, $chatId);
             return;
         }
-        if ($text === $supportText || $text === '☎️ پشتیبانی تلگرام') {
+        if (($text === $supportText || $text === '☎️ پشتیبانی تلگرام') && Setting::get('btn_support_enabled','1')==='1') {
             self::enterAiSupport($pdo, $chatId, $fromId);
             return;
         }
-        if ($text === $resellerText || $text === '🤝 درخواست نمایندگی' || $text === '🤝 درخواست پنل نمایندگی' || $text === '/reseller' || $text === '💼 اخذ نمایندگی') {
+        if (($text === $resellerText || $text === '🤝 درخواست نمایندگی' || $text === '🤝 درخواست پنل نمایندگی' || $text === '/reseller' || $text === '💼 اخذ نمایندگی') && Setting::get('btn_reseller_enabled','1')==='1') {
             self::startResellerApplication($pdo, $chatId, $fromId);
             return;
         }
+        // v4.0.52 FIX: Missing reply keyboard handlers for monitoring/financial/points/usage/panel - glass worked but reply didn't
+        if (($text === $monitoringText || $text === '📊 وضعیت سرورها LIVE' || $text === 'وضعیت سرورها' || $text === '/monitoring') && Setting::get('btn_monitoring_enabled','1')==='1') {
+            self::showMonitoringForUser($pdo, $chatId, $fromId);
+            return;
+        }
+        if (($text === $financialText || $text === '💹 گزارش مالی' || $text === 'گزارش مالی' || $text === '/financial') && Setting::get('btn_financial_enabled','1')==='1') {
+            self::showFinancialForUser($pdo, $chatId, $fromId);
+            return;
+        }
+        if (($text === $pointsText || $text === '🏆 امتیاز و جایزه' || $text === 'امتیاز' || $text === '/points') && Setting::get('btn_points_enabled','1')==='1') {
+            self::showPointsForUser($pdo, $chatId, $fromId);
+            return;
+        }
+        if (($text === $usageText || $text === '📈 مصرف و تاریخچه' || $text === 'مصرف' || $text === '/usage') && Setting::get('btn_usage_enabled','1')==='1') {
+            self::showUsageForUser($pdo, $chatId, $fromId);
+            return;
+        }
+        if (($text === $panelLoginText || $text === '🔐 ورود به پنل وب' || $text === '/panel' || $text === '/login' || $text === 'پنل' || $text === 'ورود به پنل') && Setting::get('btn_panel_login_enabled','1')==='1') {
+            self::showPanelCredentials($pdo, $chatId, $fromId);
+            return;
+        }
 
+        // B2: Smart Search - e.g. "50 گیگ یکماهه", "100 گیگ"
         // B2: Smart Search - e.g. "50 گیگ یکماهه", "100 گیگ"
         if (preg_match('/\d+\s*(گیگ|gb|ماه|روز)/i', $text) || strpos($text, 'گیگ') !== false || strpos($text, 'ماهه') !== false) {
             try {
@@ -1786,12 +1898,6 @@ class TelegramBotController {
                     return;
                 }
             } catch (Throwable $e) {}
-        }
-
-        // Web Panel Credentials Button / Commands
-        if ($text === '🔐 ورود به پنل وب' || $text === '/panel' || $text === '/login' || $text === 'پنل' || $text === 'ورود به پنل') {
-            self::showPanelCredentials($pdo, $chatId, $fromId);
-            return;
         }
 
         // Step 1: Link panel username
@@ -4597,7 +4703,7 @@ class TelegramBotController {
             Setting::set("bot_topic_{$tk}", trim($_POST["bot_topic_{$tk}"] ?? ''));
         }
 
-        // Feature: Custom Button Labels & Visibility Toggles
+        // Feature: Custom Button Labels & Visibility Toggles - v4.0.52 FIX: include monitoring/financial/points/usage
         $buttonKeys = [
             'buy' => '🛒 خرید اشتراک',
             'renew' => '🔄 تمدید اشتراک',
@@ -4611,6 +4717,10 @@ class TelegramBotController {
             'reseller' => '💼 اخذ نمایندگی',
             'panel_login' => '🔐 ورود به پنل وب',
             'webapp' => '🚀 مینی‌اپ تلگرام (Mini App)',
+            'monitoring' => '📊 وضعیت سرورها LIVE',
+            'financial' => '💹 گزارش مالی',
+            'points' => '🏆 امتیاز و جایزه',
+            'usage' => '📈 مصرف و تاریخچه',
         ];
 
         foreach ($buttonKeys as $k => $defText) {
