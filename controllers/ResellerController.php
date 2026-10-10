@@ -699,9 +699,107 @@ class ResellerController {
         require __DIR__ . '/../views/resellers/invoice.php';
     }
 
+
+    public function appConfig(): void {
+        Auth::requireAdmin();
+        $pdo = Database::getConnection();
+        try { Database::ensureExtendedTablesExist($pdo); } catch (Throwable $e) {}
+
+        $resellerId = (int)($_GET['id'] ?? $_GET['reseller_id'] ?? 0);
+        if ($resellerId <= 0) {
+            Helpers::flash('error', 'شناسه نماینده نامعتبر است.');
+            Helpers::redirect('resellers');
+            return;
+        }
+        $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ? AND role = 'reseller'");
+        $stmt->execute([$resellerId]);
+        $reseller = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$reseller) {
+            Helpers::flash('error', 'نماینده مورد نظر یافت نشد.');
+            Helpers::redirect('resellers');
+            return;
+        }
+
+        // Get app config
+        $appConfig = null;
+        try {
+            $stmtCfg = $pdo->prepare("SELECT * FROM reseller_app_config WHERE reseller_id = ? LIMIT 1");
+            $stmtCfg->execute([$resellerId]);
+            $appConfig = $stmtCfg->fetch(PDO::FETCH_ASSOC);
+        } catch (Throwable $e) {
+            $appConfig = null;
+        }
+        if (!$appConfig) {
+            $appConfig = [
+                'api_key' => $reseller['reseller_api_key'] ?? '',
+                'panel_url' => 'https://vpbotn.ir',
+                'hide_app_config' => $reseller['hide_app_config'] ?? 0,
+                'managed_mode' => $reseller['app_managed_mode'] ?? 0,
+            ];
+        }
+
+        require __DIR__ . '/../views/resellers/app_config.php';
+    }
+
+    public function saveAppConfig(): void {
+        Auth::requireAdmin();
+        if (!Helpers::verifyCsrf()) {
+            Helpers::flash('error', 'توکن امنیتی نامعتبر است.');
+            Helpers::redirect('resellers');
+            return;
+        }
+
+        $resellerId = (int)($_POST['reseller_id'] ?? 0);
+        $apiKey = trim($_POST['api_key'] ?? '');
+        $panelUrl = trim($_POST['panel_url'] ?? 'https://vpbotn.ir');
+        $hideAppConfig = !empty($_POST['hide_app_config']) ? 1 : 0;
+        $managedMode = !empty($_POST['managed_mode']) ? 1 : 0;
+
+        if ($resellerId <= 0) {
+            Helpers::flash('error', 'شناسه نماینده نامعتبر است.');
+            Helpers::redirect('resellers');
+            return;
+        }
+
+        $pdo = Database::getConnection();
+        try { Database::ensureExtendedTablesExist($pdo); } catch (Throwable $e) {}
+
+        try {
+            // Ensure table exists
+            $pdo->exec("CREATE TABLE IF NOT EXISTS reseller_app_config (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                reseller_id INT NOT NULL UNIQUE,
+                api_key VARCHAR(512) DEFAULT '',
+                panel_url VARCHAR(512) DEFAULT 'https://vpbotn.ir',
+                hide_app_config TINYINT(1) DEFAULT 0,
+                managed_mode TINYINT(1) DEFAULT 0,
+                preconfigured_servers TEXT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_app_config_reseller (reseller_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+            $stmt = $pdo->prepare("INSERT INTO reseller_app_config (reseller_id, api_key, panel_url, hide_app_config, managed_mode) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE api_key = VALUES(api_key), panel_url = VALUES(panel_url), hide_app_config = VALUES(hide_app_config), managed_mode = VALUES(managed_mode)");
+            $stmt->execute([$resellerId, $apiKey, $panelUrl, $hideAppConfig, $managedMode]);
+
+            // Also update users table for backward compatibility
+            try {
+                $pdo->prepare("UPDATE users SET reseller_api_key = ?, hide_app_config = ?, app_managed_mode = ? WHERE id = ?")->execute([$apiKey, $hideAppConfig, $managedMode, $resellerId]);
+            } catch (Throwable $e) {}
+
+            Helpers::logActivity('reseller_app_config', "ذخیره تنظیمات اپ نماینده #{$resellerId} - hide_config={$hideAppConfig} managed={$managedMode}", 'reseller', (string)$resellerId);
+            Helpers::flash('success', '✅ تنظیمات اپ نماینده با موفقیت ذخیره شد. نماینده اکنون با تنظیمات شما کار خواهد کرد.');
+        } catch (Throwable $e) {
+            Helpers::flash('error', 'خطا در ذخیره: ' . $e->getMessage());
+        }
+
+        Helpers::redirect('resellers/app-config?id=' . $resellerId);
+    }
+
     /**
      * Export Reseller Monthly Invoice CSV
      */
+
     public function exportInvoiceCsv(): void {
         Auth::requireAdmin();
         $pdo = Database::getConnection();

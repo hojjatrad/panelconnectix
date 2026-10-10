@@ -1,7 +1,7 @@
 name: connectix_vpn
-description: Connectix Professional Multiplatform VPN Client - ULTRA Dual-Core Xray + sing-box + v4.0.48 FIX RAPID REFRESH + 5 PATHS FAILED
+description: Connectix Professional Multiplatform VPN Client - ULTRA Dual-Core Xray + sing-box + v4.0.49 API KEY + MANAGED MODE
 publish_to: 'none'
-version: 4.0.48+82
+version: 4.0.49+83
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

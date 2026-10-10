@@ -16,9 +16,11 @@ class _LoginScreenState extends State<LoginScreen> {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _panelUrlController = TextEditingController(text: 'https://vpbotn.ir');
+  final _apiKeyController = TextEditingController();
   bool _isLoading = false;
   String _errorMessage = '';
   List<dynamic> _existingAccounts = [];
+  bool _showApiKeyField = false;
 
   @override
   void initState() {
@@ -32,11 +34,14 @@ class _LoginScreenState extends State<LoginScreen> {
     final u = prefs.getString('saved_username');
     final p = prefs.getString('saved_password');
     final panel = prefs.getString('api_base_url_working') ?? prefs.getString('api_base_url') ?? 'https://vpbotn.ir';
+    final apiKey = prefs.getString('saved_api_key') ?? '';
     if (u != null && p != null) {
       _usernameController.text = u;
       _passwordController.text = p;
     }
     _panelUrlController.text = panel;
+    _apiKeyController.text = apiKey;
+    if (apiKey.isNotEmpty) _showApiKeyField = true;
     // Load existing accounts for quick switch
     try {
       final accStr = prefs.getString('multi_accounts');
@@ -114,6 +119,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final u = _usernameController.text.trim();
     final p = _passwordController.text.trim();
     final panelUrl = _panelUrlController.text.trim().isNotEmpty ? _panelUrlController.text.trim() : 'https://vpbotn.ir';
+    final apiKey = _apiKeyController.text.trim();
 
     if (u.isEmpty || p.isEmpty) {
       setState(() {
@@ -128,10 +134,18 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     // v4.0.47 MULTI-SERVICE: Set baseUrl to user-provided panel before login
+    // v4.0.49 API KEY SUPPORT
     ApiService.baseUrl = panelUrl;
     ApiService.baseUrls = [panelUrl, ...ApiService.baseUrls.where((url) => url != panelUrl)];
+    if (apiKey.isNotEmpty) {
+      ApiService.setApiKey(apiKey);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('saved_api_key', apiKey);
+    }
 
-    final res = await ApiService.login(u, p);
+    final res = apiKey.isNotEmpty 
+        ? await ApiService.loginWithApiKey(username: u, password: p, apiKey: apiKey, panelUrl: panelUrl)
+        : await ApiService.login(u, p);
 
     setState(() {
       _isLoading = false;
@@ -323,6 +337,44 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 6),
                 const Text('💡 می‌توانید از پنل‌های مختلف حساب اضافه کنید - نامحدود multi-service', style: TextStyle(color: Color(0xFF475569), fontSize: 10)),
                 const SizedBox(height: 12),
+                // v4.0.49 API KEY FIELD - Toggle
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('🔑 اتصال با کلید API (اختیاری)', style: TextStyle(color: Color(0xFF64748B), fontSize: 11)),
+                    Switch(
+                      value: _showApiKeyField,
+                      activeColor: const Color(0xFF8B5CF6),
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      onChanged: (v) => setState(() => _showApiKeyField = v),
+                    ),
+                  ],
+                ),
+                if (_showApiKeyField) ...[
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _apiKeyController,
+                    style: const TextStyle(color: Colors.white, fontSize: 12, fontFamily: 'monospace'),
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: const Color(0xFF0F172A),
+                      hintText: 'کلید API (API Key) - برای نماینده‌ها یا اتصال پیشرفته',
+                      hintStyle: const TextStyle(color: Color(0xFF475569), fontSize: 10),
+                      prefixIcon: const Icon(Icons.key_rounded, color: Color(0xFFF59E0B)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: const BorderSide(color: Color(0xFF1E293B)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: const BorderSide(color: Color(0xFFF59E0B), width: 1.5),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text('💡 اگر نماینده هستی، ادمین کلید API را برایت تنظیم می‌کند - نیازی به وارد کردن نیست. اگر خودت ادمین هستی، کلید API پنل را اینجا بگذار تا اتصال مستقیم با API انجام شود.', style: TextStyle(color: Color(0xFF475569), fontSize: 9)),
+                  const SizedBox(height: 12),
+                ],
                 if (_errorMessage.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12),

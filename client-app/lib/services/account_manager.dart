@@ -101,6 +101,7 @@ class AccountManager {
     String avatarEmoji = '👤',
     int serverCount = 0,
     String planTitle = '',
+    String apiKey = '',
   }) async {
     final accounts = await getAccounts();
     final id = '${username.toLowerCase()}@${Uri.tryParse(panelUrl)?.host ?? panelUrl}';
@@ -115,6 +116,7 @@ class AccountManager {
         colorHex: colorHex != '#8B5CF6' ? colorHex : accounts[existingIdx].colorHex,
         avatarEmoji: avatarEmoji != '👤' ? avatarEmoji : accounts[existingIdx].avatarEmoji,
         panelUrl: panelUrl,
+        apiKey: apiKey.isNotEmpty ? apiKey : accounts[existingIdx].apiKey,
       );
       accounts[existingIdx] = account;
     } else {
@@ -128,6 +130,7 @@ class AccountManager {
         lastUsed: DateTime.now().millisecondsSinceEpoch,
         serverCount: serverCount,
         planTitle: planTitle,
+        apiKey: apiKey,
       );
       accounts.add(account);
     }
@@ -184,6 +187,33 @@ class AccountManager {
   static Future<void> setUnifiedEnabled(bool v) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_kUnified, v);
+  }
+
+  // v4.0.49 MANAGED MODE - hide config from reseller
+  static const String _kManagedMode = 'app_managed_mode';
+  static const String _kHideConfig = 'hide_app_config';
+
+  static Future<bool> isManagedMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_kManagedMode) ?? false;
+  }
+
+  static Future<void> setManagedMode(bool v) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kManagedMode, v);
+  }
+
+  static Future<bool> isHideConfig() async {
+    final prefs = await SharedPreferences.getInstance();
+    // Check both managed mode and explicit hide flag
+    final managed = prefs.getBool(_kManagedMode) ?? false;
+    final hide = prefs.getBool(_kHideConfig) ?? false;
+    return managed || hide;
+  }
+
+  static Future<void> setHideConfig(bool v) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kHideConfig, v);
   }
 
   // Generate random color for new account

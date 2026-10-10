@@ -757,6 +757,41 @@ class Database {
                 )");
             } catch (Throwable $e) {}
 
+            // v4.0.49 NEW: Reseller App Config - Managed Mode + API Key
+            try {
+                $pdo->exec("CREATE TABLE IF NOT EXISTS reseller_app_config (
+                    id $autoInc,
+                    reseller_id INT NOT NULL,
+                    api_key VARCHAR(255) NULL,
+                    panel_url VARCHAR(500) DEFAULT 'https://vpbotn.ir',
+                    hide_app_config TINYINT(1) DEFAULT 0,
+                    managed_mode TINYINT(1) DEFAULT 0,
+                    preconfigured_servers TEXT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(reseller_id),
+                    INDEX idx_app_config_reseller (reseller_id)
+                )");
+            } catch (Throwable $e) {}
+
+            // v4.0.49: Add columns to users for quick access
+            try {
+                $cols = $pdo->query("SHOW COLUMNS FROM users")->fetchAll(PDO::FETCH_COLUMN);
+            } catch (Throwable $e) {
+                $cols = [];
+            }
+            if (is_array($cols)) {
+                if (!in_array('app_managed_mode', $cols)) {
+                    try { $pdo->exec("ALTER TABLE users ADD COLUMN app_managed_mode TINYINT(1) DEFAULT 0"); } catch (Throwable $e) {}
+                }
+                if (!in_array('hide_app_config', $cols)) {
+                    try { $pdo->exec("ALTER TABLE users ADD COLUMN hide_app_config TINYINT(1) DEFAULT 0"); } catch (Throwable $e) {}
+                }
+                if (!in_array('reseller_api_key', $cols)) {
+                    try { $pdo->exec("ALTER TABLE users ADD COLUMN reseller_api_key VARCHAR(255) NULL"); } catch (Throwable $e) {}
+                }
+            }
+
 
             $planCols = [
                 'show_in_bot' => 'TINYINT(1) DEFAULT 1',

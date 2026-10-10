@@ -376,6 +376,40 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
         // Update last connected
         $pdo->prepare("UPDATE clients SET last_connected_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$client['id']]);
 
+        // v4.0.49 MANAGED MODE + API KEY: Get reseller config
+        $isReseller = false;
+        $hideAppConfig = false;
+        $managedMode = false;
+        $resellerApiKey = '';
+        try {
+            if (!empty($client['reseller_id'])) {
+                $stmtReseller = $pdo->prepare("SELECT * FROM users WHERE id = ? LIMIT 1");
+                $stmtReseller->execute([(int)$client['reseller_id']]);
+                $reseller = $stmtReseller->fetch(PDO::FETCH_ASSOC);
+                if ($reseller) {
+                    $isReseller = ($reseller['role'] ?? '') === 'reseller';
+                    $hideAppConfig = (int)($reseller['hide_app_config'] ?? 0) === 1;
+                    $managedMode = (int)($reseller['app_managed_mode'] ?? 0) === 1;
+                    $resellerApiKey = $reseller['reseller_api_key'] ?? '';
+                }
+                // Check reseller_app_config table
+                $stmtAppCfg = $pdo->prepare("SELECT * FROM reseller_app_config WHERE reseller_id = ? LIMIT 1");
+                $stmtAppCfg->execute([(int)$client['reseller_id']]);
+                $appCfg = $stmtAppCfg->fetch(PDO::FETCH_ASSOC);
+                if ($appCfg) {
+                    if ((int)($appCfg['hide_app_config'] ?? 0) === 1) $hideAppConfig = true;
+                    if ((int)($appCfg['managed_mode'] ?? 0) === 1) $managedMode = true;
+                    if (!empty($appCfg['api_key'])) $resellerApiKey = $appCfg['api_key'];
+                }
+            }
+            // Check API key from request header
+            $requestApiKey = $_SERVER['HTTP_X_API_KEY'] ?? $_SERVER['HTTP_X_RESELLER_API_KEY'] ?? $_POST['api_key'] ?? $_GET['api_key'] ?? '';
+            if (!empty($requestApiKey)) {
+                // Validate API key if needed - for now accept and log
+                $resellerApiKey = $requestApiKey;
+            }
+        } catch (Throwable $e) {}
+
         self::jsonSuccess([
             'auth_token' => $appToken,
             'client' => [
@@ -393,10 +427,20 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
                 'expire_at' => $client['expire_at'],
                 'days_remaining' => $daysRemaining,
                 'ip_limit' => (int)($client['ip_limit'] ?? 0),
-                'sub_url' => Helpers::subUrl($client['sub_token'])
+                'sub_url' => Helpers::subUrl($client['sub_token']),
+                'is_reseller' => $isReseller,
+                'hide_app_config' => $hideAppConfig,
+                'managed_mode' => $managedMode,
+                'api_key' => $resellerApiKey,
             ],
             'servers' => self::extractServerList($client, $pdo),
-            'branding' => self::appBrandingPayload($client)
+            'branding' => array_merge(self::appBrandingPayload($client), [
+                'hide_app_config' => $hideAppConfig,
+                'managed_mode' => $managedMode,
+                'app_managed_mode' => $managedMode,
+                'api_key' => $resellerApiKey,
+                'is_reseller' => $isReseller,
+            ])
         ], 'ورود به اپلیکیشن با موفقیت انجام شد.');
     }
 

@@ -143,6 +143,9 @@ $pendingCount = $pendingAppsCount ?? 0;
                         </td>
                         <td class="p-3.5 text-center whitespace-nowrap">
                             <div class="flex items-center justify-center gap-1.5">
+                                <a href="<?= Helpers::url('resellers/app-config?id=' . $r['id']) ?>" class="w-8 h-8 rounded-xl bg-violet-500/10 hover:bg-violet-500/20 text-violet-300 border border-violet-500/30 transition flex items-center justify-center text-xs" title="تنظیمات اپ نماینده - کلید API و حالت مدیریتی (v4.0.49)">
+                                    <i class="fa-solid fa-mobile-screen"></i>
+                                </a>
                                 <a href="<?= Helpers::url('resellers/permissions?reseller_id=' . $r['id']) ?>" class="w-8 h-8 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 transition flex items-center justify-center text-xs" title="سطح دسترسی و منوها (Permissions)">
                                     <i class="fa-solid fa-user-shield"></i>
                                 </a>

@@ -85,6 +85,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   List<VpnAccount> _accounts = [];
   VpnAccount? _activeAccount;
   bool _unifiedEnabled = false;
+  // v4.0.49 MANAGED MODE
+  bool _isManagedMode = false;
+  bool _hideConfig = false;
 
   static const String currentAppVersion = '4.0.47';
   static String _actualInstalledVersion = '4.0.47'; // Will be updated from PackageManager
@@ -360,11 +363,15 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       final accounts = await AccountManager.getAccounts();
       final active = await AccountManager.getActiveAccount();
       final unified = await AccountManager.isUnifiedEnabled();
+      final managed = await AccountManager.isManagedMode();
+      final hideConfig = await AccountManager.isHideConfig();
       if (mounted) {
         setState(() {
           _accounts = accounts;
           _activeAccount = active;
           _unifiedEnabled = unified;
+          _isManagedMode = managed;
+          _hideConfig = hideConfig;
         });
       }
     } catch (_) {}
@@ -2549,7 +2556,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               const SizedBox(height: 12),
               Row(
                 children: [
-                  Expanded(child: OutlinedButton.icon(onPressed: () { Navigator.pop(ctx); Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageAccountsScreen())).then((_) => _loadAccounts()); }, icon: const Icon(Icons.settings_rounded, size: 16), label: const Text('مدیریت حساب‌ها', style: TextStyle(fontSize: 12)), style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF94A3B8), side: const BorderSide(color: Color(0xFF334155)), padding: const EdgeInsets.symmetric(vertical: 12)))),
+                  if (!_hideConfig) Expanded(child: OutlinedButton.icon(onPressed: () { Navigator.pop(ctx); Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageAccountsScreen())).then((_) => _loadAccounts()); }, icon: const Icon(Icons.settings_rounded, size: 16), label: const Text('مدیریت حساب‌ها', style: TextStyle(fontSize: 12)), style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF94A3B8), side: const BorderSide(color: Color(0xFF334155)), padding: const EdgeInsets.symmetric(vertical: 12)))),
                   const SizedBox(width: 10),
                   Expanded(child: ElevatedButton.icon(onPressed: () { Navigator.pop(ctx); Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageAccountsScreen(isAdding: true))).then((_) => _loadAccounts()); }, icon: const Icon(Icons.person_add_rounded, size: 18), label: const Text('افزودن حساب', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366F1), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))))),
                 ],

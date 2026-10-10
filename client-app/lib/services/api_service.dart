@@ -656,6 +656,46 @@ class ApiService {
     throw lastError ?? Exception('All fallback domains failed for $path');
   }
 
+  // v4.0.49 API KEY SUPPORT: Login via API key + username/password
+  static String? _customApiKey;
+  static void setApiKey(String? key) {
+    _customApiKey = key;
+  }
+  static String? get customApiKey => _customApiKey;
+
+  static Future<Map<String, dynamic>> loginWithApiKey({
+    required String username,
+    required String password,
+    required String apiKey,
+    String? panelUrl,
+  }) async {
+    _customApiKey = apiKey;
+    if (panelUrl != null && panelUrl.isNotEmpty) {
+      baseUrl = panelUrl;
+      baseUrls = [panelUrl, ...baseUrls.where((u) => u != panelUrl)];
+    }
+    final result = await login(username, password);
+    if (result['success'] == true) {
+      // Save apiKey to account
+      try {
+        final accounts = await AccountManager.getAccounts();
+        final id = '${username.toLowerCase()}@${Uri.tryParse(panelUrl ?? baseUrl)?.host ?? baseUrl}';
+        final idx = accounts.indexWhere((a) => a.id == id);
+        if (idx >= 0) {
+          await AccountManager.updateAccountMeta(id, displayName: null, colorHex: null, avatarEmoji: null);
+          // Save apiKey via addOrUpdate
+          await AccountManager.addOrUpdateAccount(
+            username: username,
+            password: password,
+            panelUrl: panelUrl ?? baseUrl,
+            apiKey: apiKey,
+          );
+        }
+      } catch (_) {}
+    }
+    return result;
+  }
+
   // v8.0: Login with intelligent resolver + migration handling
   static Future<Map<String, dynamic>> login(String username, String password) async {
     final orderedUrls = getOrderedBaseUrls();
@@ -669,10 +709,20 @@ class ApiService {
       try {
         log('login try ${i+1}/${orderedUrls.length}: $currentBase');
         final url = Uri.parse("$currentBase/api/v1/app/login");
+        final loginHeaders = {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          if (_customApiKey != null && _customApiKey!.isNotEmpty) 'X-API-Key': _customApiKey!,
+          if (_customApiKey != null && _customApiKey!.isNotEmpty) 'X-Reseller-API-Key': _customApiKey!,
+        };
         final response = await http.post(
           url,
-          headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-          body: jsonEncode({'username': username, 'password': password}),
+          headers: loginHeaders,
+          body: jsonEncode({
+            'username': username, 
+            'password': password,
+            if (_customApiKey != null && _customApiKey!.isNotEmpty) 'api_key': _customApiKey,
+          }),
         ).timeout(const Duration(seconds: 12));
 
         // Check for migration headers/body before parsing
@@ -685,8 +735,16 @@ class ApiService {
             final retryUrl = Uri.parse("$migratedUrl/api/v1/app/login");
             final retryResp = await http.post(
               retryUrl,
-              headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-              body: jsonEncode({'username': username, 'password': password}),
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                if (_customApiKey != null && _customApiKey!.isNotEmpty) 'X-API-Key': _customApiKey!,
+              },
+              body: jsonEncode({
+                'username': username,
+                'password': password,
+                if (_customApiKey != null && _customApiKey!.isNotEmpty) 'api_key': _customApiKey,
+              }),
             ).timeout(const Duration(seconds: 12));
             final retryData = jsonDecode(utf8.decode(retryResp.bodyBytes));
             if (retryData['success'] == true) {
@@ -783,7 +841,20 @@ class ApiService {
     }
 
     // v4.0.47 MULTI-ACCOUNT: save to account manager
+    // v4.0.49 MANAGED MODE + API KEY
     try {
+      // Check if branding has hide config or managed mode flags
+      final hideConfig = brandingMap['hide_app_config'] == true || brandingMap['hide_config'] == true || brandingMap['managed_mode'] == true;
+      final managedMode = brandingMap['managed_mode'] == true || brandingMap['app_managed_mode'] == true;
+      if (hideConfig) await AccountManager.setHideConfig(true);
+      if (managedMode) await AccountManager.setManagedMode(true);
+      // Also check client flags
+      final clientHide = clientMap['hide_app_config'] == true || clientMap['is_reseller'] == true;
+      if (clientHide) {
+        // If user is reseller, check if admin wants to hide config
+        // This will be controlled via reseller permissions
+      }
+      
       final account = await AccountManager.addOrUpdateAccount(
         username: username,
         password: password,
@@ -791,6 +862,7 @@ class ApiService {
         serverCount: initialServers.length,
         planTitle: clientMap['plan_title']?.toString() ?? clientMap['plan']?.toString() ?? '',
         displayName: clientMap['customer_name']?.toString() ?? '',
+        apiKey: clientMap['api_key']?.toString() ?? brandingMap['api_key']?.toString() ?? '',
       );
       await AccountManager.saveAccountToken(account.id, token);
       if (clientMap.isNotEmpty) await AccountManager.saveAccountClient(account.id, clientMap);

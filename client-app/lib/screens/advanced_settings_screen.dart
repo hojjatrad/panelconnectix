@@ -7,6 +7,7 @@ import 'proxy_screen.dart';
 import 'gps_spoof_screen.dart';
 import 'manage_accounts_screen.dart';
 import '../services/api_service.dart';
+import '../services/account_manager.dart';
 
 class AdvancedSettingsScreen extends StatefulWidget {
   final List<String> defaultBypassList;
@@ -40,6 +41,9 @@ class _AdvancedSettingsScreenState extends State<AdvancedSettingsScreen> {
 
   static const MethodChannel _channel = MethodChannel('com.connectix.vpn/updater');
 
+  bool _isManagedMode = false;
+  bool _hideConfig = false;
+
   @override
   void initState() {
     super.initState();
@@ -47,6 +51,16 @@ class _AdvancedSettingsScreenState extends State<AdvancedSettingsScreen> {
     _autoReconnect = widget.autoReconnectEnabled;
     _winMode = widget.winTunnelMode;
     _loadAutoPause();
+    _loadManagedMode();
+  }
+
+  Future<void> _loadManagedMode() async {
+    final managed = await AccountManager.isManagedMode();
+    final hide = await AccountManager.isHideConfig();
+    if (mounted) setState(() {
+      _isManagedMode = managed;
+      _hideConfig = hide;
+    });
   }
 
   Future<void> _loadAutoPause() async {
@@ -167,20 +181,44 @@ class _AdvancedSettingsScreenState extends State<AdvancedSettingsScreen> {
             ),
             const SizedBox(height: 10),
 
-            // v4.0.47 MULTI-ACCOUNT: Manage Accounts
-            _buildQuickToolCard(
-              context: context,
-              icon: Icons.switch_account_rounded,
-              iconColor: const Color(0xFF8B5CF6),
-              title: 'مدیریت حساب‌ها - چند اکانتی نامحدود',
-              subtitle: 'افزودن حساب از پنل‌های مختلف (multi-service)',
-              badge: 'نامحدود',
-              badgeColor: const Color(0xFF10B981),
-              onTap: () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageAccountsScreen())).then((_) => setState(() {}));
-              },
-            ),
-            const SizedBox(height: 10),
+            // v4.0.47 MULTI-ACCOUNT: Manage Accounts - hidden in managed mode for resellers
+            if (!_hideConfig) ...[
+              _buildQuickToolCard(
+                context: context,
+                icon: Icons.switch_account_rounded,
+                iconColor: const Color(0xFF8B5CF6),
+                title: 'مدیریت حساب‌ها - چند اکانتی نامحدود',
+                subtitle: 'افزودن حساب از پنل‌های مختلف (multi-service) + API Key',
+                badge: 'نامحدود',
+                badgeColor: const Color(0xFF10B981),
+                onTap: () {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageAccountsScreen())).then((_) => setState(() {}));
+                },
+              ),
+              const SizedBox(height: 10),
+            ] else ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E293B),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF334155)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.lock_rounded, color: Color(0xFF64748B), size: 20),
+                    const SizedBox(width: 10),
+                    const Expanded(child: Text('مدیریت حساب‌ها توسط ادمین قفل شده - حالت مدیریتی', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12))),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(color: const Color(0xFF334155), borderRadius: BorderRadius.circular(8)),
+                      child: const Text('مدیریتی', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 9)),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
 
             // v4.0.45: Smart Connect moved here too
             _buildQuickToolCard(

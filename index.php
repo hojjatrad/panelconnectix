@@ -584,6 +584,10 @@ $router->get('resellers/applications', [ResellerController::class, 'applications
 $router->post('resellers/applications/approve', [ResellerController::class, 'approveApplication']);
 $router->post('resellers/applications/reject', [ResellerController::class, 'rejectApplication']);
 
+// v4.0.49: Reseller App Config (Managed Mode + API Key)
+$router->get('resellers/app-config', [ResellerController::class, 'appConfig']);
+$router->post('resellers/app-config/save', [ResellerController::class, 'saveAppConfig']);
+
 // v4.0.47: Reseller Permissions & Sync
 $router->get('resellers/permissions', [ResellerPermissionController::class, 'index']);
 $router->post('resellers/permissions/save', [ResellerPermissionController::class, 'save']);

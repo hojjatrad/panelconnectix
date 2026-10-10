@@ -10,6 +10,7 @@ class VpnAccount {
   final int lastUsed;
   final int serverCount;
   final String planTitle;
+  final String apiKey; // v4.0.49 API KEY support
 
   VpnAccount({
     required this.id,
@@ -21,6 +22,7 @@ class VpnAccount {
     this.lastUsed = 0,
     this.serverCount = 0,
     this.planTitle = '',
+    this.apiKey = '',
   });
 
   String get effectiveName => displayName.isNotEmpty ? displayName : username;
@@ -33,6 +35,8 @@ class VpnAccount {
     }
   }
 
+  bool get hasApiKey => apiKey.isNotEmpty;
+
   Map<String, dynamic> toJson() => {
     'id': id,
     'username': username,
@@ -43,6 +47,7 @@ class VpnAccount {
     'lastUsed': lastUsed,
     'serverCount': serverCount,
     'planTitle': planTitle,
+    'apiKey': apiKey,
   };
 
   factory VpnAccount.fromJson(Map<String, dynamic> j) => VpnAccount(
@@ -55,6 +60,7 @@ class VpnAccount {
     lastUsed: j['lastUsed'] ?? j['last_used'] ?? 0,
     serverCount: j['serverCount'] ?? j['server_count'] ?? 0,
     planTitle: j['planTitle'] ?? j['plan_title'] ?? '',
+    apiKey: j['apiKey'] ?? j['api_key'] ?? '',
   );
 
   VpnAccount copyWith({
@@ -65,6 +71,7 @@ class VpnAccount {
     int? serverCount,
     String? planTitle,
     String? panelUrl,
+    String? apiKey,
   }) => VpnAccount(
     id: id,
     username: username,
@@ -75,6 +82,7 @@ class VpnAccount {
     lastUsed: lastUsed ?? this.lastUsed,
     serverCount: serverCount ?? this.serverCount,
     planTitle: planTitle ?? this.planTitle,
+    apiKey: apiKey ?? this.apiKey,
   );
 }
 
