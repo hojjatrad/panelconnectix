@@ -883,8 +883,14 @@ class ClientController {
         $statusFilter = trim($_GET['status'] ?? '');
         $serverGroup = trim($_GET['group'] ?? '');
         $planFilter = (int)($_GET['plan_id'] ?? 0);
+        $deletedFilter = trim($_GET['deleted_filter'] ?? '');
 
         $where = $isAdmin ? ["1=1"] : ["c.reseller_id = " . intval($userId)];
+        if ($deletedFilter === 'only_deleted') {
+            $where[] = "(c.is_local_deleted = 1 OR c.is_deleted_local = 1)";
+        } elseif ($deletedFilter !== 'all') {
+            $where[] = "((c.is_local_deleted = 0 OR c.is_local_deleted IS NULL) AND (c.is_deleted_local = 0 OR c.is_deleted_local IS NULL))";
+        }
         $params = [];
 
         if (!empty($search)) {
