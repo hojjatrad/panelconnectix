@@ -4,11 +4,7 @@ require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Setting.php';
 
 class Updater {
-<<<<<<< HEAD
-    public const CURRENT_VERSION = '4.0.48'; // v4.0.47 Panel - Reseller Sync Auto + Permissions All Menus + Multi-Account Unlimited
-=======
     public const CURRENT_VERSION = '4.0.48'; // v4.0.48 Panel - FIX RAPID REFRESH + 5 PATHS FAILED + Reseller Sync + Permissions + Multi-Account
->>>>>>> 65898d9 (v4.0.48 FIX RAPID REFRESH + 5 PATHS FAILED)
 
     public static function getCurrentVersion(): string {
         $dbVer = Setting::get('current_version', '');
