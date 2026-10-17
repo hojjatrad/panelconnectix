@@ -3420,7 +3420,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
               const SizedBox(height: 8),
 
-              if (Platform.isWindows) ...[              if (Platform.isWindows) ...[
+              if (Platform.isWindows) ...[
                 const SizedBox(height: 18),
                 // Windows tunnel flavor selector (Phase 1: system proxy,
                 // Phase 2: full TUN VPN).
