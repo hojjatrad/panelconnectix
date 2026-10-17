@@ -955,6 +955,57 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
   }
 
+  // v4.0.65 NEW: Ping all servers on first page per user request
+  Future<void> _pingAllServers() async {
+    if (_isRefreshing || _servers.isEmpty) return;
+    setState(() => _isRefreshing = true);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('در حال پینگ همه سرورها...'), backgroundColor: Color(0xFF10B981), duration: Duration(seconds: 2)),
+    );
+    try {
+      int bestPing = 99999;
+      ServerModel? bestServer;
+      for (int i = 0; i < _servers.length && i < 10; i++) {
+        final s = _servers[i];
+        if (s.configUri.isEmpty) continue;
+        try {
+          final parser = V2RayCompat.parseUniversal(s.configUri);
+          int? delay;
+          try {
+            delay = await _flutterV2ray.getServerDelay(config: parser.getFullConfiguration()).timeout(const Duration(seconds: 3), onTimeout: () => -1);
+          } catch (_) {}
+          delay ??= await ApiService.pingServerUri(s.configUri);
+          if (delay != null && delay > 0 && delay < 10000) {
+            s.pingMs = delay;
+            if (delay < bestPing) {
+              bestPing = delay;
+              bestServer = s;
+            }
+          } else {
+            s.pingMs = 0;
+          }
+        } catch (_) {
+          s.pingMs = 0;
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _currentServerPing = bestServer?.pingMs;
+          if (bestServer != null) _selectedServer = bestServer;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(bestServer != null ? '✅ بهترین سرور: ${bestServer.name} (${bestPing}ms)' : 'پینگ همه سرورها انجام شد'), backgroundColor: const Color(0xFF10B981)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا در پینگ: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _isRefreshing = false);
+    }
+  }
+
   // In-App Auto-Update & In-Place Installer Flow
   void _checkAppUpdate() async {
     if (_hasAppUpdate && _updateInfo != null) {
@@ -3175,40 +3226,68 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
               const SizedBox(height: 16),
 
-              // v4.0.46 NO-SCROLL OPTIMIZATION: Keep ONLY Smart Connect on first page per user request
-              // Proxy, GPS, TV moved to gear settings, but Smart Connect stays on first page
-              // This keeps first page no-scroll (only 1 button) + smart connect convenience
-              Center(
-                child: InkWell(
-                  onTap: _smartConnect,
-                  borderRadius: BorderRadius.circular(16),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1E1B4B),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFF4338CA)),
-                    ),
-                    child: Row(
-                      textDirection: TextDirection.rtl,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _isSmartConnecting
-                            ? const SizedBox(
-                                width: 14,
-                                height: 14,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF818CF8)),
-                              )
-                            : const Icon(Icons.bolt_rounded, color: Colors.amber, size: 16),
-                        const SizedBox(width: 6),
-                        const Text(
-                          'اتصال هوشمند - بهترین سرور',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
+              // v4.0.65 FINAL UI - First page: Smart Connect + Ping All + Speed always visible
+              // Per user request: remove proxy/GPS/TV from first page (only in settings), add ping all + smart + speed on first page
+              // v4.0.46 NO-SCROLL kept, but now 2 buttons row + speed row
+              Row(
+                textDirection: TextDirection.rtl,
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      onTap: _isSmartConnecting ? null : _smartConnect,
+                      borderRadius: BorderRadius.circular(14),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E1B4B),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFF4338CA)),
                         ),
-                      ],
+                        child: Row(
+                          textDirection: TextDirection.rtl,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            _isSmartConnecting
+                                ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF818CF8)))
+                                : const Icon(Icons.bolt_rounded, color: Colors.amber, size: 16),
+                            const SizedBox(width: 5),
+                            const Flexible(
+                              child: Text('اتصال هوشمند', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: InkWell(
+                      onTap: _isRefreshing ? null : _pingAllServers,
+                      borderRadius: BorderRadius.circular(14),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0F172A),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFF10B981).withOpacity(0.5)),
+                        ),
+                        child: Row(
+                          textDirection: TextDirection.rtl,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            _isRefreshing
+                                ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF10B981)))
+                                : const Icon(Icons.speed_rounded, color: Color(0xFF10B981), size: 16),
+                            const SizedBox(width: 5),
+                            const Flexible(
+                              child: Text('پینگ همه', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
 
               const SizedBox(height: 8),
@@ -3261,42 +3340,62 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
               ),
 
-              // Live Real-Time Speed Badges (Upload / Download)
-              // LAW 12 v4.0.40: Wrap speed chips in FittedBox + Directionality to prevent RTL flip and overflow blocking buttons
-              if (_isConnected) ...[
-                const SizedBox(height: 10),
-                ValueListenableBuilder<V2RayStatus>(
-                  valueListenable: _v2rayStatus,
-                  builder: (context, status, _) {
-                    return Directionality(
-                      textDirection: TextDirection.rtl,
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Row(
-                          textDirection: TextDirection.rtl,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _buildSpeedChip(
-                              icon: Icons.arrow_downward_rounded,
-                              label: 'دانلود',
-                              bytes: status.downloadSpeed,
-                              color: const Color(0xFF10B981),
-                            ),
+              // v4.0.65 FINAL UI: Speed always visible on first page (even when disconnected, shows 0)
+              // Per user request: bring upload/download speed to first page
+              const SizedBox(height: 10),
+              ValueListenableBuilder<V2RayStatus>(
+                valueListenable: _v2rayStatus,
+                builder: (context, status, _) {
+                  final dl = _isConnected ? status.downloadSpeed : 0;
+                  final ul = _isConnected ? status.uploadSpeed : 0;
+                  return Directionality(
+                    textDirection: TextDirection.rtl,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        textDirection: TextDirection.rtl,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildSpeedChip(
+                            icon: Icons.arrow_downward_rounded,
+                            label: 'دانلود',
+                            bytes: dl,
+                            color: const Color(0xFF10B981),
+                          ),
+                          const SizedBox(width: 10),
+                          _buildSpeedChip(
+                            icon: Icons.arrow_upward_rounded,
+                            label: 'آپلود',
+                            bytes: ul,
+                            color: const Color(0xFF6366F1),
+                          ),
+                          if (_currentServerPing != null) ...[
                             const SizedBox(width: 10),
-                            _buildSpeedChip(
-                              icon: Icons.arrow_upward_rounded,
-                              label: 'آپلود',
-                              bytes: status.uploadSpeed,
-                              color: const Color(0xFF6366F1),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: (_currentServerPing == 0 ? const Color(0xFF6366F1) : const Color(0xFF10B981)).withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: (_currentServerPing == 0 ? const Color(0xFF6366F1) : const Color(0xFF10B981)).withOpacity(0.3)),
+                              ),
+                              child: Row(
+                                textDirection: TextDirection.rtl,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.network_ping_rounded, size: 12, color: _currentServerPing == 0 ? const Color(0xFF818CF8) : const Color(0xFF34D399)),
+                                  const SizedBox(width: 4),
+                                  Text(_currentServerPing == 0 ? 'آماده' : '${_currentServerPing}ms', style: TextStyle(color: _currentServerPing == 0 ? const Color(0xFF818CF8) : const Color(0xFF34D399), fontSize: 11, fontWeight: FontWeight.bold)),
+                                ],
+                              ),
                             ),
                           ],
-                        ),
+                        ],
                       ),
-                    );
-                  },
-                ),
-              ],
+                    ),
+                  );
+                },
+              ),
 
               if (Platform.isWindows) ...[
                 const SizedBox(height: 18),
