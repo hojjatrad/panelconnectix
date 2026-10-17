@@ -182,6 +182,10 @@ class TelegramBotController {
     }
 
     public static function getPlansForReseller(PDO $pdo, int $resellerId, bool $includeFree = false): array {
+        if (class_exists('BotContextService')) {
+            return BotContextService::getPlansForReseller($pdo, $resellerId, $includeFree);
+        }
+    
         Database::ensureExtendedTablesExist($pdo);
         $sql = "SELECT p.*, 
                        COALESCE(rp.custom_title, p.title) as display_title,
@@ -302,6 +306,11 @@ class TelegramBotController {
      * Main Menu Inline Keyboard with dynamic toggles, 2-column pairing & Mini App support
      */
     public static function getMainMenuInlineKeyboard(?PDO $pdo = null, ?string $fromId = null): array {
+        if (class_exists('BotKeyboardService')) {
+            return BotKeyboardService::getMainMenuInlineKeyboard($pdo, $fromId);
+        }
+        // Fallback original:
+    
         $boundCount = 0;
         if ($pdo && $fromId) {
             $stmt = $pdo->prepare("SELECT COUNT(*) FROM clients WHERE telegram_chat_id = ?");
@@ -398,6 +407,11 @@ class TelegramBotController {
      * Main Menu Reply Keyboard (Fixed at bottom chat input - Clean dynamic 2-column layout)
      */
     public static function getMainMenuReplyKeyboard(): array {
+        if (class_exists('BotKeyboardService')) {
+            return BotKeyboardService::getMainMenuReplyKeyboard();
+        }
+        // Fallback:
+    
         $items = [];
         if (Setting::get('btn_buy_enabled', '1') === '1') {
             $items[] = ['text' => Setting::get('btn_buy_text', '🛒 خرید اشتراک')];
@@ -459,6 +473,12 @@ class TelegramBotController {
     }
 
     public static function recordBotUser(PDO $pdo, array $from, int $resellerId = 1): void {
+        if (class_exists('BotContextService')) {
+            BotContextService::recordBotUser($pdo, $from, $resellerId);
+            return;
+        }
+        // fallback:
+    
         $tgId = (string)($from['id'] ?? '');
         if (empty($tgId)) return;
 
@@ -494,6 +514,18 @@ class TelegramBotController {
      * Process user or admin callback queries
      */
     private static function processCallbackQuery(PDO $pdo, array $cb): void {
+        // v4.0.53 Delegated to BotCallbackHandler with toggle enforcement + cache
+        if (class_exists('BotCallbackHandler')) {
+            try {
+                BotCallbackHandler::handle($pdo, $cb);
+                return;
+            } catch (Throwable $e) {
+                error_log("BotCallbackHandler failed, falling back: " . $e->getMessage());
+            }
+        }
+        // Fallback original logic below (will be removed in v4.0.54 when fully migrated)
+        // ORIGINAL PROCESS CALLBACK QUERY LOGIC:
+    
         $cbId = $cb['id'];
         $fromId = (string)($cb['from']['id'] ?? '');
         $data = $cb['data'] ?? '';
@@ -1527,6 +1559,18 @@ class TelegramBotController {
      * Process standard chat messages (Text, Photos)
      */
     private static function processMessage(PDO $pdo, array $msg): void {
+        // v4.0.53 Delegated to BotMessageHandler with reply keyboard fix for monitoring/financial/points/usage
+        if (class_exists('BotMessageHandler')) {
+            try {
+                BotMessageHandler::handle($pdo, $msg);
+                return;
+            } catch (Throwable $e) {
+                error_log("BotMessageHandler failed, falling back: " . $e->getMessage());
+            }
+        }
+        // Fallback original logic below
+        // ORIGINAL PROCESS MESSAGE LOGIC:
+    
         $chatId = (string)($msg['chat']['id'] ?? '');
         $fromId = (string)($msg['from']['id'] ?? $chatId);
         $chatType = $msg['chat']['type'] ?? 'private';
@@ -4638,6 +4682,10 @@ class TelegramBotController {
 
     // Session helpers
     private static function getSession(PDO $pdo, string $tgId): ?array {
+        if (class_exists('BotSessionService')) {
+            return BotSessionService::getSession($pdo, $tgId);
+        }
+    
         $stmt = $pdo->prepare("SELECT * FROM bot_sessions WHERE tg_id = ?");
         $stmt->execute([$tgId]);
         $row = $stmt->fetch();
@@ -4649,6 +4697,11 @@ class TelegramBotController {
     }
 
     private static function setSession(PDO $pdo, string $tgId, string $step, array $data = []): void {
+        if (class_exists('BotSessionService')) {
+            BotSessionService::setSession($pdo, $tgId, $step, $data);
+            return;
+        }
+    
         $jsonData = json_encode($data);
         if (DB_DRIVER === 'sqlite') {
             $stmt = $pdo->prepare("INSERT INTO bot_sessions (tg_id, step, data, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(tg_id) DO UPDATE SET step = excluded.step, data = excluded.data, updated_at = CURRENT_TIMESTAMP");
@@ -4659,6 +4712,11 @@ class TelegramBotController {
     }
 
     private static function clearSession(PDO $pdo, string $tgId): void {
+        if (class_exists('BotSessionService')) {
+            BotSessionService::clearSession($pdo, $tgId);
+            return;
+        }
+    
         $pdo->prepare("DELETE FROM bot_sessions WHERE tg_id = ?")->execute([$tgId]);
     }
 

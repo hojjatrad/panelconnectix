@@ -4,7 +4,7 @@ require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Setting.php';
 
 class Updater {
-    public const CURRENT_VERSION = '4.0.53'; // v4.0.53 ULTRA LITE - PAGINATION+SECURITY+BYPASS20+LITE BUTTON+V2RAY FIX + SOFT DELETE + RESYNC FROM MAIN SERVER
+    public const CURRENT_VERSION = '4.0.54'; // v4.0.54 ULTRA COMPLETE - BOT SPLIT + PWA OFFLINE + GRAFANA + TESTS + METRICS + DESIGN SYSTEM - PAGINATION+SECURITY+BYPASS20+LITE BUTTON+V2RAY FIX + SOFT DELETE + RESYNC FROM MAIN SERVER
 
     public static function getCurrentVersion(): string {
         $dbVer = Setting::get('current_version', '');

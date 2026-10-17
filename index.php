@@ -242,6 +242,7 @@ if (!str_contains($requestPath, 'servers/') && !str_contains($requestPath, 'node
 spl_autoload_register(function ($class) {
     $searchPaths = [
         __DIR__ . '/core/' . $class . '.php',
+        __DIR__ . '/core/Bot/' . $class . '.php',
         __DIR__ . '/controllers/' . $class . '.php',
         __DIR__ . '/drivers/' . $class . '.php'
     ];
@@ -910,6 +911,10 @@ $router->get('api/v1/client/info', [ApiControllerV2::class, 'getClientInfo']);
 $router->get('settings/app-api', [ApiControllerV2::class, 'showAppApiDoc']);
 
 // v4.0.51: Global App Config - Central Management from Web Panel
+$router->get('settings/metrics', [MetricsController::class, 'index']);
+$router->post('settings/metrics/save', [MetricsController::class, 'save']);
+$router->post('settings/metrics/clear-cache', [MetricsController::class, 'clearCache']);
+$router->get('monitoring/grafana-dashboard.json', [MetricsController::class, 'grafanaJson']);
 $router->get('settings/app-config', [AppConfigController::class, 'index']);
 $router->post('settings/app-config/save', [AppConfigController::class, 'save']);
 $router->get('api/v1/app/global-config', [AppConfigController::class, 'getGlobalConfig']);
@@ -931,6 +936,14 @@ $router->get('.well-known/connectix.json', [ApiControllerV2::class, 'wellKnown']
 $router->get('well-known/connectix.json', [ApiControllerV2::class, 'wellKnown']);
 
 // v4.0.18 PROXY: Proxy configs for Telegram and other apps - Free for VPN + Sellable
+$router->get('api/metrics', function() {
+    require_once __DIR__ . '/core/MetricsExporter.php';
+    MetricsExporter::handleRequest();
+});
+$router->get('metrics', function() {
+    require_once __DIR__ . '/core/MetricsExporter.php';
+    MetricsExporter::handleRequest();
+});
 $router->get('api/v1/app/proxies', [ProxyController::class, 'appProxies']);
 $router->post('api/v1/app/proxies', [ProxyController::class, 'appProxies']);
 $router->get('proxies', [ProxyController::class, 'adminProxies']);

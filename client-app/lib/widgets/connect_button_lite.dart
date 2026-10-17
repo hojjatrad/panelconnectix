@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../design/app_colors.dart';
+import '../design/app_spacing.dart';
 
 /// v4.0.53 LITE - سبک، سریع، 60fps در گوشی ضعیف
 /// فقط 1 انیمیشن pulse + scale، بدون confetti/dust/flag/plasma
@@ -116,16 +118,16 @@ class _ConnectButtonLiteState extends State<ConnectButtonLite>
     Color innerColor;
     IconData icon;
     if (isConnected) {
-      outerColor = const Color(0xFF10B981);
-      innerColor = const Color(0xFF059669);
+      outerColor = AppColors.success;
+      innerColor = AppColors.successDark;
       icon = Icons.power_settings_new_rounded;
     } else if (isConnecting) {
-      outerColor = const Color(0xFFF59E0B);
-      innerColor = const Color(0xFFD97706);
+      outerColor = AppColors.warning;
+      innerColor = AppColors.warningDark;
       icon = Icons.sync_rounded;
     } else {
-      outerColor = const Color(0xFF6366F1);
-      innerColor = const Color(0xFF4F46E5);
+      outerColor = AppColors.primary;
+      innerColor = AppColors.primaryDark;
       icon = Icons.power_settings_new_rounded;
     }
 

@@ -1,10 +1,10 @@
 {
-  "version": "4.0.53",
-  "code": 87,
+  "version": "4.0.54",
+  "code": 88,
   "force_update": false,
   "force_min_code": 50,
   "update_type": "full",
-  "changelog": "✅ v4.0.53 ULTRA LITE - FIX ALL MOBILE BUTTONS + PERFORMANCE:\n\n• 🚀 فیکس اصلی دکمه‌ها: مشکل TransactionTooLargeException از لیست 130 اپ bypass - کاهش به 20 اپ ضروری (ایتا، روبیکا، بله، سروش، 10 بانک اصلی، آپ، اسنپ، دیوار، بازار، دولت من) - لیست کامل 130 تایی به بخش پیشرفته منتقل شد\n• ⚡ دکمه اتصال LITE: حالت پیش‌فرض جدید با 1 انیمیشن به جای 10 کنترلر (pulse, orbit 8x, liquid, plasma 6x, fiber 14x, confetti 22x, dust 25x, shake, flagWave) - 60fps در گوشی ضعیف + HitTestBehavior.opaque برای لمس مطمئن\n• 🔧 فیکس V2Ray: initializeV2Ray قبل از اتصال + timeout 3 ثانیه برای getServerDelay (فیکس گیر کردن progress 0/16 + دکمه عمل نکردن)\n• 🎯 فیکس RTL: Directionality LTR برای دکمه اتصال - جلوگیری از تداخل RTL با GestureDetector\n• 📄 صفحه‌بندی کلاینت‌ها: 50 در صفحه (قبلا همه لود می‌شد OOM) - انتخاب 50/100/200 + دکمه قبلی/بعدی\n• 🔒 امنیت: 18 مورد pdo->query مستقیم به prepared statement تبدیل شد (SQL injection fix)\n• 🧹 پاکسازی: فایل‌های fix_44x قدیمی به archive/migrations منتقل شد\n• 📱 بهبود: محدودیت سخت 25 اپ برای bypass حتی در لیست سفارشی\n• 🛠️ اسکریپت ترمیم fix_453_ultra_lite_pagination_security.php\n\n• نسخه قبلی v4.0.52 همچنان شامل: BOT BUTTONS + SOFT DELETE + RESYNC",
+  "changelog": "✅ v4.0.54 ULTRA COMPLETE - ادامه فاز 2 و 3:\n\n• 🤖 ربات تلگرام - تقسیم به 10 سرویس: BotContextService, BotSessionService, BotKeyboardService, BotOrderService, BotAccountService, BotWalletService, BotSupportService, BotResellerService, BotCryptoService, BotAdminService, BotCallbackHandler, BotMessageHandler - از 5768 خط مونولیتیک به سرویس‌های کوچک + toggle enforcement + ApcuCache\n• 📱 PWA آفلاین کامل: sw.js v4.0.54 با stale-while-revalidate + offline.html زیبا + auto-retry هنگام آنلاین شدن\n• 📊 Grafana: dashboard JSON کامل (9 پنل: کلاینت فعال/آنلاین، ترافیک، وضعیت سرورها، سفارشات 24h، درآمد، لاگ خطاها، پینگ، APCu hit rate، نسخه اپ‌ها) + MetricsExporter.php با فرمت Prometheus + endpoint /api/metrics\n• 🧪 تست‌ها: BotServicesTest.php (7 تست: ApcuCache, Context, Session, Keyboard, Toggle, Helpers, Pagination) + BotE2ETest.php (5 سناریو: /start, toggle, reply keyboard triggers, callback, session)\n• ⚡ APCu Cache: لایه کش سریع برای پلن‌ها (60s)، تنظیمات دکمه‌ها (30s)، داشبورد (300s) + صفحه مدیریت /settings/metrics\n• 🎨 Design System: AppColors, AppTextStyles, AppSpacing + اعمال در Lite Button\n• 🔧 فیکس‌های قبلی v4.0.53 همچنان فعال: bypass 20، Lite button، V2Ray init، pagination، security\n\n• برای Grafana: /settings/metrics → کلید API → Prometheus scrape /api/metrics?key=XXX → import dashboard JSON",
   "date": "2026-10-17",
   "auto_update": {
     "enabled": true,
@@ -15,13 +15,13 @@
     "wifi_only": false
   },
   "apk": {
-    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.53/Connectix-ARM64-v8a.apk",
-    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.53/Connectix-Universal.apk",
-    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.53/Connectix-ARM32-v7a.apk"
+    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.54/Connectix-ARM64-v8a.apk",
+    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.54/Connectix-Universal.apk",
+    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.54/Connectix-ARM32-v7a.apk"
   },
   "apks": {
     "arm64-v8a": {
-      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.53/Connectix-ARM64-v8a.apk",
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.54/Connectix-ARM64-v8a.apk",
       "size": 37603235,
       "size_human": "36 MB",
       "abi": "arm64-v8a",
@@ -29,7 +29,7 @@
       "arch": "arm64"
     },
     "armeabi-v7a": {
-      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.53/Connectix-ARM32-v7a.apk",
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.54/Connectix-ARM32-v7a.apk",
       "size": 38148563,
       "size_human": "36 MB",
       "abi": "armeabi-v7a",
@@ -37,7 +37,7 @@
       "arch": "arm32"
     },
     "universal": {
-      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.53/Connectix-Universal.apk",
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.54/Connectix-Universal.apk",
       "size": 110479370,
       "size_human": "105 MB",
       "abi": "universal",
@@ -46,8 +46,8 @@
     }
   },
   "windows": {
-    "version": "4.0.53",
-    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.53/Connectix-Windows-x64.zip"
+    "version": "4.0.54",
+    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.54/Connectix-Windows-x64.zip"
   },
   "ultra": true,
   "core": "xray_1.8.23 + sing-box + multiplex + 0rtt + stealth + FULL BUG FIX",
@@ -69,12 +69,12 @@
     "stealth",
     "multiplex"
   ],
-  "version_code": 87,
+  "version_code": 88,
   "release_date": "2026-10-17",
   "apk_urls": {
-    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.53/Connectix-ARM64-v8a.apk",
-    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.53/Connectix-Universal.apk",
-    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.53/Connectix-ARM32-v7a.apk"
+    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.54/Connectix-ARM64-v8a.apk",
+    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.54/Connectix-Universal.apk",
+    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.54/Connectix-ARM32-v7a.apk"
   },
-  "download_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.53/Connectix-ARM64-v8a.apk"
+  "download_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.54/Connectix-ARM64-v8a.apk"
 }

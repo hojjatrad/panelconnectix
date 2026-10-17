@@ -1,0 +1,129 @@
+{
+  "dashboard": {
+    "title": "Connectix Panel v4.0.53 ULTRA - Monitoring",
+    "tags": ["connectix", "vpn", "ultra"],
+    "timezone": "Asia/Tehran",
+    "panels": [
+      {
+        "id": 1,
+        "title": "کلاینت‌های فعال / آنلاین",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "connectix_clients_active",
+            "legendFormat": "فعال"
+          },
+          {
+            "expr": "connectix_clients_online",
+            "legendFormat": "آنلاین"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "مصرف ترافیک (GB)",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "sum(connectix_traffic_bytes) / 1024 / 1024 / 1024",
+            "legendFormat": "کل مصرف"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 6, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "وضعیت سرورها",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "connectix_server_status",
+            "format": "table"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 0}
+      },
+      {
+        "id": 4,
+        "title": "سفارشات ربات (24h)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "increase(connectix_bot_orders_total[24h])",
+            "legendFormat": "سفارش"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 6, "x": 0, "y": 8}
+      },
+      {
+        "id": 5,
+        "title": "درآمد (تومان)",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "sum(connectix_income_toman)",
+            "legendFormat": "درآمد"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 6, "y": 8}
+      },
+      {
+        "id": 6,
+        "title": "خطاهای V2Ray / اتصال",
+        "type": "logs",
+        "targets": [
+          {
+            "expr": "{job=\"connectix\"} |= \"V2Ray\" |= \"TransactionTooLarge\" |= \"error\"",
+            "legendFormat": ""
+          }
+        ],
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 8}
+      },
+      {
+        "id": 7,
+        "title": "پینگ سرورها (ms)",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "connectix_server_ping_ms",
+            "legendFormat": "{{server_name}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+      },
+      {
+        "id": 8,
+        "title": "APCu Cache Hit Rate",
+        "type": "gauge",
+        "targets": [
+          {
+            "expr": "rate(connectix_apcu_hits[5m]) / (rate(connectix_apcu_hits[5m]) + rate(connectix_apcu_misses[5m])) * 100",
+            "legendFormat": "Hit Rate %"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 6, "x": 12, "y": 16}
+      },
+      {
+        "id": 9,
+        "title": "نسخه اپ‌ها (توزیع)",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "count by (version) (connectix_app_version)",
+            "legendFormat": "{{version}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 16}
+      }
+    ],
+    "time": {"from": "now-24h", "to": "now"},
+    "refresh": "30s"
+  },
+  "meta": {
+    "version": "4.0.53",
+    "description": "Grafana dashboard for Connectix Panel ULTRA - شامل مانیتورینگ سرورها، کلاینت‌ها، ترافیک، سفارشات ربات، کش، و نسخه اپ‌ها",
+    "metrics_endpoint": "/api/metrics (needs Prometheus exporter)",
+    "setup": "1. Install Prometheus + Grafana, 2. Add this dashboard JSON, 3. Configure metrics exporter in panel (future: core/MetricsExporter.php)"
+  }
+}
