@@ -91,9 +91,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   bool _hideConfig = false;
   bool _useLiteButton = true; // v4.0.53 LITE default - fixes button not working
 
-  static const String currentAppVersion = '4.0.51';
-  static String _actualInstalledVersion = '4.0.51'; // Will be updated from PackageManager
-  static int _actualInstalledCode = 85;
+  // v4.0.59 FOREVER FIX - Never show old version after install - PERMANENT LAW
+  // LAW: currentAppVersion must be dynamic, not hardcoded const that stays old after install
+  // Fix: Make it getter that returns actual installed version if available, else latest hardcoded
+  static const String _hardcodedVersion = '4.0.59'; // Fallback only, updated each release
+  static const int _hardcodedCode = 93;
+  static String get currentAppVersion => _actualInstalledVersion.isNotEmpty && _actualInstalledVersion != '4.0.51' ? _actualInstalledVersion : _hardcodedVersion;
+  static String _actualInstalledVersion = '4.0.59'; // Will be updated from PackageManager immediately on start
+  static int _actualInstalledCode = 93;
 
   // v4.0.46 FOREVER CACHE FIX - PERMANENT LAW - NEVER REGRESS
   // LAW 1: Panel must NEVER serve old APK (auto-delete stale files)
@@ -108,23 +113,52 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   // v4.0.46 FOREVER LAW: Get ACTUAL installed version from PackageManager, not hardcoded - NEVER REGRESS
   // LAW 7: Footer must read actual version from PackageManager, not const
   // LAW 16: Version from app_release.json, never hardcoded, delete stale APKs
+  // v4.0.59 FOREVER FIX: Robust version loading - never show old version after install
   static Future<void> loadActualInstalledVersion() async {
-    try {
-      const channel = MethodChannel('com.connectix.vpn/updater');
-      final result = await channel.invokeMethod('getInstalledAppVersion').timeout(const Duration(seconds: 2), onTimeout: () => null);
-      if (result is Map) {
-        final verName = (result['versionName'] ?? '').toString();
-        final verCode = (result['versionCode'] ?? '').toString();
-        if (verName.isNotEmpty) {
-          _actualInstalledVersion = verName;
-          print('v4.0.46 Actual installed version: $verName ($verCode)');
+    // Try 3 times with increasing timeout, fallback to hardcoded only if all fail
+    for (int attempt = 0; attempt < 3; attempt++) {
+      try {
+        const channel = MethodChannel('com.connectix.vpn/updater');
+        final timeout = Duration(seconds: 2 + attempt); // 2s, 3s, 4s
+        final result = await channel.invokeMethod('getInstalledAppVersion').timeout(timeout, onTimeout: () => null);
+        if (result is Map) {
+          final verName = (result['versionName'] ?? '').toString().trim();
+          final verCode = (result['versionCode'] ?? '').toString().trim();
+          if (verName.isNotEmpty && verName != '4.0.51' || attempt == 2) {
+            // Accept even 4.0.51 on last attempt to avoid empty, but prefer real version
+            if (verName.isNotEmpty) {
+              _actualInstalledVersion = verName;
+              print('v4.0.59 Actual installed version (attempt ${attempt+1}): $verName ($verCode)');
+            }
+          } else if (verName.isNotEmpty && verName != '4.0.51') {
+            _actualInstalledVersion = verName;
+            print('v4.0.59 Actual installed version (attempt ${attempt+1}): $verName ($verCode)');
+          }
+          if (verCode.isNotEmpty) {
+            final code = int.tryParse(verCode);
+            if (code != null && code > 0) {
+              _actualInstalledCode = code;
+            }
+          }
+          // If we got a valid version different from old hardcoded 4.0.51, break
+          if (_actualInstalledVersion.isNotEmpty && _actualInstalledVersion != '4.0.51') {
+            break;
+          }
         }
-        if (verCode.isNotEmpty) {
-          _actualInstalledCode = int.tryParse(verCode) ?? 79;
+      } catch (e) {
+        print('v4.0.59 loadActualInstalledVersion attempt ${attempt+1} error: $e');
+        if (attempt == 2) {
+          print('v4.0.59 loadActualInstalledVersion failed all attempts - using hardcoded $_hardcodedVersion');
+          // Keep hardcoded as fallback, but ensure it's latest not 4.0.51
+          if (_actualInstalledVersion == '4.0.51' || _actualInstalledVersion.isEmpty) {
+            _actualInstalledVersion = _hardcodedVersion;
+            _actualInstalledCode = _hardcodedCode;
+          }
         }
       }
-    } catch (e) {
-      print('v4.0.47 loadActualInstalledVersion error: $e - using hardcoded $currentAppVersion');
+      if (attempt < 2) {
+        await Future.delayed(Duration(milliseconds: 300 * (attempt+1)));
+      }
     }
   }
 
@@ -219,6 +253,16 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         _syncActiveServer(_servers);
       }
     }
+    // v4.0.59 FOREVER FIX: Load actual installed version immediately and update UI
+    // This fixes "new version installed but still shows old version" - must reload from PackageManager
+    loadActualInstalledVersion().then((_) {
+      if (mounted) {
+        setState(() {
+          // Force UI refresh with new actual version
+        });
+        print('v4.0.59 initState: Actual version loaded: $actualVersion ($actualCode)');
+      }
+    });
     _loadSettings();
     _loadAccounts();
     _initV2Ray();

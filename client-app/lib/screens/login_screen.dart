@@ -26,6 +26,10 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
+    // v4.0.59 FOREVER FIX: Load actual installed version on login screen too
+    DashboardScreen.loadActualInstalledVersion().then((_) {
+      if (mounted) setState(() {});
+    });
     _loadSavedCredentials();
     _checkUpdateBeforeLogin();
     _fetchGlobalConfigFromWeb();

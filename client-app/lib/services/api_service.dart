@@ -2030,7 +2030,7 @@ class ApiService {
     required Function(String error) onError,
     required Function() onSuccess,
   }) async {
-    String expectedVer = '4.0.58';
+    String expectedVer = '4.0.59';
     bool wakeLockAcquired = false;
     double lastProgress = 0.0;
     int totalAttempts = 0;
@@ -2064,7 +2064,7 @@ class ApiService {
     try {
       try {
         final m = RegExp(r'v?(\d+\.\d+\.\d+)').firstMatch(downloadUrl);
-        if (m != null) expectedVer = m.group(1) ?? '4.0.58';
+        if (m != null) expectedVer = m.group(1) ?? '4.0.59';
       } catch (_) {}
 
       safeProgress(0.02, 0, 0);
@@ -2250,7 +2250,7 @@ class ApiService {
             client = http.Client();
             final request = http.Request('GET', Uri.parse(requestUrl));
             request.headers.addAll({
-              'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Mobile) Connectix v4.0.58',
+              'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Mobile) Connectix v4.0.59',
               'Accept': '*/*',
               'Cache-Control': 'no-cache, no-store',
               'Pragma': 'no-cache',
