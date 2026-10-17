@@ -90,16 +90,16 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   // v4.0.49 MANAGED MODE
   bool _isManagedMode = false;
   bool _hideConfig = false;
-  bool _useLiteButton = false; // v4.0.67 ULTIMATE BEAUTIFUL default - wave effects restored, user can toggle to lite in settings
+  bool _useLiteButton = false; // v4.0.68 ULTIMATE BEAUTIFUL default - wave effects restored, user can toggle to lite in settings
 
   // v4.0.63 FOREVER FIX - Never show old version after install - PERMANENT LAW
   // LAW: currentAppVersion must be dynamic, not hardcoded const that stays old after install
   // Fix: Make it getter that returns actual installed version if available, else latest hardcoded
-  static const String _hardcodedVersion = '4.0.67'; // Fallback only, updated each release
-  static const int _hardcodedCode = 101;
+  static const String _hardcodedVersion = '4.0.68'; // Fallback only, updated each release
+  static const int _hardcodedCode = 102;
   static String get currentAppVersion => _actualInstalledVersion.isNotEmpty && _actualInstalledVersion != '4.0.51' ? _actualInstalledVersion : _hardcodedVersion;
-  static String _actualInstalledVersion = '4.0.67'; // Will be updated from PackageManager immediately on start
-  static int _actualInstalledCode = 101;
+  static String _actualInstalledVersion = '4.0.68'; // Will be updated from PackageManager immediately on start
+  static int _actualInstalledCode = 102;
 
   // v4.0.46 FOREVER CACHE FIX - PERMANENT LAW - NEVER REGRESS
   // LAW 1: Panel must NEVER serve old APK (auto-delete stale files)
@@ -147,9 +147,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           }
         }
       } catch (e) {
-        print('v4.0.63 loadActualInstalledVersion attempt ${attempt+1} error: $e');
+        print('v4.0.68 loadActualInstalledVersion attempt ${attempt+1} error: $e');
         if (attempt == 2) {
-          print('v4.0.63 loadActualInstalledVersion failed all attempts - using hardcoded $_hardcodedVersion');
+          print('v4.0.68 loadActualInstalledVersion failed all attempts - using hardcoded $_hardcodedVersion');
           // Keep hardcoded as fallback, but ensure it's latest not 4.0.51
           if (_actualInstalledVersion == '4.0.51' || _actualInstalledVersion.isEmpty) {
             _actualInstalledVersion = _hardcodedVersion;
@@ -302,7 +302,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         _updateWifiOnly = prefs.getBool('update_wifi_only') ?? false;
         _winTunnelMode = prefs.getString('windows_tunnel_mode') ?? 'proxy';
         _unifiedEnabled = prefs.getBool('unified_servers_enabled') ?? false;
-        _useLiteButton = prefs.getBool('use_lite_button') ?? false; // v4.0.67 default ULTIMATE beautiful
+        _useLiteButton = prefs.getBool('use_lite_button') ?? false; // v4.0.68 default ULTIMATE beautiful
       });
     }
     if (_autoPauseForBankingEnabled && _isConnected) {
@@ -3226,11 +3226,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
               const SizedBox(height: 16),
 
-              // v4.0.67 ULTIMATE BEAUTIFUL - Restored v4.0.42 wave effects + beautiful first page
+              // v4.0.68 ULTIMATE BEAUTIFUL - Restored v4.0.42 wave effects + beautiful first page
               // Per user: UI قبلی زیبا با موج برگردانده شد، Lite پیش‌فرض false شد
               // First page clean: no proxy/gps/tv (only in settings), but beautiful connect button with wave
 
-              // v4.0.53 LITE vs ULTIMATE - v4.0.67 ULTIMATE BEAUTIFUL default
+              // v4.0.53 LITE vs ULTIMATE - v4.0.68 ULTIMATE BEAUTIFUL default
               Directionality(
                 textDirection: TextDirection.ltr,
                 child: Center(
@@ -3278,7 +3278,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
               ),
 
-              // v4.0.67 ULTIMATE BEAUTIFUL: Speed always visible + beautiful Smart/Ping buttons below
+              // v4.0.68 ULTIMATE BEAUTIFUL: Speed always visible + beautiful Smart/Ping buttons below
               const SizedBox(height: 10),
               ValueListenableBuilder<V2RayStatus>(
                 valueListenable: _v2rayStatus,
@@ -3336,7 +3336,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
               const SizedBox(height: 16),
 
-              // v4.0.67 BEAUTIFUL Smart Connect + Ping All - گرادیانت زیبا با موج و سایه (مثل v4.0.42)
+              // v4.0.68 BEAUTIFUL Smart Connect + Ping All - گرادیانت زیبا با موج و سایه (مثل v4.0.42)
               Row(
                 textDirection: TextDirection.rtl,
                 children: [

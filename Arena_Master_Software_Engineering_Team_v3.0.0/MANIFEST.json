@@ -1,0 +1,37 @@
+{
+  "name": "Arena Master Software Engineering Team",
+  "version": "3.0.0",
+  "entrypoint": "MASTER_SKILL.md",
+  "capability": "Skills",
+  "scope": "All languages and project types",
+  "specialist_skills_count": 50,
+  "protocol_count": 10,
+  "native_arena_schema": "Not verified",
+  "separate_agent_execution": "Not verified; disclose if unavailable",
+  "notes": [
+    "Text instruction files; do not themselves grant tools or execute tests.",
+    "No user project tests were run while creating this package.",
+    "Arena native schema and actual runtime compatibility are not verified.",
+    "High-risk and irreversible actions require explicit human approval.",
+    "All relevant project instructions and available repository memory must be read before work.",
+    "All user-facing explanations and reports must be in Persian unless the user explicitly requests another language."
+  ],
+  "language_policy": {
+    "user_facing_language": "Persian (Farsi)",
+    "scope": "All skills, protocols, reports, explanations, status updates, and user-facing documentation",
+    "exception": "Only when the user explicitly requests another language",
+    "technical_identifiers": "Preserve original identifiers/code where required and explain in Persian"
+  },
+  "v3_controls": {
+    "read_instructions_and_project_memory_before_work": true,
+    "human_approval_required_for_high_risk_actions": true,
+    "architecture_and_module_contract_review": true,
+    "baseline_change_regression_and_integration_testing": true,
+    "independent_review_of_actual_diff": true,
+    "persistent_project_memory_and_failed_attempt_ledger": true,
+    "git_change_preservation": true,
+    "security_uiux_performance_reliability_reviews": true,
+    "evidence_based_auditable_final_report": true,
+    "persian_user_facing_language_mandatory": true
+  }
+}
