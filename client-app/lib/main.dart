@@ -579,7 +579,13 @@ class _SplashScreenState extends State<SplashScreen> {
               servers = serversCache.map((e) => ServerModel.fromJson(Map<String, dynamic>.from(e))).toList();
             }
             if (!mounted) return;
-            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => DashboardScreen(client: client, branding: branding, initialServers: servers)));
+            final prefs2 = await SharedPreferences.getInstance();
+            final useMvvm2 = prefs2.getBool('use_mvvm_dashboard') ?? true;
+            if (useMvvm2) {
+              Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => DashboardScreenMVVM(client: client, branding: branding, initialServers: servers)));
+            } else {
+              Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => DashboardScreen(client: client, branding: branding, initialServers: servers)));
+            }
             return;
           } catch (_) {}
         }
@@ -588,18 +594,37 @@ class _SplashScreenState extends State<SplashScreen> {
       final session = await ApiService.checkSavedSession().timeout(const Duration(seconds: 5), onTimeout: () => null);
       if (!mounted) return;
       if (session != null) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => DashboardScreen(
-              client: session['client'],
-              branding: session['branding'],
-              initialServers: session['servers'] is List<ServerModel> && (session['servers'] as List<ServerModel>).isNotEmpty
-                  ? (session['servers'] as List<ServerModel>)
-                  : null,
+        // v4.0.56 ULTRA FINAL: Use MVVM screen by default (feature flag)
+        final prefs = await SharedPreferences.getInstance();
+        final useMvvm = prefs.getBool('use_mvvm_dashboard') ?? true; // default true in 4.0.56
+        if (!mounted) return;
+        if (useMvvm) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => DashboardScreenMVVM(
+                client: session['client'],
+                branding: session['branding'],
+                initialServers: session['servers'] is List<ServerModel> && (session['servers'] as List<ServerModel>).isNotEmpty
+                    ? (session['servers'] as List<ServerModel>)
+                    : null,
+              ),
             ),
-          ),
-        );
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => DashboardScreen(
+                client: session['client'],
+                branding: session['branding'],
+                initialServers: session['servers'] is List<ServerModel> && (session['servers'] as List<ServerModel>).isNotEmpty
+                    ? (session['servers'] as List<ServerModel>)
+                    : null,
+              ),
+            ),
+          );
+        }
       } else {
         Navigator.pushReplacement(
           context,

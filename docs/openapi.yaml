@@ -1,0 +1,266 @@
+openapi: 3.0.3
+info:
+  title: Connectix Panel API
+  description: |
+    ULTRA v4.0.56 FINAL - Professional VPN Panel API
+    - Multi-account unlimited
+    - Soft delete + Resync
+    - Pagination 50/100/200
+    - Prometheus metrics
+    - PWA offline sync
+  version: 4.0.56
+  contact:
+    name: Connectix Support
+    url: https://vpbotn.ir
+servers:
+  - url: https://vpbotn.ir/api/v1
+    description: Production
+  - url: https://vpbotn.ir/contax/api/v1
+    description: Production (contax path)
+  - url: http://localhost/api/v1
+    description: Local dev
+
+security:
+  - bearerAuth: []
+  - apiKey: []
+
+paths:
+  /app/login:
+    post:
+      summary: App login (multi-account)
+      tags: [App]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username: {type: string, example: "client123"}
+                password: {type: string, example: "pass123"}
+                panel_url: {type: string, example: "https://vpbotn.ir", description: "Optional, auto from global config"}
+                api_key: {type: string, description: "Optional reseller API key"}
+      responses:
+        '200':
+          description: Login success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  token: {type: string}
+                  client: {$ref: '#/components/schemas/Client'}
+                  branding: {$ref: '#/components/schemas/Branding'}
+                  servers: {type: array, items: {$ref: '#/components/schemas/Server'}}
+
+  /app/profile:
+    get:
+      summary: Get client profile
+      tags: [App]
+      responses:
+        '200':
+          description: Profile
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Client'}
+
+  /app/configs:
+    get:
+      summary: Get server configs with pagination
+      tags: [App]
+      parameters:
+        - name: page
+          in: query
+          schema: {type: integer, default: 1}
+        - name: per_page
+          in: query
+          schema: {type: integer, default: 50, minimum: 10, maximum: 200}
+      responses:
+        '200':
+          description: Servers paginated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  servers: {type: array, items: {$ref: '#/components/schemas/Server'}}
+                  total: {type: integer}
+                  page: {type: integer}
+                  per_page: {type: integer}
+
+  /app/feedback:
+    post:
+      summary: Send feedback / crash report
+      tags: [App]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                subject: {type: string}
+                message: {type: string}
+                version: {type: string, example: "4.0.55+89"}
+      responses:
+        '200': {description: OK}
+
+  /app/panel-location:
+    get:
+      summary: Auto-discover panel location
+      tags: [App]
+      responses:
+        '200':
+          description: Panel location
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  panel_url: {type: string}
+                  well_known: {type: string}
+
+  /app/global-config:
+    get:
+      summary: Global app config (managed mode)
+      tags: [App]
+      responses:
+        '200':
+          description: Global config
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  default_panel_url: {type: string}
+                  hide_manual_panel_url: {type: string, enum: ["0","1"]}
+                  hide_manual_api_key: {type: string}
+                  force_managed_mode: {type: string}
+                  auto_fetch_servers: {type: string}
+                  default_api_key: {type: string}
+
+  /metrics:
+    get:
+      summary: Prometheus metrics (v4.0.54+)
+      tags: [Monitoring]
+      parameters:
+        - name: key
+          in: query
+          schema: {type: string}
+          description: metrics_api_key if set
+      responses:
+        '200':
+          description: Prometheus text format
+          content:
+            text/plain:
+              schema: {type: string, example: "connectix_clients_total 1234\n"}
+
+  /reseller/brand/{id}:
+    get:
+      summary: Reseller brand info
+      tags: [Reseller]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200': {description: Brand}
+
+  /wallet:
+    get:
+      summary: Get wallet balance
+      tags: [Wallet]
+      responses:
+        '200':
+          description: Wallet
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  wallet_balance: {type: integer}
+                  referral_balance: {type: integer}
+
+  /plans:
+    get:
+      summary: Get plans
+      tags: [Plans]
+      responses:
+        '200':
+          description: Plans list
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/Plan'}
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  schemas:
+    Client:
+      type: object
+      properties:
+        id: {type: integer}
+        username: {type: string}
+        traffic_used_bytes: {type: integer}
+        traffic_limit_bytes: {type: integer}
+        expire_at: {type: string, format: date-time}
+        status: {type: string, enum: [active, expired, never_connected]}
+        is_local_deleted: {type: integer, description: "v4.0.52 soft delete"}
+        last_synced_at: {type: string, format: date-time}
+        sub_token: {type: string}
+        node_sublink: {type: string}
+
+    Server:
+      type: object
+      properties:
+        id: {type: string}
+        name: {type: string}
+        flag: {type: string, example: "🇩🇪"}
+        group: {type: string}
+        config_uri: {type: string}
+        ping_ms: {type: integer, nullable: true}
+        is_vip: {type: boolean}
+        is_active: {type: boolean}
+
+    Branding:
+      type: object
+      properties:
+        brand_name: {type: string}
+        announcement: {type: string}
+        accentColor: {type: string}
+
+    Plan:
+      type: object
+      properties:
+        id: {type: integer}
+        title: {type: string}
+        display_title: {type: string}
+        traffic_gb: {type: integer}
+        duration_days: {type: integer}
+        base_price: {type: integer}
+        display_price: {type: integer}
+        category: {type: string}
+        server_group: {type: string}
+
+tags:
+  - name: App
+    description: Mobile app endpoints
+  - name: Monitoring
+    description: Grafana + Prometheus (v4.0.54+)
+  - name: Reseller
+    description: Reseller operations
+  - name: Wallet
+    description: Wallet & payments
+  - name: Plans
+    description: Plans & pricing
