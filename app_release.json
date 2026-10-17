@@ -4,7 +4,7 @@
   "force_update": false,
   "force_min_code": 50,
   "update_type": "full",
-  "changelog": "✅ v4.0.68 ULTIMATE BEAUTIFUL + ALL BUGS FIXED - تست عمیق کامل:\n\n• 🎨 UI زیبا برگردانده شد (مثل v4.0.42 ULTIMATE):\n  - دکمه اتصال با 14 میکرو-اینترکشن: حلقه 3x + مدار 8x + فیبر 14x + مایع + پلاسما + confetti + haptic + glow + flag wave + dust + sound + shake + heartbeat\n  - افکت موج روی دکمه (wave) + پرچم مواج + ذرات غبار نورانی\n  - _useLiteButton پیش‌فرض false شد (ULTIMATE زیبا) - کاربر می‌تواند در تنظیمات Lite را فعال کند\n  - دکمه‌های Smart Connect + Ping All با گرادیانت زیبا و سایه و انیمیشن\n\n• 🔧 فیکس نوتیفیکیشن (تست عمیق):\n  - آیکون mipmap/ic_launcher در initializeVless\n  - کانال vpn_service_channel برای سرعت زنده\n  - نمایش ↓ دانلود ↑ آپلود زنده + دکمه قطع اتصال\n  - FOREGROUND_SERVICE_DATA_SYNC + SPECIAL_USE برای Android 14+\n\n• 🔧 فیکس بروزرسانی داخل اپ:\n  - openBrowser handler اضافه شد\n  - checkAppUpdate همیشه آخرین نسخه از GitHub برمی‌گرداند\n  - download_apk.php پشتیبانی از v4.0.68\n  - AppReleasePublisher RELEASE_TAG=v4.0.68\n\n• 🔧 فیکس نصب روی نسخه قبلی:\n  - versionCode 100->102 افزایشی\n  - setAllowDowngrade true + EXTRA_ALLOW_REPLACE + allowSameVersion + allowBackup\n\n• 🧹 پاکسازی اسکیل‌های قدیمی - آماده برای اسکیل‌های جدید\n\n• 📥 لینک مستقیم:\n  https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.68/Connectix-ARM64-v8a.apk\n",
+  "changelog": "✅ v4.0.68 ULTIMATE FIX FINAL - حل کامل عدم تغییر نسخه + بازگشت ورود/خروج:\n\n• 🔧 فیکس بحرانی عدم تغییر نسخه بعد از نصب (BUG-20261017-001) - علت ریشه‌ای تایید شد:\n  - سرور: download_apk.php قبلاً فقط وجود فایل + سایز >20MB چک می‌کرد، نسخه را چک نمی‌کرد - اگر Connectix-ARM64-v8a.apk قدیمی از v4.0.64 روی سرور بود، حتی وقتی v=4.0.67 درخواست می‌شد، همان فایل قدیمی سرو می‌شد\n  - کلاینت: api_service.dart حالت ULTRA PERMISSIVE هر APK معتبر >20MB را حتی با نسخه اشتباه نصب می‌کرد تا حلقه 90% را بشکند، ولی باعث می‌شد نسخه قدیمی دوباره نصب شود\n  - فیکس سرور: تشخیص فایل کهنه - اگر mtime فایل قدیمی‌تر از app_release.json بیش از 5 دقیقه باشد، حذف و GitHub fetch اجباری + هدر X-APK-Version\n  - فیکس کلاینت: حالت STRICT - اگر نسخه APK دانلود شده با نسخه مورد انتظار متفاوت باشد، حذف و URL بعدی (GitHub با نسخه صحیح) امتحان می‌شود\n  - versionCode 101->102 افزایشی + cache bust ?v=4.0.68&t=timestamp&s=random\n\n• 🔧 فیکس حذف ورود با یوزر/پسورد و خروج (BUG-20261017-002):\n  - دکمه خروج به DashboardScreenMVVM اضافه شد - قبلاً فقط در DashboardScreen بود، کاربر با use_mvvm_dashboard=true بدون خروج گیر کرده بود\n  - متد disconnect() به DashboardViewModel اضافه شد\n  - مایگریشن در main.dart: اگر last_seen_version != 4.0.68 و use_mvvm_dashboard==true، ریست به false تا داشبورد زیبا با خروج نمایش داده شود\n  - صفحه LoginScreen با یوزر/پسورد + چندحسابه نامحدود کاملاً حفظ شده\n\n• 🎨 UI زیبا حفظ شد:\n  - _useLiteButton=false پیش‌فرض → موج 14 میکرو-اینترکشن (pulse 3x, orbit 8x, fiber 14x, liquid, plasma, confetti 22x, flag wave, dust 25x)\n  - Smart Connect + Ping All با گرادیانت زیبا زیر دکمه\n  - سرعت همیشه visible + فوتر نسخه 4.0.68\n\n• 📥 لینک مستقیم تست شده (36MB ARM64):\n  https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.68/Connectix-ARM64-v8a.apk\n  اگر نصب روی نسخه قدیمی مشکل داشت: اول Uninstall کنید سپس نصب کنید - versionCode 102 > 98 اجازه نصب روی قدیمی را می‌دهد\n\n• 🧪 تست شده: بیلد 39037490793 SUCCESS - 3 APK (36M/37M/106M) - GitHub Release v4.0.68 با 6 asset\n",
   "date": "2026-10-17",
   "auto_update": {
     "enabled": true,
@@ -22,7 +22,7 @@
   "apks": {
     "arm64-v8a": {
       "url": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.68",
-      "size": 37653182,
+      "size": 37654428,
       "size_human": "36 MB",
       "abi": "arm64-v8a",
       "recommended": true,
@@ -31,7 +31,7 @@
     },
     "armeabi-v7a": {
       "url": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.68",
-      "size": 38201111,
+      "size": 38203016,
       "size_human": "36 MB",
       "abi": "armeabi-v7a",
       "recommended": false,
@@ -40,7 +40,7 @@
     },
     "universal": {
       "url": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.68",
-      "size": 110587840,
+      "size": 110592865,
       "size_human": "105 MB",
       "abi": "universal",
       "recommended": false,
