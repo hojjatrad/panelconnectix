@@ -67,9 +67,14 @@ if (!file_exists($filePath) || filesize($filePath) < 20*1024*1024) {
     $ver = preg_replace('/[^0-9\\.]/', '', $ver);
     if (empty($ver)) $ver = '4.0.65';
     
-    // For versions >4.0.65, GitHub releases don't have APK assets, use 4.0.65 fallback
+    // v4.0.65 FIX: GitHub now has assets for 4.0.64 and 4.0.65 - allow them
     $githubVer = $ver;
-    if (version_compare($ver, '4.0.51', '>')) {
+    $allowedGithubVersions = ['4.0.51', '4.0.64', '4.0.65'];
+    if (!in_array($ver, $allowedGithubVersions) && version_compare($ver, '4.0.65', '>')) {
+        $githubVer = '4.0.65';
+        error_log("download_apk.php v4.0.65: Requested v$ver has no GitHub assets yet, using v$githubVer fallback");
+    } elseif (version_compare($ver, '4.0.51', '>') && version_compare($ver, '4.0.64', '<')) {
+        // versions between 4.0.51 and 4.0.64 had no assets, use 4.0.51
         $githubVer = '4.0.51';
         error_log("download_apk.php v4.0.65: Requested v$ver has no GitHub assets, using v$githubVer fallback");
     }
@@ -145,6 +150,7 @@ if (!file_exists($filePath) || filesize($filePath) < 20*1024*1024) {
     header('Cache-Control: no-store');
     $directLink = "https://direct.vpbotn.ir/download_apk.php?file={$fileParam}&v={$ver}";
     $githubLink51 = "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.65/Connectix-ARM64-v8a.apk";
+    $githubLink65 = "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.65/Connectix-ARM64-v8a.apk";
     $githubLink = "https://github.com/hojjatrad/panelconnectix/releases";
     $qrLink = "https://vpbotn.ir/qr_download.html";
     
