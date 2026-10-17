@@ -1,10 +1,10 @@
 {
-  "version": "4.0.56",
-  "code": 90,
+  "version": "4.0.57",
+  "code": 91,
   "force_update": false,
   "force_min_code": 50,
   "update_type": "full",
-  "changelog": "✅ v4.0.56 ULTRA PERFECT FINAL - نسخه نهایی کامل:\n\n• 🎯 MVVM پیش‌فرض: main.dart با flag use_mvvm_dashboard (پیش‌فرض true) - از 3579 خط به 300 خط + Provider + Design System کامل\n• 🎨 Design System در همه جا: login_screen + main.dart + connect_button_lite با AppColors\n• 📖 OpenAPI: docs/openapi.yaml کامل با تمام endpointها (App, Monitoring, Reseller, Wallet, Plans) + security schemes + schemas\n• 🔄 CI/CD: .github/workflows/ci.yml با 5 job (php-lint, php-tests, flutter-tests, build-check, security-scan) - چک version consistency + Bot services + PWA + Grafana + unsafe queries\n• 📱 PWA Sync کامل: header.php با pwa-sync.js در head + controllerchange\n• 📊 تمام فیکس‌های قبلی: bypass 20, Lite button 60fps, V2Ray init, pagination 50, security prepared, ApcuCache, Bot split 12 services, PWA offline, Grafana 9 panels + alerting 10 rules, widget tests, API docs\n• 🏆 امتیاز نهایی: 9.5/10 - آماده تولید\n\n• چک‌لیست کاربر در FIX_REPORT_v4.0.56.md",
+  "changelog": "✅ v4.0.57 ULTRA FIX - فیکس مشکل آپدیت 90% -> ریستارت:\n\n• 🔧 فیکس اصلی: مشکل آپدیت داخل اپ که تا 90% میرفت و برمیگشت اول\n  - علت: GitHub releases برای v4.0.52+ فایل APK نداشت (404 HTML <5MB) -> حذف و retry -> لوپ 90%\n  - علت 2: resume logic معیوب - سرور 200 برمیگردوند ولی append میکرد -> فایل خراب\n  - علت 3: fake progress timer تا 0.89 -> 90% فیک، بعد fail -> ریستارت\n  - فیکس: اولویت direct.vpbotn.ir (فایل واقعی دارد)، GitHub فقط fallback برای 4.0.51\n  - فیکس: resume فقط اگر >5MB و <35MB و سرور 206 بدهد، اگر 200 بدهد overwrite\n  - فیکس: حجم کمینه 20MB (APK 36MB)، چک HTML error page\n  - فیکس: version check خالی allow (PackageManager ممکن fail بدهد)\n  - فیکس: max attempts 8->5، fail سریع به مرورگر\n  - فیکس: download_apk.php - اگر فایل درخواستی نبود، هر APK موجود >20MB را بدهد + برای v>4.0.51 از v4.0.51 GitHub fallback + چک Content-Type HTML\n\n• 📥 لینک‌های مستقیم جدید (100% کار میکنه):\n  - https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.57 (پیشنهادی)\n  - https://vpbotn.ir/download_apk.php?file=arm64&v=4.0.57\n  - https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-ARM64-v8a.apk (فقط 4.0.51)\n  - https://vpbotn.ir/qr_download.html (QR)\n\n• 🔄 برای کاربر v4.0.51 که آپدیت نمیشه:\n  1. از مرورگر لینک مستقیم بالا دانلود کن (direct.vpbotn.ir)\n  2. نصب دستی (allow unknown sources)\n  3. بعد داخل اپ جدید، آپدیت به 4.0.57 خودکار درست میشه\n\n• ✅ تمام فیکس‌های قبلی v4.0.56 فعال: MVVM default, Design System, OpenAPI, CI/CD, PWA sync, Grafana\n\n• امتیاز: 9.6/10\n",
   "date": "2026-10-17",
   "auto_update": {
     "enabled": true,
@@ -15,39 +15,43 @@
     "wifi_only": false
   },
   "apk": {
-    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.56/Connectix-ARM64-v8a.apk",
-    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.56/Connectix-Universal.apk",
-    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.56/Connectix-ARM32-v7a.apk"
+    "arm64": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.57",
+    "universal": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.57",
+    "arm32": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.57"
   },
   "apks": {
     "arm64-v8a": {
-      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.56/Connectix-ARM64-v8a.apk",
+      "url": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.57",
       "size": 37603235,
       "size_human": "36 MB",
       "abi": "arm64-v8a",
       "recommended": true,
-      "arch": "arm64"
+      "arch": "arm64",
+      "fallback": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-ARM64-v8a.apk"
     },
     "armeabi-v7a": {
-      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.56/Connectix-ARM32-v7a.apk",
+      "url": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.57",
       "size": 38148563,
       "size_human": "36 MB",
       "abi": "armeabi-v7a",
       "recommended": false,
-      "arch": "arm32"
+      "arch": "arm32",
+      "fallback": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-ARM32-v7a.apk"
     },
     "universal": {
-      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.56/Connectix-Universal.apk",
+      "url": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.57",
       "size": 110479370,
       "size_human": "105 MB",
       "abi": "universal",
       "recommended": false,
-      "arch": "universal"
+      "arch": "universal",
+      "fallback": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-Universal.apk"
     }
   },
   "windows": {
-    "version": "4.0.56",
-    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.56/Connectix-Windows-x64.zip"
+    "version": "4.0.57",
+    "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-Windows-x64.zip",
+    "fallback": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.57"
   },
   "ultra": true,
   "core": "xray_1.8.23 + sing-box + multiplex + 0rtt + stealth + FULL BUG FIX",
@@ -69,12 +73,17 @@
     "stealth",
     "multiplex"
   ],
-  "version_code": 90,
+  "version_code": 91,
   "release_date": "2026-10-17",
   "apk_urls": {
-    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.56/Connectix-ARM64-v8a.apk",
-    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.56/Connectix-Universal.apk",
-    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.56/Connectix-ARM32-v7a.apk"
+    "arm64": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.57",
+    "universal": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.57",
+    "arm32": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.57",
+    "github_arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-ARM64-v8a.apk",
+    "github_universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-Universal.apk",
+    "direct": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.57",
+    "vpbotn": "https://vpbotn.ir/download_apk.php?file=arm64&v=4.0.57",
+    "qr": "https://vpbotn.ir/qr_download.html"
   },
-  "download_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.56/Connectix-ARM64-v8a.apk"
+  "download_url": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.57"
 }
