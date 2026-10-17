@@ -31,7 +31,7 @@ class DashboardScreen extends StatefulWidget {
 
   /// Public app version (mirrors the State) so other screens
   /// (login footer, support sheet) can display it.
-  // v4.0.61 FIX: Was const, now getter because State's version is dynamic getter (not const) - fixes build failure
+  // v4.0.62 FIX: Was const, now getter because State's version is dynamic getter (not const) - fixes build failure
   static String get currentAppVersion => _DashboardScreenState.currentAppVersion;
   static String get actualVersion => _DashboardScreenState.actualVersion;
   static int get actualCode => _DashboardScreenState.actualCode;
@@ -92,14 +92,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   bool _hideConfig = false;
   bool _useLiteButton = true; // v4.0.53 LITE default - fixes button not working
 
-  // v4.0.61 FOREVER FIX - Never show old version after install - PERMANENT LAW
+  // v4.0.62 FOREVER FIX - Never show old version after install - PERMANENT LAW
   // LAW: currentAppVersion must be dynamic, not hardcoded const that stays old after install
   // Fix: Make it getter that returns actual installed version if available, else latest hardcoded
-  static const String _hardcodedVersion = '4.0.61'; // Fallback only, updated each release
-  static const int _hardcodedCode = 95;
+  static const String _hardcodedVersion = '4.0.62'; // Fallback only, updated each release
+  static const int _hardcodedCode = 96;
   static String get currentAppVersion => _actualInstalledVersion.isNotEmpty && _actualInstalledVersion != '4.0.51' ? _actualInstalledVersion : _hardcodedVersion;
-  static String _actualInstalledVersion = '4.0.61'; // Will be updated from PackageManager immediately on start
-  static int _actualInstalledCode = 95;
+  static String _actualInstalledVersion = '4.0.62'; // Will be updated from PackageManager immediately on start
+  static int _actualInstalledCode = 96;
 
   // v4.0.46 FOREVER CACHE FIX - PERMANENT LAW - NEVER REGRESS
   // LAW 1: Panel must NEVER serve old APK (auto-delete stale files)
@@ -114,7 +114,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   // v4.0.46 FOREVER LAW: Get ACTUAL installed version from PackageManager, not hardcoded - NEVER REGRESS
   // LAW 7: Footer must read actual version from PackageManager, not const
   // LAW 16: Version from app_release.json, never hardcoded, delete stale APKs
-  // v4.0.61 FOREVER FIX: Robust version loading - never show old version after install
+  // v4.0.62 FOREVER FIX: Robust version loading - never show old version after install
   static Future<void> loadActualInstalledVersion() async {
     // Try 3 times with increasing timeout, fallback to hardcoded only if all fail
     for (int attempt = 0; attempt < 3; attempt++) {
@@ -129,11 +129,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             // Accept even 4.0.51 on last attempt to avoid empty, but prefer real version
             if (verName.isNotEmpty) {
               _actualInstalledVersion = verName;
-              print('v4.0.61 Actual installed version (attempt ${attempt+1}): $verName ($verCode)');
+              print('v4.0.62 Actual installed version (attempt ${attempt+1}): $verName ($verCode)');
             }
           } else if (verName.isNotEmpty && verName != '4.0.51') {
             _actualInstalledVersion = verName;
-            print('v4.0.61 Actual installed version (attempt ${attempt+1}): $verName ($verCode)');
+            print('v4.0.62 Actual installed version (attempt ${attempt+1}): $verName ($verCode)');
           }
           if (verCode.isNotEmpty) {
             final code = int.tryParse(verCode);
@@ -147,9 +147,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           }
         }
       } catch (e) {
-        print('v4.0.61 loadActualInstalledVersion attempt ${attempt+1} error: $e');
+        print('v4.0.62 loadActualInstalledVersion attempt ${attempt+1} error: $e');
         if (attempt == 2) {
-          print('v4.0.61 loadActualInstalledVersion failed all attempts - using hardcoded $_hardcodedVersion');
+          print('v4.0.62 loadActualInstalledVersion failed all attempts - using hardcoded $_hardcodedVersion');
           // Keep hardcoded as fallback, but ensure it's latest not 4.0.51
           if (_actualInstalledVersion == '4.0.51' || _actualInstalledVersion.isEmpty) {
             _actualInstalledVersion = _hardcodedVersion;
@@ -254,14 +254,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         _syncActiveServer(_servers);
       }
     }
-    // v4.0.61 FOREVER FIX: Load actual installed version immediately and update UI
+    // v4.0.62 FOREVER FIX: Load actual installed version immediately and update UI
     // This fixes "new version installed but still shows old version" - must reload from PackageManager
     loadActualInstalledVersion().then((_) {
       if (mounted) {
         setState(() {
           // Force UI refresh with new actual version
         });
-        print('v4.0.61 initState: Actual version loaded: $actualVersion ($actualCode)');
+        print('v4.0.62 initState: Actual version loaded: $actualVersion ($actualCode)');
       }
     });
     _loadSettings();
@@ -595,10 +595,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   void _initV2Ray() async {
     try {
       // v4.0.53 FIX: Ensure V2Ray is initialized before use
-      await _flutterV2ray.initializeV2Ray(
-        notificationIconResourceType: "mipmap",
-        notificationIconResourceName: "ic_launcher",
-      ).timeout(const Duration(seconds: 5), onTimeout: () {
+      await _flutterV2ray.initializeV2Ray().timeout(const Duration(seconds: 5), onTimeout: () {
         ApiService.log('V2Ray init timeout - will retry on connect');
       });
       _isV2RayInitialized = true;
@@ -1473,10 +1470,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       // v4.0.53 FIX: Ensure V2Ray initialized before connect - fixes button not working
       if (!_isV2RayInitialized) {
         try {
-          await _flutterV2ray.initializeV2Ray(
-            notificationIconResourceType: "mipmap",
-            notificationIconResourceName: "ic_launcher",
-          ).timeout(const Duration(seconds: 5));
+          await _flutterV2ray.initializeV2Ray().timeout(const Duration(seconds: 5));
           _isV2RayInitialized = true;
           ApiService.log('V2Ray initialized on-demand before connect');
         } catch (e) {

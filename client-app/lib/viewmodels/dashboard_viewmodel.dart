@@ -7,7 +7,7 @@ import '../services/api_service.dart';
 /// v4.0.53 MVVM - Dashboard ViewModel extracted from 3652-line dashboard_screen.dart
 /// Handles server list, selected server, ping, connection state, settings
 
-enum ConnectionState { disconnected, connecting, connected }
+enum AppConnectionState { disconnected, connecting, connected }
 
 class DashboardViewModel extends ChangeNotifier {
   // Servers
@@ -17,10 +17,10 @@ class DashboardViewModel extends ChangeNotifier {
   ServerModel? get selectedServer => _selectedServer;
 
   // Connection
-  ConnectionState _connectionState = ConnectionState.disconnected;
-  ConnectionState get connectionState => _connectionState;
-  bool get isConnected => _connectionState == ConnectionState.connected;
-  bool get isConnecting => _connectionState == ConnectionState.connecting;
+  AppConnectionState _connectionState = AppConnectionState.disconnected;
+  AppConnectionState get connectionState => _connectionState;
+  bool get isConnected => _connectionState == AppConnectionState.connected;
+  bool get isConnecting => _connectionState == AppConnectionState.connecting;
 
   int _connectedSeconds = 0;
   int get connectedSeconds => _connectedSeconds;
@@ -62,7 +62,7 @@ class DashboardViewModel extends ChangeNotifier {
     _isLoadingServers = true;
     notifyListeners();
     try {
-      final servers = await ApiService.fetchServers();
+      final servers = await ApiService.getServers();
       _servers = servers.where((s) => !s.isInfoBanner && s.configUri.isNotEmpty).toList();
       if (_servers.isNotEmpty && _selectedServer == null) {
         // Try last working
@@ -92,9 +92,9 @@ class DashboardViewModel extends ChangeNotifier {
     });
   }
 
-  void setConnectionState(ConnectionState state) {
+  void setConnectionState(AppConnectionState state) {
     _connectionState = state;
-    if (state == ConnectionState.connected) {
+    if (state == AppConnectionState.connected) {
       _connectedSeconds = 0;
       _timer?.cancel();
       _timer = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -103,7 +103,7 @@ class DashboardViewModel extends ChangeNotifier {
       });
     } else {
       _timer?.cancel();
-      if (state == ConnectionState.disconnected) {
+      if (state == AppConnectionState.disconnected) {
         _connectedSeconds = 0;
       }
     }

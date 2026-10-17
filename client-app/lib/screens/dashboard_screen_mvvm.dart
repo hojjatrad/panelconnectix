@@ -153,9 +153,9 @@ class _DashboardScreenMVVMState extends State<DashboardScreenMVVM> {
               child: Center(
                 child: vm.useLiteButton
                     ? ConnectButtonLite(
-                        state: vm.connectionState == ConnectionState.connected
+                        state: vm.connectionState == AppAppConnectionState.connected
                             ? LiteConnectState.connected
-                            : vm.connectionState == ConnectionState.connecting
+                            : vm.connectionState == AppAppConnectionState.connecting
                                 ? LiteConnectState.connecting
                                 : LiteConnectState.disconnected,
                         size: 142,
@@ -165,9 +165,9 @@ class _DashboardScreenMVVMState extends State<DashboardScreenMVVM> {
                         onTap: () => _toggleConnection(vm),
                       )
                     : ConnectButtonUltimate(
-                        state: vm.connectionState == ConnectionState.connected
+                        state: vm.connectionState == AppAppConnectionState.connected
                             ? UltimateConnectState.connected
-                            : vm.connectionState == ConnectionState.connecting
+                            : vm.connectionState == AppAppConnectionState.connecting
                                 ? UltimateConnectState.connecting
                                 : UltimateConnectState.disconnected,
                         size: 142,
@@ -252,7 +252,7 @@ class _DashboardScreenMVVMState extends State<DashboardScreenMVVM> {
                     _buildPingBadge(server.pingMs),
                     AppSpacing.gapSm,
                     Text(
-                      server.group ?? 'عمومی',
+                      server.operatorName ?? 'عمومی',
                       style: AppTextStyles.labelSmall,
                     ),
                   ],
@@ -425,7 +425,7 @@ class _DashboardScreenMVVMState extends State<DashboardScreenMVVM> {
           children: [
             _buildPingBadge(server.pingMs),
             AppSpacing.gapSm,
-            Text(server.group ?? '', style: AppTextStyles.labelSmall.copyWith(fontSize: 9)),
+            Text(server.operatorName ?? '', style: AppTextStyles.labelSmall.copyWith(fontSize: 9)),
           ],
         ),
         trailing: isSelected ? const Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 20) : null,
@@ -437,12 +437,12 @@ class _DashboardScreenMVVMState extends State<DashboardScreenMVVM> {
   void _toggleConnection(DashboardViewModel vm) {
     if (vm.isConnecting) return;
     if (vm.isConnected) {
-      vm.setConnectionState(ConnectionState.disconnected);
+      vm.setAppConnectionState(AppAppConnectionState.disconnected);
     } else {
-      vm.setConnectionState(ConnectionState.connecting);
+      vm.setAppConnectionState(AppAppConnectionState.connecting);
       // Simulate connection - real V2Ray logic would be here
       Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) vm.setConnectionState(ConnectionState.connected);
+        if (mounted) vm.setAppConnectionState(AppAppConnectionState.connected);
       });
     }
   }

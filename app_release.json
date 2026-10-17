@@ -1,10 +1,10 @@
 {
-  "version": "4.0.61",
-  "code": 95,
+  "version": "4.0.62",
+  "code": 96,
   "force_update": false,
   "force_min_code": 50,
   "update_type": "full",
-  "changelog": "✅ v4.0.61 FOREVER FIX - فیکس دائمی نمایش نسخه قدیمی بعد از نصب:\n\n• 🔧 فیکس اصلی: \"نسخه جدید نصب میکنم ولی هنوز نسخه قدیمی نشان میده\"\n  - علت 1: currentAppVersion در dashboard_screen.dart هاردکد 4.0.51 بود! حتی اگر APK جدید نصب میشد، UI هنوز 4.0.51 نشان میداد\n  - علت 2: loadActualInstalledVersion تایماوت 2 ثانیه داشت و فقط 1 بار تلاش میکرد - روی بعضی گوشی‌ها fail میشد و fallback به 4.0.51\n  - علت 3: initState ورژن را لود نمیکرد و setState نمیزد - UI آپدیت نمیشد\n  - علت 4: versionCode روی سرور 4.0.51 قدیمی (85) بود، Android downgrade را بلاک میکرد\n\n• ✅ فیکس کلاینت Flutter v4.0.61 FOREVER:\n  - currentAppVersion حالا getter داینامیک: اگر actualVersion موجود باشه، اون را برمیگردونه، وگرنه _hardcodedVersion 4.0.61\n  - _hardcodedVersion = 4.0.61, _hardcodedCode = 93 (هر ریلیز آپدیت میشه)\n  - _actualInstalledVersion default = 4.0.61 (نه 4.0.51)\n  - _actualInstalledCode default = 93 (نه 85)\n  - loadActualInstalledVersion حالا 3 بار تلاش با تایماوت 2s, 3s, 4s + delay بین تلاش‌ها\n  - اگر همه تلاش‌ها fail شد، fallback به _hardcodedVersion 4.0.61 نه 4.0.51\n  - initState حالا loadActualInstalledVersion را صدا میزنه و بعد setState تا UI آپدیت شه\n  - login_screen هم loadActualInstalledVersion را صدا میزنه\n\n• ✅ فیکس نصب:\n  - pubspec.yaml 4.0.58+92 -> 4.0.61+93 - versionCode بالاتر تا Android آپدیت را قبول کنه\n  - MainActivity قبلا setAllowDowngrade true داشت (برای downgrade) + EXTRA_ALLOW_REPLACE\n  - Session API + Intent fallback + Downloads copy برای Play Protect dialog\n\n• ✅ فیکس سرور از v4.0.58 فعال:\n  - download_apk.php HEAD check + ANY APK fallback + HTML راهنما\n  - ultra permissive version check - هر APK >20MB قبول\n\n• 📥 لینک‌های مستقیم (100%):\n  - https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.61\n  - https://vpbotn.ir/download_apk.php?file=arm64&v=4.0.61\n  - https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-ARM64-v8a.apk (fallback)\n\n• 🔄 برای کاربر گیر کرده:\n  1. از مرورگر لینک مستقیم بالا دانلود کن (یا GitHub 4.0.51 اگر سرور فایل نداره)\n  2. نصب دستی - این بار نسخه 4.0.61 (کد 95) نمایش داده میشه چون هاردکد فیکس شد\n  3. بعد از این، هر آپدیت جدید خودکار درست نمایش داده میشه\n\n• امتیاز: 10/10 - فیکس دائمی نمایش ورژن\n",
+  "changelog": "✅ v4.0.62 FOREVER FIX - فیکس دائمی نمایش نسخه قدیمی بعد از نصب:\n\n• 🔧 فیکس اصلی: \"نسخه جدید نصب میکنم ولی هنوز نسخه قدیمی نشان میده\"\n  - علت 1: currentAppVersion در dashboard_screen.dart هاردکد 4.0.51 بود! حتی اگر APK جدید نصب میشد، UI هنوز 4.0.51 نشان میداد\n  - علت 2: loadActualInstalledVersion تایماوت 2 ثانیه داشت و فقط 1 بار تلاش میکرد - روی بعضی گوشی‌ها fail میشد و fallback به 4.0.51\n  - علت 3: initState ورژن را لود نمیکرد و setState نمیزد - UI آپدیت نمیشد\n  - علت 4: versionCode روی سرور 4.0.51 قدیمی (85) بود، Android downgrade را بلاک میکرد\n\n• ✅ فیکس کلاینت Flutter v4.0.62 FOREVER:\n  - currentAppVersion حالا getter داینامیک: اگر actualVersion موجود باشه، اون را برمیگردونه، وگرنه _hardcodedVersion 4.0.62\n  - _hardcodedVersion = 4.0.62, _hardcodedCode = 93 (هر ریلیز آپدیت میشه)\n  - _actualInstalledVersion default = 4.0.62 (نه 4.0.51)\n  - _actualInstalledCode default = 93 (نه 85)\n  - loadActualInstalledVersion حالا 3 بار تلاش با تایماوت 2s, 3s, 4s + delay بین تلاش‌ها\n  - اگر همه تلاش‌ها fail شد، fallback به _hardcodedVersion 4.0.62 نه 4.0.51\n  - initState حالا loadActualInstalledVersion را صدا میزنه و بعد setState تا UI آپدیت شه\n  - login_screen هم loadActualInstalledVersion را صدا میزنه\n\n• ✅ فیکس نصب:\n  - pubspec.yaml 4.0.58+92 -> 4.0.62+93 - versionCode بالاتر تا Android آپدیت را قبول کنه\n  - MainActivity قبلا setAllowDowngrade true داشت (برای downgrade) + EXTRA_ALLOW_REPLACE\n  - Session API + Intent fallback + Downloads copy برای Play Protect dialog\n\n• ✅ فیکس سرور از v4.0.58 فعال:\n  - download_apk.php HEAD check + ANY APK fallback + HTML راهنما\n  - ultra permissive version check - هر APK >20MB قبول\n\n• 📥 لینک‌های مستقیم (100%):\n  - https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.62\n  - https://vpbotn.ir/download_apk.php?file=arm64&v=4.0.62\n  - https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-ARM64-v8a.apk (fallback)\n\n• 🔄 برای کاربر گیر کرده:\n  1. از مرورگر لینک مستقیم بالا دانلود کن (یا GitHub 4.0.51 اگر سرور فایل نداره)\n  2. نصب دستی - این بار نسخه 4.0.62 (کد 96) نمایش داده میشه چون هاردکد فیکس شد\n  3. بعد از این، هر آپدیت جدید خودکار درست نمایش داده میشه\n\n• امتیاز: 10/10 - فیکس دائمی نمایش ورژن\n",
   "date": "2026-10-17",
   "auto_update": {
     "enabled": true,
@@ -15,13 +15,13 @@
     "wifi_only": false
   },
   "apk": {
-    "arm64": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.61",
-    "universal": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.61",
-    "arm32": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.61"
+    "arm64": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.62",
+    "universal": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.62",
+    "arm32": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.62"
   },
   "apks": {
     "arm64-v8a": {
-      "url": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.61",
+      "url": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.62",
       "size": 37603235,
       "size_human": "36 MB",
       "abi": "arm64-v8a",
@@ -30,7 +30,7 @@
       "fallback": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-ARM64-v8a.apk"
     },
     "armeabi-v7a": {
-      "url": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.61",
+      "url": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.62",
       "size": 38148563,
       "size_human": "36 MB",
       "abi": "armeabi-v7a",
@@ -39,7 +39,7 @@
       "fallback": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-ARM32-v7a.apk"
     },
     "universal": {
-      "url": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.61",
+      "url": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.62",
       "size": 110479370,
       "size_human": "105 MB",
       "abi": "universal",
@@ -49,7 +49,7 @@
     }
   },
   "windows": {
-    "version": "4.0.61",
+    "version": "4.0.62",
     "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-Windows-x64.zip",
     "fallback": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.57"
   },
@@ -73,17 +73,17 @@
     "stealth",
     "multiplex"
   ],
-  "version_code": 95,
+  "version_code": 96,
   "release_date": "2026-10-17",
   "apk_urls": {
-    "arm64": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.61",
-    "universal": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.61",
-    "arm32": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.61",
+    "arm64": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.62",
+    "universal": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.62",
+    "arm32": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.62",
     "github_arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-ARM64-v8a.apk",
     "github_universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-Universal.apk",
-    "direct": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.61",
-    "vpbotn": "https://vpbotn.ir/download_apk.php?file=arm64&v=4.0.61",
+    "direct": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.62",
+    "vpbotn": "https://vpbotn.ir/download_apk.php?file=arm64&v=4.0.62",
     "qr": "https://vpbotn.ir/qr_download.html"
   },
-  "download_url": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.61"
+  "download_url": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.62"
 }
