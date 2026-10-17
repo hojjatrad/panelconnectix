@@ -108,6 +108,19 @@ class ClientController {
 
         $whereSql = implode(' AND ', $where);
 
+        // v4.0.53 PAGINATION - fix OOM and slow load
+        $page = max(1, (int)($_GET['page'] ?? 1));
+        $perPage = (int)($_GET['per_page'] ?? 50);
+        if ($perPage < 10) $perPage = 50;
+        if ($perPage > 200) $perPage = 200;
+        $offset = ($page - 1) * $perPage;
+
+        // Count total
+        $countStmt = $pdo->prepare("SELECT COUNT(*) FROM clients c LEFT JOIN plans p ON c.plan_id = p.id LEFT JOIN server_nodes s ON c.server_id = s.id WHERE $whereSql");
+        $countStmt->execute($params);
+        $totalClients = (int)$countStmt->fetchColumn();
+        $totalPages = max(1, (int)ceil($totalClients / $perPage));
+
         $stmt = $pdo->prepare("SELECT c.*, p.title as plan_title, p.traffic_gb, p.duration_days, 
                                       s.name as server_name, s.server_group, s.sub_domain, 
                                       u.username as reseller_username,
@@ -118,7 +131,7 @@ class ClientController {
                                LEFT JOIN users u ON c.reseller_id = u.id 
                                LEFT JOIN reserved_plans rp ON rp.client_id = c.id AND rp.status = 'queued'
                                WHERE $whereSql 
-                               ORDER BY c.id DESC");
+                               ORDER BY c.id DESC LIMIT $perPage OFFSET $offset");
         $stmt->execute($params);
         $clients = $stmt->fetchAll();
 
@@ -473,14 +486,14 @@ class ClientController {
         if ($oldServerId !== $serverId) {
             try {
                 // Delete from old node
-                $oldServer = $pdo->query("SELECT * FROM server_nodes WHERE id = {$oldServerId}")->fetch();
+                $stmtTmp = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ?"); $stmtTmp->execute([$oldServerId]); $oldServer = $stmtTmp->fetch();
                 if ($oldServer) {
                     $oldDriver = DriverFactory::create($oldServer);
                     $oldDriver->deleteUser($client['username']);
                 }
 
                 // Provision on new node
-                $newServer = $pdo->query("SELECT * FROM server_nodes WHERE id = {$serverId}")->fetch();
+                $stmtTmp2 = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ?"); $stmtTmp2->execute([$serverId]); $newServer = $stmtTmp2->fetch();
                 if ($newServer) {
                     $newDriver = DriverFactory::create($newServer);
                     $expireSec = $expireAt ? (strtotime($expireAt) - time()) : 0;
@@ -571,8 +584,8 @@ class ClientController {
         $user = Auth::user();
         $userId = Auth::id();
 
-        $client = $pdo->query("SELECT * FROM clients WHERE id = $clientId")->fetch();
-        $plan = $pdo->query("SELECT * FROM plans WHERE id = $planId")->fetch();
+        $stmtC = $pdo->prepare("SELECT * FROM clients WHERE id = ?"); $stmtC->execute([$clientId]); $client = $stmtC->fetch();
+        $stmtP = $pdo->prepare("SELECT * FROM plans WHERE id = ?"); $stmtP->execute([$planId]); $plan = $stmtP->fetch();
 
         if (!$client || !$plan) {
             Helpers::flash('error', 'کلاینت یا پلن یافت نشد.');
@@ -637,8 +650,8 @@ class ClientController {
         $user = Auth::user();
         $userId = Auth::id();
 
-        $client = $pdo->query("SELECT * FROM clients WHERE id = $clientId")->fetch();
-        $plan = $pdo->query("SELECT * FROM plans WHERE id = $planId")->fetch();
+        $stmtC = $pdo->prepare("SELECT * FROM clients WHERE id = ?"); $stmtC->execute([$clientId]); $client = $stmtC->fetch();
+        $stmtP = $pdo->prepare("SELECT * FROM plans WHERE id = ?"); $stmtP->execute([$planId]); $plan = $stmtP->fetch();
 
         if (!$client || !$plan) {
             Helpers::flash('error', 'اطلاعات نامعتبر است.');
@@ -685,7 +698,7 @@ class ClientController {
         $pdo = Database::getConnection();
         $userId = Auth::id();
 
-        $client = $pdo->query("SELECT * FROM clients WHERE id = $clientId")->fetch();
+        $stmtC = $pdo->prepare("SELECT * FROM clients WHERE id = ?"); $stmtC->execute([$clientId]); $client = $stmtC->fetch();
         if (!$client) {
             Helpers::flash('error', 'کاربر یافت نشد.');
             Helpers::redirect('clients');
@@ -725,7 +738,7 @@ class ClientController {
         $clientId = (int)($_POST['client_id'] ?? 0);
         $pdo = Database::getConnection();
         $userId = Auth::id();
-        $client = $pdo->query("SELECT * FROM clients WHERE id = $clientId")->fetch();
+        $stmtC = $pdo->prepare("SELECT * FROM clients WHERE id = ?"); $stmtC->execute([$clientId]); $client = $stmtC->fetch();
         if (!$client) {
             Helpers::flash('error', 'کاربر یافت نشد.');
             Helpers::redirect('clients');
@@ -757,7 +770,7 @@ class ClientController {
         $clientId = (int)($_POST['client_id'] ?? 0);
         $pdo = Database::getConnection();
         $userId = Auth::id();
-        $client = $pdo->query("SELECT * FROM clients WHERE id = $clientId")->fetch();
+        $stmtC = $pdo->prepare("SELECT * FROM clients WHERE id = ?"); $stmtC->execute([$clientId]); $client = $stmtC->fetch();
         if (!$client) {
             Helpers::flash('error', 'کاربر یافت نشد.');
             Helpers::redirect('clients');
@@ -859,7 +872,7 @@ class ClientController {
         }
         try {
             require_once __DIR__ . '/../core/NodeSync.php';
-            $server = $pdo->query("SELECT * FROM server_nodes WHERE id = $serverId")->fetch();
+            $stmtS = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ?"); $stmtS->execute([$serverId]); $server = $stmtS->fetch();
             if (!$server) throw new Exception("سرور یافت نشد");
             $result = \NodeSync::syncServer($pdo, $server);
             $pdo->prepare("UPDATE server_nodes SET last_sync_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$serverId]);

@@ -240,8 +240,8 @@ class BankVerificationController {
         }
         
         $pdo = Database::getConnection();
-        $tx = $pdo->query("SELECT * FROM bank_transactions WHERE id=$txId LIMIT 1")->fetch(PDO::FETCH_ASSOC);
-        $order = $pdo->query("SELECT * FROM bot_orders WHERE id=$orderId LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+        $stmtTx = $pdo->prepare("SELECT * FROM bank_transactions WHERE id=? LIMIT 1"); $stmtTx->execute([$txId]); $tx = $stmtTx->fetch(PDO::FETCH_ASSOC);
+        $stmtOrd = $pdo->prepare("SELECT * FROM bot_orders WHERE id=? LIMIT 1"); $stmtOrd->execute([$orderId]); $order = $stmtOrd->fetch(PDO::FETCH_ASSOC);
         
         if (!$tx || !$order) {
             Helpers::flash('error', 'تراکنش یا سفارش یافت نشد');

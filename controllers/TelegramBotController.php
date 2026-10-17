@@ -11,9 +11,12 @@ class TelegramBotController {
     public static ?array $currentContext = null;
 
     public static function resolveContext(PDO $pdo, ?string $token = null, ?int $resellerId = null): array {
+        // v4.0.53 Delegated to BotContextService
+        if (class_exists('BotContextService')) {
+            return BotContextService::resolveContext($pdo, $token, $resellerId);
+        }
         $token = $token ?: ($_GET['bot_token'] ?? $_GET['token'] ?? null);
         $resellerId = $resellerId ?: (isset($_GET['reseller_id']) ? (int)$_GET['reseller_id'] : null);
-
         $reseller = null;
         if (!empty($token)) {
             $stmt = $pdo->prepare("SELECT * FROM users WHERE telegram_bot_token = ? LIMIT 1");
@@ -24,12 +27,12 @@ class TelegramBotController {
             $stmt->execute([$resellerId]);
             $reseller = $stmt->fetch();
         }
-
         if (!$reseller) {
-            $reseller = $pdo->query("SELECT * FROM users WHERE role = 'admin' ORDER BY id ASC LIMIT 1")->fetch();
+            $stmt = $pdo->prepare("SELECT * FROM users WHERE role = 'admin' ORDER BY id ASC LIMIT 1");
+            $stmt->execute();
+            $reseller = $stmt->fetch();
             $token = $token ?: TelegramBot::getToken();
         }
-
         $brand = !empty($reseller['brand_name']) ? $reseller['brand_name'] : Setting::get('brand_name', 'کانکتیکس');
         $card = [
             'number' => !empty($reseller['card_number']) ? $reseller['card_number'] : Setting::get('bank_card', Setting::get('card_number', '۶۰۳۷-۹۹۷۵-xxxx-xxxx')),
@@ -37,7 +40,6 @@ class TelegramBotController {
             'shaba' => !empty($reseller['card_shaba']) ? $reseller['card_shaba'] : Setting::get('card_sheba', ''),
         ];
         $adminChatId = !empty($reseller['telegram_admin_chat_id']) ? $reseller['telegram_admin_chat_id'] : TelegramBot::getAdminChatId();
-
         self::$currentContext = [
             'reseller_id' => (int)($reseller['id'] ?? 1),
             'reseller' => $reseller,
@@ -48,7 +50,6 @@ class TelegramBotController {
             'support_username' => !empty($reseller['support_username']) ? $reseller['support_username'] : Setting::get('telegram_support', ''),
             'channel' => !empty($reseller['telegram_channel']) ? $reseller['telegram_channel'] : Setting::get('bot_force_join_channel', '')
         ];
-
         return self::$currentContext;
     }
 

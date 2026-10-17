@@ -56,7 +56,7 @@ class MonitorController {
         Auth::requireAdmin();
         $id = (int)$id;
         $pdo = Database::getConnection();
-        $server = $pdo->query("SELECT * FROM server_nodes WHERE id = $id")->fetch();
+        $stmt = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ?"); $stmt->execute([$id]); $server = $stmt->fetch();
         if (!$server) {
             Helpers::flash('error', 'سرور یافت نشد');
             Helpers::redirect('monitoring');

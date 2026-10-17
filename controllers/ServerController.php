@@ -584,7 +584,7 @@ require_once __DIR__ . '/../core/Encryption.php';
         Auth::requireAdmin();
         $id = (int)($_GET['id'] ?? 0);
         $pdo = Database::getConnection();
-        $server = $pdo->query("SELECT * FROM server_nodes WHERE id = $id")->fetch();
+        $stmt = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ?"); $stmt->execute([$id]); $server = $stmt->fetch();
 
         if (!$server) {
             Helpers::jsonResponse(['success' => false, 'message' => 'سرور یافت نشد.']);
@@ -793,7 +793,7 @@ require_once __DIR__ . '/../core/Encryption.php';
         Auth::requireAdmin();
         $id = (int)($_GET['id'] ?? 0);
         $pdo = Database::getConnection();
-        $server = $pdo->query("SELECT * FROM server_nodes WHERE id = $id")->fetch();
+        $stmt = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ?"); $stmt->execute([$id]); $server = $stmt->fetch();
 
         if (!$server) {
             Helpers::jsonResponse(['success' => false, 'message' => 'سرور یافت نشد.']);
@@ -1384,15 +1384,15 @@ require_once __DIR__ . '/../core/Encryption.php';
         }
 
         $pdo = Database::getConnection();
-        $fromServer = $pdo->query("SELECT * FROM server_nodes WHERE id = {$fromServerId}")->fetch();
-        $toServer = $pdo->query("SELECT * FROM server_nodes WHERE id = {$toServerId}")->fetch();
+        $stmtFrom = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ?"); $stmtFrom->execute([$fromServerId]); $fromServer = $stmtFrom->fetch();
+        $stmtTo = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ?"); $stmtTo->execute([$toServerId]); $toServer = $stmtTo->fetch();
 
         if (!$fromServer || !$toServer) {
             Helpers::flash('error', 'سرور مبدا یا مقصد یافت نشد.');
             Helpers::redirect('servers');
         }
 
-        $clients = $pdo->query("SELECT * FROM clients WHERE server_id = {$fromServerId}")->fetchAll();
+        $stmtCl = $pdo->prepare("SELECT * FROM clients WHERE server_id = ?"); $stmtCl->execute([$fromServerId]); $clients = $stmtCl->fetchAll();
         if (empty($clients)) {
             Helpers::flash('info', 'هیچ کلاینتی بر روی سرور مبدا برای انتقال وجود ندارد.');
             Helpers::redirect('servers');

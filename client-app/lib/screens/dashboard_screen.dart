@@ -14,6 +14,7 @@ import '../services/api_service.dart';
 import '../services/account_manager.dart';
 import '../services/v2ray_compat.dart';
 import '../widgets/connect_button_ultimate.dart';
+import '../widgets/connect_button_lite.dart';
 import 'login_screen.dart';
 import 'server_list_modal.dart';
 import 'bypass_apps_screen.dart';
@@ -88,6 +89,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   // v4.0.49 MANAGED MODE
   bool _isManagedMode = false;
   bool _hideConfig = false;
+  bool _useLiteButton = true; // v4.0.53 LITE default - fixes button not working
 
   static const String currentAppVersion = '4.0.51';
   static String _actualInstalledVersion = '4.0.51'; // Will be updated from PackageManager
@@ -133,210 +135,78 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   bool _updateWifiOnly = false;
 
   // Comprehensive Iranian & Banking Apps Bypass List (Verified package names from Cafe Bazaar & Myket)
+  // v4.0.53 ULTRA LITE: 20 essential apps only - fixes TransactionTooLarge + button not working
+  // Full 130 list moved to extendedDomesticBypassApps for optional use
   static const List<String> defaultDomesticBypassApps = [
-    // ---------------------------------------------------------
-    // 1. پیام‌رسان‌ها و ارتباطی (Messengers & Social)
-    // ---------------------------------------------------------
-    'ir.eitaa.messenger',             // ایتا
-    'ir.resanememaran.rubika',        // روبیکا
-    'ir.resanememaran.rubikax',       // روبیکا ایکس
+    // پیام‌رسان‌های اصلی (4)
+    'ir.eitaa.messenger',             // ایتا - 20M
+    'ir.resanememaran.rubika',        // روبیکا - 40M
     'ir.ble.messenger',               // بله
     'mobi.mmdt.ott',                  // سروش پلاس
-    'net.iGap',                       // آیگپ
-    'i.gap.im',                       // آیگپ
-    'ir.soroush.app',                 // سروش
-    'ir.medu.shad',                   // شاد
-    'com.gap.android',                // گپ
 
-    // ---------------------------------------------------------
-    // 2. بانک ملت (Bank Mellat)
-    // ---------------------------------------------------------
-    'com.pmb.mobile',                 // همراه بانک ملت (اصلی - ۱۹ میلیون نصب)
-    'com.mellat.mobilebank',
-    'ir.bankmellat.mobilebank',
-    'com.mellat.mobilebank.new',
-    'ir.bankmellat.sekeh',            // سکه ملت
+    // بانک‌های اصلی (10)
+    'com.pmb.mobile',                 // ملت - 19M
+    'ir.bmi.bam.nativeweb',           // ملی بام
+    'ir.tejaratbank.tata.mobile.android.tejarat', // تجارت - 9.7M
+    'com.isc.bsinew',                 // صادرات - 6M
+    'mob.banking.android.sepah',      // سپه
+    'mob.banking.android.pasargad',   // پاسارگاد - 4.4M
+    'com.samanpr.mobillet',           // سامان موبایلت
+    'com.maskanmobilebank',           // مسکن
+    'com.bki.mobilebanking.android',  // کشاورزی
+    'com.citydi.hplus',               // شهر پلاس - 3.7M
 
-    // ---------------------------------------------------------
-    // 3. بانک رفاه کارگران (Bank Refah)
-    // ---------------------------------------------------------
-    'com.refahbank.dpi.android',      // همراه بانک رفاه (اصلی - ۷ میلیون نصب)
-    'com.refah.superapp',             // فرا رفاه
-    'ir.refah.mobilebank',
-    'com.refah.mobilebank',
-    'ir.refah.omidbank',              // امید بانک رفاه
-    'com.refah.fara',
-
-    // ---------------------------------------------------------
-    // 4. بانک ملی ایران (Bank Melli)
-    // ---------------------------------------------------------
-    'ir.bmi.bam.nativeweb',           // همراه بام ملی (نسخه اصلی جدید)
-    'com.bmi.bam',                    // همراه بام ملی
-    'ir.bmi.bam',
-    'com.sadadpsp.eva',               // ایوا (پرداخت سداد ملی)
-    'com.sadad.shast',                // شصت (رمزساز بانک ملی)
-    'ir.melli.app',
-    'ir.sadad.mobilebank',
-
-    // ---------------------------------------------------------
-    // 5. بانک تجارت (Bank Tejarat)
-    // ---------------------------------------------------------
-    'ir.tejaratbank.tata.mobile.android.tejarat', // همراه بانک تجارت (اصلی - ۹.۷ میلیون نصب)
-    'com.tejaratbank.mobilebank',
-    'ir.stts.bjt',                    // باجت (دیجیتال‌بانک تجارت)
-    'ir.stts.etc',                    // ست تجارت
-    'ir.mbt.android',
-    'com.tejarat.hamrah',
-
-    // ---------------------------------------------------------
-    // 6. بانک صادرات ایران (Bank Saderat)
-    // ---------------------------------------------------------
-    'com.isc.bsinew',                 // همراه بانک صادرات (اصلی - ۶ میلیون نصب)
-    'ir.bsi.mobilebank',
-    'com.saderat.mobilebank',
-    'com.isc.sap',                    // صاپ (پرداخت بانک صادرات)
-    'com.saderat.sipa',
-    'com.saderat.rimor',
-
-    // ---------------------------------------------------------
-    // 7. بانک سپه و بانک‌های ادغامی (Bank Sepah)
-    // ---------------------------------------------------------
-    'mob.banking.android.sepah',       // همراه بانک سپه (سامانه توسن)
-    'ir.sepah.mobilebank',
-    'com.sepah.mobilebank',
-    'ir.sepah.omid',                  // امید سپه
-    'com.ansar.mobilebank',           // انصار سابق
-    'com.ghavamin.mobilebank',         // قوامین سابق
-    'com.kosar.mobilebank',           // کوثر سابق
-
-    // ---------------------------------------------------------
-    // 8. بانک پاسارگاد و ویپاد (Bank Pasargad & Wepod)
-    // ---------------------------------------------------------
-    'mob.banking.android.pasargad',    // همراه بانک پاسارگاد (اصلی - ۴.۴ میلیون نصب)
-    'com.dotin.wepod',                // ویپاد (نئوبانک پاسارگاد)
-    'com.pasargad.mobilebank',
-    'ir.pasargad.mobilebank',
-
-    // ---------------------------------------------------------
-    // 9. بانک سامان و بلو بانک (Bank Saman & BluBank)
-    // ---------------------------------------------------------
-    'com.samanpr.mobillet',           // موبایلت (همراه بانک سامان)
-    'com.samanpr.blubank',            // بلو بانک (BluBank سامان)
-    'com.modern.blubank',
-    'com.samanpr.mb',
-    'com.saman.mobilebank',
-
-    // ---------------------------------------------------------
-    // 10. بانک مسکن (Bank Maskan)
-    // ---------------------------------------------------------
-    'com.maskanmobilebank',           // همراه بانک مسکن (اصلی - ۲ میلیون نصب)
-    'mob.banking.android.maskan',
-    'ir.maskan.mobilebank',
-    'com.maskan.mobilebank',
-
-    // ---------------------------------------------------------
-    // 11. بانک کشاورزی (Bank Keshavarzi)
-    // ---------------------------------------------------------
-    'com.bki.mobilebanking.android',  // همراه بانک کشاورزی (اصلی)
-    'ir.keshavarzibank.mobilebank',
-    'com.bki.mobilebank',
-
-    // ---------------------------------------------------------
-    // 12. بانک شهر (Bank Shahr)
-    // ---------------------------------------------------------
-    'com.citydi.hplus',               // همراه شهر پلاس (اصلی - ۳.۷ میلیون نصب)
-    'mob.banking.android.shahr',
-    'ir.shahr.hamrah',
-    'com.tosan.shahr',
-
-    // ---------------------------------------------------------
-    // 13. بانک رسالت و مهر ایران (Gharzolhasaneh Banks)
-    // ---------------------------------------------------------
-    'mob.banking.android.resalat',     // همراه بانک رسالت (اصلی)
-    'ir.rqbank.mobilebank',
-    'com.melli.resalat',
-    'com.qmb.mobile',                 // بانک قرض‌الحسنه مهر ایران
-    'ir.qmb.mobilebank',
-    'com.qmb.mobilebank',
-    'ir.ttbank.mobilebank',
-
-    // ---------------------------------------------------------
-    // 14. بانک آینده، آبانک و همراه کارت (Bank Ayandeh & Hamrah Card)
-    // ---------------------------------------------------------
-    'com.adpdigital.mbs.ayande',      // همراه کارت (۱۲ میلیون نصب)
-    'ir.ba.abank',                    // آبانک (نئوبانک آینده)
-    'com.tosan.keylid',               // کیلید بانک آینده
-    'com.ayandeh.mobilebank',
-
-    // ---------------------------------------------------------
-    // 15. سایر بانک‌ها (دی، گردشگری، سینا، تعاون، کارآفرین، خاورمیانه)
-    // ---------------------------------------------------------
-    'com.tosan.dara.day',             // دی جت (بانک دی)
-    'mob.banking.android.day',
-    'ir.daybank.mobilebank',
-    'mob.banking.android.gardesh',    // توبانک / گردشگری
-    'ir.tourismbank.mobilebank',
-    'com.tosan.gardeshgari',
-    'mob.banking.android.sina',       // بانک سینا
-    'ir.sinabank.mobilebank',
-    'mob.banking.android.taavon',     // توسعه تعاون
-    'com.tosan.dara.bim',             // صنعت و معدن
-    'com.tosan.dara.edbi',            // توسعه صادرات
-    'mob.banking.android.karafarin',  // کارآفرین
-    'com.middleeastbank.mobile',      // خاورمیانه
-    'mob.banking.android.iranzamin',  // ایران زمین
-    'com.iranzamin.faraz',            // فراز ایران زمین
-    'com.bankino.mobile',             // بانکینو (خاورمیانه)
-
-    // ---------------------------------------------------------
-    // 16. پرداخت، فین‌تک و خدمات مالی (Fintech & Payment)
-    // ---------------------------------------------------------
-    'com.asanpardakht.app',           // آپ (آسان پرداخت)
-    'ir.sep.seso',                    // ۷۲۴ (پرداخت الکترونیک سامان)
-    'ir.pec.top',                     // تاپ (تجارت الکترونیک پارسیان)
-    'com.pec.parsian',                // پارسیان من
-    'com.tosan.saman.sekeh',          // سکه
-    'com.snapp.pay',                  // اسنپ پی
-    'ir.mcoin.hamrahcard',
-
-    // ---------------------------------------------------------
-    // 17. صرافی‌های ایرانی ارز دیجیتال (Crypto Exchanges)
-    // ---------------------------------------------------------
-    'ir.nobitex.app',                 // نوبیتکس
-    'ir.wallex.app',                  // والکس
-    'ir.ramzinex.app',                // رمزینکس
-    'ir.abantether.app',              // آبان تتر
-    'com.bitpin.app',                 // بیت پین
-    'ir.exir.app',                    // اکسیر
-
-    // ---------------------------------------------------------
-    // 18. خدمات پرکاربرد روزمره، حمل‌ونقل و خرید (Daily Services)
-    // ---------------------------------------------------------
-    'cab.snapp.passenger',            // اسنپ مسافر
-    'cab.snapp.driver',               // اسنپ راننده
-    'com.tapsi.passenger',            // تپسی مسافر
-    'com.tapsi.driver',               // تپسی راننده
+    // پرداخت و خدمات (6)
+    'com.adpdigital.mbs.ayande',      // همراه کارت - 12M
+    'com.asanpardakht.app',           // آپ
+    'cab.snapp.passenger',            // اسنپ
     'ir.divar',                       // دیوار
-    'com.farsitel.bazaar',            // کافه بازار
-    'com.myket.android',              // مایکت
-    'ir.torob',                       // ترب
-    'com.digikala',                   // دیجی‌کالا
-    'ir.neshan.sp',                   // نشان
-    'ir.balad',                       // بلد
-    'com.takhfifan',                  // تخفیفان
-    'com.snapp.food',                 // اسنپ فود
-    'com.snappbox.passenger',         // اسنپ باکس
+    'com.farsitel.bazaar',            // بازار
+    'ir.gov.my',                      // دولت من
+  ];
 
-    // ---------------------------------------------------------
-    // 19. خدمات دولتی، بیمه و عمومی (Government & Utilities)
-    // ---------------------------------------------------------
-    'ir.gov.my',                      // پنجره ملی خدمات دولت هوشمند
-    'ir.tamin.taminman',              // تأمین اجتماعی من
-    'ir.post.postman',                // پست من
-    'ir.tehran.mytehran',             // تهران من
-    'ir.mci.ecareapp',                // همراه من (همراه اول)
-    'ir.irancell.myirancell',         // ایرانسل من
-    'ir.rightel.myrightel',           // رایتل من
+  // Extended list (130) - optional, user can enable in advanced settings
+  static const List<String> extendedDomesticBypassApps = [
+    'ir.eitaa.messenger', 'ir.resanememaran.rubika', 'ir.resanememaran.rubikax',
+    'ir.ble.messenger', 'mobi.mmdt.ott', 'net.iGap', 'i.gap.im', 'ir.soroush.app',
+    'ir.medu.shad', 'com.gap.android',
+    'com.pmb.mobile', 'com.mellat.mobilebank', 'ir.bankmellat.mobilebank',
+    'com.mellat.mobilebank.new', 'ir.bankmellat.sekeh',
+    'com.refahbank.dpi.android', 'com.refah.superapp', 'ir.refah.mobilebank',
+    'com.refah.mobilebank', 'ir.refah.omidbank', 'com.refah.fara',
+    'ir.bmi.bam.nativeweb', 'com.bmi.bam', 'ir.bmi.bam', 'com.sadadpsp.eva',
+    'com.sadad.shast', 'ir.melli.app', 'ir.sadad.mobilebank',
+    'ir.tejaratbank.tata.mobile.android.tejarat', 'com.tejaratbank.mobilebank',
+    'ir.stts.bjt', 'ir.stts.etc', 'ir.mbt.android', 'com.tejarat.hamrah',
+    'com.isc.bsinew', 'ir.bsi.mobilebank', 'com.saderat.mobilebank',
+    'com.isc.sap', 'com.saderat.sipa', 'com.saderat.rimor',
+    'mob.banking.android.sepah', 'ir.sepah.mobilebank', 'com.sepah.mobilebank',
+    'ir.sepah.omid', 'com.ansar.mobilebank', 'com.ghavamin.mobilebank',
+    'com.kosar.mobilebank', 'mob.banking.android.pasargad', 'com.dotin.wepod',
+    'com.pasargad.mobilebank', 'ir.pasargad.mobilebank',
+    'com.samanpr.mobillet', 'com.samanpr.blubank', 'com.modern.blubank',
+    'com.samanpr.mb', 'com.saman.mobilebank',
+    'com.maskanmobilebank', 'mob.banking.android.maskan', 'ir.maskan.mobilebank',
+    'com.maskan.mobilebank', 'com.bki.mobilebanking.android',
+    'ir.keshavarzibank.mobilebank', 'com.bki.mobilebank',
+    'com.citydi.hplus', 'mob.banking.android.shahr', 'ir.shahr.hamrah', 'com.tosan.shahr',
+    'mob.banking.android.resalat', 'ir.rqbank.mobilebank', 'com.melli.resalat',
+    'com.qmb.mobile', 'ir.qmb.mobilebank', 'com.qmb.mobilebank', 'ir.ttbank.mobilebank',
+    'com.adpdigital.mbs.ayande', 'ir.ba.abank', 'com.tosan.keylid', 'com.ayandeh.mobilebank',
+    'com.tosan.dara.day', 'mob.banking.android.day', 'ir.daybank.mobilebank',
+    'mob.banking.android.gardesh', 'ir.tourismbank.mobilebank', 'com.tosan.gardeshgari',
+    'mob.banking.android.sina', 'ir.sinabank.mobilebank', 'mob.banking.android.taavon',
+    'com.tosan.dara.bim', 'com.tosan.dara.edbi', 'mob.banking.android.karafarin',
+    'com.middleeastbank.mobile', 'mob.banking.android.iranzamin', 'com.iranzamin.faraz',
+    'com.bankino.mobile', 'com.asanpardakht.app', 'ir.sep.seso', 'ir.pec.top',
+    'com.pec.parsian', 'com.tosan.saman.sekeh', 'com.snapp.pay', 'ir.mcoin.hamrahcard',
+    'ir.nobitex.app', 'ir.wallex.app', 'ir.ramzinex.app', 'ir.abantether.app',
+    'com.bitpin.app', 'ir.exir.app',
+    'cab.snapp.passenger', 'cab.snapp.driver', 'com.tapsi.passenger', 'com.tapsi.driver',
+    'ir.divar', 'com.farsitel.bazaar', 'com.myket.android', 'ir.torob', 'com.digikala',
+    'ir.neshan.sp', 'ir.balad', 'com.takhfifan', 'com.snapp.food', 'com.snappbox.passenger',
+    'ir.gov.my', 'ir.tamin.taminman', 'ir.post.postman', 'ir.tehran.mytehran',
+    'ir.mci.ecareapp', 'ir.irancell.myirancell', 'ir.rightel.myrightel',
   ];
 
   @override
@@ -387,6 +257,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         _updateWifiOnly = prefs.getBool('update_wifi_only') ?? false;
         _winTunnelMode = prefs.getString('windows_tunnel_mode') ?? 'proxy';
         _unifiedEnabled = prefs.getBool('unified_servers_enabled') ?? false;
+        _useLiteButton = prefs.getBool('use_lite_button') ?? true; // v4.0.53 default lite
       });
     }
     if (_autoPauseForBankingEnabled && _isConnected) {
@@ -675,8 +546,24 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     });
   }
 
+  bool _isV2RayInitialized = false;
   void _initV2Ray() async {
-    MethodChannel('com.connectix.vpn/updater').setMethodCallHandler((call) async {
+    try {
+      // v4.0.53 FIX: Ensure V2Ray is initialized before use
+      await _flutterV2ray.initializeV2Ray(
+        notificationIconResourceType: "mipmap",
+        notificationIconResourceName: "ic_launcher",
+      ).timeout(const Duration(seconds: 5), onTimeout: () {
+        ApiService.log('V2Ray init timeout - will retry on connect');
+      });
+      _isV2RayInitialized = true;
+      ApiService.log('V2Ray initialized successfully');
+    } catch (e) {
+      ApiService.log('V2Ray init failed: $e - will retry on connect');
+      _isV2RayInitialized = false;
+    }
+    try {
+      MethodChannel('com.connectix.vpn/updater').setMethodCallHandler((call) async {
       if (call.method == 'onNotificationDisconnect') {
         _userIntentionallyDisconnected = true;
         _pausedByBankingApp = false;
@@ -699,6 +586,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         );
       }
     });
+    } catch (e) {
+      ApiService.log('MethodChannel handler setup failed: $e');
+    }
 
     _flutterV2ray = V2RayCompat(
       onStatusChanged: (status) {
@@ -910,7 +800,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       int? delay;
       try {
         final parser = V2RayCompat.parseUniversal(_selectedServer!.configUri);
-        delay = await _flutterV2ray.getServerDelay(config: parser.getFullConfiguration());
+        // v4.0.53 FIX: Add timeout to prevent stuck progress 0/16 + button not working
+        if (_isV2RayInitialized) {
+          delay = await _flutterV2ray.getServerDelay(config: parser.getFullConfiguration())
+              .timeout(const Duration(seconds: 3), onTimeout: () => -1);
+        } else {
+          ApiService.log('measurePing: V2Ray not initialized, skipping V2Ray ping');
+        }
         ApiService.log('measurePing: V2Ray delay for ${_selectedServer!.name} => $delay ms');
       } catch (e) {
         ApiService.log('measurePing: V2Ray getServerDelay failed: $e');
@@ -1529,6 +1425,20 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     });
 
     try {
+      // v4.0.53 FIX: Ensure V2Ray initialized before connect - fixes button not working
+      if (!_isV2RayInitialized) {
+        try {
+          await _flutterV2ray.initializeV2Ray(
+            notificationIconResourceType: "mipmap",
+            notificationIconResourceName: "ic_launcher",
+          ).timeout(const Duration(seconds: 5));
+          _isV2RayInitialized = true;
+          ApiService.log('V2Ray initialized on-demand before connect');
+        } catch (e) {
+          ApiService.log('V2Ray on-demand init failed: $e');
+        }
+      }
+
       final hasPermission = await _flutterV2ray.requestPermission();
       if (!hasPermission) {
         setState(() {
@@ -1577,9 +1487,20 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         try {
           final prefs = await SharedPreferences.getInstance();
           final List<String>? customBypass = prefs.getStringList('custom_bypass_apps');
-          List<String> candidateList = (customBypass != null && customBypass.isNotEmpty)
-              ? customBypass
-              : defaultDomesticBypassApps;
+          List<String> candidateList;
+          if (customBypass != null && customBypass.isNotEmpty) {
+            candidateList = customBypass;
+          } else {
+            // v4.0.53 Check if user enabled extended 130 list
+            final useExtended = prefs.getBool('use_extended_bypass') ?? false;
+            candidateList = useExtended ? extendedDomesticBypassApps : defaultDomesticBypassApps;
+            ApiService.log('bypass mode: ${useExtended ? 'extended 130' : 'lite 20'} -> ${candidateList.length} apps');
+          }
+          // v4.0.53 FIX: Hard limit to 25 to prevent TransactionTooLargeException (130->20 default already, but custom may be large)
+          if (candidateList.length > 25) {
+            candidateList = candidateList.sublist(0, 25);
+            ApiService.log('bypass truncated to 25 to prevent TransactionTooLarge');
+          }
 
           // v3.5.8: Ask native layer to filter to installed apps only (real check via PackageManager)
           try {
@@ -3253,27 +3174,42 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
               const SizedBox(height: 8),
 
-              // v4.0.42 ULTIMATE FULL - کامل با پرچم مواج + غبار + صدا + لرزش + ضربان قلب
-              // 14 میکرو-اینترکشن: حلقه 3x + مدار 8x + فیبر 14x + مایع + پلاسما 6x + confetti 22x + haptic 3x + count-up + glow + flag wave + dust 25x + sound + shake + heartbeat
-              Center(
-                child: ConnectButtonUltimate(
-                  state: _isConnected
-                      ? UltimateConnectState.connected
-                      : _isConnecting
-                          ? UltimateConnectState.connecting
-                          : UltimateConnectState.disconnected,
-                  size: 142,
-                  countryFlag: _selectedServer?.flag ?? '🌐',
-                  serverName: _selectedServer?.name ?? 'Connectix',
-                  enableHaptic: true,
-                  enableConfetti: true,
-                  enablePlasma: true,
-                  enableSound: true,
-                  enableFlagWave: true,
-                  enableDust: true,
-                  enableScreenShake: true,
-                  onTap: _toggleConnection,
-                ),
+              // v4.0.53 LITE vs ULTIMATE - Lite by default for 60fps and reliable tap
+              Directionality(
+                textDirection: TextDirection.ltr,
+                child: Center(
+                child: _useLiteButton
+                    ? ConnectButtonLite(
+                        state: _isConnected
+                            ? LiteConnectState.connected
+                            : _isConnecting
+                                ? LiteConnectState.connecting
+                                : LiteConnectState.disconnected,
+                        size: 142,
+                        countryFlag: _selectedServer?.flag ?? '🌐',
+                        serverName: _selectedServer?.name ?? 'Connectix',
+                        enableHaptic: true,
+                        onTap: _toggleConnection,
+                      )
+                    : ConnectButtonUltimate(
+                        state: _isConnected
+                            ? UltimateConnectState.connected
+                            : _isConnecting
+                                ? UltimateConnectState.connecting
+                                : UltimateConnectState.disconnected,
+                        size: 142,
+                        countryFlag: _selectedServer?.flag ?? '🌐',
+                        serverName: _selectedServer?.name ?? 'Connectix',
+                        enableHaptic: true,
+                        enableConfetti: true,
+                        enablePlasma: true,
+                        enableSound: true,
+                        enableFlagWave: true,
+                        enableDust: true,
+                        enableScreenShake: true,
+                        onTap: _toggleConnection,
+                      ),
+              ),
               ),
 
               const SizedBox(height: 14),

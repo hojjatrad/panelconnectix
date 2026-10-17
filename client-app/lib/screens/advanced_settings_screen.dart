@@ -43,6 +43,8 @@ class _AdvancedSettingsScreenState extends State<AdvancedSettingsScreen> {
 
   bool _isManagedMode = false;
   bool _hideConfig = false;
+  bool _useLiteButton = true;
+  bool _useExtendedBypass = false;
 
   @override
   void initState() {
@@ -52,6 +54,17 @@ class _AdvancedSettingsScreenState extends State<AdvancedSettingsScreen> {
     _winMode = widget.winTunnelMode;
     _loadAutoPause();
     _loadManagedMode();
+    _loadLiteAndExtended();
+  }
+
+  Future<void> _loadLiteAndExtended() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _useLiteButton = prefs.getBool('use_lite_button') ?? true;
+        _useExtendedBypass = prefs.getBool('use_extended_bypass') ?? false;
+      });
+    }
   }
 
   Future<void> _loadManagedMode() async {
@@ -419,6 +432,83 @@ class _AdvancedSettingsScreenState extends State<AdvancedSettingsScreen> {
                   setState(() => _autoReconnect = val);
                   widget.onAutoReconnectChanged(val);
                 },
+              ),
+            ),
+
+            // v4.0.53 LITE BUTTON TOGGLE
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F172A),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: _useLiteButton ? const Color(0xFF6366F1).withOpacity(0.4) : const Color(0xFF1E293B)),
+              ),
+              child: SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('دکمه اتصال سبک (LITE) - پیشنهادی', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                subtitle: const Text('حالت سبک: 1 انیمیشن، 60fps، لمس مطمئن. حالت ULTIMATE: 10 انیمیشن سنگین (برای گوشی قوی)', style: TextStyle(color: Color(0xFF64748B), fontSize: 11, height: 1.4)),
+                value: _useLiteButton,
+                activeColor: const Color(0xFF6366F1),
+                onChanged: (val) async {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setBool('use_lite_button', val);
+                  setState(() => _useLiteButton = val);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(val ? '✅ حالت سبک فعال - دکمه‌ها سریع‌تر کار می‌کنند' : '⚠️ حالت ULTIMATE فعال - ممکن است در گوشی ضعیف کند باشد'), duration: const Duration(seconds: 2)),
+                    );
+                  }
+                },
+              ),
+            ),
+
+            const SizedBox(height: 16),
+            // v4.0.53 EXTENDED BYPASS TOGGLE (130 vs 20)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F172A),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: _useExtendedBypass ? const Color(0xFFF59E0B).withOpacity(0.4) : const Color(0xFF1E293B)),
+              ),
+              child: Column(
+                children: [
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('لیست کامل bypass (130 اپ)', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                    subtitle: Text(_useExtendedBypass ? '130 اپ (ممکن است باعث TransactionTooLarge شود)' : '20 اپ ضروری (پیشنهادی - سریع و مطمئن)', style: TextStyle(color: _useExtendedBypass ? const Color(0xFFF59E0B) : const Color(0xFF64748B), fontSize: 11, height: 1.4)),
+                    value: _useExtendedBypass,
+                    activeColor: const Color(0xFFF59E0B),
+                    onChanged: (val) async {
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.setBool('use_extended_bypass', val);
+                      setState(() => _useExtendedBypass = val);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(val ? '⚠️ لیست کامل 130 فعال - در صورت مشکل دکمه، خاموش کنید' : '✅ لیست سبک 20 فعال - بهینه و سریع'), duration: const Duration(seconds: 2)),
+                        );
+                      }
+                    },
+                  ),
+                  if (_useExtendedBypass)
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(color: const Color(0xFFF59E0B).withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.warning_rounded, color: Color(0xFFF59E0B), size: 16),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'هشدار: لیست 130 تایی ممکن است در گوشی‌های ضعیف باعث TransactionTooLargeException و عمل نکردن دکمه شود. پیشنهاد: خاموش بماند.',
+                              style: TextStyle(color: Color(0xFFFDE68A), fontSize: 10, height: 1.4),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
               ),
             ),
 

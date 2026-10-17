@@ -40,12 +40,13 @@ class DashboardController {
         $freePlans = (int)($planStats['free'] ?? 0);
         $premiumPlans = max(0, $totalPlans - $freePlans);
 
-        // Use cache for transactions count if possible
-        if (class_exists('Cache')) {
-            $totalTransactions = Cache::remember('dashboard_tx_count_' . $userId, 300, function() use ($pdo, $transWhere) {
+        // v4.0.53 Use ApcuCache (fast) with fallback to file cache
+        $cacheClass = class_exists('ApcuCache') ? 'ApcuCache' : (class_exists('Cache') ? 'Cache' : null);
+        if ($cacheClass) {
+            $totalTransactions = $cacheClass::remember('dashboard_tx_count_' . $userId, 300, function() use ($pdo, $transWhere) {
                 return (int)$pdo->query("SELECT COUNT(*) FROM transactions WHERE $transWhere")->fetchColumn();
             });
-            $totalSpent = Cache::remember('dashboard_spent_' . $userId, 300, function() use ($pdo, $transWhere) {
+            $totalSpent = $cacheClass::remember('dashboard_spent_' . $userId, 300, function() use ($pdo, $transWhere) {
                 return (int)$pdo->query("SELECT ABS(SUM(amount)) FROM transactions WHERE amount < 0 AND $transWhere")->fetchColumn();
             });
         } else {

@@ -246,6 +246,36 @@ if(preg_match('/(\d+)\s*روز/', $daysRemText, $m)){
 </table>
 </div>
 </div>
+
+<!-- v4.0.53 PAGINATION -->
+<?php if(isset($totalPages) && $totalPages > 1): ?>
+<div class="flex items-center justify-between gap-3 bg-slate-900/60 p-3 rounded-xl border border-slate-800 text-xs mt-3">
+    <div class="flex items-center gap-2">
+        <span class="text-slate-400">صفحه <?= $page ?> از <?= $totalPages ?> (<?= number_format($totalClients) ?> کلاینت)</span>
+        <select onchange="const url=new URL(window.location);url.searchParams.set('per_page',this.value);url.searchParams.set('page','1');window.location=url;" class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-white">
+            <option value="50" <?= $perPage==50?'selected':'' ?>>50 در صفحه</option>
+            <option value="100" <?= $perPage==100?'selected':'' ?>>100 در صفحه</option>
+            <option value="200" <?= $perPage==200?'selected':'' ?>>200 در صفحه</option>
+        </select>
+    </div>
+    <div class="flex items-center gap-1">
+        <?php if($page > 1): ?>
+            <a href="?<?= http_build_query(array_merge($_GET, ['page' => $page-1])) ?>" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg border border-slate-700">قبلی</a>
+        <?php endif; ?>
+        <?php 
+        $start = max(1, $page-2);
+        $end = min($totalPages, $page+2);
+        for($i=$start;$i<=$end;$i++): 
+        ?>
+            <a href="?<?= http_build_query(array_merge($_GET, ['page' => $i])) ?>" class="px-3 py-1.5 <?= $i==$page?'bg-purple-600 text-white font-bold':'bg-slate-800 text-slate-300 hover:bg-slate-700' ?> rounded-lg border border-slate-700"><?= $i ?></a>
+        <?php endfor; ?>
+        <?php if($page < $totalPages): ?>
+            <a href="?<?= http_build_query(array_merge($_GET, ['page' => $page+1])) ?>" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg border border-slate-700">بعدی</a>
+        <?php endif; ?>
+    </div>
+</div>
+<?php endif; ?>
+
 </form>
 
 <form id="deleteForm" action="<?= Helpers::url('clients/delete') ?>" method="POST" class="hidden"><?= Helpers::csrfField() ?><input type="hidden" name="client_id" id="deleteIdInput"></form>
