@@ -41,7 +41,10 @@ class V2RayCompat {
       // Try FlutterVless Windows first, fallback to XrayService
       try {
         _vless ??= FlutterVless(onStatusChanged: (s) => _onStatusChanged(s));
-        await _vless!.initializeVless();
+        await _vless!.initializeVless(
+          notificationIconResourceType: 'mipmap',
+          notificationIconResourceName: 'ic_launcher',
+        );
         return;
       } catch (_) {
         await _xray.initialize();
@@ -49,7 +52,19 @@ class V2RayCompat {
       }
     }
     _vless ??= FlutterVless(onStatusChanged: (s) => _onStatusChanged(s));
-    await _vless!.initializeVless();
+    // v4.0.66 FIX: Pass notification icon to ensure foreground notification shows with speed + disconnect button
+    // Without this, APPLICATION_ICON=0 -> uses ic_dialog_info -> notification may not show properly on Android 13+
+    try {
+      await _vless!.initializeVless(
+        notificationIconResourceType: 'mipmap',
+        notificationIconResourceName: 'ic_launcher',
+      );
+    } catch (e) {
+      // Fallback without icon if old API
+      try {
+        await _vless!.initializeVless();
+      } catch (_) {}
+    }
   }
 
   Future<int?> getServerDelay({required String config}) async {

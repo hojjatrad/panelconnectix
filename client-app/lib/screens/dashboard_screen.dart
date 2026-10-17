@@ -955,7 +955,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
   }
 
-  // v4.0.65 NEW: Ping all servers on first page per user request
+  // v4.0.66 NEW: Ping all servers on first page per user request
   Future<void> _pingAllServers() async {
     if (_isRefreshing || _servers.isEmpty) return;
     setState(() => _isRefreshing = true);
@@ -3226,7 +3226,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
               const SizedBox(height: 16),
 
-              // v4.0.65 FINAL UI - First page: Smart Connect + Ping All + Speed always visible
+              // v4.0.66 FINAL UI - First page: Smart Connect + Ping All + Speed always visible
               // Per user request: remove proxy/GPS/TV from first page (only in settings), add ping all + smart + speed on first page
               // v4.0.46 NO-SCROLL kept, but now 2 buttons row + speed row
               Row(
@@ -3340,7 +3340,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
               ),
 
-              // v4.0.65 FINAL UI: Speed always visible on first page (even when disconnected, shows 0)
+              // v4.0.66 FINAL UI: Speed always visible on first page (even when disconnected, shows 0)
               // Per user request: bring upload/download speed to first page
               const SizedBox(height: 10),
               ValueListenableBuilder<V2RayStatus>(

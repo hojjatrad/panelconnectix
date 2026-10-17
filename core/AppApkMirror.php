@@ -67,13 +67,13 @@ class AppApkMirror {
             );
             if (!is_array($release) || empty($release['assets'])) {
                 $release = Updater::githubRequest(
-                    "https://api.github.com/repos/{$repo}/releases/tags/v4.0.8",
+                    "https://api.github.com/repos/{$repo}/releases/tags/v4.0.65",
                     $token
                 );
             }
             if (!is_array($release) || empty($release['assets'])) {
                 $release = Updater::githubRequest(
-                    "https://api.github.com/repos/{$repo}/releases/tags/v3.7.0",
+                    "https://api.github.com/repos/{$repo}/releases/tags/v4.0.64",
                     $token
                 );
             }

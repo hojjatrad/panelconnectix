@@ -23,7 +23,7 @@ android {
     defaultConfig {
         applicationId = "com.connectix.vpn"
         minSdk = 23
-        targetSdk = 34
+        targetSdk = 35
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }

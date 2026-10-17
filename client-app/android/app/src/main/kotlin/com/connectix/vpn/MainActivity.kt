@@ -86,30 +86,59 @@ class MainActivity: FlutterActivity() {
                         val notifMgr = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
                         if (notifMgr != null) {
                             if (!isConnected) {
-                                notifMgr.cancel(NOTIF_ID)
-                                notifMgr.cancel(9999)
+                                // v4.0.66 FIX: Don't cancel foreground service notification here - let XrayVPNService handle it
+                                // Only cancel our custom status notification if we use different ID
+                                // But we use same ID 1 as foreground, so don't cancel when disconnected - service already stopped
+                                try {
+                                    notifMgr.cancel(NOTIF_ID)
+                                } catch (_: Exception) {}
+                                try {
+                                    notifMgr.cancel(9999)
+                                } catch (_: Exception) {}
                                 result.success(true)
                                 return@setMethodCallHandler
                             }
 
-                            var channelId = NOTIF_CHANNEL_ID
+                            // v4.0.66 FIX: Use vpn_service_channel (library's channel) as primary to update foreground notification with speed
+                            // Library uses channel "vpn_service_channel" and ID 1 for foreground service
+                            // We should use same channel to update its notification with speed + disconnect button
+                            var channelId = "vpn_service_channel"
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                if (notifMgr.getNotificationChannel(V2RAY_CHANNEL_ID) != null) {
-                                    channelId = V2RAY_CHANNEL_ID
-                                } else {
-                                    if (notifMgr.getNotificationChannel(NOTIF_CHANNEL_ID) == null) {
-                                        val ch = NotificationChannel(
-                                            NOTIF_CHANNEL_ID,
-                                            "Connectix VPN Status",
-                                            NotificationManager.IMPORTANCE_LOW
-                                        ).apply {
-                                            description = "نمایش زنده سرعت و وضعیت اتصال وی‌پی‌ان"
-                                            setShowBadge(false)
-                                            setSound(null, null)
-                                            enableVibration(false)
-                                        }
-                                        notifMgr.createNotificationChannel(ch)
+                                // Check if library's channel exists, if not create it
+                                if (notifMgr.getNotificationChannel("vpn_service_channel") == null) {
+                                    val vpnCh = NotificationChannel(
+                                        "vpn_service_channel",
+                                        "VPN Service",
+                                        NotificationManager.IMPORTANCE_LOW
+                                    ).apply {
+                                        description = "نمایش زنده سرعت و وضعیت اتصال وی‌پی‌ان"
+                                        setShowBadge(false)
+                                        setSound(null, null)
+                                        enableVibration(false)
                                     }
+                                    notifMgr.createNotificationChannel(vpnCh)
+                                }
+                                // Also ensure our custom channel exists as fallback
+                                if (notifMgr.getNotificationChannel(V2RAY_CHANNEL_ID) != null) {
+                                    // Library may have created with old ID in some versions, prefer vpn_service_channel but keep compat
+                                }
+                                if (notifMgr.getNotificationChannel(NOTIF_CHANNEL_ID) == null) {
+                                    val ch = NotificationChannel(
+                                        NOTIF_CHANNEL_ID,
+                                        "Connectix VPN Status",
+                                        NotificationManager.IMPORTANCE_LOW
+                                    ).apply {
+                                        description = "نمایش زنده سرعت و وضعیت اتصال وی‌پی‌ان"
+                                        setShowBadge(false)
+                                        setSound(null, null)
+                                        enableVibration(false)
+                                    }
+                                    notifMgr.createNotificationChannel(ch)
+                                }
+                            } else {
+                                // Pre-O, use NOTIF_CHANNEL_ID as fallback if vpn_service_channel not available
+                                if (notifMgr.getNotificationChannel("vpn_service_channel") == null) {
+                                    channelId = NOTIF_CHANNEL_ID
                                 }
                             }
 
@@ -128,6 +157,8 @@ class MainActivity: FlutterActivity() {
                             }
                             val discPendingIntent = PendingIntent.getActivity(this, 101, discIntent, flags)
 
+                            // v4.0.66 FIX: Build notification with speed + disconnect button, using same ID 1 as foreground service
+                            // This updates the foreground notification to show speed
                             val notif = NotificationCompat.Builder(this, channelId)
                                 .setSmallIcon(R.mipmap.ic_launcher)
                                 .setContentTitle(title)
@@ -137,21 +168,29 @@ class MainActivity: FlutterActivity() {
                                 .setContentIntent(contentPendingIntent)
                                 .addAction(android.R.drawable.ic_menu_close_clear_cancel, "قطع اتصال", discPendingIntent)
                                 .setPriority(NotificationCompat.PRIORITY_LOW)
+                                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                                .setCategory(NotificationCompat.CATEGORY_SERVICE)
                                 .build()
 
                             notifMgr.notify(NOTIF_ID, notif)
-                            notifMgr.cancel(9999)
+                            // Don't cancel 9999 here - it might be used by other
                         }
                         result.success(true)
                     } catch (e: Exception) {
+                        android.util.Log.e("ConnectixNotif", "updateNotification failed: ${e.message}", e)
                         result.success(false)
                     }
                 }
                 "cancelNotification" -> {
                     try {
                         val notifMgr = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
-                        notifMgr?.cancel(NOTIF_ID)
-                        notifMgr?.cancel(9999)
+                        // v4.0.66 FIX: Only cancel our custom, don't interfere with foreground service if it's still running
+                        try {
+                            notifMgr?.cancel(NOTIF_ID)
+                        } catch (_: Exception) {}
+                        try {
+                            notifMgr?.cancel(9999)
+                        } catch (_: Exception) {}
                         result.success(true)
                     } catch (e: Exception) {
                         result.success(false)
@@ -230,6 +269,23 @@ class MainActivity: FlutterActivity() {
                         } catch (e2: Exception) {
                             result.error("HOTSPOT_SETTINGS_ERROR", e2.message, null)
                         }
+                    }
+                }
+                "openBrowser" -> {
+                    // v4.0.66 FIX: Open browser for manual download fallback
+                    val url = call.argument<String>("url") ?: ""
+                    try {
+                        if (url.isEmpty()) {
+                            result.error("INVALID_URL", "URL empty", null)
+                            return@setMethodCallHandler
+                        }
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(intent)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("BROWSER_ERROR", e.message, null)
                     }
                 }
                 "openFileManager" -> {
