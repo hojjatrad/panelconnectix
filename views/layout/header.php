@@ -170,6 +170,8 @@ if (!function_exists('isActiveRoute')) {
             }
         }
     </style>
+    <!-- v4.0.55 PWA Background Sync -->
+    <script src="<?= $base ?>/assets/js/pwa-sync.js?v=<?= $assetVer ?? Updater::CURRENT_VERSION ?? '4.0.55' ?>" defer></script>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col md:flex-row antialiased selection:bg-purple-600 selection:text-white">
 
@@ -817,6 +819,11 @@ if (!function_exists('isActiveRoute')) {
                 return;
             }
             console.log('SW controller changed, reloading...');
+            // v4.0.55 PWA Sync
+            const pwaSyncScript = document.createElement('script');
+            pwaSyncScript.src = '<?= $base ?>/assets/js/pwa-sync.js?v=<?= $assetVer ?? Updater::CURRENT_VERSION ?>';
+            document.head.appendChild(pwaSyncScript);
+
             sessionStorage.setItem('sw_reloaded', '1');
             window.location.reload();
         });

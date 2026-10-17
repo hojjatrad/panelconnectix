@@ -5,13 +5,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
 import 'models/client_model.dart';
 import 'models/server_model.dart';
 import 'screens/dashboard_screen.dart';
+import 'screens/dashboard_screen_mvvm.dart';
 import 'screens/login_screen.dart';
 import 'services/api_service.dart';
 import 'services/account_manager.dart';
 import 'services/v2ray_compat.dart';
+import 'viewmodels/dashboard_viewmodel.dart';
+import 'design/design.dart';
 
 // ---------------- Global crash capture ----------------
 // 3.3.3: crashes used to be swallowed by debugPrint (invisible in release)
@@ -63,10 +67,15 @@ void main() async {
     return true; // handled — the crash screen takes over instead of dying
   };
 
-  // v4.0.23 FIX: White screen root cause - initBaseUrl network hang before runApp
-  // Previously awaited initBaseUrl without timeout, if network slow DNS fail, app stayed white forever
-  // Now: runApp immediately, initBaseUrl in background with timeout
-  runApp(const ConnectixApp());
+  // v4.0.55 MVVM + Provider - runApp with MultiProvider
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => DashboardViewModel()),
+      ],
+      child: const ConnectixApp(),
+    ),
+  );
   runZonedGuarded(() async {
     try {
       await ApiService.initBaseUrl().timeout(const Duration(seconds: 8));
@@ -229,19 +238,20 @@ class ConnectixApp extends StatefulWidget {
   State<ConnectixApp> createState() => _ConnectixAppState();
 }
 
-/// Brand palette (shared by every screen).
+/// Brand palette (shared by every screen) - v4.0.55 now uses AppColors design system
+/// Kept for backward compat, but new code should use AppColors
 class C {
-  static const Color seed = Color(0xFF9333EA); // purple
-  static const Color accent = Color(0xFF6366F1); // indigo
-  static const Color ok = Color(0xFF10B981); // green
-  static const Color warn = Color(0xFFF59E0B); // amber
-  static const Color danger = Color(0xFFF87171); // red
-  static const Color bg = Color(0xFF090D16);
-  static const Color surface = Color(0xFF111827);
-  static const Color surface2 = Color(0xFF0F172A);
-  static const Color border = Color(0xFF1E293B);
-  static const Color textMain = Color(0xFFF1F5F9);
-  static const Color textDim = Color(0xFF94A3B8);
+  static const Color seed = AppColors.primary; // was 0xFF9333EA
+  static const Color accent = AppColors.primaryLight; // was 0xFF6366F1
+  static const Color ok = AppColors.success;
+  static const Color warn = AppColors.warning;
+  static const Color danger = AppColors.error;
+  static const Color bg = AppColors.bgPrimary;
+  static const Color surface = AppColors.bgSecondary;
+  static const Color surface2 = AppColors.bgPrimary;
+  static const Color border = AppColors.border;
+  static const Color textMain = AppColors.textPrimary;
+  static const Color textDim = AppColors.textSecondary;
 }
 
 /// App-wide Material 3 dark theme with the Vazirmatn Persian font.

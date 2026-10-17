@@ -1,7 +1,7 @@
 name: connectix_vpn
-description: Connectix Professional Multiplatform VPN Client - ULTRA Dual-Core Xray + sing-box + v4.0.52 BOT FIX + SOFT DELETE + RESYNC
+description: Connectix Professional Multiplatform VPN Client - ULTRA Dual-Core Xray + sing-box + v4.0.55 ULTRA FINAL - MVVM + PROVIDER + DESIGN SYSTEM FULL + WIDGET TESTS + PWA SYNC + API DOCS
 publish_to: 'none'
-version: 4.0.54+88
+version: 4.0.55+89
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -19,6 +19,9 @@ dependencies:
   connectivity_plus: ^6.0.3
   path_provider: ^2.1.0
   wakelock_plus: ^1.2.5
+  provider: ^6.1.2
+  cached_network_image: ^3.3.0
+  flutter_cache_manager: ^3.3.2
 
 dev_dependencies:
   flutter_test:

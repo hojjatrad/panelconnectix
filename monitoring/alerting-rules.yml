@@ -1,0 +1,110 @@
+# v4.0.55 Grafana Alerting Rules for Connectix Panel
+# Import into Prometheus Alertmanager or Grafana Alerting
+
+groups:
+  - name: connectix_panel_alerts
+    interval: 30s
+    rules:
+      - alert: HighClientExpiry
+        expr: connectix_clients_expired / connectix_clients_total > 0.3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "تعداد کلاینت منقضی بالا"
+          description: "بیش از 30% کلاینت‌ها منقضی شده‌اند: {{ $value | humanizePercentage }}"
+
+      - alert: ServerDown
+        expr: connectix_servers_online < connectix_servers_total
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "سرور آفلاین"
+          description: "{{ $value }} سرور از {{ $labels.total }} آفلاین است"
+
+      - alert: HighServerPing
+        expr: connectix_server_ping_ms > 500
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "پینگ سرور بالا"
+          description: "سرور {{ $labels.server_name }} پینگ {{ $value }}ms دارد"
+
+      - alert: TransactionTooLargeRisk
+        expr: increase(connectix_errors_total{error="TransactionTooLarge"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "خطر TransactionTooLarge"
+          description: "خطای TransactionTooLarge در 5 دقیقه اخیر رخ داده - bypass list را چک کنید"
+
+      - alert: V2RayErrors
+        expr: increase(connectix_errors_total{error="V2Ray"}[5m]) > 5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "خطاهای V2Ray"
+          description: "بیش از 5 خطای V2Ray در 5 دقیقه"
+
+      - alert: LowAPCuHitRate
+        expr: (rate(connectix_apcu_hits[5m]) / (rate(connectix_apcu_hits[5m]) + rate(connectix_apcu_misses[5m])) * 100) < 70
+        for: 10m
+        labels:
+          severity: info
+        annotations:
+          summary: "Hit Rate کش پایین"
+          description: "APCu hit rate {{ $value }}% - کش بهینه نیست"
+
+      - alert: BotOrdersSpike
+        expr: increase(connectix_bot_orders_total[1h]) > 50
+        for: 5m
+        labels:
+          severity: info
+        annotations:
+          summary: "افزایش سفارشات ربات"
+          description: "بیش از 50 سفارش در یک ساعت"
+
+      - alert: NoOnlineClients
+        expr: connectix_clients_online == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "هیچ کلاینت آنلاینی نیست"
+          description: "در 15 دقیقه اخیر هیچ کلاینت آنلاینی نبوده"
+
+      - alert: HighTrafficUsage
+        expr: (connectix_traffic_bytes / 1024 / 1024 / 1024) > 1000
+        for: 5m
+        labels:
+          severity: info
+        annotations:
+          summary: "مصرف ترافیک بالا"
+          description: "مصرف کل ترافیک از 1TB گذشت: {{ $value }} GB"
+
+      - alert: AppOldVersion
+        expr: count by (version) (connectix_app_version{version=~"4\\.0\\.[0-4][0-9].*"}) > 0
+        for: 1h
+        labels:
+          severity: info
+        annotations:
+          summary: "نسخه قدیمی اپ"
+          description: "کاربرانی با نسخه قدیمی اپ وجود دارند: {{ $labels.version }}"
+
+# Notification channels (configure in Grafana)
+# - Telegram: برای اطلاع‌رسانی به ادمین
+# - Email: گزارش روزانه
+# - Webhook: برای اتصال به ربات تلگرام Connectix
+
+# Example Prometheus config for alerts:
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets:
+#           - alertmanager:9093
+# rule_files:
+#   - "alerting-rules.yml"
