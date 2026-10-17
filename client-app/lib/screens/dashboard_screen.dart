@@ -90,16 +90,16 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   // v4.0.49 MANAGED MODE
   bool _isManagedMode = false;
   bool _hideConfig = false;
-  bool _useLiteButton = true; // v4.0.53 LITE default - fixes button not working
+  bool _useLiteButton = false; // v4.0.67 ULTIMATE BEAUTIFUL default - wave effects restored, user can toggle to lite in settings
 
   // v4.0.63 FOREVER FIX - Never show old version after install - PERMANENT LAW
   // LAW: currentAppVersion must be dynamic, not hardcoded const that stays old after install
   // Fix: Make it getter that returns actual installed version if available, else latest hardcoded
-  static const String _hardcodedVersion = '4.0.64'; // Fallback only, updated each release
-  static const int _hardcodedCode = 98;
+  static const String _hardcodedVersion = '4.0.67'; // Fallback only, updated each release
+  static const int _hardcodedCode = 101;
   static String get currentAppVersion => _actualInstalledVersion.isNotEmpty && _actualInstalledVersion != '4.0.51' ? _actualInstalledVersion : _hardcodedVersion;
-  static String _actualInstalledVersion = '4.0.64'; // Will be updated from PackageManager immediately on start
-  static int _actualInstalledCode = 98;
+  static String _actualInstalledVersion = '4.0.67'; // Will be updated from PackageManager immediately on start
+  static int _actualInstalledCode = 101;
 
   // v4.0.46 FOREVER CACHE FIX - PERMANENT LAW - NEVER REGRESS
   // LAW 1: Panel must NEVER serve old APK (auto-delete stale files)
@@ -302,7 +302,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         _updateWifiOnly = prefs.getBool('update_wifi_only') ?? false;
         _winTunnelMode = prefs.getString('windows_tunnel_mode') ?? 'proxy';
         _unifiedEnabled = prefs.getBool('unified_servers_enabled') ?? false;
-        _useLiteButton = prefs.getBool('use_lite_button') ?? true; // v4.0.53 default lite
+        _useLiteButton = prefs.getBool('use_lite_button') ?? false; // v4.0.67 default ULTIMATE beautiful
       });
     }
     if (_autoPauseForBankingEnabled && _isConnected) {
@@ -3226,73 +3226,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
               const SizedBox(height: 16),
 
-              // v4.0.66 FINAL UI - First page: Smart Connect + Ping All + Speed always visible
-              // Per user request: remove proxy/GPS/TV from first page (only in settings), add ping all + smart + speed on first page
-              // v4.0.46 NO-SCROLL kept, but now 2 buttons row + speed row
-              Row(
-                textDirection: TextDirection.rtl,
-                children: [
-                  Expanded(
-                    child: InkWell(
-                      onTap: _isSmartConnecting ? null : _smartConnect,
-                      borderRadius: BorderRadius.circular(14),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1E1B4B),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: const Color(0xFF4338CA)),
-                        ),
-                        child: Row(
-                          textDirection: TextDirection.rtl,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            _isSmartConnecting
-                                ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF818CF8)))
-                                : const Icon(Icons.bolt_rounded, color: Colors.amber, size: 16),
-                            const SizedBox(width: 5),
-                            const Flexible(
-                              child: Text('اتصال هوشمند', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: InkWell(
-                      onTap: _isRefreshing ? null : _pingAllServers,
-                      borderRadius: BorderRadius.circular(14),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0F172A),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: const Color(0xFF10B981).withOpacity(0.5)),
-                        ),
-                        child: Row(
-                          textDirection: TextDirection.rtl,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            _isRefreshing
-                                ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF10B981)))
-                                : const Icon(Icons.speed_rounded, color: Color(0xFF10B981), size: 16),
-                            const SizedBox(width: 5),
-                            const Flexible(
-                              child: Text('پینگ همه', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              // v4.0.67 ULTIMATE BEAUTIFUL - Restored v4.0.42 wave effects + beautiful first page
+              // Per user: UI قبلی زیبا با موج برگردانده شد، Lite پیش‌فرض false شد
+              // First page clean: no proxy/gps/tv (only in settings), but beautiful connect button with wave
 
-              const SizedBox(height: 8),
-
-              // v4.0.53 LITE vs ULTIMATE - Lite by default for 60fps and reliable tap
+              // v4.0.53 LITE vs ULTIMATE - v4.0.67 ULTIMATE BEAUTIFUL default
               Directionality(
                 textDirection: TextDirection.ltr,
                 child: Center(
@@ -3340,8 +3278,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
               ),
 
-              // v4.0.66 FINAL UI: Speed always visible on first page (even when disconnected, shows 0)
-              // Per user request: bring upload/download speed to first page
+              // v4.0.67 ULTIMATE BEAUTIFUL: Speed always visible + beautiful Smart/Ping buttons below
               const SizedBox(height: 10),
               ValueListenableBuilder<V2RayStatus>(
                 valueListenable: _v2rayStatus,
@@ -3397,7 +3334,93 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 },
               ),
 
-              if (Platform.isWindows) ...[
+              const SizedBox(height: 16),
+
+              // v4.0.67 BEAUTIFUL Smart Connect + Ping All - گرادیانت زیبا با موج و سایه (مثل v4.0.42)
+              Row(
+                textDirection: TextDirection.rtl,
+                children: [
+                  Expanded(
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: _isSmartConnecting ? null : _smartConnect,
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF4338CA), Color(0xFF6366F1), Color(0xFF818CF8)],
+                              begin: Alignment.topRight,
+                              end: Alignment.bottomLeft,
+                            ),
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(color: const Color(0xFF6366F1).withOpacity(0.35), blurRadius: 12, offset: const Offset(0, 4)),
+                              BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 2)),
+                            ],
+                          ),
+                          child: Row(
+                            textDirection: TextDirection.rtl,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _isSmartConnecting
+                                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                  : const Icon(Icons.bolt_rounded, color: Colors.amber, size: 18),
+                              const SizedBox(width: 6),
+                              const Flexible(
+                                child: Text('اتصال هوشمند', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: _isRefreshing ? null : _pingAllServers,
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF065F46), Color(0xFF10B981), Color(0xFF34D399)],
+                              begin: Alignment.topRight,
+                              end: Alignment.bottomLeft,
+                            ),
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(color: const Color(0xFF10B981).withOpacity(0.35), blurRadius: 12, offset: const Offset(0, 4)),
+                              BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 2)),
+                            ],
+                          ),
+                          child: Row(
+                            textDirection: TextDirection.rtl,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _isRefreshing
+                                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                  : const Icon(Icons.speed_rounded, color: Colors.white, size: 18),
+                              const SizedBox(width: 6),
+                              const Flexible(
+                                child: Text('پینگ همه', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 8),
+
+              if (Platform.isWindows) ...[              if (Platform.isWindows) ...[
                 const SizedBox(height: 18),
                 // Windows tunnel flavor selector (Phase 1: system proxy,
                 // Phase 2: full TUN VPN).

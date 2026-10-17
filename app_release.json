@@ -1,10 +1,10 @@
 {
-  "version": "4.0.66",
-  "code": 100,
+  "version": "4.0.67",
+  "code": 101,
   "force_update": false,
   "force_min_code": 50,
   "update_type": "full",
-  "changelog": "✅ v4.0.66 FIX ALL REPORTED BUGS:\n\n• 🔧 فیکس نوتیفیکیشن بالای گوشی:\n  - اضافه شدن آیکون mipmap/ic_launcher به initializeVless (قبلا 0 بود)\n  - استفاده از کانال vpn_service_channel برای آپدیت اعلان سرعت\n  - نمایش سرعت دانلود/آپلود زنده در نوتیفیکیشن\n  - دکمه قطع اتصال در نوتیفیکیشن\n  - اضافه شدن FOREGROUND_SERVICE_DATA_SYNC و SPECIAL_USE برای Android 14+\n\n• 🔧 فیکس بروزرسانی از داخل اپ:\n  - اضافه شدن openBrowser handler در MainActivity\n  - بهبود checkAppUpdate برای برگرداندن همیشه آخرین نسخه از GitHub\n  - فیکس download_apk.php برای پشتیبانی از v4.0.66\n  - بهبود AppReleasePublisher و AppApkMirror برای v4.0.65/66\n\n• 🔧 فیکس نصب روی نسخه‌های قبلی:\n  - versionCode 99->100 همیشه افزایشی\n  - setAllowDowngrade true در Session API\n  - EXTRA_ALLOW_REPLACE true در Intent\n  - allowSameVersion true\n  - اضافه شدن allowBackup true\n\n• 🎨 نگه داشتن UI جدید: Smart Connect + Ping All + Speed همیشه visible",
+  "changelog": "✅ v4.0.67 ULTIMATE BEAUTIFUL + ALL BUGS FIXED - تست عمیق کامل:\n\n• 🎨 UI زیبا برگردانده شد (مثل v4.0.42 ULTIMATE):\n  - دکمه اتصال با 14 میکرو-اینترکشن: حلقه 3x + مدار 8x + فیبر 14x + مایع + پلاسما + confetti + haptic + glow + flag wave + dust + sound + shake + heartbeat\n  - افکت موج روی دکمه (wave) + پرچم مواج + ذرات غبار نورانی\n  - _useLiteButton پیش‌فرض false شد (ULTIMATE زیبا) - کاربر می‌تواند در تنظیمات Lite را فعال کند\n  - دکمه‌های Smart Connect + Ping All با گرادیانت زیبا و سایه و انیمیشن\n\n• 🔧 فیکس نوتیفیکیشن (تست عمیق):\n  - آیکون mipmap/ic_launcher در initializeVless\n  - کانال vpn_service_channel برای سرعت زنده\n  - نمایش ↓ دانلود ↑ آپلود زنده + دکمه قطع اتصال\n  - FOREGROUND_SERVICE_DATA_SYNC + SPECIAL_USE برای Android 14+\n\n• 🔧 فیکس بروزرسانی داخل اپ:\n  - openBrowser handler اضافه شد\n  - checkAppUpdate همیشه آخرین نسخه از GitHub برمی‌گرداند\n  - download_apk.php پشتیبانی از v4.0.67\n  - AppReleasePublisher RELEASE_TAG=v4.0.67\n\n• 🔧 فیکس نصب روی نسخه قبلی:\n  - versionCode 100->101 افزایشی\n  - setAllowDowngrade true + EXTRA_ALLOW_REPLACE + allowSameVersion + allowBackup\n\n• 🧹 پاکسازی اسکیل‌های قدیمی - آماده برای اسکیل‌های جدید\n\n• 📥 لینک مستقیم:\n  https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.67/Connectix-ARM64-v8a.apk\n",
   "date": "2026-10-17",
   "auto_update": {
     "enabled": true,
@@ -15,37 +15,37 @@
     "wifi_only": false
   },
   "apk": {
-    "arm64": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.66",
-    "universal": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.66",
-    "arm32": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.66"
+    "arm64": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.67",
+    "universal": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.67",
+    "arm32": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.67"
   },
   "apks": {
     "arm64-v8a": {
-      "url": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.66",
-      "size": 37653019,
+      "url": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.67",
+      "size": 37653182,
       "size_human": "36 MB",
       "abi": "arm64-v8a",
       "recommended": true,
       "arch": "arm64",
-      "fallback": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.66/Connectix-ARM64-v8a.apk"
+      "fallback": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.67/Connectix-ARM64-v8a.apk"
     },
     "armeabi-v7a": {
-      "url": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.66",
-      "size": 38200883,
+      "url": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.67",
+      "size": 38201111,
       "size_human": "36 MB",
       "abi": "armeabi-v7a",
       "recommended": false,
       "arch": "arm32",
-      "fallback": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.66/Connectix-ARM32-v7a.apk"
+      "fallback": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.67/Connectix-ARM32-v7a.apk"
     },
     "universal": {
-      "url": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.66",
-      "size": 110587515,
+      "url": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.67",
+      "size": 110587840,
       "size_human": "105 MB",
       "abi": "universal",
       "recommended": false,
       "arch": "universal",
-      "fallback": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.66/Connectix-Universal.apk"
+      "fallback": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.67/Connectix-Universal.apk"
     }
   },
   "windows": {
@@ -73,18 +73,18 @@
     "stealth",
     "multiplex"
   ],
-  "version_code": 100,
+  "version_code": 101,
   "release_date": "2026-10-17",
   "apk_urls": {
-    "arm64": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.66",
-    "universal": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.66",
-    "arm32": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.66",
-    "github_arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.66/Connectix-ARM64-v8a.apk",
-    "github_universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.66/Connectix-Universal.apk",
-    "direct": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.66",
-    "vpbotn": "https://vpbotn.ir/download_apk.php?file=arm64&v=4.0.66",
+    "arm64": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.67",
+    "universal": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.67",
+    "arm32": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.67",
+    "github_arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.67/Connectix-ARM64-v8a.apk",
+    "github_universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.67/Connectix-Universal.apk",
+    "direct": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.67",
+    "vpbotn": "https://vpbotn.ir/download_apk.php?file=arm64&v=4.0.67",
     "qr": "https://vpbotn.ir/qr_download.html"
   },
-  "download_url": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.66",
-  "build_number": 100
+  "download_url": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.67",
+  "build_number": 101
 }

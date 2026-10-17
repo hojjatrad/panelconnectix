@@ -596,7 +596,7 @@ class _SplashScreenState extends State<SplashScreen> {
       if (session != null) {
         // v4.0.56 ULTRA FINAL: Use MVVM screen by default (feature flag)
         final prefs = await SharedPreferences.getInstance();
-        final useMvvm = prefs.getBool('use_mvvm_dashboard') ?? true; // default true in 4.0.56
+        final useMvvm = prefs.getBool('use_mvvm_dashboard') ?? false; // v4.0.67 ULTIMATE BEAUTIFUL - default false to show wave effects, user can toggle in settings
         if (!mounted) return;
         if (useMvvm) {
           Navigator.pushReplacement(

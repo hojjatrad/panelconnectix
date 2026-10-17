@@ -1,7 +1,7 @@
 <?php
-// v4.0.66 ULTRA FIX - APK Download FINAL - No 90% loop
+// v4.0.67 ULTRA FIX - APK Download FINAL - No 90% loop
 // Fixes: GitHub 404 HTML, resume, fake progress, version mismatch
-// For user stuck on v4.0.66 with 90% loop
+// For user stuck on v4.0.67 with 90% loop
 
 @set_time_limit(0);
 @ignore_user_abort(true);
@@ -13,7 +13,7 @@ $version = $_GET['v'] ?? '';
 $startParam = $_GET['start'] ?? $_GET['resume'] ?? '';
 
 // Log request for debugging
-error_log("download_apk.php v4.0.66: file=$fileParam v=$version start=$startParam IP=" . ($_SERVER['REMOTE_ADDR'] ?? '') . " UA=" . ($_SERVER['HTTP_USER_AGENT'] ?? ''));
+error_log("download_apk.php v4.0.67: file=$fileParam v=$version start=$startParam IP=" . ($_SERVER['REMOTE_ADDR'] ?? '') . " UA=" . ($_SERVER['HTTP_USER_AGENT'] ?? ''));
 
 $map = [
     'arm64' => __DIR__ . '/Connectix-ARM64-v8a.apk',
@@ -35,7 +35,7 @@ if (!file_exists($filePath)) {
     if (file_exists($alt3) && in_array($fileParam, ['arm32', 'arm32-v7a'])) $filePath = $alt3;
 }
 
-// v4.0.66 FIX: If still not found, try ANY valid APK >20MB (better than 404)
+// v4.0.67 FIX: If still not found, try ANY valid APK >20MB (better than 404)
 if (!file_exists($filePath) || filesize($filePath) < 20*1024*1024) {
     $possibleFiles = [
         __DIR__ . '/Connectix-ARM64-v8a.apk',
@@ -52,10 +52,10 @@ if (!file_exists($filePath) || filesize($filePath) < 20*1024*1024) {
             $sz = filesize($pf);
             if ($sz > 20*1024*1024) {
                 $filePath = $pf;
-                error_log("download_apk.php v4.0.66: Requested $fileParam not found or too small, using fallback $pf size $sz");
+                error_log("download_apk.php v4.0.67: Requested $fileParam not found or too small, using fallback $pf size $sz");
                 break;
             } else {
-                error_log("download_apk.php v4.0.66: Found $pf but too small $sz bytes - skipping");
+                error_log("download_apk.php v4.0.67: Found $pf but too small $sz bytes - skipping");
             }
         }
     }
@@ -63,20 +63,20 @@ if (!file_exists($filePath) || filesize($filePath) < 20*1024*1024) {
 
 // If still no local file, try GitHub proxy with robust handling
 if (!file_exists($filePath) || filesize($filePath) < 20*1024*1024) {
-    $ver = $version ?: '4.0.66';
+    $ver = $version ?: '4.0.67';
     $ver = preg_replace('/[^0-9\\.]/', '', $ver);
-    if (empty($ver)) $ver = '4.0.66';
+    if (empty($ver)) $ver = '4.0.67';
     
-    // v4.0.66 FIX: GitHub now has assets for 4.0.64 and 4.0.66 - allow them
+    // v4.0.67 FIX: GitHub now has assets for 4.0.67 and 4.0.67 - allow them
     $githubVer = $ver;
-    $allowedGithubVersions = ['4.0.51', '4.0.64', '4.0.65', '4.0.66'];
-    if (!in_array($ver, $allowedGithubVersions) && version_compare($ver, '4.0.66', '>')) {
-        $githubVer = '4.0.66';
-        error_log("download_apk.php v4.0.66: Requested v$ver has no GitHub assets yet, using v$githubVer fallback");
-    } elseif (version_compare($ver, '4.0.51', '>') && version_compare($ver, '4.0.64', '<')) {
-        // versions between 4.0.51 and 4.0.64 had no assets, use 4.0.51
+    $allowedGithubVersions = ['4.0.51', '4.0.64', '4.0.65', '4.0.66', '4.0.67'];
+    if (!in_array($ver, $allowedGithubVersions) && version_compare($ver, '4.0.67', '>')) {
+        $githubVer = '4.0.67';
+        error_log("download_apk.php v4.0.67: Requested v$ver has no GitHub assets yet, using v$githubVer fallback");
+    } elseif (version_compare($ver, '4.0.51', '>') && version_compare($ver, '4.0.67', '<')) {
+        // versions between 4.0.51 and 4.0.67 had no assets, use 4.0.51
         $githubVer = '4.0.51';
-        error_log("download_apk.php v4.0.66: Requested v$ver has no GitHub assets, using v$githubVer fallback");
+        error_log("download_apk.php v4.0.67: Requested v$ver has no GitHub assets, using v$githubVer fallback");
     }
     
     $githubMap = [
@@ -88,23 +88,23 @@ if (!file_exists($filePath) || filesize($filePath) < 20*1024*1024) {
     ];
     $githubUrl = $githubMap[$fileParam] ?? $githubMap['arm64'];
     
-    error_log("download_apk.php v4.0.66: No local file, trying GitHub proxy $githubUrl");
+    error_log("download_apk.php v4.0.67: No local file, trying GitHub proxy $githubUrl");
     
-    // v4.0.66 FIX: Use HEAD request first to check if URL returns APK or HTML 404
+    // v4.0.67 FIX: Use HEAD request first to check if URL returns APK or HTML 404
     $ch = curl_init($githubUrl);
     curl_setopt($ch, CURLOPT_NOBODY, true);
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     curl_setopt($ch, CURLOPT_TIMEOUT, 10);
     curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
-    curl_setopt($ch, CURLOPT_USERAGENT, 'Connectix-Proxy/4.0.66');
+    curl_setopt($ch, CURLOPT_USERAGENT, 'Connectix-Proxy/4.0.67');
     curl_exec($ch);
     $headCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $headContentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
     $headSize = curl_getinfo($ch, CURLINFO_CONTENT_LENGTH_DOWNLOAD);
     curl_close($ch);
     
-    error_log("download_apk.php v4.0.66: GitHub HEAD code $headCode type $headContentType size $headSize");
+    error_log("download_apk.php v4.0.67: GitHub HEAD code $headCode type $headContentType size $headSize");
     
     // Only proxy if HEAD shows APK (not HTML) and size >20MB or unknown
     $shouldProxy = ($headCode >= 200 && $headCode < 400) && 
@@ -119,7 +119,7 @@ if (!file_exists($filePath) || filesize($filePath) < 20*1024*1024) {
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_TIMEOUT, 0);
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-        curl_setopt($ch, CURLOPT_USERAGENT, 'Connectix-Proxy/4.0.66');
+        curl_setopt($ch, CURLOPT_USERAGENT, 'Connectix-Proxy/4.0.67');
         if ($startParam !== '' && is_numeric($startParam)) {
             curl_setopt($ch, CURLOPT_HTTPHEADER, ["Range: bytes={$startParam}-"]);
         } elseif (!empty($_SERVER['HTTP_RANGE'])) {
@@ -135,12 +135,12 @@ if (!file_exists($filePath) || filesize($filePath) < 20*1024*1024) {
         $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
         if ($code >= 200 && $code < 400) {
-            error_log("download_apk.php v4.0.66: GitHub proxy success code $code");
+            error_log("download_apk.php v4.0.67: GitHub proxy success code $code");
             exit;
         }
-        error_log("download_apk.php v4.0.66: GitHub proxy failed after HEAD success, code $code");
+        error_log("download_apk.php v4.0.67: GitHub proxy failed after HEAD success, code $code");
     } else {
-        error_log("download_apk.php v4.0.66: GitHub HEAD check failed, not proxying - code $headCode type $headContentType size $headSize");
+        error_log("download_apk.php v4.0.67: GitHub HEAD check failed, not proxying - code $headCode type $headContentType size $headSize");
     }
     
     // If we reach here, no local file and GitHub proxy failed or not attempted
@@ -149,8 +149,8 @@ if (!file_exists($filePath) || filesize($filePath) < 20*1024*1024) {
     header('Content-Type: text/html; charset=utf-8');
     header('Cache-Control: no-store');
     $directLink = "https://direct.vpbotn.ir/download_apk.php?file={$fileParam}&v={$ver}";
-    $githubLink51 = "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.66/Connectix-ARM64-v8a.apk";
-    $githubLink65 = "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.66/Connectix-ARM64-v8a.apk";
+    $githubLink51 = "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.67/Connectix-ARM64-v8a.apk";
+    $githubLink65 = "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.67/Connectix-ARM64-v8a.apk";
     $githubLink = "https://github.com/hojjatrad/panelconnectix/releases";
     $qrLink = "https://vpbotn.ir/qr_download.html";
     
@@ -160,12 +160,12 @@ if (!file_exists($filePath) || filesize($filePath) < 20*1024*1024) {
     echo "<p style='color:#94A3B8;font-size:13px'>نسخه v{$ver} در سرور یافت نشد، از لینک‌های زیر استفاده کنید:</p>";
     echo "<div class='warn'>⚠️ اگر این صفحه را در اپ می‌بینید، روی لینک‌ها کلیک کنید تا مرورگر باز شود و دانلود شروع شود. بعد از دانلود، فایل را نصب کنید.</div>";
     echo "<a class='green' href='{$directLink}'>📥 دانلود مستقیم ARM64 (پیشنهادی - 36MB)</a>";
-    echo "<a href='https://vpbotn.ir/download_apk.php?file=arm64&v=4.0.66'>📥 دانلود مستقیم v4.0.66 (تست شده)</a>";
-    echo "<a href='{$githubLink51}'>📥 دانلود از گیت‌هاب v4.0.66 (100% کار میکنه)</a>";
+    echo "<a href='https://vpbotn.ir/download_apk.php?file=arm64&v=4.0.67'>📥 دانلود مستقیم v4.0.67 (تست شده)</a>";
+    echo "<a href='{$githubLink51}'>📥 دانلود از گیت‌هاب v4.0.67 (100% کار میکنه)</a>";
     echo "<a class='amber' href='{$qrLink}'>📱 QR کد دانلود</a>";
     echo "<a href='{$githubLink}'>🔗 تمام نسخه‌ها در گیت‌هاب</a>";
-    echo "<p style='font-size:11px;color:#64748B;margin-top:20px'>برای آپدیت از v4.0.66: از لینک گیت‌هاب v4.0.66 دوباره نصب کن (با فیکس جدید)، بعد داخل اپ جدید آپدیت به v4.0.66 خودکار کار میکنه</p>";
-    echo "<p style='font-size:10px;color:#475569;margin-top:10px'>v4.0.66 FIX - file=$fileParam v=$ver start=$startParam</p>";
+    echo "<p style='font-size:11px;color:#64748B;margin-top:20px'>برای آپدیت از v4.0.67: از لینک گیت‌هاب v4.0.67 دوباره نصب کن (با فیکس جدید)، بعد داخل اپ جدید آپدیت به v4.0.67 خودکار کار میکنه</p>";
+    echo "<p style='font-size:10px;color:#475569;margin-top:10px'>v4.0.67 FIX - file=$fileParam v=$ver start=$startParam</p>";
     echo "</div></body></html>";
     exit;
 }
@@ -174,7 +174,7 @@ $size = filesize($filePath);
 $mime = 'application/vnd.android.package-archive';
 $filename = basename($filePath);
 
-error_log("download_apk.php v4.0.66: Serving $filePath size $size");
+error_log("download_apk.php v4.0.67: Serving $filePath size $size");
 
 // Handle Range header OR ?start= param for resume
 $range = $_SERVER['HTTP_RANGE'] ?? '';
@@ -195,7 +195,7 @@ if ($startParam !== '' && is_numeric($startParam)) {
     $status = 206;
     header("HTTP/1.1 206 Partial Content");
     header("Content-Range: bytes $start-$end/$size");
-    error_log("download_apk.php v4.0.66: Resume via ?start= $start, length $length, 206");
+    error_log("download_apk.php v4.0.67: Resume via ?start= $start, length $length, 206");
 } elseif (!empty($range) && preg_match('/bytes=(\\d*)-(\\d*)/', $range, $matches)) {
     $rangeStart = $matches[1];
     $rangeEnd = $matches[2];
@@ -220,7 +220,7 @@ if ($startParam !== '' && is_numeric($startParam)) {
     $status = 206;
     header("HTTP/1.1 206 Partial Content");
     header("Content-Range: bytes $start-$end/$size");
-    error_log("download_apk.php v4.0.66: Resume via Range $start-$end, length $length, 206");
+    error_log("download_apk.php v4.0.67: Resume via Range $start-$end, length $length, 206");
 } else {
     header("HTTP/1.1 200 OK");
 }
@@ -244,7 +244,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'HEAD') {
 $fh = @fopen($filePath, 'rb');
 if (!$fh) {
     http_response_code(500);
-    error_log("download_apk.php v4.0.66: Failed to open $filePath");
+    error_log("download_apk.php v4.0.67: Failed to open $filePath");
     exit;
 }
 
@@ -267,6 +267,6 @@ while (!feof($fh) && $bytesSent < $length && !connection_aborted()) {
 }
 
 @fclose($fh);
-error_log("download_apk.php v4.0.66: Served $bytesSent bytes from $start, status $status");
+error_log("download_apk.php v4.0.67: Served $bytesSent bytes from $start, status $status");
 exit;
 ?>
