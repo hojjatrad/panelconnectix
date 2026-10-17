@@ -11,6 +11,7 @@ import '../viewmodels/dashboard_viewmodel.dart';
 import '../widgets/connect_button_lite.dart';
 import '../widgets/connect_button_ultimate.dart';
 import 'advanced_settings_screen.dart';
+import 'login_screen.dart';
 import 'bypass_apps_screen.dart';
 
 /// v4.0.55 ULTRA FINAL - MVVM + Provider + Design System Full
@@ -107,6 +108,28 @@ class _DashboardScreenMVVMState extends State<DashboardScreenMVVM> {
           icon: const Icon(Icons.tune_rounded, color: AppColors.textSecondary),
           tooltip: 'تنظیمات پیشرفته',
           onPressed: () => _openAdvancedSettings(vm),
+        ),
+        Builder(
+          builder: (ctx) => IconButton(
+            icon: const Icon(Icons.logout_rounded, color: AppColors.textSecondary),
+            tooltip: 'خروج از حساب',
+            onPressed: () async {
+              try {
+                if (vm.isConnected) {
+                  await vm.disconnect();
+                }
+              } catch (_) {}
+              try {
+                await ApiService.logout();
+              } catch (_) {}
+              if (ctx.mounted) {
+                Navigator.pushReplacement(
+                  ctx,
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                );
+              }
+            },
+          ),
         ),
       ],
     );

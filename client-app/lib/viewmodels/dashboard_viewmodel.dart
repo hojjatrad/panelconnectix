@@ -156,6 +156,14 @@ class DashboardViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> disconnect() async {
+    try {
+      setConnectionState(AppConnectionState.disconnected);
+    } catch (e) {
+      debugPrint('VM disconnect error: $e');
+    }
+  }
+
   @override
   void dispose() {
     _timer?.cancel();

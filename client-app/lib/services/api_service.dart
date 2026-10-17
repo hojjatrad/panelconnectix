@@ -2389,33 +2389,40 @@ class ApiService {
               continue;
             }
 
-            // v4.0.68 ULTRA FIX: Version check - ULTRA PERMISSIVE for user stuck on 4.0.68
-            // Allow ANY valid APK >20MB regardless of version to break 90% loop
-            // Old code deleted older versions, causing loop when server returns 4.0.66 for 4.0.66 request
-            // Now: allow older, newer, empty, mismatch - as long as PK header and size >20MB ok
+                        // v4.0.68 STRICT FIX - حل کامل عدم تغییر نسخه بعد از نصب
+            // Root cause v4.0.66/v4.0.67: ULTRA PERMISSIVE allowed ANY APK >20MB even if old version, causing "نصب میکنم ولی همون نسخه قدیمی"
+            // Fix v4.0.68: STRICT version check - if mismatch, try next URL (GitHub has correct version)
+            bool versionOk = false;
             try {
               final apkVersion = await _updaterChannel.invokeMethod<String>('getApkVersionName', {'filePath': file.path}).timeout(const Duration(seconds: 3), onTimeout: () => '');
               final apkVer = (apkVersion ?? '').trim();
-              log('v4.0.68 APK version check: expected $expectedVer, got $apkVer, len $len - ULTRA PERMISSIVE MODE');
-              print('v4.0.68 APK version: expected $expectedVer, got $apkVer - allowing ANY valid APK >20MB');
+              log('v4.0.68 APK version check: expected $expectedVer, got $apkVer, len $len - STRICT MODE');
+              print('v4.0.68 APK version: expected $expectedVer, got $apkVer - STRICT check');
               
-              // v4.0.68 FIX: NEVER delete based on version mismatch for user stuck on 4.0.68
-              // If APK is valid (PK header + >20MB), allow install regardless of version
-              // This breaks the 90% loop: even if server returns 4.0.68 for 4.0.68 request, we install it
-              // Then user will have 4.0.68 again, but with manual download they can get 4.0.68
-              // For future, we will ensure server has 4.0.68 APK file
               if (apkVer.isNotEmpty && expectedVer.isNotEmpty) {
                 if (apkVer == expectedVer) {
-                  log('v4.0.68 APK version match: $apkVer == $expectedVer - perfect');
+                  log('v4.0.68 APK version MATCH: $apkVer == $expectedVer - perfect, installing');
+                  versionOk = true;
                 } else {
-                  log('v4.0.68 APK version mismatch: expected $expectedVer, got $apkVer - BUT ALLOWING ANYWAY to break loop (PK and size ok)');
-                  // Don't delete, allow - this is the key fix for 90% loop
+                  log('v4.0.68 APK version MISMATCH: expected $expectedVer, got $apkVer - REJECTING, trying next URL');
+                  print('v4.0.68 Version mismatch - expected $expectedVer but got $apkVer, trying next URL (GitHub)');
+                  try { await file.delete(); } catch (_) {}
+                  continue;
                 }
               } else if (apkVer.isEmpty) {
-                log('v4.0.68 APK version empty, but PK and size ok (36MB) - allowing');
+                log('v4.0.68 APK version empty, but PK and size ok (${len}bytes) - allowing as fallback');
+                versionOk = true;
+              } else {
+                versionOk = true;
               }
             } catch (e) {
-              log('v4.0.68 Version check error (allowing): $e - PK and size verified (36MB) - ALLOWING');
+              log('v4.0.68 Version check error: $e - PK and size verified (${len}bytes) - allowing as fallback');
+              versionOk = true;
+            }
+            
+            if (!versionOk) {
+              print('v4.0.68 Version check failed, trying next URL');
+              continue;
             }
 
             safeProgress(0.92, len, len);

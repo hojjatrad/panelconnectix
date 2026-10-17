@@ -580,7 +580,13 @@ class _SplashScreenState extends State<SplashScreen> {
             }
             if (!mounted) return;
             final prefs2 = await SharedPreferences.getInstance();
-            final useMvvm2 = prefs2.getBool('use_mvvm_dashboard') ?? true;
+            var useMvvm2 = prefs2.getBool('use_mvvm_dashboard') ?? false;
+            final lastVer2 = prefs2.getString('last_seen_app_version') ?? '4.0.0';
+            if (lastVer2 != '4.0.68' && prefs2.getBool('use_mvvm_dashboard') == true) {
+              await prefs2.setBool('use_mvvm_dashboard', false);
+              useMvvm2 = false;
+            }
+            await prefs2.setString('last_seen_app_version', '4.0.68');
             if (useMvvm2) {
               Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => DashboardScreenMVVM(client: client, branding: branding, initialServers: servers)));
             } else {
@@ -596,7 +602,14 @@ class _SplashScreenState extends State<SplashScreen> {
       if (session != null) {
         // v4.0.56 ULTRA FINAL: Use MVVM screen by default (feature flag)
         final prefs = await SharedPreferences.getInstance();
-        final useMvvm = prefs.getBool('use_mvvm_dashboard') ?? false; // v4.0.67 ULTIMATE BEAUTIFUL - default false to show wave effects, user can toggle in settings
+        var useMvvm = prefs.getBool('use_mvvm_dashboard') ?? false;
+        final lastSeenVersion = prefs.getString('last_seen_app_version') ?? '4.0.0';
+        if (lastSeenVersion != '4.0.68' && prefs.getBool('use_mvvm_dashboard') == true) {
+          print('v4.0.68 Migration: Resetting use_mvvm_dashboard from true to false for user coming from $lastSeenVersion');
+          await prefs.setBool('use_mvvm_dashboard', false);
+          useMvvm = false;
+        }
+        await prefs.setString('last_seen_app_version', '4.0.68');
         if (!mounted) return;
         if (useMvvm) {
           Navigator.pushReplacement(
