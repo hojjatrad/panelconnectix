@@ -153,9 +153,9 @@ class _DashboardScreenMVVMState extends State<DashboardScreenMVVM> {
               child: Center(
                 child: vm.useLiteButton
                     ? ConnectButtonLite(
-                        state: vm.connectionState == AppAppConnectionState.connected
+                        state: vm.connectionState == AppConnectionState.connected
                             ? LiteConnectState.connected
-                            : vm.connectionState == AppAppConnectionState.connecting
+                            : vm.connectionState == AppConnectionState.connecting
                                 ? LiteConnectState.connecting
                                 : LiteConnectState.disconnected,
                         size: 142,
@@ -165,9 +165,9 @@ class _DashboardScreenMVVMState extends State<DashboardScreenMVVM> {
                         onTap: () => _toggleConnection(vm),
                       )
                     : ConnectButtonUltimate(
-                        state: vm.connectionState == AppAppConnectionState.connected
+                        state: vm.connectionState == AppConnectionState.connected
                             ? UltimateConnectState.connected
-                            : vm.connectionState == AppAppConnectionState.connecting
+                            : vm.connectionState == AppConnectionState.connecting
                                 ? UltimateConnectState.connecting
                                 : UltimateConnectState.disconnected,
                         size: 142,
@@ -437,12 +437,12 @@ class _DashboardScreenMVVMState extends State<DashboardScreenMVVM> {
   void _toggleConnection(DashboardViewModel vm) {
     if (vm.isConnecting) return;
     if (vm.isConnected) {
-      vm.setAppConnectionState(AppAppConnectionState.disconnected);
+      vm.setConnectionState(AppConnectionState.disconnected);
     } else {
-      vm.setAppConnectionState(AppAppConnectionState.connecting);
+      vm.setConnectionState(AppConnectionState.connecting);
       // Simulate connection - real V2Ray logic would be here
       Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) vm.setAppConnectionState(AppAppConnectionState.connected);
+        if (mounted) vm.setConnectionState(AppConnectionState.connected);
       });
     }
   }

@@ -4,11 +4,11 @@ require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Setting.php';
 
 class Updater {
-    public const CURRENT_VERSION = '4.0.63'; // v4.0.63 ULTRA FIX FINAL - FIX UPDATE 90% LOOP - ROBUST DOWNLOAD + DIRECT LINKS - MVVM DEFAULT + DESIGN ALL + OPENAPI + CI/CD + PWA SYNC + FINAL CHECKLIST - MVVM FULL + PROVIDER + DESIGN SYSTEM ALL + WIDGET TESTS + PWA SYNC + API DOCS + GRAFANA ALERTING - BOT SPLIT + PWA OFFLINE + GRAFANA + TESTS + METRICS + DESIGN SYSTEM - PAGINATION+SECURITY+BYPASS20+LITE BUTTON+V2RAY FIX + SOFT DELETE + RESYNC FROM MAIN SERVER
+    public const CURRENT_VERSION = '4.0.64'; // v4.0.64 ULTRA FIX FINAL - FIX UPDATE 90% LOOP - ROBUST DOWNLOAD + DIRECT LINKS - MVVM DEFAULT + DESIGN ALL + OPENAPI + CI/CD + PWA SYNC + FINAL CHECKLIST - MVVM FULL + PROVIDER + DESIGN SYSTEM ALL + WIDGET TESTS + PWA SYNC + API DOCS + GRAFANA ALERTING - BOT SPLIT + PWA OFFLINE + GRAFANA + TESTS + METRICS + DESIGN SYSTEM - PAGINATION+SECURITY+BYPASS20+LITE BUTTON+V2RAY FIX + SOFT DELETE + RESYNC FROM MAIN SERVER
 
     public static function getCurrentVersion(): string {
         $dbVer = Setting::get('current_version', '');
-        // v4.0.45 UNIFIED: Force 4.0.45 if DB has old 7.x version or commit hash
+        // v4.0.64 UNIFIED: Force 4.0.64 if DB has old 7.x version or commit hash
         if (!empty($dbVer) && (str_starts_with($dbVer, 'commit-') || str_starts_with($dbVer, '7.') || version_compare($dbVer, '5.0.0', '>='))) {
             Setting::set('current_version', self::CURRENT_VERSION);
             return self::CURRENT_VERSION;
@@ -89,7 +89,7 @@ class Updater {
                     $data['current_version'] = self::sanitizeVersion((string)$cv);
                     $data['latest_version_full'] = "Connectix v" . $data['latest_version'];
                     $data['current_version_full'] = "Connectix v" . $data['current_version'];
-                    // v4.0.26 FINAL FOREVER FIX: If cached says has_update true but versions same, force false
+                    // v4.0.64 FINAL FOREVER FIX: If cached says has_update true but versions same, force false
                     // Prevents "Ctrl+F5 goes away but clicking dashboard again shows banner"
                     if (!empty($data['has_update']) && $data['latest_version'] === $data['current_version']) {
                         $data['has_update'] = false;
@@ -152,7 +152,7 @@ class Updater {
             }
         }
 
-        // 2. Source 2: Releases list - v4.0.26 FIX: Ignore client-app releases (v4.x) for panel update check
+        // 2. Source 2: Releases list - v4.0.64 FIX: Ignore client-app releases (v4.x) for panel update check
         $url = "https://api.github.com/repos/{$repo}/releases";
         $releases = self::githubRequest($url, $token);
         // Filter out client-app releases (v4.x) - only panel releases (v7.x, v8.x etc) should trigger panel update banner
@@ -202,7 +202,7 @@ class Updater {
         }
 
         // 3. Fallback to branch commits API if no release tagged
-        // v4.0.26 FIX: Don't show update banner for same version even if commit SHA differs (prevents "same version shows update" issue)
+        // v4.0.64 FIX: Don't show update banner for same version even if commit SHA differs (prevents "same version shows update" issue)
         $commitUrl = "https://api.github.com/repos/{$repo}/commits/{$branch}";
         $commitRes = self::githubRequest($commitUrl, $token);
 
@@ -211,9 +211,9 @@ class Updater {
             $lastInstalledSha = Setting::get('last_installed_commit_sha', '');
             $commitMsg = $commitRes['commit']['message'] ?? '';
 
-            // v4.0.26 FOREVER FIX FINAL: User reports "Ctrl+F5 banner goes but clicking dashboard/stats again shows v4.0.45"
-            // Root cause: commit fallback sets has_update true when SHA differs, even though version same (4.0.45 == 4.0.45)
-            // Previous filter tried to check v4.x but commit message contains v4.0.45 so filter failed
+            // v4.0.64 FOREVER FIX FINAL: User reports "Ctrl+F5 banner goes but clicking dashboard/stats again shows v4.0.64"
+            // Root cause: commit fallback sets has_update true when SHA differs, even though version same (4.0.64 == 4.0.64)
+            // Previous filter tried to check v4.x but commit message contains v4.0.64 so filter failed
             // FINAL LAW: has_update ALWAYS false in commit fallback - only version_compare via raw Updater.php should trigger banner
             // Panel updates are detected via raw CURRENT_VERSION check, not via commit SHA
             $hasUpdate = false;
@@ -986,7 +986,7 @@ class Updater {
             if ($panelRoot) {
                 self::syncRootLanding($panelRoot);
             }
-            // v4.0.47 AUTO SYNC RESELLERS
+            // v4.0.64 AUTO SYNC RESELLERS
             try {
                 require_once __DIR__ . '/ResellerSyncManager.php';
                 require_once __DIR__ . '/ResellerPermissionManager.php';

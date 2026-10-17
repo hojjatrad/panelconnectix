@@ -1,6 +1,6 @@
 {
-  "version": "4.0.63",
-  "code": 97,
+  "version": "4.0.64",
+  "code": 98,
   "force_update": false,
   "force_min_code": 50,
   "update_type": "full",
@@ -15,13 +15,13 @@
     "wifi_only": false
   },
   "apk": {
-    "arm64": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.63",
-    "universal": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.63",
-    "arm32": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.63"
+    "arm64": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.64",
+    "universal": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.64",
+    "arm32": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.64"
   },
   "apks": {
     "arm64-v8a": {
-      "url": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.63",
+      "url": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.64",
       "size": 37603235,
       "size_human": "36 MB",
       "abi": "arm64-v8a",
@@ -30,7 +30,7 @@
       "fallback": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-ARM64-v8a.apk"
     },
     "armeabi-v7a": {
-      "url": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.63",
+      "url": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.64",
       "size": 38148563,
       "size_human": "36 MB",
       "abi": "armeabi-v7a",
@@ -39,7 +39,7 @@
       "fallback": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-ARM32-v7a.apk"
     },
     "universal": {
-      "url": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.63",
+      "url": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.64",
       "size": 110479370,
       "size_human": "105 MB",
       "abi": "universal",
@@ -49,7 +49,7 @@
     }
   },
   "windows": {
-    "version": "4.0.63",
+    "version": "4.0.64",
     "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-Windows-x64.zip",
     "fallback": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.57"
   },
@@ -73,17 +73,17 @@
     "stealth",
     "multiplex"
   ],
-  "version_code": 97,
+  "version_code": 98,
   "release_date": "2026-10-17",
   "apk_urls": {
-    "arm64": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.63",
-    "universal": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.63",
-    "arm32": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.63",
+    "arm64": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.64",
+    "universal": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.64",
+    "arm32": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.64",
     "github_arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-ARM64-v8a.apk",
     "github_universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.51/Connectix-Universal.apk",
-    "direct": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.63",
-    "vpbotn": "https://vpbotn.ir/download_apk.php?file=arm64&v=4.0.63",
+    "direct": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.64",
+    "vpbotn": "https://vpbotn.ir/download_apk.php?file=arm64&v=4.0.64",
     "qr": "https://vpbotn.ir/qr_download.html"
   },
-  "download_url": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.63"
+  "download_url": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.64"
 }
