@@ -81,7 +81,14 @@ jobs:
       - name: Extract App Version
         id: version
         run: |
-          APP_VER=$(grep -oE "currentAppVersion[[:space:]]*=[[:space:]]*'[0-9]+\.[0-9]+\.[0-9]+'" client-app/lib/screens/dashboard_screen.dart | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          # v4.0.60 FIX: currentAppVersion is now getter, extract from _hardcodedVersion instead
+          APP_VER=$(grep -oE "_hardcodedVersion[[:space:]]*=[[:space:]]*'[0-9]+\.[0-9]+\.[0-9]+'" client-app/lib/screens/dashboard_screen.dart | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          if [ -z "$APP_VER" ]; then
+            APP_VER=$(grep -oE "version:\s*[0-9]+\.[0-9]+\.[0-9]+" client-app/pubspec.yaml | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          fi
+          if [ -z "$APP_VER" ]; then
+            APP_VER=$(grep -oE "currentAppVersion[[:space:]]*=[[:space:]]*'[0-9]+\.[0-9]+\.[0-9]+'" client-app/lib/screens/dashboard_screen.dart | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          fi
           echo "app_ver=$APP_VER" >> $GITHUB_OUTPUT
           echo "Detected App Version: $APP_VER"
 
@@ -121,10 +128,15 @@ jobs:
           python3 - << 'PY'
           import json, re, datetime, pathlib
           dart = open('client-app/lib/screens/dashboard_screen.dart', encoding='utf-8').read()
-          ver = re.search(r"currentAppVersion\s*=\s*'([\d.]+)'", dart).group(1)
+          # v4.0.60 FIX: currentAppVersion is now getter, try _hardcodedVersion first
+          m = re.search(r"_hardcodedVersion\s*=\s*'([\d.]+)'", dart)
+          if not m:
+              m = re.search(r"currentAppVersion\s*=\s*'([\d.]+)'", dart)
+          ver = m.group(1) if m else '4.0.60'
           pub = open('client-app/pubspec.yaml', encoding='utf-8').read()
-          code = re.search(r"^version:\s*[\d.]+\+(\d+)", pub, re.M).group(1)
-          changelog = 'ULTRA Dual-Core: flutter_vless with full protocol support (VLESS Reality/Vision, VMess, Trojan, SS, SOCKS, HTTP, WireGuard, Hysteria2, Raw JSON, Clash YAML, sing-box JSON)'
+          code_match = re.search(r"^version:\s*[\d.]+\+(\d+)", pub, re.M)
+          code = code_match.group(1) if code_match else '94'
+          changelog = 'ULTRA Dual-Core: flutter_vless with full protocol support (VLESS Reality/Vision, VMess, Trojan, SS, SOCKS, HTTP, WireGuard, Hysteria2, Raw JSON, Clash YAML, sing-box JSON) + v4.0.60 FOREVER FIX'
           base = f'https://github.com/hojjatrad/panelconnectix/releases/download/v{ver}'
           data = {
               'version': ver,
@@ -172,7 +184,10 @@ jobs:
         id: win_version
         shell: bash
         run: |
-          APP_VER=$(grep -oE "currentAppVersion[[:space:]]*=[[:space:]]*'[0-9]+\.[0-9]+\.[0-9]+'" client-app/lib/screens/dashboard_screen.dart | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          APP_VER=$(grep -oE "_hardcodedVersion[[:space:]]*=[[:space:]]*'[0-9]+\.[0-9]+\.[0-9]+'" client-app/lib/screens/dashboard_screen.dart | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          if [ -z "$APP_VER" ]; then
+            APP_VER=$(grep -oE "version:\s*[0-9]+\.[0-9]+\.[0-9]+" client-app/pubspec.yaml | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          fi
           echo "app_ver=$APP_VER" >> $GITHUB_OUTPUT
           echo "Detected App Version for Windows: $APP_VER"
 
