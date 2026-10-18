@@ -15,14 +15,14 @@
     "wifi_only": false
   },
   "apk": {
-    "arm64": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.73",
-    "universal": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.73",
-    "arm32": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.73"
+    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.73/Connectix-ARM64-v8a.apk",
+    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.73/Connectix-Universal.apk",
+    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.73/Connectix-ARM32-v7a.apk"
   },
   "apks": {
     "arm64-v8a": {
-      "url": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.73",
-      "size": 36940652,
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.73/Connectix-ARM64-v8a.apk",
+      "size": 36942894,
       "size_human": "36 MB",
       "abi": "arm64-v8a",
       "recommended": true,
@@ -30,8 +30,8 @@
       "fallback": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.73/Connectix-ARM64-v8a.apk"
     },
     "armeabi-v7a": {
-      "url": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.73",
-      "size": 37614794,
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.73/Connectix-ARM32-v7a.apk",
+      "size": 37618589,
       "size_human": "36 MB",
       "abi": "armeabi-v7a",
       "recommended": false,
@@ -39,8 +39,8 @@
       "fallback": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.73/Connectix-ARM32-v7a.apk"
     },
     "universal": {
-      "url": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.73",
-      "size": 107987013,
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.73/Connectix-Universal.apk",
+      "size": 107996041,
       "size_human": "105 MB",
       "abi": "universal",
       "recommended": false,
@@ -54,50 +54,50 @@
     "fallback": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.57"
   },
   "ultra": true,
-  "core": "xray_1.8.23 + sing-box + multiplex + 0rtt + stealth + FULL BUG FIX",
+  "core": "xray_1.8.23 + sing-box + multiplex + 0rtt + stealth + TUIC v5 + Hysteria2 + Reality + FULL BUG FIX",
   "protocols": [
-    "clash",
-    "http",
-    "hysteria",
-    "hysteria2",
-    "mtproto",
-    "multiplex",
-    "raw",
-    "reality",
-    "singbox",
-    "socks",
-    "ss",
-    "stealth",
-    "trojan",
-    "tuic",
     "vless",
     "vmess",
+    "trojan",
+    "ss",
+    "socks",
+    "http",
     "wireguard",
-    "xtls"
+    "hysteria2",
+    "hysteria",
+    "tuic",
+    "raw",
+    "clash",
+    "singbox",
+    "mtproto",
+    "reality",
+    "xtls",
+    "stealth",
+    "multiplex"
   ],
   "version_code": 107,
   "release_date": "2026-10-18",
   "apk_urls": {
-    "arm64": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.73",
-    "universal": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.73",
-    "arm32": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.73",
+    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.73/Connectix-ARM64-v8a.apk",
+    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.73/Connectix-Universal.apk",
+    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.73/Connectix-ARM32-v7a.apk",
     "github_arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.73/Connectix-ARM64-v8a.apk",
     "github_universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.73/Connectix-Universal.apk",
     "direct": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.73",
     "vpbotn": "https://vpbotn.ir/download_apk.php?file=arm64&v=4.0.73",
     "qr": "https://vpbotn.ir/qr_download.html"
   },
-  "download_url": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.73",
+  "download_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.73/Connectix-ARM64-v8a.apk",
   "build_number": 107,
   "latest_version": "4.0.73",
   "latest_code": 107,
   "apk_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.73/Connectix-ARM64-v8a.apk",
-  "apk_size": 36940652,
+  "apk_size": 36942894,
   "arm64_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.73/Connectix-ARM64-v8a.apk",
-  "arm64_size": 36940652,
+  "arm64_size": 36942894,
   "arm32_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.73/Connectix-ARM32-v7a.apk",
-  "arm32_size": 37614794,
+  "arm32_size": 37618589,
   "universal_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.73/Connectix-Universal.apk",
-  "universal_size": 107987013,
-  "release_notes": "v4.0.73+107 TUIC v5 + Hysteria2 + Reality Multi-Protocol: 🛡️ Reality 443 TCP پایدار 9.5/10 مقاوم، ⚡ Hysteria2 4443 UDP سریع برای اینترنت ضعیف استریم 4K + دانلود Brutal CC salamander obfs، 🚀 TUIC v5 8443 UDP کمترین تاخیر 110-140ms BBR 0-RTT native h3 برای گیمینگ + تماس صوتی + ترید. پنل: MultiProtocolGenerator core جدید auto-gen missing TUIC/Hy2، ApiController/V2 metadata icon/color/desc/best_for، SublinkControllerV2 fallback multi-protocol. اپ: server_model 5 فیلد جدید + helpers، server_list_modal legend + colored badges، dashboard icon + best_for. flutter_vless 1.1.6 sing-box TUIC v5 ready. 70% ready قبل، 0% breaking."
+  "universal_size": 107996041,
+  "release_notes": "v4.0.73+107 TUIC v5 + Hysteria2 + Reality Multi-Protocol: 3 پروتکل در هر سرور - کاربر انتخاب می‌کند: 🛡️ Reality پایدار 9.5/10 برای روزمره، ⚡ Hysteria2 سریع برای استریم 4K در اینترنت ضعیف، 🚀 TUIC v5 کمترین تاخیر 110-140ms برای گیمینگ + تماس صوتی + ترید. QUIC + BBR + 0-RTT + Migration."
 }
