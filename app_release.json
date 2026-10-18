@@ -1,10 +1,10 @@
 {
-  "version": "4.0.69",
-  "code": 103,
+  "version": "4.0.70",
+  "code": 104,
   "force_update": false,
   "force_min_code": 50,
   "update_type": "full",
-  "changelog": "✅ v4.0.69 COMPACT NO-SCROLL + SMART CONNECT FIX:\n\n• 📱 صفحه اول جمع‌وجور بدون اسکرول:\n  - تمام محتوا در یک صفحه بدون نیاز به اسکرول به پایین\n  - کارت سهمیه فشرده: دایره کوچک‌تر (radius 36) + متریک‌ها در یک ردیف\n  - دکمه اتصال 120 به جای 142 (زیبا با موج حفظ شد)\n  - فاصله‌ها کاهش یافت (16→8, 14→6)\n  - پینگ از کنار سرعت حذف شد (فقط دانلود/آپلود)\n  - موارد تکراری حذف و ادغام شد\n\n• 🔧 فیکس اتصال هوشمند:\n  - دیگر کانکشن‌های مربوط به مصرف حجم و خواندن از سرور (isInfoBanner) را انتخاب نمی‌کند\n  - فقط سرورهای واقعی VPN (vless/vmess/trojan/ss با configUri معتبر) انتخاب می‌شود\n  - فیلتر قوی‌تر برای نام‌های شامل حجم، مصرف، روز، انقضا، ترافیک\n\n• 🎨 UI مرتب و تمیز با پیشنهاد بهینه\n\n• 📥 لینک: https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.69/Connectix-ARM64-v8a.apk\n",
+  "changelog": "✅ v4.0.70 ULTRA COMPACT NO-SCROLL FINAL + SMART CONNECT ULTRA FIX:\n\n• 📱 صفحه اول فوق‌فشرده بدون اسکرول (ULTRA COMPACT):\n  - تمام محتوا حتی در گوشی‌های کوچک بدون اسکرول\n  - کارت سهمیه فوق‌فشرده: padding 12→8, radius 32→24, دایره حذف و نوار خطی جایگزین\n  - دکمه اتصال 120→100 (زیبا با موج حفظ شد)\n  - فاصله‌ها: 8→4, 6→2, بنرها فوق‌فشرده\n  - سرعت: چیپ‌های کوچک‌تر\n  - Smart+Ping: padding 12,10→8,6 font 12→10\n\n• 🔧 فیکس نهایی اتصال هوشمند - هرگز حجم/زمان را انتخاب نمی‌کند:\n  - isInfoBanner فوق‌تهاجمی: هر نامی شامل عدد + GB/MB + (روز/ساعت/انقضا/حجم/مصرف/ترافیک) = اطلاعات\n  - کلمات کلیدی بیشتر: GB, MB, روز, ساعت, دقیقه, انقضا, اعتبار, حجم, مصرف, ترافیک, باقی, مانده, time, traffic, expire, remaining, used, total\n  - اگر configUri شامل traffic/expire/info باشد = اطلاعات\n  - isRealVpnServer: فقط پروتکل‌های واقعی + طول configUri >30 + نام بدون کلمات حجم\n  - _smartConnect: فیلتر ULTRA STRICT + لاگ سرورهای فیلتر شده + فقط سرورهای با پینگ معتبر\n\n• 📥 لینک: https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.70/Connectix-ARM64-v8a.apk\n",
   "date": "2026-10-17",
   "auto_update": {
     "enabled": true,
@@ -15,13 +15,13 @@
     "wifi_only": false
   },
   "apk": {
-    "arm64": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.69",
-    "universal": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.69",
-    "arm32": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.69"
+    "arm64": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.70",
+    "universal": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.70",
+    "arm32": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.70"
   },
   "apks": {
     "arm64-v8a": {
-      "url": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.69",
+      "url": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.70",
       "size": 36940724,
       "size_human": "36 MB",
       "abi": "arm64-v8a",
@@ -30,7 +30,7 @@
       "fallback": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.68/Connectix-ARM64-v8a.apk"
     },
     "armeabi-v7a": {
-      "url": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.69",
+      "url": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.70",
       "size": 37618217,
       "size_human": "36 MB",
       "abi": "armeabi-v7a",
@@ -39,7 +39,7 @@
       "fallback": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.68/Connectix-ARM32-v7a.apk"
     },
     "universal": {
-      "url": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.69",
+      "url": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.70",
       "size": 107990186,
       "size_human": "105 MB",
       "abi": "universal",
@@ -73,18 +73,18 @@
     "stealth",
     "multiplex"
   ],
-  "version_code": 103,
+  "version_code": 104,
   "release_date": "2026-10-17",
   "apk_urls": {
-    "arm64": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.69",
-    "universal": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.69",
-    "arm32": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.69",
-    "github_arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.69/Connectix-ARM64-v8a.apk",
-    "github_universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.69/Connectix-Universal.apk",
-    "direct": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.69",
-    "vpbotn": "https://vpbotn.ir/download_apk.php?file=arm64&v=4.0.69",
+    "arm64": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.70",
+    "universal": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.70",
+    "arm32": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.70",
+    "github_arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.70/Connectix-ARM64-v8a.apk",
+    "github_universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.70/Connectix-Universal.apk",
+    "direct": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.70",
+    "vpbotn": "https://vpbotn.ir/download_apk.php?file=arm64&v=4.0.70",
     "qr": "https://vpbotn.ir/qr_download.html"
   },
-  "download_url": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.69",
-  "build_number": 103
+  "download_url": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.70",
+  "build_number": 104
 }

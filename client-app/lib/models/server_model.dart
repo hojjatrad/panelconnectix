@@ -73,15 +73,20 @@ class ServerModel {
   }
 
   /// True if this node is an upstream quota/status pseudo-config rather than a functional proxy server
-  /// v4.0.69 ENHANCED: Stronger filter for volume/traffic reading servers per user request
+  /// v4.0.70 ULTRA ENHANCED: فوق‌تهاجمی - هرگز حجم/زمان را به عنوان کانکشن انتخاب نکند
   bool get isInfoBanner {
     final lower = name.toLowerCase();
     final lowerUri = configUri.toLowerCase();
-    // Emoji indicators for info
-    if (name.contains('📊') || name.contains('⏳') || name.contains('📉') || name.contains('⌛') || name.contains('💾') || name.contains('📈')) {
+    if (name.contains('📊') || name.contains('⏳') || name.contains('📉') || name.contains('⌛') || name.contains('💾') || name.contains('📈') || name.contains('⏰') || name.contains('⌚')) {
       return true;
     }
-    // Persian keywords for volume/traffic/expiry
+    final volumeKeywords = ['روز', 'ساعت', 'دقیقه', 'ثانیه', 'انقضا', 'اعتبار', 'حجم', 'مصرف', 'ترافیک', 'باقی', 'مانده', 'کل', 'زمان', 'مدت', 'شده'];
+    final hasVolumeKeyword = volumeKeywords.any((k) => lower.contains(k));
+    final hasNumber = RegExp(r'\d').hasMatch(name);
+    final hasGBMB = RegExp(r'(gb|mb)', caseSensitive: false).hasMatch(name);
+    if (hasVolumeKeyword && (hasNumber || hasGBMB)) {
+      return true;
+    }
     if (lower.contains('روز اعتبار') ||
         lower.contains('اعتبار باقی') ||
         lower.contains('حجم باقی') ||
@@ -92,36 +97,52 @@ class ServerModel {
         lower.contains('ترافیک') ||
         lower.contains('انقضا') ||
         lower.contains('باقی مانده') ||
+        lower.contains('زمان باقی') ||
+        lower.contains('مدت باقی') ||
         lower.contains('traffic remaining') ||
         lower.contains('traffic used') ||
         lower.contains('expire') ||
         lower.contains('remaining') ||
         lower.contains('used traffic') ||
-        lower.contains('total traffic')) {
+        lower.contains('total traffic') ||
+        lower.contains('time left') ||
+        lower.contains('days left') ||
+        lower.contains('volume')) {
       return true;
     }
-    // If name contains GB/MB + any of day/expire/traffic/volume keywords
     if (RegExp(r'\d+(\.\d+)?\s*(gb|mb)', caseSensitive: false).hasMatch(name) &&
-        (lower.contains('روز') || lower.contains('day') || lower.contains('expire') || lower.contains('اعتبار') || lower.contains('حجم') || lower.contains('مصرف') || lower.contains('ترافیک'))) {
+        (lower.contains('روز') || lower.contains('day') || lower.contains('expire') || lower.contains('اعتبار') || lower.contains('حجم') || lower.contains('مصرف') || lower.contains('ترافیک') || lower.contains('زمان') || lower.contains('ساعت'))) {
       return true;
     }
-    // URI encoded emojis
-    if (lowerUri.contains('%f0%9f%93%8a') || lowerUri.contains('%e2%8f%b3') || lowerUri.contains('%f0%9f%92%be')) {
+    if (lowerUri.contains('%f0%9f%93%8a') || lowerUri.contains('%e2%8f%b3') || lowerUri.contains('%f0%9f%92%be') || lowerUri.contains('traffic') || lowerUri.contains('expire') || lowerUri.contains('info') || lowerUri.contains('remaining')) {
       return true;
     }
-    // v4.0.69: If configUri empty or very short (<20 chars) and name looks like info, treat as info
-    if (configUri.isEmpty || configUri.length < 20) {
+    if (configUri.isEmpty || configUri.length < 30) {
+      return true;
+    }
+    if (name.length < 20 && hasNumber && hasGBMB) {
       return true;
     }
     return false;
   }
   
-  /// v4.0.69: Real VPN server check - used for smart connect to avoid volume reading connections
   bool get isRealVpnServer {
     if (isInfoBanner) return false;
     if (configUri.isEmpty) return false;
-    final validProtocols = ['vless', 'vmess', 'trojan', 'ss', 'socks', 'http', 'wireguard', 'hysteria', 'hysteria2', 'tuic', 'juicity'];
-    return validProtocols.any((p) => protocol.toLowerCase().contains(p) || configUri.toLowerCase().startsWith(p));
+    if (configUri.length < 30) return false;
+    final validProtocols = ['vless://', 'vmess://', 'trojan://', 'ss://', 'socks://', 'http://', 'wireguard://', 'hysteria://', 'hysteria2://', 'tuic://', 'juicity://'];
+    final hasValidProto = validProtocols.any((p) => configUri.toLowerCase().startsWith(p));
+    if (!hasValidProto) return false;
+    final lower = name.toLowerCase();
+    final forbidden = ['حجم', 'مصرف', 'ترافیک', 'روز', 'ساعت', 'انقضا', 'اعتبار', 'باقی', 'مانده', 'traffic', 'expire', 'remaining', 'volume', 'time left'];
+    if (forbidden.any((k) => lower.contains(k))) {
+      return false;
+    }
+    return true;
+  }
+  
+  bool get isSelectableForSmartConnect {
+    return isRealVpnServer && !isInfoBanner && configUri.isNotEmpty && configUri.length > 30;
   }
 
   factory ServerModel.fromUri(String rawUri, int index) {
