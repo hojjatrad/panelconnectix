@@ -5,6 +5,11 @@ class ServerModel {
   final String countryCode;
   final String flag;
   final String protocol;
+  final String protocolLabel;
+  final String protocolIcon;
+  final String protocolColor;
+  final String protocolDesc;
+  final String bestFor;
   final String operatorTag;
   final String operatorName;
   final String pingUrl;
@@ -20,6 +25,11 @@ class ServerModel {
     required this.countryCode,
     required this.flag,
     required this.protocol,
+    this.protocolLabel = '',
+    this.protocolIcon = '🌐',
+    this.protocolColor = '#6B7280',
+    this.protocolDesc = '',
+    this.bestFor = 'عمومی',
     required this.operatorTag,
     required this.operatorName,
     required this.pingUrl,
@@ -37,6 +47,11 @@ class ServerModel {
       countryCode: json['country_code'] ?? 'INT',
       flag: json['flag'] ?? '🌐',
       protocol: json['protocol'] ?? 'vless',
+      protocolLabel: json['protocol_label'] ?? (json['protocol'] ?? 'vless').toString().toUpperCase(),
+      protocolIcon: json['protocol_icon'] ?? _getProtocolIcon(json['protocol'] ?? 'vless'),
+      protocolColor: json['protocol_color'] ?? _getProtocolColor(json['protocol'] ?? 'vless'),
+      protocolDesc: json['protocol_desc'] ?? _getProtocolDesc(json['protocol'] ?? 'vless'),
+      bestFor: json['best_for'] ?? _getBestFor(json['protocol'] ?? 'vless'),
       operatorTag: json['operator_tag'] ?? 'all',
       operatorName: json['operator_name'] ?? 'تمام اپراتورها',
       pingUrl: json['ping_url'] ?? 'https://www.google.com/generate_204',
@@ -45,6 +60,52 @@ class ServerModel {
       isOnline: json['is_online'] ?? true,
       pingMs: json['ping_ms'] is int ? json['ping_ms'] : null,
     );
+  }
+  
+  // v4.0.73 NEW: Multi-protocol metadata helpers
+  static String _getProtocolIcon(String proto) {
+    switch (proto.toLowerCase()) {
+      case 'vless': return '🛡️';
+      case 'vmess': return '🔒';
+      case 'trojan': return '🐴';
+      case 'ss': case 'shadowsocks': return '👻';
+      case 'hysteria2': case 'hy2': case 'hysteria': return '⚡';
+      case 'tuic': return '🚀';
+      case 'wireguard': return '🔐';
+      default: return '🌐';
+    }
+  }
+  static String _getProtocolColor(String proto) {
+    switch (proto.toLowerCase()) {
+      case 'vless': return '#10B981';
+      case 'vmess': return '#3B82F6';
+      case 'trojan': return '#EF4444';
+      case 'ss': case 'shadowsocks': return '#8B5CF6';
+      case 'hysteria2': case 'hy2': case 'hysteria': return '#F59E0B';
+      case 'tuic': return '#8B5CF6';
+      case 'wireguard': return '#06B6D4';
+      default: return '#6B7280';
+    }
+  }
+  static String _getProtocolDesc(String proto) {
+    switch (proto.toLowerCase()) {
+      case 'vless': return 'پایدار + مقاوم در برابر فیلتر - 9.5/10';
+      case 'hysteria2': case 'hy2': return 'سریع برای اینترنت ضعیف - استریم + دانلود';
+      case 'tuic': return 'کمترین تاخیر 110-140ms - بازی + تماس صوتی';
+      case 'vmess': return 'کلاسیک + سازگار';
+      case 'trojan': return 'ساده + سریع';
+      default: return '';
+    }
+  }
+  static String _getBestFor(String proto) {
+    switch (proto.toLowerCase()) {
+      case 'vless': return 'روزمره + استقامت';
+      case 'hysteria2': case 'hy2': return 'استریم + دانلود حجیم';
+      case 'tuic': return 'بازی آنلاین + تماس صوتی + ترید';
+      case 'vmess': return 'سازگاری عمومی';
+      case 'trojan': return 'سرعت بالا';
+      default: return 'عمومی';
+    }
   }
 
   Map<String, dynamic> toJson() {
@@ -55,6 +116,11 @@ class ServerModel {
       'country_code': countryCode,
       'flag': flag,
       'protocol': protocol,
+      'protocol_label': protocolLabel,
+      'protocol_icon': protocolIcon,
+      'protocol_color': protocolColor,
+      'protocol_desc': protocolDesc,
+      'best_for': bestFor,
       'operator_tag': operatorTag,
       'operator_name': operatorName,
       'ping_url': pingUrl,
@@ -148,6 +214,26 @@ class ServerModel {
   
   bool get isSelectableForSmartConnect {
     return isRealVpnServer && !isInfoBanner && configUri.isNotEmpty && configUri.length > 30;
+  }
+
+  // v4.0.73 NEW: Protocol display helpers
+  String get displayProtocolLabel => protocolLabel.isNotEmpty ? protocolLabel : protocol.toUpperCase();
+  String get displayIcon => protocolIcon.isNotEmpty ? protocolIcon : _getProtocolIcon(protocol);
+  String get displayDesc => protocolDesc.isNotEmpty ? protocolDesc : _getProtocolDesc(protocol);
+  
+  bool get isTuic => protocol.toLowerCase() == 'tuic';
+  bool get isHysteria2 => protocol.toLowerCase() == 'hysteria2' || protocol.toLowerCase() == 'hy2' || protocol.toLowerCase() == 'hysteria';
+  bool get isVless => protocol.toLowerCase() == 'vless';
+  
+  // Color as int for Flutter
+  int get protocolColorInt {
+    try {
+      var hex = protocolColor.replaceAll('#', '');
+      if (hex.length == 6) hex = 'FF$hex';
+      return int.parse(hex, radix: 16);
+    } catch (_) {
+      return 0xFF6B7280;
+    }
   }
 
   factory ServerModel.fromUri(String rawUri, int index) {

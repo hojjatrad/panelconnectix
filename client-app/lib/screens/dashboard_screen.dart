@@ -96,7 +96,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   // v4.0.63 FOREVER FIX - Never show old version after install - PERMANENT LAW
   // LAW: currentAppVersion must be dynamic, not hardcoded const that stays old after install
   // Fix: Make it getter that returns actual installed version if available, else latest hardcoded
-  static const String _hardcodedVersion = '4.0.72'; // Fallback only, updated each release
+  static const String _hardcodedVersion = '4.0.73'; // Fallback only, updated each release
   static const int _hardcodedCode = 106;
   static String get currentAppVersion => _actualInstalledVersion.isNotEmpty && _actualInstalledVersion != '4.0.51' ? _actualInstalledVersion : _hardcodedVersion;
   static String _actualInstalledVersion = '4.0.69'; // Will be updated from PackageManager immediately on start
@@ -1179,7 +1179,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   // Real-time In-App Downloader Modal Sheet
-  // v4.0.72 NEW ARCHITECTURE: 3-Tier Hybrid - GitHub Direct + Panel Proxy + Browser Fallback - 100% Guaranteed
+  // v4.0.73 NEW ARCHITECTURE: 3-Tier Hybrid - GitHub Direct + Panel Proxy + Browser Fallback - 100% Guaranteed
   void _startInAppDownloadAndInstall(String downloadUrl, String version, {String fallbackUrl = ''}) {
     final githubReleasesPage = "https://github.com/hojjatrad/panelconnectix/releases/tag/v$version";
     final githubLatestPage = "https://github.com/hojjatrad/panelconnectix/releases/latest";
@@ -1370,7 +1370,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                           ],
                         ),
                         const SizedBox(height: 12),
-                        // v4.0.72: 3-Tier Browser Fallback - GitHub Releases Page (100% guaranteed)
+                        // v4.0.73: 3-Tier Browser Fallback - GitHub Releases Page (100% guaranteed)
                         ElevatedButton.icon(
                           onPressed: () async {
                             Navigator.pop(bottomSheetContext);
@@ -3527,18 +3527,51 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                _selectedServer?.name ?? 'در حال دریافت سرورها...',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                ),
+                              Row(
+                                children: [
+                                  if (_selectedServer != null) ...[
+                                    Text(_selectedServer!.displayIcon, style: const TextStyle(fontSize: 12)),
+                                    const SizedBox(width: 4),
+                                  ],
+                                  Expanded(
+                                    child: Text(
+                                      _selectedServer?.name ?? 'در حال دریافت سرورها...',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
                               ),
                               const SizedBox(height: 3),
-                              Text(
-                                '${_selectedServer?.protocol.toUpperCase() ?? 'VLESS'} • ${_selectedServer?.operatorName ?? 'پیش‌فرض'}',
-                                style: const TextStyle(color: Color(0xFF64748B), fontSize: 11),
+                              Row(
+                                children: [
+                                  if (_selectedServer != null)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                      decoration: BoxDecoration(
+                                        color: Color(_selectedServer!.protocolColorInt).withOpacity(0.15),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        _selectedServer!.displayProtocolLabel,
+                                        style: TextStyle(color: Color(_selectedServer!.protocolColorInt), fontSize: 9, fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                  const SizedBox(width: 5),
+                                  Expanded(
+                                    child: Text(
+                                      _selectedServer != null ? '${_selectedServer!.bestFor} • ${_selectedServer!.operatorName}' : (_selectedServer?.operatorName ?? 'پیش‌فرض'),
+                                      style: const TextStyle(color: Color(0xFF64748B), fontSize: 10),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),

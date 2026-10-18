@@ -396,6 +396,30 @@ class SublinkControllerV2 {
             }
         }
 
+        // v4.0.73 NEW: Multi-Protocol Fallback - Generate TUIC + Hysteria2 + Reality if still empty
+        try {
+            require_once __DIR__ . '/../core/MultiProtocolGenerator.php';
+            $serverInfo = [];
+            if (!empty($client['server_id'])) {
+                try {
+                    $stmt = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ?");
+                    $stmt->execute([(int)$client['server_id']]);
+                    $serverInfo = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+                } catch (Throwable $e) {}
+            }
+            $multi = MultiProtocolGenerator::generateForClient($client, $serverInfo);
+            $result = [];
+            if (!empty($multi['vless'])) $result['vless_reality'] = $multi['vless'];
+            if (!empty($multi['hysteria2'])) $result['hysteria2'] = $multi['hysteria2'];
+            if (!empty($multi['tuic'])) $result['tuic'] = $multi['tuic'];
+            if (!empty($result)) {
+                @file_put_contents($cacheFile, json_encode(['configs' => $result, 'ts' => time()]));
+                return $result;
+            }
+        } catch (Throwable $e) {
+            error_log("MultiProtocol fallback failed: " . $e->getMessage());
+        }
+
         return [];
     }
 

@@ -649,12 +649,57 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
 
         // HARD GUARD: never deliver legacy mock/fake connections
         $realLinks = Helpers::stripMockLinks($realLinks);
+
+        // v4.0.73 NEW: Auto-generate missing TUIC + Hysteria2 via MultiProtocolGenerator
+        try {
+            require_once __DIR__ . '/../core/MultiProtocolGenerator.php';
+            $hasTuic = false;
+            $hasHy2 = false;
+            foreach ($realLinks as $l) {
+                if (stripos($l, 'tuic://') === 0) $hasTuic = true;
+                if (stripos($l, 'hysteria2://') === 0 || stripos($l, 'hy2://') === 0) $hasHy2 = true;
+            }
+            if (!$hasTuic || !$hasHy2) {
+                $serverInfo = [];
+                if (!empty($client['server_id'])) {
+                    try {
+                        $stmtSrv = $pdo->prepare("SELECT * FROM server_nodes WHERE id = ?");
+                        $stmtSrv->execute([(int)$client['server_id']]);
+                        $serverInfo = $stmtSrv->fetch(PDO::FETCH_ASSOC) ?: [];
+                    } catch (Throwable $e) {}
+                }
+                $multi = MultiProtocolGenerator::generateForClient($client, $serverInfo);
+                if (!$hasTuic && !empty($multi['tuic'])) {
+                    $realLinks[] = $multi['tuic'];
+                }
+                if (!$hasHy2 && !empty($multi['hysteria2'])) {
+                    $realLinks[] = $multi['hysteria2'];
+                }
+            }
+        } catch (Throwable $e) {
+            error_log("MultiProtocol auto-gen in ApiController failed: " . $e->getMessage());
+        }
+
+        $realLinks = array_values(array_unique($realLinks));
+        $realLinks = Helpers::stripMockLinks($realLinks);
         if (empty($realLinks)) {
             return [];
         }
 
         $serverList = [];
         $idx = 1;
+        // v4.0.73: Protocol metadata map
+        $protoMeta = [
+            'vless' => ['icon' => '🛡️', 'color' => '#10B981', 'label' => 'VLESS Reality', 'desc' => 'پایدار + مقاوم در برابر فیلتر - 9.5/10', 'best_for' => 'روزمره + استقامت'],
+            'vmess' => ['icon' => '🔒', 'color' => '#3B82F6', 'label' => 'VMess', 'desc' => 'کلاسیک + سازگار', 'best_for' => 'سازگاری عمومی'],
+            'trojan' => ['icon' => '🐴', 'color' => '#EF4444', 'label' => 'Trojan', 'desc' => 'ساده + سریع', 'best_for' => 'سرعت بالا'],
+            'ss' => ['icon' => '👻', 'color' => '#8B5CF6', 'label' => 'Shadowsocks', 'desc' => 'سبک + قدیمی', 'best_for' => 'سازگاری'],
+            'hysteria2' => ['icon' => '⚡', 'color' => '#F59E0B', 'label' => 'Hysteria2', 'desc' => 'سریع برای اینترنت ضعیف - استریم + دانلود', 'best_for' => 'استریم + دانلود حجیم'],
+            'hy2' => ['icon' => '⚡', 'color' => '#F59E0B', 'label' => 'Hysteria2', 'desc' => 'سریع برای اینترنت ضعیف - استریم + دانلود', 'best_for' => 'استریم + دانلود حجیم'],
+            'tuic' => ['icon' => '🚀', 'color' => '#8B5CF6', 'label' => 'TUIC v5', 'desc' => 'کمترین تاخیر 110-140ms - بازی + تماس صوتی', 'best_for' => 'بازی آنلاین + تماس صوتی + ترید'],
+            'wireguard' => ['icon' => '🔐', 'color' => '#06B6D4', 'label' => 'WireGuard', 'desc' => 'VPN لایه 3', 'best_for' => 'امنیت کامل'],
+        ];
+        
         foreach ($realLinks as $link) {
             $parsed = parse_url($link);
             $proto = strtolower($parsed['scheme'] ?? 'vless');
@@ -665,7 +710,8 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
             } else {
                 $host = $parsed['host'] ?? 'Node';
                 $port = $parsed['port'] ?? 443;
-                $name = strtoupper($proto) . " - {$host}:{$port}";
+                $meta = $protoMeta[$proto] ?? ['label' => strtoupper($proto)];
+                $name = ($meta['label'] ?? strtoupper($proto)) . " - {$host}:{$port}";
             }
 
             // Flag and Country detection
@@ -703,6 +749,7 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
                 $opTag = 'wifi'; $opName = 'اینترنت خانگی / Wi-Fi';
             }
 
+            $meta = $protoMeta[$proto] ?? ['icon' => '🌐', 'color' => '#6B7280', 'label' => strtoupper($proto), 'desc' => '', 'best_for' => 'عمومی'];
             $serverList[] = [
                 'id' => 'conn_' . $idx,
                 'name' => $name,
@@ -710,6 +757,11 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
                 'country_code' => $countryCode,
                 'flag' => $flag,
                 'protocol' => $proto,
+                'protocol_label' => $meta['label'] ?? strtoupper($proto),
+                'protocol_icon' => $meta['icon'] ?? '🌐',
+                'protocol_color' => $meta['color'] ?? '#6B7280',
+                'protocol_desc' => $meta['desc'] ?? '',
+                'best_for' => $meta['best_for'] ?? 'عمومی',
                 'operator_tag' => $opTag,
                 'operator_name' => $opName,
                 'ping_url' => 'https://www.google.com/generate_204',

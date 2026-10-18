@@ -1578,7 +1578,7 @@ class ApiService {
   // OLD BUG: 6s timeout per URL, 4 URLs = 24s wait, plus GitHub 5s = 29s total before showing error
   // User on slow Iran network sees timeout and gets "connection failed"
   // FIX: 10s timeout, only 2 primary URLs, parallel GitHub check, never show connection error for update
-  // v4.0.72 NEW ARCHITECTURE: 3-Tier Hybrid - GitHub Direct + Panel Proxy + Browser Fallback - 100% Reliable
+  // v4.0.73 NEW ARCHITECTURE: 3-Tier Hybrid - GitHub Direct + Panel Proxy + Browser Fallback - 100% Reliable
   // Tier 1: GitHub API Direct (Primary - no panel dependency, always fresh)
   // Tier 2: Panel Proxy (Secondary - for Iran where GitHub blocked)
   // Tier 3: Browser Fallback (Guaranteed - always works)
@@ -1590,12 +1590,12 @@ class ApiService {
     // ============ TIER 1: GitHub API Direct (Primary - Source of Truth) ============
     // This is the most reliable - GitHub is always up-to-date, no panel dependency
     try {
-      log('v4.0.72 TIER1: Checking GitHub API directly...');
+      log('v4.0.73 TIER1: Checking GitHub API directly...');
       final ghApiResp = await http.get(
         Uri.parse("https://api.github.com/repos/hojjatrad/panelconnectix/releases/latest"),
         headers: {
           'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'ConnectixVPN-App/4.0.72',
+          'User-Agent': 'ConnectixVPN-App/4.0.73',
           'Cache-Control': 'no-cache'
         },
       ).timeout(const Duration(seconds: 8));
@@ -1647,17 +1647,17 @@ class ApiService {
             'force_update': false,
           };
           bestVersion = ver;
-          log('v4.0.72 TIER1 SUCCESS: GitHub API returned $ver');
+          log('v4.0.73 TIER1 SUCCESS: GitHub API returned $ver');
         }
       }
     } catch (e) {
-      log('v4.0.72 TIER1 FAILED: GitHub API error: $e');
+      log('v4.0.73 TIER1 FAILED: GitHub API error: $e');
     }
     
     // ============ TIER 1B: GitHub Raw app_release.json (Secondary Primary) ============
     if (bestResult == null) {
       try {
-        log('v4.0.72 TIER1B: Checking GitHub Raw app_release.json...');
+        log('v4.0.73 TIER1B: Checking GitHub Raw app_release.json...');
         final rawResp = await http.get(
           Uri.parse("https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/app_release.json?v=${DateTime.now().millisecondsSinceEpoch}"),
           headers: {'Accept': 'application/json', 'Cache-Control': 'no-cache'},
@@ -1688,11 +1688,11 @@ class ApiService {
               'force_update': rawData['force_update'] == true,
             };
             bestVersion = ver;
-            log('v4.0.72 TIER1B SUCCESS: GitHub Raw returned $ver');
+            log('v4.0.73 TIER1B SUCCESS: GitHub Raw returned $ver');
           }
         }
       } catch (e) {
-        log('v4.0.72 TIER1B FAILED: GitHub Raw error: $e');
+        log('v4.0.73 TIER1B FAILED: GitHub Raw error: $e');
       }
     }
     
@@ -1706,7 +1706,7 @@ class ApiService {
     for (final tier2Url in tier2Urls) {
       if (bestResult != null) break;
       try {
-        log('v4.0.72 TIER2: Checking $tier2Url...');
+        log('v4.0.73 TIER2: Checking $tier2Url...');
         final resp = await http.get(
           Uri.parse("$tier2Url?v=${DateTime.now().millisecondsSinceEpoch}"),
           headers: {'Accept': 'application/json', 'Cache-Control': 'no-cache'},
@@ -1736,12 +1736,12 @@ class ApiService {
               'force_update': data['force_update'] == true,
             };
             bestVersion = ver;
-            log('v4.0.72 TIER2 SUCCESS: $tier2Url returned $ver');
+            log('v4.0.73 TIER2 SUCCESS: $tier2Url returned $ver');
             break;
           }
         }
       } catch (e) {
-        log('v4.0.72 TIER2 FAILED: $tier2Url error: $e');
+        log('v4.0.73 TIER2 FAILED: $tier2Url error: $e');
       }
     }
     
@@ -1771,23 +1771,23 @@ class ApiService {
               map['source'] = 'panel_api';
               bestResult = map;
               bestVersion = ver;
-              log('v4.0.72 TIER2B SUCCESS: Panel API $currentBase returned $ver');
+              log('v4.0.73 TIER2B SUCCESS: Panel API $currentBase returned $ver');
               break;
             }
           }
         } catch (e) {
-          log('v4.0.72 TIER2B FAILED: Panel API error: $e');
+          log('v4.0.73 TIER2B FAILED: Panel API error: $e');
         }
       }
     }
     
     // ============ FINAL: Return best result (newest version) ============
     if (bestResult != null) {
-      log('v4.0.72 FINAL: Returning $bestVersion from ${bestResult['source']}');
+      log('v4.0.73 FINAL: Returning $bestVersion from ${bestResult['source']}');
       return bestResult;
     }
     
-    log('v4.0.72 FINAL: No update found from any tier');
+    log('v4.0.73 FINAL: No update found from any tier');
     return null;
   }
 
@@ -2495,15 +2495,15 @@ class ApiService {
         }
       }
 
-      // v4.0.72 NEW ARCHITECTURE: 3-Tier Browser Fallback Guaranteed - GitHub Releases Page
+      // v4.0.73 NEW ARCHITECTURE: 3-Tier Browser Fallback Guaranteed - GitHub Releases Page
       if (!hasShownBrowserFallback) {
         hasShownBrowserFallback = true;
-        // v4.0.72: Try to open browser to GitHub releases page as ultimate fallback (100% guaranteed)
+        // v4.0.73: Try to open browser to GitHub releases page as ultimate fallback (100% guaranteed)
         try {
           final githubPage = "https://github.com/hojjatrad/panelconnectix/releases/tag/v$expectedVer";
           final latestPage = "https://github.com/hojjatrad/panelconnectix/releases/latest";
           final directUrl = "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=$expectedVer";
-          log('v4.0.72 Browser fallback: opening $githubPage and $directUrl');
+          log('v4.0.73 Browser fallback: opening $githubPage and $directUrl');
           // Don't auto-open here, let UI handle it, but log
         } catch (_) {}
         try {
@@ -2556,7 +2556,7 @@ class ApiService {
   }
 
 
-    // v4.0.72 NEW: Open GitHub releases page - 100% guaranteed fallback
+    // v4.0.73 NEW: Open GitHub releases page - 100% guaranteed fallback
   static Future<bool> openGitHubReleasesPage(String version) async {
     try {
       const channel = MethodChannel('com.connectix.vpn/updater');
