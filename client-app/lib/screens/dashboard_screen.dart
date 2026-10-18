@@ -3328,7 +3328,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             color: const Color(0xFF6366F1),
                           ),
                           // v4.0.69 COMPACT: پینگ از کنار سرعت حذف شد per user request - فقط دانلود/آپلود
-                          ],
                         ],
                       ),
                     ),
@@ -3643,6 +3642,31 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         ),
       ),
       ),
+    );
+  }
+}
+
+class _CompactQuotaMetric extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+  final IconData icon;
+  const _CompactQuotaMetric({required this.label, required this.value, required this.color, required this.icon});
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 10, color: color),
+            const SizedBox(width: 3),
+            Text(label, style: const TextStyle(color: Color(0xFF64748B), fontSize: 8)),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(value, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
+      ],
     );
   }
 }
