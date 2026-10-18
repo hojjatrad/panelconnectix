@@ -22,7 +22,7 @@
   "apks": {
     "arm64-v8a": {
       "url": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.71",
-      "size": 36940084,
+      "size": 36940652,
       "size_human": "36 MB",
       "abi": "arm64-v8a",
       "recommended": true,
@@ -31,7 +31,7 @@
     },
     "armeabi-v7a": {
       "url": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.71",
-      "size": 37613192,
+      "size": 37614794,
       "size_human": "36 MB",
       "abi": "armeabi-v7a",
       "recommended": false,
@@ -40,7 +40,7 @@
     },
     "universal": {
       "url": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.71",
-      "size": 107982525,
+      "size": 107987013,
       "size_human": "105 MB",
       "abi": "universal",
       "recommended": false,
@@ -90,12 +90,12 @@
   "latest_version": "4.0.72",
   "latest_code": 106,
   "apk_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.71/Connectix-ARM64-v8a.apk",
-  "apk_size": 36940084,
+  "apk_size": 36940652,
   "arm64_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.71/Connectix-ARM64-v8a.apk",
-  "arm64_size": 36940084,
+  "arm64_size": 36940652,
   "arm32_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.71/Connectix-ARM32-v7a.apk",
-  "arm32_size": 37613192,
+  "arm32_size": 37614794,
   "universal_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.71/Connectix-Universal.apk",
-  "universal_size": 107982525,
+  "universal_size": 107987013,
   "release_notes": "v4.0.70 ULTRA COMPACT FINAL + SMART CONNECT ULTRA FIX: صفحه اول فوق‌فشرده بدون اسکرول حتی در گوشی کوچک (quota نوار خطی 3px، دکمه 90، فاصله 2px) + اتصال هوشمند هرگز حجم/زمان را انتخاب نمی‌کند (isInfoBanner فوق‌تهاجمی + isSelectableForSmartConnect) + آپلود/دانلود درست + 3 APK با لینک مستقیم سالم."
 }
