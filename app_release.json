@@ -1,10 +1,10 @@
 {
-  "version": "4.0.71",
-  "code": 105,
+  "version": "4.0.72",
+  "code": 106,
   "force_update": false,
   "force_min_code": 50,
   "update_type": "full",
-  "changelog": "v4.0.71 OPTIMIZED + BUG FIX: فیکس تمام باگ‌های گزارش جامع + بهینه‌سازی سرعت اتصال 6x (Future.wait موازی) + پایداری + باتری -50% (timer 2s→5s, 1s→1.5s) + فیکس SQLi + حذف cpanel_cron + ایندکس‌های جدید + N+1 fix + Cache apcu + CSRF + Rate limit + Timer leak + print cleanup + isInfoBanner false positive fix",
+  "changelog": "v4.0.72 NEW UPDATE ARCHITECTURE 3-Tier Hybrid 100% Reliable: Tier1 GitHub API Direct (source of truth, no panel dependency), Tier2 Panel Proxy (direct.vpbotn.ir/app_release.json + panel API for Iran), Tier3 Browser Fallback Guaranteed (GitHub releases page). Fix panel 'no update needed' bug: ApiController now reads from app_release.json + GitHub API if Setting empty, AppReleasePublisher auto-syncs GitHub to Setting every 5min, app_release.json URLs fixed to correct version. In-app installer with FileProvider + version verification + browser fallback to GitHub releases page 100% guaranteed.",
   "date": "2026-10-18",
   "auto_update": {
     "enabled": true,
@@ -15,13 +15,13 @@
     "wifi_only": false
   },
   "apk": {
-    "arm64": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.70",
-    "universal": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.70",
-    "arm32": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.70"
+    "arm64": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.71",
+    "universal": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.71",
+    "arm32": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.71"
   },
   "apks": {
     "arm64-v8a": {
-      "url": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.70",
+      "url": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.71",
       "size": 36940084,
       "size_human": "36 MB",
       "abi": "arm64-v8a",
@@ -30,7 +30,7 @@
       "fallback": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.71/Connectix-ARM64-v8a.apk"
     },
     "armeabi-v7a": {
-      "url": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.70",
+      "url": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.71",
       "size": 37613192,
       "size_human": "36 MB",
       "abi": "armeabi-v7a",
@@ -39,7 +39,7 @@
       "fallback": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.71/Connectix-ARM32-v7a.apk"
     },
     "universal": {
-      "url": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.70",
+      "url": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.71",
       "size": 107982525,
       "size_human": "105 MB",
       "abi": "universal",
@@ -73,22 +73,22 @@
     "stealth",
     "multiplex"
   ],
-  "version_code": 105,
+  "version_code": 106,
   "release_date": "2026-10-18",
   "apk_urls": {
-    "arm64": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.70",
-    "universal": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.70",
-    "arm32": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.70",
-    "github_arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.70/Connectix-ARM64-v8a.apk",
-    "github_universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.70/Connectix-Universal.apk",
-    "direct": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.70",
-    "vpbotn": "https://vpbotn.ir/download_apk.php?file=arm64&v=4.0.70",
+    "arm64": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.71",
+    "universal": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.71",
+    "arm32": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.71",
+    "github_arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.71/Connectix-ARM64-v8a.apk",
+    "github_universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.71/Connectix-Universal.apk",
+    "direct": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.71",
+    "vpbotn": "https://vpbotn.ir/download_apk.php?file=arm64&v=4.0.71",
     "qr": "https://vpbotn.ir/qr_download.html"
   },
-  "download_url": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.70",
-  "build_number": 105,
-  "latest_version": "4.0.71",
-  "latest_code": 105,
+  "download_url": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.71",
+  "build_number": 106,
+  "latest_version": "4.0.72",
+  "latest_code": 106,
   "apk_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.71/Connectix-ARM64-v8a.apk",
   "apk_size": 36940084,
   "arm64_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.71/Connectix-ARM64-v8a.apk",

@@ -156,7 +156,20 @@ $appAutoMode = (($appPub['source'] ?? 'auto') !== 'admin');
                     <div class="grid grid-cols-2 gap-2">
                         <div>
                             <label class="block text-[11px] text-slate-400 mb-1">نسخه‌ی جدید <span class="text-slate-600">(حالت خودکار: فقط‌نمایش)</span></label>
-                            <input type="text" id="appVerInput" name="app_latest_version" value="<?= htmlspecialchars(Setting::get('app_latest_version', '')) ?>" dir="ltr" placeholder="3.2.0" <?= $appAutoMode ? 'readonly' : '' ?>
+                            <?php
+                            // v4.0.72 FIX: Fallback to app_release.json if Setting empty (fix 'no update needed' bug)
+                            $appVerFallback = Setting::get('app_latest_version', '');
+                            if (empty($appVerFallback)) {
+                                $releasePath = __DIR__ . '/../../app_release.json';
+                                if (file_exists($releasePath)) {
+                                    $releaseData = @json_decode(@file_get_contents($releasePath), true);
+                                    if (!empty($releaseData['version'])) {
+                                        $appVerFallback = $releaseData['version'];
+                                    }
+                                }
+                            }
+                            ?>
+                            <input type="text" id="appVerInput" name="app_latest_version" value="<?= htmlspecialchars($appVerFallback) ?>" dir="ltr" placeholder="3.2.0" <?= $appAutoMode ? 'readonly' : '' ?>
                                    class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-xs <?= $appAutoMode ? 'opacity-60' : '' ?>">
                         </div>
                         <div>

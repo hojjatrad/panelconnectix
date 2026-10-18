@@ -847,10 +847,62 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
         $changelog   = trim(Setting::get('app_update_changelog', '')) ?: "• نگارش جدید سامانه منتشر شد.";
         $enabled     = trim(Setting::get('app_update_enabled', '1'));
 
+        // v4.0.72 NEW ARCHITECTURE: If Setting empty, read from app_release.json directly (fix 'no update needed' bug)
+        if ($latest === '') {
+            $releasePath = __DIR__ . '/../app_release.json';
+            if (file_exists($releasePath)) {
+                $releaseData = @json_decode(@file_get_contents($releasePath), true);
+                if (!empty($releaseData['version'])) {
+                    $latest = $releaseData['version'];
+                    $downloadUrl = $releaseData['apk_url'] ?? $releaseData['arm64_url'] ?? $downloadUrl;
+                    $universalUrl = $releaseData['universal_url'] ?? $universalUrl;
+                    $title = $releaseData['version'] ? "Connectix v{$releaseData['version']}" : $title;
+                    $changelog = $releaseData['changelog'] ?? $releaseData['release_notes'] ?? $changelog;
+                    error_log("v4.0.72: Using app_release.json fallback for update check: $latest");
+                }
+            }
+        }
+        
+        // v4.0.72: If still empty, try GitHub API as last resort
+        if ($latest === '') {
+            try {
+                $ch = curl_init("https://api.github.com/repos/hojjatrad/panelconnectix/releases/latest");
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_TIMEOUT => 5,
+                    CURLOPT_USERAGENT => 'ConnectixPanel/4.0.72',
+                    CURLOPT_SSL_VERIFYPEER => false
+                ]);
+                $resp = curl_exec($ch);
+                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+                if ($httpCode === 200 && $resp) {
+                    $ghData = @json_decode($resp, true);
+                    if (!empty($ghData['tag_name'])) {
+                        $latest = ltrim($ghData['tag_name'], 'v');
+                        $title = "Connectix v$latest";
+                        $changelog = $ghData['body'] ?? $changelog;
+                        // Find APK asset
+                        foreach ($ghData['assets'] ?? [] as $asset) {
+                            if (str_contains($asset['name'] ?? '', 'ARM64-v8a') && empty($downloadUrl)) {
+                                $downloadUrl = $asset['browser_download_url'];
+                            }
+                            if (str_contains($asset['name'] ?? '', 'Universal') && empty($universalUrl)) {
+                                $universalUrl = $asset['browser_download_url'];
+                            }
+                        }
+                        error_log("v4.0.72: Using GitHub API fallback for update check: $latest");
+                    }
+                }
+            } catch (Throwable $e) {
+                error_log("v4.0.72: GitHub API fallback failed: " . $e->getMessage());
+            }
+        }
+
         if ($latest === '' || $enabled === '0') {
             self::jsonSuccess([
                 'current_version' => '3.0.0',
-                'latest_version' => '3.1.0',
+                'latest_version' => $latest !== '' ? $latest : '4.0.71',
                 'has_update' => false,
                 'title' => 'Connectix',
                 'changelog' => '',

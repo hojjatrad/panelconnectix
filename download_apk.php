@@ -24,10 +24,10 @@ $map = [
 
 $filePath = $map[$fileParam] ?? $map['arm64'];
 
-// v4.0.71 SECURE FIX: Only delete if version mismatch AND file too small (<20MB), not based on mtime (DoS fix)
+// v4.0.72 SECURE FIX: Only delete if version mismatch AND file too small (<20MB), not based on mtime (DoS fix)
 $requestedVer = $version;
 $appReleasePath = __DIR__ . '/app_release.json';
-$currentReleaseVer = '4.0.71';
+$currentReleaseVer = '4.0.72';
 if (file_exists($appReleasePath)) {
     $jsonContent = @file_get_contents($appReleasePath);
     $jsonData = @json_decode($jsonContent, true);
@@ -36,12 +36,12 @@ if (file_exists($appReleasePath)) {
     }
 }
 
-// v4.0.71: Only delete stale if requested version != current AND file is too small or invalid
+// v4.0.72: Only delete stale if requested version != current AND file is too small or invalid
 // Prevents DoS via mtime manipulation
 if (!empty($requestedVer) && $requestedVer !== $currentReleaseVer && file_exists($filePath)) {
     $sz = filesize($filePath);
     if ($sz < 20*1024*1024) {
-        error_log("download_apk.php v4.0.71: Version mismatch ($requestedVer vs $currentReleaseVer) and file too small ($sz) - deleting $filePath");
+        error_log("download_apk.php v4.0.72: Version mismatch ($requestedVer vs $currentReleaseVer) and file too small ($sz) - deleting $filePath");
         @unlink($filePath);
     }
 }
@@ -84,17 +84,17 @@ if (!file_exists($filePath) || filesize($filePath) < 20*1024*1024) {
 
 // If still no local file, try GitHub proxy
 if (!file_exists($filePath) || filesize($filePath) < 20*1024*1024) {
-    $ver = $version ?: '4.0.71';
+    $ver = $version ?: '4.0.72';
     $ver = preg_replace('/[^0-9\.]/', '', $ver);
-    if (empty($ver)) $ver = '4.0.71';
+    if (empty($ver)) $ver = '4.0.72';
     
     $githubVer = $ver;
-    $allowedGithubVersions = ['4.0.51', '4.0.64', '4.0.65', '4.0.66', '4.0.67', '4.0.71'];
-    if (!in_array($ver, $allowedGithubVersions) && version_compare($ver, '4.0.71', '>')) {
-        $githubVer = '4.0.71';
+    $allowedGithubVersions = ['4.0.51', '4.0.64', '4.0.65', '4.0.66', '4.0.67', '4.0.72'];
+    if (!in_array($ver, $allowedGithubVersions) && version_compare($ver, '4.0.72', '>')) {
+        $githubVer = '4.0.72';
         error_log("download_apk.php v4.0.70: Requested v$ver has no GitHub assets yet, using v$githubVer fallback");
-    } elseif (version_compare($ver, '4.0.51', '>') && version_compare($ver, '4.0.71', '<')) {
-        if (!in_array($ver, ['4.0.64', '4.0.65', '4.0.66', '4.0.67', '4.0.71'])) {
+    } elseif (version_compare($ver, '4.0.51', '>') && version_compare($ver, '4.0.72', '<')) {
+        if (!in_array($ver, ['4.0.64', '4.0.65', '4.0.66', '4.0.67', '4.0.72'])) {
             $githubVer = '4.0.51';
             error_log("download_apk.php v4.0.70: Requested v$ver has no GitHub assets, using v$githubVer fallback");
         }

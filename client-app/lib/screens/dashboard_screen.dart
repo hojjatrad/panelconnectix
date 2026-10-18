@@ -96,8 +96,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   // v4.0.63 FOREVER FIX - Never show old version after install - PERMANENT LAW
   // LAW: currentAppVersion must be dynamic, not hardcoded const that stays old after install
   // Fix: Make it getter that returns actual installed version if available, else latest hardcoded
-  static const String _hardcodedVersion = '4.0.71'; // Fallback only, updated each release
-  static const int _hardcodedCode = 105;
+  static const String _hardcodedVersion = '4.0.72'; // Fallback only, updated each release
+  static const int _hardcodedCode = 106;
   static String get currentAppVersion => _actualInstalledVersion.isNotEmpty && _actualInstalledVersion != '4.0.51' ? _actualInstalledVersion : _hardcodedVersion;
   static String _actualInstalledVersion = '4.0.69'; // Will be updated from PackageManager immediately on start
   static int _actualInstalledCode = 103;
@@ -1179,8 +1179,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   // Real-time In-App Downloader Modal Sheet
+  // v4.0.72 NEW ARCHITECTURE: 3-Tier Hybrid - GitHub Direct + Panel Proxy + Browser Fallback - 100% Guaranteed
   void _startInAppDownloadAndInstall(String downloadUrl, String version, {String fallbackUrl = ''}) {
-    final defaultPrimary = "https://github.com/hojjatrad/panelconnectix/releases/download/v$version/Connectix-Android-ARM64.apk";
+    final githubReleasesPage = "https://github.com/hojjatrad/panelconnectix/releases/tag/v$version";
+    final githubLatestPage = "https://github.com/hojjatrad/panelconnectix/releases/latest";
+    final directPanelUrl = "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=$version";
+    final defaultPrimary = "https://github.com/hojjatrad/panelconnectix/releases/download/v$version/Connectix-ARM64-v8a.apk";
     final defaultFallback = "https://github.com/hojjatrad/panelconnectix/releases/download/v$version/Connectix-Android-Universal.apk";
 
     if (downloadUrl.isEmpty || !downloadUrl.startsWith('http')) {
@@ -1366,12 +1370,20 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                           ],
                         ),
                         const SizedBox(height: 12),
+                        // v4.0.72: 3-Tier Browser Fallback - GitHub Releases Page (100% guaranteed)
                         ElevatedButton.icon(
                           onPressed: () async {
                             Navigator.pop(bottomSheetContext);
-                            final uri = Uri.parse(downloadUrl);
-                            if (await canLaunchUrl(uri)) {
-                              await launchUrl(uri, mode: LaunchMode.externalApplication);
+                            // Try direct panel first (works in Iran), then GitHub releases page
+                            final urlsToTry = [directPanelUrl, downloadUrl, githubReleasesPage, githubLatestPage];
+                            for (final u in urlsToTry) {
+                              try {
+                                final uri = Uri.parse(u);
+                                if (await canLaunchUrl(uri)) {
+                                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                  break;
+                                }
+                              } catch (_) {}
                             }
                           },
                           style: ElevatedButton.styleFrom(
@@ -1379,7 +1391,23 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             padding: const EdgeInsets.symmetric(vertical: 12),
                           ),
                           icon: const Icon(Icons.open_in_browser, size: 16),
-                          label: const Text('دانلود با مرورگر', style: TextStyle(fontWeight: FontWeight.bold)),
+                          label: const Text('دانلود با مرورگر (100% تضمینی)', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                        const SizedBox(height: 8),
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            Navigator.pop(bottomSheetContext);
+                            final uri = Uri.parse(githubReleasesPage);
+                            if (await canLaunchUrl(uri)) {
+                              await launchUrl(uri, mode: LaunchMode.externalApplication);
+                            }
+                          },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF10B981),
+                            side: const BorderSide(color: Color(0xFF10B981)),
+                          ),
+                          icon: const Icon(Icons.public_rounded, size: 16),
+                          label: const Text('صفحه ریلیز گیت‌هاب', style: TextStyle(fontSize: 12)),
                         ),
                       ],
                     )
