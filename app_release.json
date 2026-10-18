@@ -4,7 +4,7 @@
   "force_update": false,
   "force_min_code": 50,
   "update_type": "full",
-  "changelog": "v4.0.74+108 FIX in-app update + browser old version: 🔧 Root cause: download_apk.php allowlist ['4.0.51','4.0.64',...,'4.0.72'] blocked v4.0.73, served old APK (4.0.72) -> version mismatch STRICT -> all attempts fail -> browser fallback. Also api_service.dart addUrl blocked GitHub for v4.0.73 (hardcoded list), only panel URLs tried. Fix: Panel allowlist now includes 4.0.73,4.0.74 + dynamic, GitHub allowlist expanded, URL prioritization GitHub first (source of truth) then panel (Iran fallback), SMART version check (allow newer than current, not just exact), canInstallPackages check + permission request before install, browser fallback GitHub first. ✅ In-app update now works, browser always serves new version.",
+  "changelog": "v4.0.74+108 FIX in-app update + browser old version: 🔧 Root cause: download_apk.php allowlist ['4.0.51','4.0.64',...,'4.0.72'] blocked v4.0.73, served old APK (4.0.72) -> version mismatch STRICT -> all attempts fail -> browser fallback. Also api_service.dart addUrl blocked GitHub for v4.0.73 (hardcoded list), only panel URLs tried. Fix: Panel allowlist now includes 4.0.73,4.0.74 + dynamic, GitHub allowlist expanded, URL prioritization GitHub first (source of truth) then panel (Iran fallback), SMART version check (allow newer than current, not just exact), canInstallPackages check + permission request before install, browser fallback GitHub first. ✅ In-app update now works, browser always serves new version. TUIC v5 + dual-core.",
   "date": "2026-10-18",
   "auto_update": {
     "enabled": true,
@@ -22,7 +22,7 @@
   "apks": {
     "arm64-v8a": {
       "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.74/Connectix-ARM64-v8a.apk",
-      "size": 36942894,
+      "size": 36945932,
       "size_human": "36 MB",
       "abi": "arm64-v8a",
       "recommended": true,
@@ -31,7 +31,7 @@
     },
     "armeabi-v7a": {
       "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.74/Connectix-ARM32-v7a.apk",
-      "size": 37618589,
+      "size": 37624641,
       "size_human": "36 MB",
       "abi": "armeabi-v7a",
       "recommended": false,
@@ -40,7 +40,7 @@
     },
     "universal": {
       "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.74/Connectix-Universal.apk",
-      "size": 107996041,
+      "size": 108009740,
       "size_human": "105 MB",
       "abi": "universal",
       "recommended": false,
@@ -92,12 +92,17 @@
   "latest_version": "4.0.74",
   "latest_code": 108,
   "apk_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.74/Connectix-ARM64-v8a.apk",
-  "apk_size": 36942894,
+  "apk_size": 36945932,
   "arm64_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.74/Connectix-ARM64-v8a.apk",
-  "arm64_size": 36942894,
+  "arm64_size": 36945932,
   "arm32_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.74/Connectix-ARM32-v7a.apk",
-  "arm32_size": 37618589,
+  "arm32_size": 37624641,
   "universal_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.74/Connectix-Universal.apk",
-  "universal_size": 107996041,
-  "release_notes": "v4.0.74+108 FIX in-app update + browser old version: 🔧 Root cause: download_apk.php allowlist ['4.0.51','4.0.64',...,'4.0.72'] blocked v4.0.73, served old APK (4.0.72) -> version mismatch STRICT -> all attempts fail -> browser fallback. Also api_service.dart addUrl blocked GitHub for v4.0.73 (hardcoded list), only panel URLs tried. Fix: Panel allowlist now includes 4.0.73,4.0.74 + dynamic, GitHub allowlist expanded, URL prioritization GitHub first (source of truth) then panel (Iran fallback), SMART version check (allow newer than current, not just exact), canInstallPackages check + permission request before install, browser fallback GitHub first. ✅ In-app update now works, browser always serves new version."
+  "universal_size": 108009740,
+  "release_notes": "v4.0.74+108 FIX in-app update + browser old version: 🔧 Root cause: download_apk.php allowlist ['4.0.51','4.0.64',...,'4.0.72'] blocked v4.0.73, served old APK (4.0.72) -> version mismatch STRICT -> all attempts fail -> browser fallback. Also api_service.dart addUrl blocked GitHub for v4.0.73 (hardcoded list), only panel URLs tried. Fix: Panel allowlist now includes 4.0.73,4.0.74 + dynamic, GitHub allowlist expanded, URL prioritization GitHub first (source of truth) then panel (Iran fallback), SMART version check (allow newer than current, not just exact), canInstallPackages check + permission request before install, browser fallback GitHub first. ✅ In-app update now works, browser always serves new version. TUIC v5 + dual-core.",
+  "sizes": {
+    "arm64": 36945932,
+    "universal": 108009740,
+    "arm32": 37624641
+  }
 }
