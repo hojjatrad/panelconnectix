@@ -95,11 +95,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   // v4.0.63 FOREVER FIX - Never show old version after install - PERMANENT LAW
   // LAW: currentAppVersion must be dynamic, not hardcoded const that stays old after install
   // Fix: Make it getter that returns actual installed version if available, else latest hardcoded
-  static const String _hardcodedVersion = '4.0.70'; // Fallback only, updated each release
-  static const int _hardcodedCode = 104;
+  static const String _hardcodedVersion = '4.0.69'; // Fallback only, updated each release
+  static const int _hardcodedCode = 103;
   static String get currentAppVersion => _actualInstalledVersion.isNotEmpty && _actualInstalledVersion != '4.0.51' ? _actualInstalledVersion : _hardcodedVersion;
-  static String _actualInstalledVersion = '4.0.70'; // Will be updated from PackageManager immediately on start
-  static int _actualInstalledCode = 104;
+  static String _actualInstalledVersion = '4.0.69'; // Will be updated from PackageManager immediately on start
+  static int _actualInstalledCode = 103;
 
   // v4.0.46 FOREVER CACHE FIX - PERMANENT LAW - NEVER REGRESS
   // LAW 1: Panel must NEVER serve old APK (auto-delete stale files)
@@ -147,9 +147,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           }
         }
       } catch (e) {
-        print('4.0.70 loadActualInstalledVersion attempt ${attempt+1} error: $e');
+        print('v4.0.69 loadActualInstalledVersion attempt ${attempt+1} error: $e');
         if (attempt == 2) {
-          print('4.0.70 loadActualInstalledVersion failed all attempts - using hardcoded $_hardcodedVersion');
+          print('v4.0.69 loadActualInstalledVersion failed all attempts - using hardcoded $_hardcodedVersion');
           // Keep hardcoded as fallback, but ensure it's latest not 4.0.51
           if (_actualInstalledVersion == '4.0.51' || _actualInstalledVersion.isEmpty) {
             _actualInstalledVersion = _hardcodedVersion;
@@ -883,11 +883,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
   }
 
-  // 1-Tap Smart Connect to Best Ping Server - 4.0.70 ENHANCED: Never select volume/traffic reading connections
+  // 1-Tap Smart Connect to Best Ping Server - v4.0.69 ENHANCED: Never select volume/traffic reading connections
   void _smartConnect() async {
     if (_isSmartConnecting || _isConnecting) return;
-    // 4.0.70 STRICT: Only real VPN servers, never info banners or volume reading connections
-    final clean = _servers.where((s) => s.isSelectableForSmartConnect && s.isRealVpnServer && !s.isInfoBanner && s.configUri.isNotEmpty && s.configUri.length > 30).toList();
+    // v4.0.69 STRICT: Only real VPN servers, never info banners or volume reading connections
+    final clean = _servers.where((s) => s.isRealVpnServer && !s.isInfoBanner && s.configUri.isNotEmpty && s.configUri.length > 20).toList();
     if (clean.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('هیچ سروری برای سنجش پینگ یافت نشد.')),
@@ -956,11 +956,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
   }
 
-  // v4.0.66 NEW: Ping all servers - 4.0.70 ENHANCED: Only real VPN servers, not volume info
+  // v4.0.66 NEW: Ping all servers - v4.0.69 ENHANCED: Only real VPN servers, not volume info
   Future<void> _pingAllServers() async {
     if (_isRefreshing || _servers.isEmpty) return;
     // Filter to only real VPN servers for ping
-    final realServers = _servers.where((s) => s.isSelectableForSmartConnect && s.isRealVpnServer && !s.isInfoBanner && s.configUri.isNotEmpty && s.configUri.length > 30).toList();
+    final realServers = _servers.where((s) => s.isRealVpnServer && !s.isInfoBanner && s.configUri.isNotEmpty).toList();
     if (realServers.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('هیچ سرور واقعی برای پینگ یافت نشد (فقط اطلاعات حجم بود)'), backgroundColor: Color(0xFFEF4444)),
@@ -2977,13 +2977,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         textDirection: TextDirection.rtl,
         child: SafeArea(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6), // 4.0.70 COMPACT NO-SCROLL
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2), // v4.0.69 COMPACT NO-SCROLL
             child: Column(
               children: [
               // Global / Reseller Announcement Banner
               if (widget.branding.announcement.isNotEmpty)
                 Container(
-                  margin: const EdgeInsets.only(bottom: 6), // 4.0.70 COMPACT
+                  margin: const EdgeInsets.only(bottom: 6), // v4.0.69 COMPACT
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     color: const Color(0xFF1E293B),
@@ -3006,7 +3006,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               // In-App Update Alert Banner
               if (_hasAppUpdate && _updateInfo != null)
                 Container(
-                  margin: const EdgeInsets.only(bottom: 6), // 4.0.70 COMPACT
+                  margin: const EdgeInsets.only(bottom: 6), // v4.0.69 COMPACT
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
@@ -3031,11 +3031,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                           children: [
                             Text(
                               'نگارش جدید ${_updateInfo!['latest_version'] ?? 'جدید'} آماده است',
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11), // 4.0.70 COMPACT
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11), // v4.0.69 COMPACT
                             ),
                             const Text(
                               'نصب مستقیم بدون حذف نسخه قبل',
-                              style: TextStyle(color: Color(0xFFE0E7FF), fontSize: 9), // 4.0.70 COMPACT
+                              style: TextStyle(color: Color(0xFFE0E7FF), fontSize: 9), // v4.0.69 COMPACT
                             ),
                           ],
                         ),
@@ -3067,7 +3067,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   ),
                 ),
 
-              // v4.0.70 ULTRA COMPACT FINAL: فوق‌فشرده - نوار خطی
+              // v4.0.70 ULTRA COMPACT FINAL
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                 decoration: BoxDecoration(
@@ -3160,7 +3160,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
               const SizedBox(height: 6),
 
-              // 4.0.70 COMPACT NO-SCROLL - Restored v4.0.42 wave effects + beautiful first page
+              // v4.0.69 COMPACT NO-SCROLL - Restored v4.0.42 wave effects + beautiful first page
               // Per user: UI قبلی زیبا با موج برگردانده شد، Lite پیش‌فرض false شد
               // First page clean: no proxy/gps/tv (only in settings), but beautiful connect button with wave
 
@@ -3175,7 +3175,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             : _isConnecting
                                 ? LiteConnectState.connecting
                                 : LiteConnectState.disconnected,
-                        size: 90, // v4.0.70 ULTRA FINAL // 4.0.70 COMPACT: 142→120 for no-scroll
+                        size: 90, // v4.0.69 COMPACT: 142→120 for no-scroll
                         countryFlag: _selectedServer?.flag ?? '🌐',
                         serverName: _selectedServer?.name ?? 'Connectix',
                         enableHaptic: true,
@@ -3187,7 +3187,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             : _isConnecting
                                 ? UltimateConnectState.connecting
                                 : UltimateConnectState.disconnected,
-                        size: 90, // v4.0.70 ULTRA FINAL // 4.0.70 COMPACT: 142→120 for no-scroll
+                        size: 90, // v4.0.69 COMPACT: 142→120 for no-scroll
                         countryFlag: _selectedServer?.flag ?? '🌐',
                         serverName: _selectedServer?.name ?? 'Connectix',
                         enableHaptic: true,
@@ -3202,9 +3202,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               ),
               ),
 
-              const SizedBox(height: 3),
+              const SizedBox(height: 4),
 
-              // Timer & Status Tag - v4.0.70 ULTRA COMPACT FINAL
+              // Timer & Status Tag
               Text(
                 _isConnected
                     ? 'زمان اتصال: ${_formatDuration(_connectedSeconds)}'
@@ -3214,7 +3214,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
               // v4.0.68 ULTIMATE BEAUTIFUL: Speed always visible + beautiful Smart/Ping buttons below
               const SizedBox(height: 2),
-              ValueListenableBuilder<V2RayStatus> // v4.0.70 ULTRA COMPACT FINAL(
+              ValueListenableBuilder<V2RayStatus>(
                 valueListenable: _v2rayStatus,
                 builder: (context, status, _) {
                   final dl = _isConnected ? status.downloadSpeed : 0;
@@ -3241,7 +3241,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             bytes: ul,
                             color: const Color(0xFF6366F1),
                           ),
-                          // 4.0.70 COMPACT: پینگ از کنار سرعت حذف شد per user request - فقط دانلود/آپلود
+                          // v4.0.69 COMPACT: پینگ از کنار سرعت حذف شد per user request - فقط دانلود/آپلود
                         ],
                       ),
                     ),
@@ -3251,7 +3251,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
               const SizedBox(height: 8),
 
-              // 4.0.70 COMPACT Smart Connect + Ping All - گرادیانت زیبا با موج و سایه (مثل v4.0.42)
+              // v4.0.69 COMPACT Smart Connect + Ping All - گرادیانت زیبا با موج و سایه (مثل v4.0.42)
               Row(
                 textDirection: TextDirection.rtl,
                 children: [
@@ -3262,7 +3262,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         onTap: _isSmartConnecting ? null : _smartConnect,
                         borderRadius: BorderRadius.circular(14),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6), // v4.0.70 ULTRA COMPACT
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
                               colors: [Color(0xFF4338CA), Color(0xFF6366F1), Color(0xFF818CF8)],
@@ -3300,7 +3300,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         onTap: _isRefreshing ? null : _pingAllServers,
                         borderRadius: BorderRadius.circular(14),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6), // v4.0.70 ULTRA COMPACT
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
                               colors: [Color(0xFF065F46), Color(0xFF10B981), Color(0xFF34D399)],
@@ -3333,9 +3333,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 ],
               ),
 
-              const SizedBox(height: 2),
+              const SizedBox(height: 6),
 
-              if (Platform.isWindows) ...[ // 4.0.70 COMPACT
+              if (Platform.isWindows) ...[ // v4.0.69 COMPACT
                 const SizedBox(height: 18),
                 // Windows tunnel flavor selector (Phase 1: system proxy,
                 // Phase 2: full TUN VPN).
@@ -3387,7 +3387,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
               const SizedBox(height: 8),
 
-              // Server Selector Card - 4.0.70 COMPACT NO-SCROLL - v4.0.47 MULTI-ACCOUNT UNIFIED
+              // Server Selector Card - v4.0.69 COMPACT NO-SCROLL - v4.0.47 MULTI-ACCOUNT UNIFIED
               Material(
                 color: Colors.transparent,
                 child: InkWell(
@@ -3457,7 +3457,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   },
                   borderRadius: BorderRadius.circular(20),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10), // 4.0.70 COMPACT
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), // v4.0.69 COMPACT
                     decoration: BoxDecoration(
                       color: const Color(0xFF0F172A),
                       borderRadius: BorderRadius.circular(20),
