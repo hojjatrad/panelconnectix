@@ -95,8 +95,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   // v4.0.63 FOREVER FIX - Never show old version after install - PERMANENT LAW
   // LAW: currentAppVersion must be dynamic, not hardcoded const that stays old after install
   // Fix: Make it getter that returns actual installed version if available, else latest hardcoded
-  static const String _hardcodedVersion = '4.0.69'; // Fallback only, updated each release
-  static const int _hardcodedCode = 103;
+  static const String _hardcodedVersion = '4.0.70'; // Fallback only, updated each release
+  static const int _hardcodedCode = 104;
   static String get currentAppVersion => _actualInstalledVersion.isNotEmpty && _actualInstalledVersion != '4.0.51' ? _actualInstalledVersion : _hardcodedVersion;
   static String _actualInstalledVersion = '4.0.69'; // Will be updated from PackageManager immediately on start
   static int _actualInstalledCode = 103;
