@@ -347,7 +347,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   void _startForegroundAppMonitoring() {
     if (!Platform.isAndroid || !_autoPauseForBankingEnabled) return;
     _foregroundCheckTimer?.cancel();
-    _foregroundCheckTimer = Timer.periodic(const Duration(seconds: 5), // v4.0.71: 2s→5s for battery (timer) async {
+    _foregroundCheckTimer = Timer.periodic(const Duration(seconds: 5), // v4.0.71: 2s->5s battery (timer) async {
       if (!_isConnected || _isConnecting || _pausedByBankingApp) {
         // If already paused by banking, check if we should resume
         if (_pausedByBankingApp) {
@@ -1654,7 +1654,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               ? List<dynamic>.from(routing['rules'] as List<dynamic>)
               : <dynamic>[];
 
-          // v4.0.71: Rule 0 - Bypass panel domain + Iranian domains -> direct (prevent loop + speed)
+          // v4.0.71: Bypass panel domain + Iranian domains -> direct (prevent loop + speed)
           rules.insert(0, {
             'type': 'field',
             'outboundTag': 'direct',
@@ -1863,7 +1863,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
       _connectedSeconds = 0;
       _timer?.cancel();
-      _timer = Timer.periodic(const Duration(milliseconds: 1500), // v4.0.71: 1s→1.5s + throttle (timer) {
+      _timer = Timer.periodic(const Duration(milliseconds: 1500), // v4.0.71: 1s->1.5s battery (timer) {
         if (mounted && _isConnected) {
           setState(() {
             _connectedSeconds++;
@@ -1951,7 +1951,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             sockopt['tcpNoDelay'] = true;
             sockopt['tcpKeepAliveIdle'] = 100;
             sockopt['tcpKeepAliveInterval'] = 30;
-            sockopt['tcpFastOpen'] = true; // v4.0.71: Fast open for faster handshake
+            sockopt['tcpFastOpen'] = true;
             sockopt['tcpKeepAlive'] = true;
             sockopt['mark'] = 0;
             sockopt['domainStrategy'] = 'AsIs';
