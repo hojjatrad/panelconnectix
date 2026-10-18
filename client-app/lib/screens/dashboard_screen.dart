@@ -95,11 +95,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   // v4.0.63 FOREVER FIX - Never show old version after install - PERMANENT LAW
   // LAW: currentAppVersion must be dynamic, not hardcoded const that stays old after install
   // Fix: Make it getter that returns actual installed version if available, else latest hardcoded
-  static const String _hardcodedVersion = '4.0.68'; // Fallback only, updated each release
-  static const int _hardcodedCode = 102;
+  static const String _hardcodedVersion = '4.0.69'; // Fallback only, updated each release
+  static const int _hardcodedCode = 103;
   static String get currentAppVersion => _actualInstalledVersion.isNotEmpty && _actualInstalledVersion != '4.0.51' ? _actualInstalledVersion : _hardcodedVersion;
-  static String _actualInstalledVersion = '4.0.68'; // Will be updated from PackageManager immediately on start
-  static int _actualInstalledCode = 102;
+  static String _actualInstalledVersion = '4.0.69'; // Will be updated from PackageManager immediately on start
+  static int _actualInstalledCode = 103;
 
   // v4.0.46 FOREVER CACHE FIX - PERMANENT LAW - NEVER REGRESS
   // LAW 1: Panel must NEVER serve old APK (auto-delete stale files)
@@ -147,9 +147,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           }
         }
       } catch (e) {
-        print('v4.0.68 loadActualInstalledVersion attempt ${attempt+1} error: $e');
+        print('v4.0.69 loadActualInstalledVersion attempt ${attempt+1} error: $e');
         if (attempt == 2) {
-          print('v4.0.68 loadActualInstalledVersion failed all attempts - using hardcoded $_hardcodedVersion');
+          print('v4.0.69 loadActualInstalledVersion failed all attempts - using hardcoded $_hardcodedVersion');
           // Keep hardcoded as fallback, but ensure it's latest not 4.0.51
           if (_actualInstalledVersion == '4.0.51' || _actualInstalledVersion.isEmpty) {
             _actualInstalledVersion = _hardcodedVersion;
@@ -883,10 +883,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
   }
 
-  // 1-Tap Smart Connect to Best Ping Server
+  // 1-Tap Smart Connect to Best Ping Server - v4.0.69 ENHANCED: Never select volume/traffic reading connections
   void _smartConnect() async {
     if (_isSmartConnecting || _isConnecting) return;
-    final clean = _servers.where((s) => !s.isInfoBanner && s.configUri.isNotEmpty).toList();
+    // v4.0.69 STRICT: Only real VPN servers, never info banners or volume reading connections
+    final clean = _servers.where((s) => s.isRealVpnServer && !s.isInfoBanner && s.configUri.isNotEmpty && s.configUri.length > 20).toList();
     if (clean.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('هیچ سروری برای سنجش پینگ یافت نشد.')),
@@ -955,9 +956,17 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
   }
 
-  // v4.0.66 NEW: Ping all servers on first page per user request
+  // v4.0.66 NEW: Ping all servers - v4.0.69 ENHANCED: Only real VPN servers, not volume info
   Future<void> _pingAllServers() async {
     if (_isRefreshing || _servers.isEmpty) return;
+    // Filter to only real VPN servers for ping
+    final realServers = _servers.where((s) => s.isRealVpnServer && !s.isInfoBanner && s.configUri.isNotEmpty).toList();
+    if (realServers.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('هیچ سرور واقعی برای پینگ یافت نشد (فقط اطلاعات حجم بود)'), backgroundColor: Color(0xFFEF4444)),
+      );
+      return;
+    }
     setState(() => _isRefreshing = true);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('در حال پینگ همه سرورها...'), backgroundColor: Color(0xFF10B981), duration: Duration(seconds: 2)),
@@ -965,8 +974,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     try {
       int bestPing = 99999;
       ServerModel? bestServer;
-      for (int i = 0; i < _servers.length && i < 10; i++) {
-        final s = _servers[i];
+      for (int i = 0; i < realServers.length && i < 10; i++) {
+        final s = realServers[i];
         if (s.configUri.isEmpty) continue;
         try {
           final parser = V2RayCompat.parseUniversal(s.configUri);
@@ -2968,14 +2977,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         textDirection: TextDirection.rtl,
         child: SafeArea(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6), // v4.0.69 COMPACT NO-SCROLL
             child: Column(
               children: [
               // Global / Reseller Announcement Banner
               if (widget.branding.announcement.isNotEmpty)
                 Container(
-                  margin: const EdgeInsets.only(bottom: 14),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  margin: const EdgeInsets.only(bottom: 6), // v4.0.69 COMPACT
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     color: const Color(0xFF1E293B),
                     borderRadius: BorderRadius.circular(14),
@@ -2997,8 +3006,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               // In-App Update Alert Banner
               if (_hasAppUpdate && _updateInfo != null)
                 Container(
-                  margin: const EdgeInsets.only(bottom: 14),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  margin: const EdgeInsets.only(bottom: 6), // v4.0.69 COMPACT
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       colors: [Color(0xFF4338CA), Color(0xFF6D28D9)],
@@ -3022,11 +3031,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                           children: [
                             Text(
                               'نگارش جدید ${_updateInfo!['latest_version'] ?? 'جدید'} آماده است',
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11), // v4.0.69 COMPACT
                             ),
                             const Text(
-                              'نصب خودکار مستقیم بدون نیاز به حذف نسخه قبل',
-                              style: TextStyle(color: Color(0xFFE0E7FF), fontSize: 11),
+                              'نصب مستقیم بدون حذف نسخه قبل',
+                              style: TextStyle(color: Color(0xFFE0E7FF), fontSize: 9), // v4.0.69 COMPACT
                             ),
                           ],
                         ),
@@ -3058,67 +3067,76 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   ),
                 ),
 
-              // Modern Circular Speedometer & Quota Gauge Card
+              // v4.0.69 COMPACT NO-SCROLL: Quota card فشرده - همه چیز در یک ردیف بدون اسکرول
               Container(
-                padding: const EdgeInsets.all(18),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     colors: [Color(0xFF161536), Color(0xFF0F172A)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: const Color(0xFF312E81)),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: const Color(0xFF312E81).withOpacity(0.6)),
                 ),
                 child: Column(
                   children: [
+                    // Compact user row + small gauge
                     Row(textDirection: TextDirection.rtl, 
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _client.username,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      _client.username,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF10B981).withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
+                                    ),
+                                    child: Text(
+                                      _client.daysRemaining,
+                                      style: const TextStyle(
+                                        color: Color(0xFF10B981),
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _client.planTitle,
-                              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
-                            ),
-                          ],
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF10B981).withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
-                          ),
-                          child: Text(
-                            _client.daysRemaining,
-                            style: const TextStyle(
-                              color: Color(0xFF10B981),
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
+                              const SizedBox(height: 2),
+                              Text(
+                                _client.planTitle,
+                                style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 10),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    // Circular Gauge
-                    Row(textDirection: TextDirection.rtl, 
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
+                        const SizedBox(width: 10),
+                        // Small circular gauge
                         CircularPercentIndicator(
-                          radius: 54.0,
-                          lineWidth: 9.0,
+                          radius: 32.0,
+                          lineWidth: 5.0, // v4.0.69 COMPACT
                           percent: usageClamped,
                           animation: true,
                           center: Column(
@@ -3126,39 +3144,41 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             children: [
                               Text(
                                 '${(_client.usagePercent).toInt()}%',
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.white),
                               ),
-                              const Text('مصرف شده', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
+                              const Text('مصرف', style: TextStyle(fontSize: 7, color: Color(0xFF94A3B8))),
                             ],
                           ),
                           circularStrokeCap: CircularStrokeCap.round,
                           backgroundColor: const Color(0xFF1E293B),
                           progressColor: usageClamped > 0.85 ? const Color(0xFFEF4444) : const Color(0xFF6366F1),
                         ),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _QuotaMetricRow(
-                              label: 'باقیمانده:',
-                              value: '${_client.trafficRemainingGb} GB',
-                              valueColor: const Color(0xFF38BDF8),
-                              icon: Icons.pie_chart_outline_rounded,
-                            ),
-                            const SizedBox(height: 8),
-                            _QuotaMetricRow(
-                              label: 'مصرف شده:',
-                              value: '${_client.trafficUsedGb} GB',
-                              valueColor: const Color(0xFFCBD5E1),
-                              icon: Icons.data_usage_rounded,
-                            ),
-                            const SizedBox(height: 8),
-                            _QuotaMetricRow(
-                              label: 'سقف کل:',
-                              value: '${_client.trafficTotalGb} GB',
-                              valueColor: const Color(0xFF94A3B8),
-                              icon: Icons.cloud_done_outlined,
-                            ),
-                          ],
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    // Compact metrics in one row
+                    Row(textDirection: TextDirection.rtl, 
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _CompactQuotaMetric(
+                          label: 'باقیمانده',
+                          value: '${_client.trafficRemainingGb} GB',
+                          color: const Color(0xFF38BDF8),
+                          icon: Icons.pie_chart_outline_rounded,
+                        ),
+                        Container(width: 1, height: 24, color: const Color(0xFF1E293B)),
+                        _CompactQuotaMetric(
+                          label: 'مصرف',
+                          value: '${_client.trafficUsedGb} GB',
+                          color: const Color(0xFFCBD5E1),
+                          icon: Icons.data_usage_rounded,
+                        ),
+                        Container(width: 1, height: 24, color: const Color(0xFF1E293B)),
+                        _CompactQuotaMetric(
+                          label: 'کل',
+                          value: '${_client.trafficTotalGb} GB',
+                          color: const Color(0xFF94A3B8),
+                          icon: Icons.cloud_done_outlined,
                         ),
                       ],
                     ),
@@ -3224,9 +3244,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 ),
               ],
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 6),
 
-              // v4.0.68 ULTIMATE BEAUTIFUL - Restored v4.0.42 wave effects + beautiful first page
+              // v4.0.69 COMPACT NO-SCROLL - Restored v4.0.42 wave effects + beautiful first page
               // Per user: UI قبلی زیبا با موج برگردانده شد، Lite پیش‌فرض false شد
               // First page clean: no proxy/gps/tv (only in settings), but beautiful connect button with wave
 
@@ -3241,7 +3261,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             : _isConnecting
                                 ? LiteConnectState.connecting
                                 : LiteConnectState.disconnected,
-                        size: 142,
+                        size: 120, // v4.0.69 COMPACT: 142→120 for no-scroll
                         countryFlag: _selectedServer?.flag ?? '🌐',
                         serverName: _selectedServer?.name ?? 'Connectix',
                         enableHaptic: true,
@@ -3253,7 +3273,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             : _isConnecting
                                 ? UltimateConnectState.connecting
                                 : UltimateConnectState.disconnected,
-                        size: 142,
+                        size: 120, // v4.0.69 COMPACT: 142→120 for no-scroll
                         countryFlag: _selectedServer?.flag ?? '🌐',
                         serverName: _selectedServer?.name ?? 'Connectix',
                         enableHaptic: true,
@@ -3307,25 +3327,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             bytes: ul,
                             color: const Color(0xFF6366F1),
                           ),
-                          if (_currentServerPing != null) ...[
-                            const SizedBox(width: 10),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: (_currentServerPing == 0 ? const Color(0xFF6366F1) : const Color(0xFF10B981)).withOpacity(0.12),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: (_currentServerPing == 0 ? const Color(0xFF6366F1) : const Color(0xFF10B981)).withOpacity(0.3)),
-                              ),
-                              child: Row(
-                                textDirection: TextDirection.rtl,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.network_ping_rounded, size: 12, color: _currentServerPing == 0 ? const Color(0xFF818CF8) : const Color(0xFF34D399)),
-                                  const SizedBox(width: 4),
-                                  Text(_currentServerPing == 0 ? 'آماده' : '${_currentServerPing}ms', style: TextStyle(color: _currentServerPing == 0 ? const Color(0xFF818CF8) : const Color(0xFF34D399), fontSize: 11, fontWeight: FontWeight.bold)),
-                                ],
-                              ),
-                            ),
+                          // v4.0.69 COMPACT: پینگ از کنار سرعت حذف شد per user request - فقط دانلود/آپلود
                           ],
                         ],
                       ),
@@ -3334,9 +3336,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 },
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
 
-              // v4.0.68 BEAUTIFUL Smart Connect + Ping All - گرادیانت زیبا با موج و سایه (مثل v4.0.42)
+              // v4.0.69 COMPACT Smart Connect + Ping All - گرادیانت زیبا با موج و سایه (مثل v4.0.42)
               Row(
                 textDirection: TextDirection.rtl,
                 children: [
@@ -3345,9 +3347,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       color: Colors.transparent,
                       child: InkWell(
                         onTap: _isSmartConnecting ? null : _smartConnect,
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(14),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
                               colors: [Color(0xFF4338CA), Color(0xFF6366F1), Color(0xFF818CF8)],
@@ -3383,9 +3385,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       color: Colors.transparent,
                       child: InkWell(
                         onTap: _isRefreshing ? null : _pingAllServers,
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(14),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
                               colors: [Color(0xFF065F46), Color(0xFF10B981), Color(0xFF34D399)],
@@ -3418,9 +3420,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 ],
               ),
 
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
 
-              if (Platform.isWindows) ...[
+              if (Platform.isWindows) ...[ // v4.0.69 COMPACT
                 const SizedBox(height: 18),
                 // Windows tunnel flavor selector (Phase 1: system proxy,
                 // Phase 2: full TUN VPN).
@@ -3470,9 +3472,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 ),
               ],
 
-              const SizedBox(height: 22),
+              const SizedBox(height: 8),
 
-              // Server Selector Card - v4.0.47 MULTI-ACCOUNT UNIFIED
+              // Server Selector Card - v4.0.69 COMPACT NO-SCROLL - v4.0.47 MULTI-ACCOUNT UNIFIED
               Material(
                 color: Colors.transparent,
                 child: InkWell(
@@ -3542,7 +3544,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   },
                   borderRadius: BorderRadius.circular(20),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10), // v4.0.69 COMPACT
                     decoration: BoxDecoration(
                       color: const Color(0xFF0F172A),
                       borderRadius: BorderRadius.circular(20),

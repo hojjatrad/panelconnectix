@@ -73,27 +73,55 @@ class ServerModel {
   }
 
   /// True if this node is an upstream quota/status pseudo-config rather than a functional proxy server
+  /// v4.0.69 ENHANCED: Stronger filter for volume/traffic reading servers per user request
   bool get isInfoBanner {
     final lower = name.toLowerCase();
     final lowerUri = configUri.toLowerCase();
-    if (name.contains('📊') || name.contains('⏳') || name.contains('📉') || name.contains('⌛')) {
+    // Emoji indicators for info
+    if (name.contains('📊') || name.contains('⏳') || name.contains('📉') || name.contains('⌛') || name.contains('💾') || name.contains('📈')) {
       return true;
     }
+    // Persian keywords for volume/traffic/expiry
     if (lower.contains('روز اعتبار') ||
         lower.contains('اعتبار باقی') ||
         lower.contains('حجم باقی') ||
+        lower.contains('حجم مصرف') ||
+        lower.contains('مصرف حجم') ||
+        lower.contains('مصرف شده') ||
+        lower.contains('حجم کل') ||
+        lower.contains('ترافیک') ||
         lower.contains('انقضا') ||
-        lower.contains('traffic remaining')) {
+        lower.contains('باقی مانده') ||
+        lower.contains('traffic remaining') ||
+        lower.contains('traffic used') ||
+        lower.contains('expire') ||
+        lower.contains('remaining') ||
+        lower.contains('used traffic') ||
+        lower.contains('total traffic')) {
       return true;
     }
+    // If name contains GB/MB + any of day/expire/traffic/volume keywords
     if (RegExp(r'\d+(\.\d+)?\s*(gb|mb)', caseSensitive: false).hasMatch(name) &&
-        (lower.contains('روز') || lower.contains('day') || lower.contains('expire') || lower.contains('اعتبار'))) {
+        (lower.contains('روز') || lower.contains('day') || lower.contains('expire') || lower.contains('اعتبار') || lower.contains('حجم') || lower.contains('مصرف') || lower.contains('ترافیک'))) {
       return true;
     }
-    if (lowerUri.contains('%f0%9f%93%8a') || lowerUri.contains('%e2%8f%b3')) {
+    // URI encoded emojis
+    if (lowerUri.contains('%f0%9f%93%8a') || lowerUri.contains('%e2%8f%b3') || lowerUri.contains('%f0%9f%92%be')) {
+      return true;
+    }
+    // v4.0.69: If configUri empty or very short (<20 chars) and name looks like info, treat as info
+    if (configUri.isEmpty || configUri.length < 20) {
       return true;
     }
     return false;
+  }
+  
+  /// v4.0.69: Real VPN server check - used for smart connect to avoid volume reading connections
+  bool get isRealVpnServer {
+    if (isInfoBanner) return false;
+    if (configUri.isEmpty) return false;
+    final validProtocols = ['vless', 'vmess', 'trojan', 'ss', 'socks', 'http', 'wireguard', 'hysteria', 'hysteria2', 'tuic', 'juicity'];
+    return validProtocols.any((p) => protocol.toLowerCase().contains(p) || configUri.toLowerCase().startsWith(p));
   }
 
   factory ServerModel.fromUri(String rawUri, int index) {
