@@ -120,8 +120,13 @@ class ServerModel {
     if (configUri.isEmpty || configUri.length < 30) {
       return true;
     }
-    if (name.length < 20 && hasNumber && hasGBMB) {
-      return true;
+    // v4.0.71 FIX: False positive for real server named "Germany 10GB" - reduced from 20 to 15 and added extra checks
+    if (name.length < 15 && hasNumber && hasGBMB) {
+      // Only if also contains volume keywords or very short
+      final lower = name.toLowerCase();
+      if (lower.contains('حجم') || lower.contains('مصرف') || lower.contains('ترافیک') || lower.contains('باقی') || lower.contains('روز') || lower.contains('ساعت') || lower.contains('traffic') || lower.contains('expire') || lower.contains('remaining') || name.length < 10) {
+        return true;
+      }
     }
     return false;
   }

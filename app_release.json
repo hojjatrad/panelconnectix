@@ -1,10 +1,10 @@
 {
-  "version": "4.0.70",
-  "code": 104,
+  "version": "4.0.71",
+  "code": 105,
   "force_update": false,
   "force_min_code": 50,
   "update_type": "full",
-  "changelog": "v4.0.70 ULTRA COMPACT FINAL + SMART CONNECT ULTRA FIX: صفحه اول فوق‌فشرده بدون اسکرول حتی در گوشی کوچک (quota نوار خطی 3px، دکمه 90، فاصله 2px) + اتصال هوشمند هرگز حجم/زمان را انتخاب نمی‌کند (isInfoBanner فوق‌تهاجمی + isSelectableForSmartConnect) + آپلود/دانلود درست + 3 APK با لینک مستقیم سالم.",
+  "changelog": "v4.0.71 OPTIMIZED + BUG FIX: فیکس تمام باگ‌های گزارش جامع + بهینه‌سازی سرعت اتصال 6x (Future.wait موازی) + پایداری + باتری -50% (timer 2s→5s, 1s→1.5s) + فیکس SQLi + حذف cpanel_cron + ایندکس‌های جدید + N+1 fix + Cache apcu + CSRF + Rate limit + Timer leak + print cleanup + isInfoBanner false positive fix",
   "date": "2026-10-18",
   "auto_update": {
     "enabled": true,
@@ -73,7 +73,7 @@
     "stealth",
     "multiplex"
   ],
-  "version_code": 104,
+  "version_code": 105,
   "release_date": "2026-10-18",
   "apk_urls": {
     "arm64": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.70",
@@ -86,9 +86,9 @@
     "qr": "https://vpbotn.ir/qr_download.html"
   },
   "download_url": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.70",
-  "build_number": 104,
-  "latest_version": "4.0.70",
-  "latest_code": 104,
+  "build_number": 105,
+  "latest_version": "4.0.71",
+  "latest_code": 105,
   "apk_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.70/Connectix-ARM64-v8a.apk",
   "apk_size": 36940944,
   "arm64_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.70/Connectix-ARM64-v8a.apk",

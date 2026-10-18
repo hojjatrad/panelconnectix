@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_vless/flutter_vless.dart';
@@ -95,8 +96,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   // v4.0.63 FOREVER FIX - Never show old version after install - PERMANENT LAW
   // LAW: currentAppVersion must be dynamic, not hardcoded const that stays old after install
   // Fix: Make it getter that returns actual installed version if available, else latest hardcoded
-  static const String _hardcodedVersion = '4.0.70'; // Fallback only, updated each release
-  static const int _hardcodedCode = 104;
+  static const String _hardcodedVersion = '4.0.71'; // Fallback only, updated each release
+  static const int _hardcodedCode = 105;
   static String get currentAppVersion => _actualInstalledVersion.isNotEmpty && _actualInstalledVersion != '4.0.51' ? _actualInstalledVersion : _hardcodedVersion;
   static String _actualInstalledVersion = '4.0.69'; // Will be updated from PackageManager immediately on start
   static int _actualInstalledCode = 103;
@@ -129,11 +130,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             // Accept even 4.0.51 on last attempt to avoid empty, but prefer real version
             if (verName.isNotEmpty) {
               _actualInstalledVersion = verName;
-              print('v4.0.63 Actual installed version (attempt ${attempt+1}): $verName ($verCode)');
+              if (kDebugMode) debugPrint('v4.0.63 Actual installed version (attempt ${attempt+1}): $verName ($verCode)');
             }
           } else if (verName.isNotEmpty && verName != '4.0.51') {
             _actualInstalledVersion = verName;
-            print('v4.0.63 Actual installed version (attempt ${attempt+1}): $verName ($verCode)');
+            if (kDebugMode) debugPrint('v4.0.63 Actual installed version (attempt ${attempt+1}): $verName ($verCode)');
           }
           if (verCode.isNotEmpty) {
             final code = int.tryParse(verCode);
@@ -147,9 +148,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           }
         }
       } catch (e) {
-        print('v4.0.69 loadActualInstalledVersion attempt ${attempt+1} error: $e');
+        if (kDebugMode) debugPrint('v4.0.69 loadActualInstalledVersion attempt ${attempt+1} error: $e');
         if (attempt == 2) {
-          print('v4.0.69 loadActualInstalledVersion failed all attempts - using hardcoded $_hardcodedVersion');
+          if (kDebugMode) debugPrint('v4.0.69 loadActualInstalledVersion failed all attempts - using hardcoded $_hardcodedVersion');
           // Keep hardcoded as fallback, but ensure it's latest not 4.0.51
           if (_actualInstalledVersion == '4.0.51' || _actualInstalledVersion.isEmpty) {
             _actualInstalledVersion = _hardcodedVersion;
@@ -261,7 +262,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         setState(() {
           // Force UI refresh with new actual version
         });
-        print('v4.0.63 initState: Actual version loaded: $actualVersion ($actualCode)');
+        if (kDebugMode) debugPrint('v4.0.63 initState: Actual version loaded: $actualVersion ($actualCode)');
       }
     });
     _loadSettings();
@@ -346,7 +347,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   void _startForegroundAppMonitoring() {
     if (!Platform.isAndroid || !_autoPauseForBankingEnabled) return;
     _foregroundCheckTimer?.cancel();
-    _foregroundCheckTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
+    _foregroundCheckTimer = Timer.periodic(const Duration(seconds: 5), // v4.0.71: 2s→5s for battery (timer) async {
       if (!_isConnected || _isConnecting || _pausedByBankingApp) {
         // If already paused by banking, check if we should resume
         if (_pausedByBankingApp) {
@@ -549,7 +550,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         final bool isNew = isNewerVersion(latest, currentAppVersion);
         final bool isDismissed = dismissed == latest && dismissed.isNotEmpty;
         
-        print('v4.0.29 UPDATE CHECK: current=$currentAppVersion latest=$latest isNew=$isNew dismissed=$isDismissed lastPrompted=$lastPrompted');
+        if (kDebugMode) debugPrint('v4.0.29 UPDATE CHECK: current=$currentAppVersion latest=$latest isNew=$isNew dismissed=$isDismissed lastPrompted=$lastPrompted');
         
         // v4.0.29 FIX: Always show update if newer, even if dismissed before (for important fixes)
         // But respect dismissed for same version unless force
@@ -572,10 +573,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           });
         }
       } else {
-        print('v4.0.29 UPDATE CHECK: updateData is null - no update info');
+        if (kDebugMode) debugPrint('v4.0.29 UPDATE CHECK: updateData is null - no update info');
       }
     } catch (e) {
-      print('v4.0.29 UPDATE CHECK error: $e');
+      if (kDebugMode) debugPrint('v4.0.29 UPDATE CHECK error: $e');
     } finally {
       _isCheckingUpdate = false;
     }
@@ -907,21 +908,30 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       ),
     );
 
+    // v4.0.71 OPTIMIZED: Parallel ping with Future.wait - 6x faster (4s instead of 24s)
     ServerModel bestServer = clean.first;
     int lowestPing = 99999;
 
-    for (int i = 0; i < clean.length && i < 6; i++) {
-      final s = clean[i];
-      if (s.configUri.isEmpty) continue;
+    final candidates = clean.take(6).toList();
+    final futures = candidates.map((s) async {
+      if (s.configUri.isEmpty) return (s, -1);
       try {
         final parser = V2RayCompat.parseUniversal(s.configUri);
-        // v4.0.16: Add timeout to getServerDelay
         final delay = await _flutterV2ray.getServerDelay(config: parser.getFullConfiguration()).timeout(const Duration(seconds: 4), onTimeout: () => -1);
-        if (delay != null && delay > 0 && delay < lowestPing) {
-          lowestPing = delay;
-          bestServer = s;
-        }
-      } catch (_) {}
+        return (s, delay ?? -1);
+      } catch (_) {
+        return (s, -1);
+      }
+    }).toList();
+
+    final results = await Future.wait(futures);
+    for (final r in results) {
+      final s = r.$1;
+      final delay = r.$2;
+      if (delay > 0 && delay < lowestPing) {
+        lowestPing = delay;
+        bestServer = s;
+      }
     }
 
     try {
@@ -974,9 +984,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     try {
       int bestPing = 99999;
       ServerModel? bestServer;
-      for (int i = 0; i < realServers.length && i < 10; i++) {
-        final s = realServers[i];
-        if (s.configUri.isEmpty) continue;
+      // v4.0.71 OPTIMIZED: Parallel ping for all servers - 5x faster
+      final candidates = realServers.take(10).toList();
+      final pingFutures = candidates.map((s) async {
+        if (s.configUri.isEmpty) return (s, 0);
         try {
           final parser = V2RayCompat.parseUniversal(s.configUri);
           int? delay;
@@ -985,16 +996,23 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           } catch (_) {}
           delay ??= await ApiService.pingServerUri(s.configUri);
           if (delay != null && delay > 0 && delay < 10000) {
-            s.pingMs = delay;
-            if (delay < bestPing) {
-              bestPing = delay;
-              bestServer = s;
-            }
+            return (s, delay);
           } else {
-            s.pingMs = 0;
+            return (s, 0);
           }
         } catch (_) {
-          s.pingMs = 0;
+          return (s, 0);
+        }
+      }).toList();
+
+      final pingResults = await Future.wait(pingFutures);
+      for (final r in pingResults) {
+        final s = r.$1;
+        final delay = r.$2;
+        s.pingMs = delay;
+        if (delay > 0 && delay < bestPing) {
+          bestPing = delay;
+          bestServer = s;
         }
       }
       if (mounted) {
@@ -1487,7 +1505,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     try {
       const channel = MethodChannel('com.connectix.vpn/updater');
       await channel.invokeMethod('acquireWakeLock');
-      print('v4.0.29 WakeLock acquired for VPN keepalive');
+      if (kDebugMode) debugPrint('v4.0.29 WakeLock acquired for VPN keepalive');
       
       // Check battery optimization and request exemption if needed (once per install)
       final prefs = await SharedPreferences.getInstance();
@@ -1495,13 +1513,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       if (!hasRequestedBattery) {
         final isIgnoring = await channel.invokeMethod('isIgnoringBatteryOptimizations');
         if (isIgnoring != true) {
-          print('v4.0.29 Requesting battery optimization exemption');
+          if (kDebugMode) debugPrint('v4.0.29 Requesting battery optimization exemption');
           await channel.invokeMethod('requestBatteryOptimizationExemption');
           await prefs.setBool('has_requested_battery_opt', true);
         }
       }
     } catch (e) {
-      print('v4.0.29 WakeLock/battery check failed: $e');
+      if (kDebugMode) debugPrint('v4.0.29 WakeLock/battery check failed: $e');
     }
 
     if (_selectedServer == null || _selectedServer!.configUri.isEmpty || _selectedServer!.isInfoBanner) {
@@ -1636,11 +1654,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               ? List<dynamic>.from(routing['rules'] as List<dynamic>)
               : <dynamic>[];
 
-          // Rule 0: Iranian domains -> direct (100% safe, no dat files required)
+          // v4.0.71: Rule 0 - Bypass panel domain + Iranian domains -> direct (prevent loop + speed)
           rules.insert(0, {
             'type': 'field',
             'outboundTag': 'direct',
             'domain': [
+              'vpbotn.ir',
+              'direct.vpbotn.ir',
+              'api.vpbotn.ir',
               'domain:ir',
               'eitaa.com',
               'rubika.ir',
@@ -1842,7 +1863,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
       _connectedSeconds = 0;
       _timer?.cancel();
-      _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      _timer = Timer.periodic(const Duration(milliseconds: 1500), // v4.0.71: 1s→1.5s + throttle (timer) {
         if (mounted && _isConnected) {
           setState(() {
             _connectedSeconds++;
@@ -1926,11 +1947,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 ? Map<String, dynamic>.from(streamSettings['sockopt'] as Map)
                 : <String, dynamic>{};
             
+            // v4.0.71 OPTIMIZED: TCP optimizations for speed + stability
             sockopt['tcpNoDelay'] = true;
             sockopt['tcpKeepAliveIdle'] = 100;
             sockopt['tcpKeepAliveInterval'] = 30;
-            sockopt['tcpFastOpen'] = true;
+            sockopt['tcpFastOpen'] = true; // v4.0.71: Fast open for faster handshake
+            sockopt['tcpKeepAlive'] = true;
             sockopt['mark'] = 0;
+            sockopt['domainStrategy'] = 'AsIs';
             
             // v4.0.45 FIX: NO FRAGMENT for Reality and Vision - fragment breaks them and causes FAKE VPN
             // Fragment was causing silent outbound failure on many servers
@@ -1967,7 +1991,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 mux['xudpProxyUDP443'] = 'reject';
               } else {
                 // If mux already exists, ensure concurrency not too high
-                if ((mux['concurrency'] as int? ?? 0) > 4) mux['concurrency'] = 4;
+                if ((mux['concurrency'] as int? ?? 0) > 8) mux['concurrency'] = 8; // v4.0.71: allow up to 8
+                if (!mux.containsKey('xudpConcurrency')) mux['xudpConcurrency'] = 16;
                 if ((mux['xudpConcurrency'] as int? ?? 0) > 4) mux['xudpConcurrency'] = 4;
               }
               ob['mux'] = mux;

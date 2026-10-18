@@ -14,11 +14,11 @@ if (php_sapi_name() !== 'cli') {
     if (!Auth::isAdmin()) {
         $providedKey = $_GET['key'] ?? $_GET['secret'] ?? '';
         $expectedSecret = Setting::get('github_webhook_secret', defined('APP_SECRET') ? APP_SECRET : '');
+        // v4.0.71 FIX: Removed hardcoded cpanel_cron key (security) - only APP_SECRET + webhook secret + admin
         $valid = false;
         if (!empty($providedKey)) {
             if (!empty($expectedSecret) && hash_equals($expectedSecret, $providedKey)) $valid = true;
             if (defined('APP_SECRET') && !empty(APP_SECRET) && hash_equals(APP_SECRET, $providedKey)) $valid = true;
-            if ($providedKey === 'cpanel_cron') $valid = true;
         }
         if (!$valid) {
             http_response_code(403);

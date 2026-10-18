@@ -132,6 +132,11 @@ CREATE TABLE IF NOT EXISTS `clients` (
     INDEX `idx_reseller` (`reseller_id`),
     INDEX `idx_server` (`server_id`),
     INDEX `idx_sub_token` (`sub_token`),
+    INDEX `idx_client_username` (`username`),
+    INDEX `idx_client_expire` (`expire_at`),
+    INDEX `idx_client_status` (`status`),
+    INDEX `idx_client_traffic` (`traffic_used_bytes`),
+    INDEX `idx_client_created` (`created_at`),
     CONSTRAINT `fk_client_reseller` FOREIGN KEY (`reseller_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
     CONSTRAINT `fk_client_server` FOREIGN KEY (`server_id`) REFERENCES `server_nodes` (`id`) ON DELETE CASCADE,
     CONSTRAINT `fk_client_plan` FOREIGN KEY (`plan_id`) REFERENCES `plans` (`id`) ON DELETE SET NULL

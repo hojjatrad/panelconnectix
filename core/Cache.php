@@ -1,7 +1,7 @@
 <?php
 /**
- * Connectix Cache - File-based cache for shared hosting (no Redis needed)
- * Phase 2 Performance Optimization
+ * Connectix Cache - v4.0.71 OPTIMIZED - File + APCu + flock
+ * Phase 2 Performance Optimization + Security + Race fix
  * 
  * Usage:
  *   $plans = Cache::remember('plans_active', 600, fn() => $pdo->query("SELECT * FROM plans WHERE is_active=1")->fetchAll());
@@ -10,6 +10,14 @@
 class Cache {
     private static string $cacheDir = '';
     private static bool $enabled = true;
+    private static bool $apcuAvailable = false;
+    private static bool $apcuChecked = false;
+
+    private static function checkApcu(): void {
+        if (self::$apcuChecked) return;
+        self::$apcuChecked = true;
+        self::$apcuAvailable = function_exists('apcu_fetch') && ini_get('apc.enabled');
+    }
 
     private static function getCacheDir(): string {
         if (self::$cacheDir === '') {
@@ -23,12 +31,40 @@ class Cache {
 
     public static function get(string $key) {
         if (!self::$enabled) return null;
+        self::checkApcu();
+        
+        // v4.0.71: Try APCu first (fastest)
+        if (self::$apcuAvailable) {
+            try {
+                $data = apcu_fetch('cx_' . $key, $success);
+                if ($success && is_array($data) && isset($data['expire']) && $data['expire'] >= time()) {
+                    return $data['value'];
+                }
+                if ($success) {
+                    apcu_delete('cx_' . $key);
+                }
+            } catch (Throwable $e) {}
+        }
+        
         try {
             $file = self::getCacheDir() . '/' . md5($key) . '.cache';
             if (!file_exists($file)) return null;
             
-            $data = @file_get_contents($file);
-            if ($data === false) return null;
+            // v4.0.71: Use flock for race condition fix
+            $fh = @fopen($file, 'r');
+            if (!$fh) return null;
+            if (!flock($fh, LOCK_SH)) {
+                fclose($fh);
+                return null;
+            }
+            $data = '';
+            while (!feof($fh)) {
+                $data .= fread($fh, 8192);
+            }
+            flock($fh, LOCK_UN);
+            fclose($fh);
+            
+            if ($data === false || $data === '') return null;
             
             $decoded = @json_decode($data, true);
             if (!is_array($decoded) || !isset($decoded['expire']) || !isset($decoded['value'])) {
@@ -38,7 +74,15 @@ class Cache {
             
             if ($decoded['expire'] < time()) {
                 @unlink($file);
+                if (self::$apcuAvailable) @apcu_delete('cx_' . $key);
                 return null;
+            }
+            
+            // Populate APCu for next time
+            if (self::$apcuAvailable) {
+                try {
+                    apcu_store('cx_' . $key, $decoded, $decoded['expire'] - time());
+                } catch (Throwable $e) {}
             }
             
             return $decoded['value'];
@@ -49,14 +93,24 @@ class Cache {
 
     public static function set(string $key, $value, int $ttl = 300): bool {
         if (!self::$enabled) return false;
+        self::checkApcu();
+        
+        $data = [
+            'key' => $key,
+            'value' => $value,
+            'expire' => time() + $ttl,
+            'created' => time()
+        ];
+        
+        // v4.0.71: Store in APCu
+        if (self::$apcuAvailable) {
+            try {
+                apcu_store('cx_' . $key, $data, $ttl);
+            } catch (Throwable $e) {}
+        }
+        
         try {
             $file = self::getCacheDir() . '/' . md5($key) . '.cache';
-            $data = [
-                'key' => $key,
-                'value' => $value,
-                'expire' => time() + $ttl,
-                'created' => time()
-            ];
             return @file_put_contents($file, json_encode($data, JSON_UNESCAPED_UNICODE), LOCK_EX) !== false;
         } catch (Throwable $e) {
             return false;
@@ -75,6 +129,10 @@ class Cache {
     }
 
     public static function forget(string $key): bool {
+        self::checkApcu();
+        if (self::$apcuAvailable) {
+            try { apcu_delete('cx_' . $key); } catch (Throwable $e) {}
+        }
         try {
             $file = self::getCacheDir() . '/' . md5($key) . '.cache';
             if (file_exists($file)) {
@@ -87,6 +145,10 @@ class Cache {
     }
 
     public static function clear(): int {
+        self::checkApcu();
+        if (self::$apcuAvailable) {
+            try { apcu_clear_cache(); } catch (Throwable $e) {}
+        }
         $count = 0;
         try {
             $dir = self::getCacheDir();
@@ -101,6 +163,7 @@ class Cache {
     }
 
     public static function clearByPrefix(string $prefix): int {
+        self::checkApcu();
         // Clear all cache keys containing prefix (by checking stored key name)
         $count = 0;
         try {
@@ -112,7 +175,12 @@ class Cache {
                     if ($content) {
                         $data = @json_decode($content, true);
                         if (isset($data['key']) && str_contains($data['key'], $prefix)) {
-                            if (@unlink($file)) $count++;
+                            if (@unlink($file)) {
+                                $count++;
+                                if (self::$apcuAvailable) {
+                                    try { apcu_delete('cx_' . $data['key']); } catch (Throwable $e) {}
+                                }
+                            }
                         }
                     }
                 }
@@ -121,7 +189,7 @@ class Cache {
         return $count;
     }
 
-    // Specialized helpers for common data
+    // Specialized helpers for common data - v4.0.71 with Cache::remember
     public static function getPlans(PDO $pdo): array {
         return self::remember('plans_active_v2', 600, function() use ($pdo) {
             try {
@@ -182,5 +250,27 @@ class Cache {
                 return 0;
             }
         });
+    }
+    
+    // v4.0.71 NEW: Rate limiting helper
+    public static function checkRateLimit(string $key, int $maxAttempts = 5, int $windowSeconds = 900): bool {
+        $cacheKey = "rate_limit_$key";
+        $attempts = self::get($cacheKey);
+        if ($attempts === null) {
+            self::set($cacheKey, 1, $windowSeconds);
+            return true;
+        }
+        if ($attempts >= $maxAttempts) {
+            return false;
+        }
+        self::set($cacheKey, $attempts + 1, $windowSeconds);
+        return true;
+    }
+    
+    public static function getRateLimitRemaining(string $key, int $maxAttempts = 5): int {
+        $cacheKey = "rate_limit_$key";
+        $attempts = self::get($cacheKey);
+        if ($attempts === null) return $maxAttempts;
+        return max(0, $maxAttempts - $attempts);
     }
 }

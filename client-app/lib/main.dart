@@ -582,11 +582,11 @@ class _SplashScreenState extends State<SplashScreen> {
             final prefs2 = await SharedPreferences.getInstance();
             var useMvvm2 = prefs2.getBool('use_mvvm_dashboard') ?? false;
             final lastVer2 = prefs2.getString('last_seen_app_version') ?? '4.0.0';
-            if (lastVer2 != '4.0.70' && prefs2.getBool('use_mvvm_dashboard') == true) {
+            if (lastVer2 != '4.0.71' && prefs2.getBool('use_mvvm_dashboard') == true) {
               await prefs2.setBool('use_mvvm_dashboard', false);
               useMvvm2 = false;
             }
-            await prefs2.setString('last_seen_app_version', '4.0.70');
+            await prefs2.setString('last_seen_app_version', '4.0.71');
             if (useMvvm2) {
               Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => DashboardScreenMVVM(client: client, branding: branding, initialServers: servers)));
             } else {
@@ -604,12 +604,12 @@ class _SplashScreenState extends State<SplashScreen> {
         final prefs = await SharedPreferences.getInstance();
         var useMvvm = prefs.getBool('use_mvvm_dashboard') ?? false;
         final lastSeenVersion = prefs.getString('last_seen_app_version') ?? '4.0.0';
-        if (lastSeenVersion != '4.0.70' && prefs.getBool('use_mvvm_dashboard') == true) {
-          print('v4.0.68 Migration: Resetting use_mvvm_dashboard from true to false for user coming from $lastSeenVersion - v4.0.70 COMPACT');
+        if (lastSeenVersion != '4.0.71' && prefs.getBool('use_mvvm_dashboard') == true) {
+          print('v4.0.68 Migration: Resetting use_mvvm_dashboard from true to false for user coming from $lastSeenVersion - v4.0.71 COMPACT');
           await prefs.setBool('use_mvvm_dashboard', false);
           useMvvm = false;
         }
-        await prefs.setString('last_seen_app_version', '4.0.70');
+        await prefs.setString('last_seen_app_version', '4.0.71');
         if (!mounted) return;
         if (useMvvm) {
           Navigator.pushReplacement(

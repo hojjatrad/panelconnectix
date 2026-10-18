@@ -1,7 +1,7 @@
 <?php
 /**
  * A4: Daily Report to Telegram - Automatic at 9 AM
- * Updated: 2026-10-02 - Domain independent
+ * Updated: 2026-10-18 - v4.0.71 FIXED SQLi + optimized
  */
 
 require_once __DIR__ . '/Helpers.php';
@@ -11,23 +11,30 @@ class DailyReport {
         try {
             $pdo = Database::getConnection();
             
-            // Yesterday stats
+            // Yesterday stats - v4.0.71 FIX: Use prepared statements
             $yesterday = date('Y-m-d', strtotime('-1 day'));
-            $today = date('Y-m-d');
             
-            $yesterdaySales = $pdo->query("SELECT COUNT(*) FROM transactions WHERE DATE(created_at) = '$yesterday' AND status='completed'")->fetchColumn();
-            $yesterdayRevenue = $pdo->query("SELECT COALESCE(SUM(amount),0) FROM transactions WHERE DATE(created_at) = '$yesterday' AND status='completed'")->fetchColumn();
+            $stmt = $pdo->prepare("SELECT COUNT(*) FROM transactions WHERE DATE(created_at) = ? AND status='completed'");
+            $stmt->execute([$yesterday]);
+            $yesterdaySales = $stmt->fetchColumn();
+            
+            $stmt = $pdo->prepare("SELECT COALESCE(SUM(amount),0) FROM transactions WHERE DATE(created_at) = ? AND status='completed'");
+            $stmt->execute([$yesterday]);
+            $yesterdayRevenue = $stmt->fetchColumn();
             
             $todaySales = $pdo->query("SELECT COUNT(*) FROM transactions WHERE DATE(created_at) = CURDATE() AND status='completed'")->fetchColumn();
             $monthSales = $pdo->query("SELECT COUNT(*) FROM transactions WHERE MONTH(created_at) = MONTH(NOW()) AND YEAR(created_at) = YEAR(NOW()) AND status='completed'")->fetchColumn();
             $monthRevenue = $pdo->query("SELECT COALESCE(SUM(amount),0) FROM transactions WHERE MONTH(created_at) = MONTH(NOW()) AND YEAR(created_at) = YEAR(NOW()) AND status='completed'")->fetchColumn();
             
             $activeClients = $pdo->query("SELECT COUNT(*) FROM clients WHERE status='active'")->fetchColumn();
-            $expiring3Days = $pdo->query("SELECT COUNT(*) FROM clients WHERE status='active' AND expire_date BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 3 DAY)")->fetchColumn();
-            $expiringToday = $pdo->query("SELECT COUNT(*) FROM clients WHERE status='active' AND DATE(expire_date) = CURDATE()")->fetchColumn();
+            $expiring3Days = $pdo->query("SELECT COUNT(*) FROM clients WHERE status='active' AND expire_at BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 3 DAY)")->fetchColumn();
+            $expiringToday = $pdo->query("SELECT COUNT(*) FROM clients WHERE status='active' AND DATE(expire_at) = CURDATE()")->fetchColumn();
             
             $totalUsers = $pdo->query("SELECT COUNT(*) FROM users WHERE status='active'")->fetchColumn();
-            $newUsersYesterday = $pdo->query("SELECT COUNT(*) FROM users WHERE DATE(created_at) = '$yesterday'")->fetchColumn();
+            
+            $stmt = $pdo->prepare("SELECT COUNT(*) FROM users WHERE DATE(created_at) = ?");
+            $stmt->execute([$yesterday]);
+            $newUsersYesterday = $stmt->fetchColumn();
             
             $servers = $pdo->query("SELECT COUNT(*) FROM server_nodes WHERE is_active=1")->fetchColumn();
             

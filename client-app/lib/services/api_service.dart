@@ -1208,7 +1208,7 @@ class ApiService {
     }
   }
 
-  // v4.0.68 IMPROVED PING - More robust with fallbacks
+  // v4.0.71 IMPROVED PING - TCP + HTTP fallback + bypass for panel domain
   static Future<int?> pingServerUri(String uriStr) async {
     try {
       String host = '';
@@ -1609,7 +1609,7 @@ class ApiService {
           final latestVer = (map['latest_version'] ?? '').toString();
           // Skip if panel returns 0.0.0 or 3.x (disabled)
           if (latestVer == '0.0.0' || latestVer.startsWith('3.0.') || latestVer.startsWith('3.1.')) {
-            print('Panel returned disabled version $latestVer, trying GitHub');
+            log('Panel returned disabled version $latestVer, trying GitHub');
             continue;
           }
           final serverUrl = (map['download_url'] ?? '').toString();
@@ -1660,11 +1660,11 @@ class ApiService {
           map['selected_arch'] = 'arm64';
           panelResult = map;
           panelVersion = latestVer;
-          print('Panel update check: $latestVer from $currentBase');
+          log('Panel update check: $latestVer from $currentBase');
           break; // Got panel result, now check GitHub for newer
         }
       } catch (e) {
-        print('Panel check failed: $e');
+        log('Panel check failed: $e');
       }
     }
 
@@ -1724,20 +1724,20 @@ class ApiService {
             'size': bestApk['size'] ?? 0,
           };
           githubVersion = ver;
-          print('GitHub update check: $ver');
+          log('GitHub update check: $ver');
         }
       }
     } catch (e) {
-      print('GitHub check failed: $e');
+      log('GitHub check failed: $e');
     }
 
     // v4.0.68 FIX: Return newest version between panel and GitHub
     if (panelResult != null && githubResult != null) {
       if (isNewerVersionStatic(githubVersion, panelVersion)) {
-        print('Returning GitHub newer: $githubVersion > $panelVersion');
+        log('Returning GitHub newer: $githubVersion > $panelVersion');
         return githubResult;
       } else {
-        print('Returning panel newer: $panelVersion >= $githubVersion');
+        log('Returning panel newer: $panelVersion >= $githubVersion');
         return panelResult;
       }
     } else if (githubResult != null) {
