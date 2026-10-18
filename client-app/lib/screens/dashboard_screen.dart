@@ -347,7 +347,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   void _startForegroundAppMonitoring() {
     if (!Platform.isAndroid || !_autoPauseForBankingEnabled) return;
     _foregroundCheckTimer?.cancel();
-    _foregroundCheckTimer = Timer.periodic(const Duration(seconds: 5), // v4.0.71: 2s->5s battery (timer) async {
+    _foregroundCheckTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
       if (!_isConnected || _isConnecting || _pausedByBankingApp) {
         // If already paused by banking, check if we should resume
         if (_pausedByBankingApp) {
@@ -1863,7 +1863,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
       _connectedSeconds = 0;
       _timer?.cancel();
-      _timer = Timer.periodic(const Duration(milliseconds: 1500), // v4.0.71: 1s->1.5s battery (timer) {
+      _timer = Timer.periodic(const Duration(milliseconds: 1500), (timer) { // v4.0.71: 1s->1.5s
         if (mounted && _isConnected) {
           setState(() {
             _connectedSeconds++;
