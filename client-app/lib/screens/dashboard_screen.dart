@@ -887,7 +887,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   void _smartConnect() async {
     if (_isSmartConnecting || _isConnecting) return;
     // v4.0.69 STRICT: Only real VPN servers, never info banners or volume reading connections
-    final clean = _servers.where((s) => s.isRealVpnServer && !s.isInfoBanner && s.configUri.isNotEmpty && s.configUri.length > 20).toList();
+    final clean = _servers.where((s) => s.isSelectableForSmartConnect).toList();
     if (clean.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('هیچ سروری برای سنجش پینگ یافت نشد.')),
@@ -960,7 +960,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Future<void> _pingAllServers() async {
     if (_isRefreshing || _servers.isEmpty) return;
     // Filter to only real VPN servers for ping
-    final realServers = _servers.where((s) => s.isRealVpnServer && !s.isInfoBanner && s.configUri.isNotEmpty).toList();
+    final realServers = _servers.where((s) => s.isSelectableForSmartConnect).toList();
     if (realServers.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('هیچ سرور واقعی برای پینگ یافت نشد (فقط اطلاعات حجم بود)'), backgroundColor: Color(0xFFEF4444)),
