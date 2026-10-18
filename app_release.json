@@ -22,7 +22,7 @@
   "apks": {
     "arm64-v8a": {
       "url": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.69",
-      "size": 37654428,
+      "size": 36940724,
       "size_human": "36 MB",
       "abi": "arm64-v8a",
       "recommended": true,
@@ -31,7 +31,7 @@
     },
     "armeabi-v7a": {
       "url": "https://direct.vpbotn.ir/download_apk.php?file=arm32&v=4.0.69",
-      "size": 38203016,
+      "size": 37618217,
       "size_human": "36 MB",
       "abi": "armeabi-v7a",
       "recommended": false,
@@ -40,7 +40,7 @@
     },
     "universal": {
       "url": "https://direct.vpbotn.ir/download_apk.php?file=universal&v=4.0.69",
-      "size": 110592865,
+      "size": 107990186,
       "size_human": "105 MB",
       "abi": "universal",
       "recommended": false,
