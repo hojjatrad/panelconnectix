@@ -4,7 +4,7 @@ require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Setting.php';
 
 class Updater {
-    public const CURRENT_VERSION = '4.0.73'; // v4.0.73 TUIC v5 + Hysteria2 + Reality Multi-Protocol - 🛡️ Reality 443 TCP stable 9.5/10, ⚡ Hysteria2 4443 UDP fast lossy streaming Brutal CC salamander, 🚀 TUIC v5 8443 UDP lowest latency 110-140ms BBR 0-RTT native h3 - MultiProtocolGenerator + ApiController metadata + server_model enhanced + UI legend + colored badges
+    public const CURRENT_VERSION = '4.0.74'; // v4.0.74 FIX in-app update + browser old version v5 + Hysteria2 + Reality Multi-Protocol - 🛡️ Reality 443 TCP stable 9.5/10, ⚡ Hysteria2 4443 UDP fast lossy streaming Brutal CC salamander, 🚀 TUIC v5 8443 UDP lowest latency 110-140ms BBR 0-RTT native h3 - MultiProtocolGenerator + ApiController metadata + server_model enhanced + UI legend + colored badges
 
     public static function getCurrentVersion(): string {
         $dbVer = Setting::get('current_version', '');

@@ -96,11 +96,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   // v4.0.63 FOREVER FIX - Never show old version after install - PERMANENT LAW
   // LAW: currentAppVersion must be dynamic, not hardcoded const that stays old after install
   // Fix: Make it getter that returns actual installed version if available, else latest hardcoded
-  static const String _hardcodedVersion = '4.0.73'; // Fallback only, updated each release
-  static const int _hardcodedCode = 106;
+  static const String _hardcodedVersion = '4.0.74'; // Fallback only, updated each release - v4.0.74 FIX in-app update + old version after browser
+  static const int _hardcodedCode = 108;
   static String get currentAppVersion => _actualInstalledVersion.isNotEmpty && _actualInstalledVersion != '4.0.51' ? _actualInstalledVersion : _hardcodedVersion;
-  static String _actualInstalledVersion = '4.0.69'; // Will be updated from PackageManager immediately on start
-  static int _actualInstalledCode = 103;
+  static String _actualInstalledVersion = '4.0.74'; // Will be updated from PackageManager immediately on start - v4.0.74 FIX
+  static int _actualInstalledCode = 108;
 
   // v4.0.46 FOREVER CACHE FIX - PERMANENT LAW - NEVER REGRESS
   // LAW 1: Panel must NEVER serve old APK (auto-delete stale files)
@@ -1160,6 +1160,60 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   return;
                 }
               }
+              // v4.0.74 NEW: Check install permission before download
+              try {
+                const channel = MethodChannel('com.connectix.vpn/updater');
+                final canInstall = await channel.invokeMethod('canInstallPackages').timeout(const Duration(seconds: 2), onTimeout: () => true);
+                if (canInstall != true) {
+                  // Show permission dialog
+                  final shouldOpen = await showDialog<bool>(
+                    context: ctx,
+                    builder: (permCtx) => AlertDialog(
+                      backgroundColor: const Color(0xFF0F172A),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      title: const Row(
+                        textDirection: TextDirection.rtl,
+                        children: [
+                          Icon(Icons.security_rounded, color: Color(0xFFF59E0B)),
+                          SizedBox(width: 8),
+                          Text('مجوز نصب لازم است', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      content: const Text(
+                        'برای نصب خودکار درون‌برنامه‌ای، باید اجازه نصب برنامه‌های ناشناخته را فعال کنید:\n\n'
+                        '1️⃣ در صفحه بعدی، Connectix را پیدا کنید\n'
+                        '2️⃣ گزینه "مجاز" یا "Allow" را فعال کنید\n'
+                        '3️⃣ برگردید و دوباره "نصب خودکار" را بزنید\n\n'
+                        'این مجوز فقط برای بروزرسانی استفاده می‌شود و امن است.',
+                        style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, height: 1.6),
+                        textDirection: TextDirection.rtl,
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(permCtx, false),
+                          child: Text('انصراف', style: TextStyle(color: Color(0xFF64748B))),
+                        ),
+                      ],
+                    ),
+                  );
+                  // Open settings
+                  try {
+                    await channel.invokeMethod('openInstallPermissionSettings');
+                  } catch (_) {}
+                  // Don't start download yet, let user enable permission first
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(
+                      content: Text('لطفا مجوز نصب را فعال کنید، سپس دوباره بروزرسانی را بزنید'),
+                      backgroundColor: Color(0xFFF59E0B),
+                      duration: Duration(seconds: 4),
+                    ),
+                  );
+                  return;
+                }
+              } catch (e) {
+                // If check fails, continue anyway
+              }
+              
               Navigator.pop(ctx);
               _startInAppDownloadAndInstall(downloadUrl, latestVer, fallbackUrl: fallbackUrl);
             },
@@ -1244,14 +1298,26 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     });
                   },
                   onError: (error) {
-                    // Auto-retry once via the GitHub release fallback
+                    // v4.0.74 FIX: Handle INSTALL_PERMISSION_REQUIRED specially
+                    if (error.contains('INSTALL_PERMISSION_REQUIRED')) {
+                      setModalState(() {
+                        isFailed = true;
+                        statusText = '⚠️ مجوز نصب لازم است\n\n'
+                            'برای نصب خودکار، باید اجازه نصب برنامه‌های ناشناخته را فعال کنید:\n'
+                            'تنظیمات → برنامه‌ها → Connectix → نصب برنامه‌های ناشناخته → مجاز\n\n'
+                            'بعد از فعال‌سازی، دوباره تلاش کنید.\n\n'
+                            'یا از مرورگر دانلود کنید (لینک گیت‌هاب مستقیم - همیشه نسخه جدید):';
+                      });
+                      return;
+                    }
+                    // Auto-retry once via the GitHub release fallback (GitHub first now - source of truth)
                     if (!usedFallback && fallbackUrl.isNotEmpty && fallbackUrl != url) {
                       usedFallback = true;
                       setModalState(() {
                         isFailed = false;
                         downloadProgress = 0.0;
                         transferredText = '0 MB / ...';
-                        statusText = 'لینک اصلی در دسترس نبود؛ در حال دریافت از لینک جایگزین...';
+                        statusText = 'لینک اصلی در دسترس نبود؛ در حال دریافت از لینک جایگزین گیت‌هاب (منبع اصلی - همیشه نسخه جدید)...';
                       });
                       launchDownload(fallbackUrl);
                     } else {
@@ -1370,12 +1436,15 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                           ],
                         ),
                         const SizedBox(height: 12),
-                        // v4.0.73: 3-Tier Browser Fallback - GitHub Releases Page (100% guaranteed)
+                        // v4.0.74 FIX: 3-Tier Browser Fallback - GitHub Direct FIRST (always correct version)
+                        // Previous bug: directPanelUrl first, but panel download_apk.php had allowlist bug serving old APK (4.0.72) for v4.0.73 request
+                        // This caused "browser update still old version" - user downloads via browser but gets old version
+                        // Fix: GitHub direct first (source of truth, always correct), panel second (for Iran)
                         ElevatedButton.icon(
                           onPressed: () async {
                             Navigator.pop(bottomSheetContext);
-                            // Try direct panel first (works in Iran), then GitHub releases page
-                            final urlsToTry = [directPanelUrl, downloadUrl, githubReleasesPage, githubLatestPage];
+                            // v4.0.74: GitHub direct FIRST (always correct version), then panel (for Iran where GitHub blocked)
+                            final urlsToTry = [downloadUrl, githubReleasesPage, githubLatestPage, directPanelUrl];
                             for (final u in urlsToTry) {
                               try {
                                 final uri = Uri.parse(u);

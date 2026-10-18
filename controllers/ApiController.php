@@ -954,7 +954,7 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
         if ($latest === '' || $enabled === '0') {
             self::jsonSuccess([
                 'current_version' => '3.0.0',
-                'latest_version' => $latest !== '' ? $latest : '4.0.71',
+                'latest_version' => $latest !== '' ? $latest : '4.0.74',
                 'has_update' => false,
                 'title' => 'Connectix',
                 'changelog' => '',

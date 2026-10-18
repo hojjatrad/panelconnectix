@@ -441,9 +441,27 @@ class MainActivity: FlutterActivity() {
                         result.error("FILE_TOO_SMALL", "File too small (${file.length()} bytes), likely HTML error page: $filePath", null)
                         return@setMethodCallHandler
                     }
+                    
+                    // v4.0.74 NEW: Check if app can request package installs (Android 8+)
+                    // This is critical - if false, all install intents will fail silently
+                    // We check here and log, but Flutter side should also check and request permission
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        try {
+                            val canInstall = context.packageManager.canRequestPackageInstalls()
+                            android.util.Log.i("ConnectixInstaller", "v4.0.74 canRequestPackageInstalls: $canInstall")
+                            if (!canInstall) {
+                                android.util.Log.w("ConnectixInstaller", "v4.0.74 canRequestPackageInstalls=false - install will likely fail, need to request permission via Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES")
+                                // Don't error here, let Flutter handle permission request, but log
+                                // We will still try Session API and intents, they may trigger system dialog on some OEMs
+                            }
+                        } catch (e: Exception) {
+                            android.util.Log.w("ConnectixInstaller", "v4.0.74 canRequestPackageInstalls check failed: ${e.message}")
+                        }
+                    }
+                    
                     try {
                         file.setReadable(true, false)
-                        android.util.Log.i("ConnectixInstaller", "v4.0.24 ULTRA start: path=$filePath len=${file.length()} brand=${Build.BRAND} sdk=${Build.VERSION.SDK_INT} model=${Build.MODEL}")
+                        android.util.Log.i("ConnectixInstaller", "v4.0.74 ULTRA start: path=$filePath len=${file.length()} brand=${Build.BRAND} sdk=${Build.VERSION.SDK_INT} model=${Build.MODEL}")
 
                         // LAW 1: Ensure working file in app external files dir (most compatible with FileProvider)
                         var workingFile = file
@@ -457,11 +475,11 @@ class MainActivity: FlutterActivity() {
                                     file.copyTo(newFile, overwrite = true)
                                     newFile.setReadable(true, false)
                                     workingFile = newFile
-                                    android.util.Log.i("ConnectixInstaller", "v4.0.24 Copied to external: ${newFile.absolutePath} len=${newFile.length()}")
+                                    android.util.Log.i("ConnectixInstaller", "v4.0.74 Copied to external: ${newFile.absolutePath} len=${newFile.length()}")
                                 }
                             }
                         } catch (e: Exception) {
-                            android.util.Log.w("ConnectixInstaller", "v4.0.24 Copy to external failed: ${e.message}, using original")
+                            android.util.Log.w("ConnectixInstaller", "v4.0.74 Copy to external failed: ${e.message}, using original")
                             workingFile = file
                         }
 
@@ -480,10 +498,10 @@ class MainActivity: FlutterActivity() {
                                 dlFile.setReadable(true, false)
                                 downloadsFile = dlFile
                                 downloadCopySuccess = true
-                                android.util.Log.i("ConnectixInstaller", "v4.0.24 Copied to public Downloads: ${dlFile.absolutePath} len=${dlFile.length()}")
+                                android.util.Log.i("ConnectixInstaller", "v4.0.74 Copied to public Downloads: ${dlFile.absolutePath} len=${dlFile.length()}")
                             }
                         } catch (e: Exception) {
-                            android.util.Log.w("ConnectixInstaller", "v4.0.24 Public Downloads copy failed: ${e.message}")
+                            android.util.Log.w("ConnectixInstaller", "v4.0.74 Public Downloads copy failed: ${e.message}")
                         }
                         // Method 2: /storage/emulated/0/Download direct
                         if (!downloadCopySuccess) {
@@ -496,10 +514,10 @@ class MainActivity: FlutterActivity() {
                                     dlFile.setReadable(true, false)
                                     downloadsFile = dlFile
                                     downloadCopySuccess = true
-                                    android.util.Log.i("ConnectixInstaller", "v4.0.24 Copied to alt Download: ${dlFile.absolutePath}")
+                                    android.util.Log.i("ConnectixInstaller", "v4.0.74 Copied to alt Download: ${dlFile.absolutePath}")
                                 }
                             } catch (e: Exception) {
-                                android.util.Log.w("ConnectixInstaller", "v4.0.24 Alt Download copy failed: ${e.message}")
+                                android.util.Log.w("ConnectixInstaller", "v4.0.74 Alt Download copy failed: ${e.message}")
                             }
                         }
                         // Method 3: App-specific Download dir (always works, but less likely to trigger Play Protect dialog)
@@ -513,10 +531,10 @@ class MainActivity: FlutterActivity() {
                                     workingFile.copyTo(dlFile, overwrite = true)
                                     dlFile.setReadable(true, false)
                                     downloadsFile = dlFile
-                                    android.util.Log.i("ConnectixInstaller", "v4.0.24 Copied to app-specific Download: ${dlFile.absolutePath}")
+                                    android.util.Log.i("ConnectixInstaller", "v4.0.74 Copied to app-specific Download: ${dlFile.absolutePath}")
                                 }
                             } catch (e: Exception) {
-                                android.util.Log.w("ConnectixInstaller", "v4.0.24 App-specific Download copy failed: ${e.message}")
+                                android.util.Log.w("ConnectixInstaller", "v4.0.74 App-specific Download copy failed: ${e.message}")
                             }
                         }
 
@@ -525,7 +543,7 @@ class MainActivity: FlutterActivity() {
                         var sessionId = -1
                         try {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                                android.util.Log.i("ConnectixInstaller", "v4.0.24 Trying Session API primary...")
+                                android.util.Log.i("ConnectixInstaller", "v4.0.74 Trying Session API primary...")
                                 val packageInstaller = context.packageManager.packageInstaller
                                 val params = android.content.pm.PackageInstaller.SessionParams(
                                     android.content.pm.PackageInstaller.SessionParams.MODE_FULL_INSTALL
@@ -572,9 +590,9 @@ class MainActivity: FlutterActivity() {
                                     val pi = PendingIntent.getActivity(context, sessionId, callbackIntent, flags)
                                     session.commit(pi.intentSender)
                                     sessionSuccess = true
-                                    android.util.Log.i("ConnectixInstaller", "v4.0.24 Session API commit SUCCESS id=$sessionId len=${workingFile.length()} - system installer UI should appear")
+                                    android.util.Log.i("ConnectixInstaller", "v4.0.74 Session API commit SUCCESS id=$sessionId len=${workingFile.length()} - system installer UI should appear")
                                 } catch (e: Exception) {
-                                    android.util.Log.e("ConnectixInstaller", "v4.0.24 Session write/commit failed: ${e.message}", e)
+                                    android.util.Log.e("ConnectixInstaller", "v4.0.74 Session write/commit failed: ${e.message}", e)
                                     try { session.close() } catch (_: Exception) {}
                                     try { packageInstaller.abandonSession(sessionId) } catch (_: Exception) {}
                                     sessionSuccess = false
@@ -583,7 +601,7 @@ class MainActivity: FlutterActivity() {
                                 }
                             }
                         } catch (e: Exception) {
-                            android.util.Log.w("ConnectixInstaller", "v4.0.24 Session API exception: ${e.message}", e)
+                            android.util.Log.w("ConnectixInstaller", "v4.0.74 Session API exception: ${e.message}", e)
                             sessionSuccess = false
                         }
 
@@ -611,10 +629,10 @@ class MainActivity: FlutterActivity() {
                                     Uri.fromFile(f)
                                 }
                                 finalFile = f
-                                android.util.Log.i("ConnectixInstaller", "v4.0.24 FileProvider SUCCESS for ${f.absolutePath} len=${f.length()}")
+                                android.util.Log.i("ConnectixInstaller", "v4.0.74 FileProvider SUCCESS for ${f.absolutePath} len=${f.length()}")
                                 break
                             } catch (e: Exception) {
-                                android.util.Log.w("ConnectixInstaller", "v4.0.24 FileProvider failed for ${f.absolutePath}: ${e.message}")
+                                android.util.Log.w("ConnectixInstaller", "v4.0.74 FileProvider failed for ${f.absolutePath}: ${e.message}")
                                 continue
                             }
                         }
@@ -643,7 +661,7 @@ class MainActivity: FlutterActivity() {
                         for (pkg in installerPackages) {
                             try {
                                 context.grantUriPermission(pkg, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION or Intent.FLAG_GRANT_PREFIX_URI_PERMISSION)
-                                android.util.Log.d("ConnectixInstaller", "v4.0.24 Granted to $pkg")
+                                android.util.Log.d("ConnectixInstaller", "v4.0.74 Granted to $pkg")
                             } catch (_: Exception) {
                                 try {
                                     context.grantUriPermission(pkg, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -668,9 +686,9 @@ class MainActivity: FlutterActivity() {
                                     context.grantUriPermission(pkg, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
                                 } catch (_: Exception) {}
                             }
-                            android.util.Log.i("ConnectixInstaller", "v4.0.24 Granted to ${resList.size} resolved activities")
+                            android.util.Log.i("ConnectixInstaller", "v4.0.74 Granted to ${resList.size} resolved activities")
                         } catch (e: Exception) {
-                            android.util.Log.w("ConnectixInstaller", "v4.0.24 Grant to resolved failed: ${e.message}")
+                            android.util.Log.w("ConnectixInstaller", "v4.0.74 Grant to resolved failed: ${e.message}")
                         }
 
                         // LAW 6: Build intents - Downloads URI FIRST to trigger Play Protect dialog, then external
@@ -698,9 +716,9 @@ class MainActivity: FlutterActivity() {
                                     putExtra("android.intent.extra.ALLOW_REPLACE", true)
                                 }
                                 intents.add(dlIntent)
-                                android.util.Log.i("ConnectixInstaller", "v4.0.24 Added Downloads intent")
+                                android.util.Log.i("ConnectixInstaller", "v4.0.74 Added Downloads intent")
                             } catch (e: Exception) {
-                                android.util.Log.w("ConnectixInstaller", "v4.0.24 Downloads intent failed: ${e.message}")
+                                android.util.Log.w("ConnectixInstaller", "v4.0.74 Downloads intent failed: ${e.message}")
                             }
                         }
 
@@ -739,15 +757,15 @@ class MainActivity: FlutterActivity() {
                         var intentSuccess = false
                         for (intent in intents) {
                             try {
-                                android.util.Log.i("ConnectixInstaller", "v4.0.24 Trying intent ${intent.action} data=${intent.data} file=${finalFile.absolutePath}")
+                                android.util.Log.i("ConnectixInstaller", "v4.0.74 Trying intent ${intent.action} data=${intent.data} file=${finalFile.absolutePath}")
                                 context.startActivity(intent)
                                 intentSuccess = true
-                                android.util.Log.i("ConnectixInstaller", "v4.0.24 Intent ${intent.action} SUCCESS - installer should be visible now, sessionSuccess=$sessionSuccess")
+                                android.util.Log.i("ConnectixInstaller", "v4.0.74 Intent ${intent.action} SUCCESS - installer should be visible now, sessionSuccess=$sessionSuccess")
                                 result.success(true)
                                 return@setMethodCallHandler
                             } catch (e: Exception) {
                                 lastError = e
-                                android.util.Log.e("ConnectixInstaller", "v4.0.24 Intent ${intent.action} FAILED: ${e.message}", e)
+                                android.util.Log.e("ConnectixInstaller", "v4.0.74 Intent ${intent.action} FAILED: ${e.message}", e)
                                 continue
                             }
                         }
@@ -761,17 +779,17 @@ class MainActivity: FlutterActivity() {
                                 addFlags(Intent.FLAG_GRANT_PREFIX_URI_PERMISSION)
                             }
                             context.startActivity(chooser)
-                            android.util.Log.i("ConnectixInstaller", "v4.0.24 Chooser SUCCESS")
+                            android.util.Log.i("ConnectixInstaller", "v4.0.74 Chooser SUCCESS")
                             result.success(true)
                             return@setMethodCallHandler
                         } catch (e: Exception) {
                             lastError = e
-                            android.util.Log.e("ConnectixInstaller", "v4.0.24 Chooser FAILED: ${e.message}", e)
+                            android.util.Log.e("ConnectixInstaller", "v4.0.74 Chooser FAILED: ${e.message}", e)
                         }
 
                         // LAW 9: If Session API succeeded, still report success even if Intents failed
                         if (sessionSuccess) {
-                            android.util.Log.i("ConnectixInstaller", "v4.0.24 Session API succeeded, Intents failed - still SUCCESS, installer UI should be visible via Session")
+                            android.util.Log.i("ConnectixInstaller", "v4.0.74 Session API succeeded, Intents failed - still SUCCESS, installer UI should be visible via Session")
                             result.success(true)
                             return@setMethodCallHandler
                         }
@@ -791,18 +809,18 @@ class MainActivity: FlutterActivity() {
                                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                 }
                                 context.startActivity(fmIntent)
-                                android.util.Log.i("ConnectixInstaller", "v4.0.24 Opened file manager at Downloads")
+                                android.util.Log.i("ConnectixInstaller", "v4.0.74 Opened file manager at Downloads")
                                 result.success(true)
                                 return@setMethodCallHandler
                             } catch (e: Exception) {
-                                android.util.Log.w("ConnectixInstaller", "v4.0.24 File manager open failed: ${e.message}")
+                                android.util.Log.w("ConnectixInstaller", "v4.0.74 File manager open failed: ${e.message}")
                             }
                         }
 
                         throw lastError ?: Exception("No installer activity found - tried ${intents.size} intents + chooser + file manager, sessionSuccess=$sessionSuccess")
 
                     } catch (e: Exception) {
-                        val msg = "INSTALL_ERROR v4.0.24: ${e.message} path=$filePath len=${file.length()} brand=${Build.BRAND} sdk=${Build.VERSION.SDK_INT} model=${Build.MODEL}"
+                        val msg = "INSTALL_ERROR v4.0.74: ${e.message} path=$filePath len=${file.length()} brand=${Build.BRAND} sdk=${Build.VERSION.SDK_INT} model=${Build.MODEL}"
                         android.util.Log.e("ConnectixInstaller", msg, e)
                         result.error("INSTALL_ERROR", msg, null)
                     }

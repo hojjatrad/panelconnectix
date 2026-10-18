@@ -1,10 +1,10 @@
 {
-  "version": "4.0.73",
-  "code": 107,
+  "version": "4.0.74",
+  "code": 108,
   "force_update": false,
   "force_min_code": 50,
   "update_type": "full",
-  "changelog": "v4.0.73+107 TUIC v5 + Hysteria2 + Reality Multi-Protocol: 🛡️ Reality 443 TCP پایدار 9.5/10 مقاوم، ⚡ Hysteria2 4443 UDP سریع برای اینترنت ضعیف استریم 4K + دانلود Brutal CC salamander obfs، 🚀 TUIC v5 8443 UDP کمترین تاخیر 110-140ms BBR 0-RTT native h3 برای گیمینگ + تماس صوتی + ترید. پنل: MultiProtocolGenerator core جدید auto-gen missing TUIC/Hy2، ApiController/V2 metadata icon/color/desc/best_for، SublinkControllerV2 fallback multi-protocol. اپ: server_model 5 فیلد جدید + helpers، server_list_modal legend + colored badges، dashboard icon + best_for. flutter_vless 1.1.6 sing-box TUIC v5 ready. 70% ready قبل، 0% breaking.",
+  "changelog": "v4.0.74+108 FIX in-app update + browser old version: 🔧 Root cause: download_apk.php allowlist ['4.0.51','4.0.64',...,'4.0.72'] blocked v4.0.73, served old APK (4.0.72) -> version mismatch STRICT -> all attempts fail -> browser fallback. Also api_service.dart addUrl blocked GitHub for v4.0.73 (hardcoded list), only panel URLs tried. Fix: Panel allowlist now includes 4.0.73,4.0.74 + dynamic, GitHub allowlist expanded, URL prioritization GitHub first (source of truth) then panel (Iran fallback), SMART version check (allow newer than current, not just exact), canInstallPackages check + permission request before install, browser fallback GitHub first. ✅ In-app update now works, browser always serves new version.",
   "date": "2026-10-18",
   "auto_update": {
     "enabled": true,
@@ -15,37 +15,37 @@
     "wifi_only": false
   },
   "apk": {
-    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.73/Connectix-ARM64-v8a.apk",
-    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.73/Connectix-Universal.apk",
-    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.73/Connectix-ARM32-v7a.apk"
+    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.74/Connectix-ARM64-v8a.apk",
+    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.74/Connectix-Universal.apk",
+    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.74/Connectix-ARM32-v7a.apk"
   },
   "apks": {
     "arm64-v8a": {
-      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.73/Connectix-ARM64-v8a.apk",
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.74/Connectix-ARM64-v8a.apk",
       "size": 36942894,
       "size_human": "36 MB",
       "abi": "arm64-v8a",
       "recommended": true,
       "arch": "arm64",
-      "fallback": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.73/Connectix-ARM64-v8a.apk"
+      "fallback": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.74/Connectix-ARM64-v8a.apk"
     },
     "armeabi-v7a": {
-      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.73/Connectix-ARM32-v7a.apk",
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.74/Connectix-ARM32-v7a.apk",
       "size": 37618589,
       "size_human": "36 MB",
       "abi": "armeabi-v7a",
       "recommended": false,
       "arch": "arm32",
-      "fallback": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.73/Connectix-ARM32-v7a.apk"
+      "fallback": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.74/Connectix-ARM32-v7a.apk"
     },
     "universal": {
-      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.73/Connectix-Universal.apk",
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.74/Connectix-Universal.apk",
       "size": 107996041,
       "size_human": "105 MB",
       "abi": "universal",
       "recommended": false,
       "arch": "universal",
-      "fallback": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.73/Connectix-Universal.apk"
+      "fallback": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.74/Connectix-Universal.apk"
     }
   },
   "windows": {
@@ -75,29 +75,29 @@
     "stealth",
     "multiplex"
   ],
-  "version_code": 107,
+  "version_code": 108,
   "release_date": "2026-10-18",
   "apk_urls": {
-    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.73/Connectix-ARM64-v8a.apk",
-    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.73/Connectix-Universal.apk",
-    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.73/Connectix-ARM32-v7a.apk",
-    "github_arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.73/Connectix-ARM64-v8a.apk",
-    "github_universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.73/Connectix-Universal.apk",
-    "direct": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.73",
-    "vpbotn": "https://vpbotn.ir/download_apk.php?file=arm64&v=4.0.73",
+    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.74/Connectix-ARM64-v8a.apk",
+    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.74/Connectix-Universal.apk",
+    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.74/Connectix-ARM32-v7a.apk",
+    "github_arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.74/Connectix-ARM64-v8a.apk",
+    "github_universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.74/Connectix-Universal.apk",
+    "direct": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.74",
+    "vpbotn": "https://vpbotn.ir/download_apk.php?file=arm64&v=4.0.74",
     "qr": "https://vpbotn.ir/qr_download.html"
   },
-  "download_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.73/Connectix-ARM64-v8a.apk",
-  "build_number": 107,
-  "latest_version": "4.0.73",
-  "latest_code": 107,
-  "apk_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.73/Connectix-ARM64-v8a.apk",
+  "download_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.74/Connectix-ARM64-v8a.apk",
+  "build_number": 108,
+  "latest_version": "4.0.74",
+  "latest_code": 108,
+  "apk_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.74/Connectix-ARM64-v8a.apk",
   "apk_size": 36942894,
-  "arm64_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.73/Connectix-ARM64-v8a.apk",
+  "arm64_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.74/Connectix-ARM64-v8a.apk",
   "arm64_size": 36942894,
-  "arm32_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.73/Connectix-ARM32-v7a.apk",
+  "arm32_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.74/Connectix-ARM32-v7a.apk",
   "arm32_size": 37618589,
-  "universal_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.73/Connectix-Universal.apk",
+  "universal_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.74/Connectix-Universal.apk",
   "universal_size": 107996041,
-  "release_notes": "v4.0.73+107 TUIC v5 + Hysteria2 + Reality Multi-Protocol: 3 پروتکل در هر سرور - کاربر انتخاب می‌کند: 🛡️ Reality پایدار 9.5/10 برای روزمره، ⚡ Hysteria2 سریع برای استریم 4K در اینترنت ضعیف، 🚀 TUIC v5 کمترین تاخیر 110-140ms برای گیمینگ + تماس صوتی + ترید. QUIC + BBR + 0-RTT + Migration."
+  "release_notes": "v4.0.74+108 FIX in-app update + browser old version: 🔧 Root cause: download_apk.php allowlist ['4.0.51','4.0.64',...,'4.0.72'] blocked v4.0.73, served old APK (4.0.72) -> version mismatch STRICT -> all attempts fail -> browser fallback. Also api_service.dart addUrl blocked GitHub for v4.0.73 (hardcoded list), only panel URLs tried. Fix: Panel allowlist now includes 4.0.73,4.0.74 + dynamic, GitHub allowlist expanded, URL prioritization GitHub first (source of truth) then panel (Iran fallback), SMART version check (allow newer than current, not just exact), canInstallPackages check + permission request before install, browser fallback GitHub first. ✅ In-app update now works, browser always serves new version."
 }
