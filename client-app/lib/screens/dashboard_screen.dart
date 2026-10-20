@@ -3171,7 +3171,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
-                    'نسخه ${actualVersion} (کد $actualCode)',
+                    'نسخه ${actualVersion} (کد $actualCode) | هاردکد $_hardcodedVersion ($_hardcodedCode)',
                     style: const TextStyle(color: Color(0xFF64748B), fontSize: 9),
                   ),
                 ],
