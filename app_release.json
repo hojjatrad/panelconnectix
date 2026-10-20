@@ -22,7 +22,7 @@
   "apks": {
     "arm64-v8a": {
       "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.75/Connectix-ARM64-v8a.apk",
-      "size": 36945932,
+      "size": 36951738,
       "size_human": "36 MB",
       "abi": "arm64-v8a",
       "recommended": true,
@@ -31,7 +31,7 @@
     },
     "armeabi-v7a": {
       "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.75/Connectix-ARM32-v7a.apk",
-      "size": 37624641,
+      "size": 37631466,
       "size_human": "36 MB",
       "abi": "armeabi-v7a",
       "recommended": false,
@@ -40,7 +40,7 @@
     },
     "universal": {
       "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.75/Connectix-Universal.apk",
-      "size": 108009740,
+      "size": 108022637,
       "size_human": "105 MB",
       "abi": "universal",
       "recommended": false,
@@ -92,17 +92,17 @@
   "latest_version": "4.0.75",
   "latest_code": 109,
   "apk_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.75/Connectix-ARM64-v8a.apk",
-  "apk_size": 36945932,
+  "apk_size": 36951738,
   "arm64_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.75/Connectix-ARM64-v8a.apk",
-  "arm64_size": 36945932,
+  "arm64_size": 36951738,
   "arm32_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.75/Connectix-ARM32-v7a.apk",
-  "arm32_size": 37624641,
+  "arm32_size": 37631466,
   "universal_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.75/Connectix-Universal.apk",
-  "universal_size": 108009740,
+  "universal_size": 108022637,
   "release_notes": "v4.0.75+109 FULL-SCREEN + SMART CONNECT FIX: 🖥️ تمام صفحه در هر گوشی - Edge-to-Edge + SafeArea bottom:false + SizedBox width:double.infinity + responsive button size (12% screen height) + MainActivity onCreate edge-to-edge + styles.xml transparent status/nav + shortEdges cutout. 🚫 اتصال هوشمند هرگز حجم/زمان را انتخاب نکند - isInfoBanner ULTRA STRICT + isRealVpnServer گسترده + isSelectableForSmartConnect فوق‌تهاجمی + _smartConnect و _pingAllServers فیلتر 3 لایه + لاگ دیباگ + rejectReason. ✅ اپ در هر گوشی تمام صفحه، اتصال هوشمند فقط سرور واقعی.",
   "sizes": {
-    "arm64": 36945932,
-    "universal": 108009740,
-    "arm32": 37624641
+    "arm64": 36951738,
+    "universal": 108022637,
+    "arm32": 37631466
   }
 }
