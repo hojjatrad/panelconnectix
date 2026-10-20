@@ -138,65 +138,43 @@ class ServerModel {
     return '$pingMs ms';
   }
 
-  /// True if this node is an upstream quota/status pseudo-config rather than a functional proxy server
-  /// v4.0.70 ULTRA ENHANCED: فوق‌تهاجمی - هرگز حجم/زمان را به عنوان کانکشن انتخاب نکند
   bool get isInfoBanner {
     final lower = name.toLowerCase();
     final lowerUri = configUri.toLowerCase();
-    if (name.contains('📊') || name.contains('⏳') || name.contains('📉') || name.contains('⌛') || name.contains('💾') || name.contains('📈') || name.contains('⏰') || name.contains('⌚')) {
+    if (name.contains('📊') || name.contains('⏳') || name.contains('📉') || name.contains('⌛') || name.contains('💾') || name.contains('📈') || name.contains('⏰') || name.contains('⌚') || name.contains('💿') || name.contains('📅')) {
       return true;
     }
-    final volumeKeywords = ['روز', 'ساعت', 'دقیقه', 'ثانیه', 'انقضا', 'اعتبار', 'حجم', 'مصرف', 'ترافیک', 'باقی', 'مانده', 'کل', 'زمان', 'مدت', 'شده'];
+    final volumeKeywords = ['روز', 'ساعت', 'دقیقه', 'ثانیه', 'انقضا', 'اعتبار', 'حجم', 'مصرف', 'ترافیک', 'باقی', 'مانده', 'کل', 'زمان', 'مدت', 'شده', 'تاریخ', 'مهلت', 'پایان'];
     final hasVolumeKeyword = volumeKeywords.any((k) => lower.contains(k));
     final hasNumber = RegExp(r'\d').hasMatch(name);
     final hasGBMB = RegExp(r'(gb|mb)', caseSensitive: false).hasMatch(name);
-    if (hasVolumeKeyword && (hasNumber || hasGBMB)) {
+    final hasPercent = name.contains('%');
+    if (hasVolumeKeyword && (hasNumber || hasGBMB || hasPercent)) {
       return true;
     }
-    if (lower.contains('روز اعتبار') ||
-        lower.contains('اعتبار باقی') ||
-        lower.contains('حجم باقی') ||
-        lower.contains('حجم مصرف') ||
-        lower.contains('مصرف حجم') ||
-        lower.contains('مصرف شده') ||
-        lower.contains('حجم کل') ||
-        lower.contains('ترافیک') ||
-        lower.contains('انقضا') ||
-        lower.contains('باقی مانده') ||
-        lower.contains('زمان باقی') ||
-        lower.contains('مدت باقی') ||
-        lower.contains('traffic remaining') ||
-        lower.contains('traffic used') ||
-        lower.contains('expire') ||
-        lower.contains('remaining') ||
-        lower.contains('used traffic') ||
-        lower.contains('total traffic') ||
-        lower.contains('time left') ||
-        lower.contains('days left') ||
-        lower.contains('volume')) {
+    if (lower.contains('روز اعتبار') || lower.contains('اعتبار باقی') || lower.contains('حجم باقی') || lower.contains('حجم مصرف') || lower.contains('مصرف حجم') || lower.contains('مصرف شده') || lower.contains('حجم کل') || lower.contains('ترافیک') || lower.contains('انقضا') || lower.contains('باقی مانده') || lower.contains('زمان باقی') || lower.contains('مدت باقی') || lower.contains('traffic remaining') || lower.contains('traffic used') || lower.contains('expire') || lower.contains('remaining') || lower.contains('volume') || lower.contains('quota') || lower.contains('usage') || lower.contains('subscription info') || lower.contains('account info')) {
       return true;
     }
-    if (RegExp(r'\d+(\.\d+)?\s*(gb|mb)', caseSensitive: false).hasMatch(name) &&
-        (lower.contains('روز') || lower.contains('day') || lower.contains('expire') || lower.contains('اعتبار') || lower.contains('حجم') || lower.contains('مصرف') || lower.contains('ترافیک') || lower.contains('زمان') || lower.contains('ساعت'))) {
+    if (RegExp(r'\d+(\.\d+)?\s*(gb|mb)', caseSensitive: false).hasMatch(name) && (lower.contains('روز') || lower.contains('day') || lower.contains('expire') || lower.contains('اعتبار') || lower.contains('حجم') || lower.contains('مصرف') || lower.contains('ترافیک') || lower.contains('زمان') || lower.contains('ساعت'))) {
       return true;
     }
-    if (lowerUri.contains('%f0%9f%93%8a') || lowerUri.contains('%e2%8f%b3') || lowerUri.contains('%f0%9f%92%be') || lowerUri.contains('traffic') || lowerUri.contains('expire') || lowerUri.contains('info') || lowerUri.contains('remaining')) {
+    if (lowerUri.contains('%f0%9f%93%8a') || lowerUri.contains('traffic') || lowerUri.contains('expire') || lowerUri.contains('info') || lowerUri.contains('remaining') || lowerUri.contains('quota')) {
       return true;
     }
     if (configUri.isEmpty || configUri.length < 30) {
       return true;
     }
-    // v4.0.71 FIX: False positive for real server named "Germany 10GB" - reduced from 20 to 15 and added extra checks
-    if (name.length < 15 && hasNumber && hasGBMB) {
-      // Only if also contains volume keywords or very short
-      final lower = name.toLowerCase();
-      if (lower.contains('حجم') || lower.contains('مصرف') || lower.contains('ترافیک') || lower.contains('باقی') || lower.contains('روز') || lower.contains('ساعت') || lower.contains('traffic') || lower.contains('expire') || lower.contains('remaining') || name.length < 10) {
-        return true;
-      }
+    if (name.length < 20 && hasNumber && hasGBMB) {
+      final hasCountry = RegExp(r'(germany|france|usa|netherlands|finland|turkey|iran|uk|gb|de|nl|fi|tr|ir|us)', caseSensitive: false).hasMatch(lower);
+      final hasVolumeWord = lower.contains('حجم') || lower.contains('مصرف') || lower.contains('ترافیک') || lower.contains('باقی') || lower.contains('روز') || lower.contains('traffic') || lower.contains('expire');
+      if (hasVolumeWord) return true;
+      if (name.length < 12 && !hasCountry) return true;
+    }
+    if (RegExp(r'^\s*\d+\s*%\s*$').hasMatch(name) || RegExp(r'^\s*\d+(\.\d+)?\s*(gb|mb)\s*$', caseSensitive: false).hasMatch(name)) {
+      return true;
     }
     return false;
   }
-  
   bool get isRealVpnServer {
     if (isInfoBanner) return false;
     if (configUri.isEmpty) return false;
@@ -205,15 +183,24 @@ class ServerModel {
     final hasValidProto = validProtocols.any((p) => configUri.toLowerCase().startsWith(p));
     if (!hasValidProto) return false;
     final lower = name.toLowerCase();
-    final forbidden = ['حجم', 'مصرف', 'ترافیک', 'روز', 'ساعت', 'انقضا', 'اعتبار', 'باقی', 'مانده', 'traffic', 'expire', 'remaining', 'volume', 'time left'];
-    if (forbidden.any((k) => lower.contains(k))) {
-      return false;
-    }
+    final forbidden = ['حجم', 'مصرف', 'ترافیک', 'روز', 'ساعت', 'انقضا', 'اعتبار', 'باقی', 'مانده', 'traffic', 'expire', 'remaining', 'volume', 'quota', 'account', 'subscription', 'info'];
+    if (forbidden.any((k) => lower.contains(k))) return false;
+    if (RegExp(r'^\s*\d+\s*%\s*$').hasMatch(name) || RegExp(r'^\s*\d+(\.\d+)?\s*(gb|mb)\s*$', caseSensitive: false).hasMatch(name)) return false;
     return true;
   }
-  
   bool get isSelectableForSmartConnect {
-    return isRealVpnServer && !isInfoBanner && configUri.isNotEmpty && configUri.length > 30;
+    if (isInfoBanner) return false;
+    if (!isRealVpnServer) return false;
+    if (configUri.isEmpty || configUri.length < 30) return false;
+    final lower = name.toLowerCase();
+    if (lower.contains('📊') || lower.contains('⏳') || lower.contains('حجم') || lower.contains('روز') || lower.contains('ساعت') || lower.contains('انقضا') || lower.contains('باقی') || lower.contains('traffic') || lower.contains('expire') || lower.contains('remaining') || lower.contains('quota')) return false;
+    return true;
+  }
+  String get rejectReason {
+    if (isInfoBanner) return 'isInfoBanner';
+    if (!isRealVpnServer) return 'notReal';
+    if (configUri.isEmpty || configUri.length < 30) return 'invalidUri';
+    return 'ok';
   }
 
   // v4.0.73 NEW: Protocol display helpers

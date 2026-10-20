@@ -96,11 +96,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   // v4.0.63 FOREVER FIX - Never show old version after install - PERMANENT LAW
   // LAW: currentAppVersion must be dynamic, not hardcoded const that stays old after install
   // Fix: Make it getter that returns actual installed version if available, else latest hardcoded
-  static const String _hardcodedVersion = '4.0.74'; // Fallback only, updated each release - v4.0.74 FIX in-app update + old version after browser
-  static const int _hardcodedCode = 108;
+  static const String _hardcodedVersion = '4.0.75'; // Fallback only, updated each release - v4.0.75 FIX in-app update + old version after browser
+  static const int _hardcodedCode = 109;
   static String get currentAppVersion => _actualInstalledVersion.isNotEmpty && _actualInstalledVersion != '4.0.51' ? _actualInstalledVersion : _hardcodedVersion;
-  static String _actualInstalledVersion = '4.0.74'; // Will be updated from PackageManager immediately on start - v4.0.74 FIX
-  static int _actualInstalledCode = 108;
+  static String _actualInstalledVersion = '4.0.75'; // Will be updated from PackageManager immediately on start - v4.0.75 FIX
+  static int _actualInstalledCode = 109;
 
   // v4.0.46 FOREVER CACHE FIX - PERMANENT LAW - NEVER REGRESS
   // LAW 1: Panel must NEVER serve old APK (auto-delete stale files)
@@ -884,35 +884,41 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
   }
 
-  // 1-Tap Smart Connect to Best Ping Server - v4.0.69 ENHANCED: Never select volume/traffic reading connections
+  // 1-Tap Smart Connect to Best Ping Server - v4.0.75 ULTRA STRICT: Never select volume/traffic reading connections
   void _smartConnect() async {
     if (_isSmartConnecting || _isConnecting) return;
-    // v4.0.69 STRICT: Only real VPN servers, never info banners or volume reading connections
-    final clean = _servers.where((s) => s.isSelectableForSmartConnect).toList();
+    print('v4.0.75 _smartConnect: total=${_servers.length}');
+    for (final s in _servers) {
+      print('  ${s.name} | isInfo=${s.isInfoBanner} | isReal=${s.isRealVpnServer} | sel=${s.isSelectableForSmartConnect} | reason=${s.rejectReason}');
+    }
+    final clean = _servers.where((s) {
+      if (s.isInfoBanner) return false;
+      if (!s.isRealVpnServer) return false;
+      if (!s.isSelectableForSmartConnect) return false;
+      final lower = s.name.toLowerCase();
+      if (lower.contains('حجم') || lower.contains('باقی') || lower.contains('روز') || lower.contains('ساعت') || lower.contains('انقضا') || lower.contains('ترافیک') || lower.contains('traffic') || lower.contains('expire') || lower.contains('remaining') || lower.contains('quota') || lower.contains('info') || lower.contains('📊') || lower.contains('⏳')) return false;
+      return true;
+    }).toList();
+    print('v4.0.75 clean=${clean.length}');
     if (clean.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('هیچ سروری برای سنجش پینگ یافت نشد.')),
+        const SnackBar(content: Text('هیچ سرور واقعی برای اتصال هوشمند یافت نشد.'), backgroundColor: Color(0xFFEF4444)),
       );
       return;
     }
-
     setState(() {
       _isSmartConnecting = true;
     });
-
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('در حال سنجش پینگ و انتخاب سریع‌ترین سرور...'),
-        backgroundColor: Color(0xFF6366F1),
-        duration: Duration(seconds: 2),
+      SnackBar(
+        content: Text('در حال سنجش پینگ ${clean.length} سرور واقعی... (حجم/زمان رد شد)'),
+        backgroundColor: const Color(0xFF6366F1),
+        duration: const Duration(seconds: 2),
       ),
     );
-
-    // v4.0.71 OPTIMIZED: Parallel ping with Future.wait - 6x faster (4s instead of 24s)
     ServerModel bestServer = clean.first;
     int lowestPing = 99999;
-
-    final candidates = clean.take(6).toList();
+    final candidates = clean.length > 10 ? clean.take(10).toList() : clean;
     final futures = candidates.map((s) async {
       if (s.configUri.isEmpty) return (s, -1);
       try {
@@ -923,40 +929,40 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         return (s, -1);
       }
     }).toList();
-
     final results = await Future.wait(futures);
+    bool found = false;
     for (final r in results) {
       final s = r.$1;
       final delay = r.$2;
       if (delay > 0 && delay < lowestPing) {
         lowestPing = delay;
         bestServer = s;
+        found = true;
       }
     }
-
+    if (!found) {
+      bestServer = clean.first;
+      lowestPing = 99999;
+    }
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('last_working_server_id', bestServer.id);
     } catch (_) {}
-
     if (mounted) {
       setState(() {
         _isSmartConnecting = false;
         _selectedServer = bestServer;
         _currentServerPing = lowestPing < 99999 ? lowestPing : null;
       });
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('سریع‌ترین سرور (${bestServer.name}) با پینگ ${lowestPing < 99999 ? '$lowestPing ms' : 'عالی'} انتخاب شد.'),
+          content: Text('✅ سریع‌ترین سرور واقعی (${bestServer.name}) پینگ ${lowestPing < 99999 ? '$lowestPing ms' : 'عالی'} (حجم/زمان رد شد)'),
           backgroundColor: const Color(0xFF10B981),
         ),
       );
-
       if (!_isConnected) {
         _startTunnel();
       } else {
-        // Reconnect to best server
         try {
           await _flutterV2ray.stopV2Ray();
         } catch (_) {}
@@ -966,11 +972,18 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
   }
 
-  // v4.0.66 NEW: Ping all servers - v4.0.69 ENHANCED: Only real VPN servers, not volume info
+  // v4.0.66 NEW: Ping all servers - v4.0.75 ULTRA STRICT: Only real VPN servers, not volume info
   Future<void> _pingAllServers() async {
     if (_isRefreshing || _servers.isEmpty) return;
-    // Filter to only real VPN servers for ping
-    final realServers = _servers.where((s) => s.isSelectableForSmartConnect).toList();
+    final realServers = _servers.where((s) {
+      if (s.isInfoBanner) return false;
+      if (!s.isRealVpnServer) return false;
+      if (!s.isSelectableForSmartConnect) return false;
+      final lower = s.name.toLowerCase();
+      if (lower.contains('حجم') || lower.contains('باقی') || lower.contains('روز') || lower.contains('ساعت') || lower.contains('انقضا') || lower.contains('ترافیک') || lower.contains('traffic') || lower.contains('expire') || lower.contains('remaining') || lower.contains('quota') || lower.contains('📊') || lower.contains('⏳')) return false;
+      return true;
+    }).toList();
+    print('v4.0.75 _pingAllServers: total=${_servers.length} real=${realServers.length}');
     if (realServers.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('هیچ سرور واقعی برای پینگ یافت نشد (فقط اطلاعات حجم بود)'), backgroundColor: Color(0xFFEF4444)),
@@ -1160,7 +1173,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   return;
                 }
               }
-              // v4.0.74 NEW: Check install permission before download
+              // v4.0.75 NEW: Check install permission before download
               try {
                 const channel = MethodChannel('com.connectix.vpn/updater');
                 final canInstall = await channel.invokeMethod('canInstallPackages').timeout(const Duration(seconds: 2), onTimeout: () => true);
@@ -1298,7 +1311,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     });
                   },
                   onError: (error) {
-                    // v4.0.74 FIX: Handle INSTALL_PERMISSION_REQUIRED specially
+                    // v4.0.75 FIX: Handle INSTALL_PERMISSION_REQUIRED specially
                     if (error.contains('INSTALL_PERMISSION_REQUIRED')) {
                       setModalState(() {
                         isFailed = true;
@@ -1436,14 +1449,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                           ],
                         ),
                         const SizedBox(height: 12),
-                        // v4.0.74 FIX: 3-Tier Browser Fallback - GitHub Direct FIRST (always correct version)
+                        // v4.0.75 FIX: 3-Tier Browser Fallback - GitHub Direct FIRST (always correct version)
                         // Previous bug: directPanelUrl first, but panel download_apk.php had allowlist bug serving old APK (4.0.72) for v4.0.73 request
                         // This caused "browser update still old version" - user downloads via browser but gets old version
                         // Fix: GitHub direct first (source of truth, always correct), panel second (for Iran)
                         ElevatedButton.icon(
                           onPressed: () async {
                             Navigator.pop(bottomSheetContext);
-                            // v4.0.74: GitHub direct FIRST (always correct version), then panel (for Iran where GitHub blocked)
+                            // v4.0.75: GitHub direct FIRST (always correct version), then panel (for Iran where GitHub blocked)
                             final urlsToTry = [downloadUrl, githubReleasesPage, githubLatestPage, directPanelUrl];
                             for (final u in urlsToTry) {
                               try {
@@ -2915,6 +2928,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
     return Scaffold(
       backgroundColor: const Color(0xFF090D16),
+      extendBody: true,
+      extendBodyBehindAppBar: false,
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -3098,9 +3114,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       body: Directionality(
         textDirection: TextDirection.rtl,
         child: SafeArea(
+          bottom: false,
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2), // v4.0.69 COMPACT NO-SCROLL
-            child: Column(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+            child: SizedBox(
+              width: double.infinity,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
               // Global / Reseller Announcement Banner
               if (widget.branding.announcement.isNotEmpty)
@@ -3297,7 +3318,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             : _isConnecting
                                 ? LiteConnectState.connecting
                                 : LiteConnectState.disconnected,
-                        size: 90, // v4.0.69 COMPACT: 142→120 for no-scroll
+                        size: (MediaQuery.of(context).size.height * 0.12).clamp(80.0, 130.0), // v4.0.75 RESPONSIVE تمام صفحه
                         countryFlag: _selectedServer?.flag ?? '🌐',
                         serverName: _selectedServer?.name ?? 'Connectix',
                         enableHaptic: true,
@@ -3309,7 +3330,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             : _isConnecting
                                 ? UltimateConnectState.connecting
                                 : UltimateConnectState.disconnected,
-                        size: 90, // v4.0.69 COMPACT: 142→120 for no-scroll
+                        size: (MediaQuery.of(context).size.height * 0.12).clamp(80.0, 130.0), // v4.0.75 RESPONSIVE تمام صفحه
                         countryFlag: _selectedServer?.flag ?? '🌐',
                         serverName: _selectedServer?.name ?? 'Connectix',
                         enableHaptic: true,
@@ -3708,6 +3729,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               const SizedBox(height: 12),
             ],
           ),
+            ),
         ),
       ),
       ),

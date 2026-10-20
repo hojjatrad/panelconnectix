@@ -27,6 +27,37 @@ import java.util.Timer
 import java.util.TimerTask
 
 class MainActivity: FlutterActivity() {
+    // v4.0.75 FULL-SCREEN: تمام صفحه در هر گوشی - Edge-to-Edge
+    override fun onCreate(savedInstanceState: android.os.Bundle?) {
+        super.onCreate(savedInstanceState)
+        try {
+            // Enable edge-to-edge for full-screen on all phones
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                window.setDecorFitsSystemWindows(false)
+                window.statusBarColor = android.graphics.Color.TRANSPARENT
+                window.navigationBarColor = android.graphics.Color.TRANSPARENT
+                // Allow content behind cutout
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                    window.attributes.layoutInDisplayCutoutMode = android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                window.decorView.systemUiVisibility = (
+                    android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                    or android.view.View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                    or android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                )
+                @Suppress("DEPRECATION")
+                window.statusBarColor = android.graphics.Color.TRANSPARENT
+                @Suppress("DEPRECATION")
+                window.navigationBarColor = android.graphics.Color.TRANSPARENT
+            }
+            android.util.Log.i("ConnectixFullScreen", "v4.0.75 Edge-to-Edge enabled for full-screen")
+        } catch (e: Exception) {
+            android.util.Log.w("ConnectixFullScreen", "v4.0.75 Edge-to-Edge failed: ${e.message}")
+        }
+    }
+
     private val CHANNEL = "com.connectix.vpn/updater"
     private val NOTIF_CHANNEL_ID = "connectix_vpn_status_ch"
     private val V2RAY_CHANNEL_ID = "A_FLUTTER_V2RAY_SERVICE_CH_ID"
