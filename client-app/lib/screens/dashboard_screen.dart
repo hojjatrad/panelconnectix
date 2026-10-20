@@ -96,11 +96,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   // v4.0.63 FOREVER FIX - Never show old version after install - PERMANENT LAW
   // LAW: currentAppVersion must be dynamic, not hardcoded const that stays old after install
   // Fix: Make it getter that returns actual installed version if available, else latest hardcoded
-  static const String _hardcodedVersion = '4.0.78'; // Fallback only, updated each release - v4.0.78 FIX version display + account info filter
-  static const int _hardcodedCode = 112;
+  static const String _hardcodedVersion = '4.0.79'; // Fallback only, updated each release - v4.0.78 FIX version display + account info filter
+  static const int _hardcodedCode = 113;
   static String get currentAppVersion => _actualInstalledVersion.isNotEmpty && _actualInstalledVersion != '4.0.51' ? _actualInstalledVersion : _hardcodedVersion;
-  static String _actualInstalledVersion = '4.0.78'; // Will be updated from PackageManager immediately on start - v4.0.75 FIX
-  static int _actualInstalledCode = 112;
+  static String _actualInstalledVersion = '4.0.79'; // Will be updated from PackageManager immediately on start - v4.0.75 FIX
+  static int _actualInstalledCode = 113;
 
   // v4.0.46 FOREVER CACHE FIX - PERMANENT LAW - NEVER REGRESS
   // LAW 1: Panel must NEVER serve old APK (auto-delete stale files)
@@ -117,13 +117,34 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   // LAW 16: Version from app_release.json, never hardcoded, delete stale APKs
   // v4.0.63 FOREVER FIX: Robust version loading - never show old version after install
   static Future<void> loadActualInstalledVersion() async {
-    // v4.0.78 FOREVER FIX: Clear any cached old version prefs that might cause stale display
+    // v4.0.79 ROOT CAUSE FIX: Clear any cached old version prefs that might cause stale display - NEVER REGRESS
     try {
       final prefs = await SharedPreferences.getInstance();
-      // If we have a cached dismissed_version that equals old hardcoded, clear it to force fresh check
       final cachedVer = prefs.getString('cached_app_version') ?? '';
       if (cachedVer.isNotEmpty && cachedVer != _hardcodedVersion) {
         // Old cached version detected, will be updated
+      }
+      // v4.0.79: If installed version is newer than cached dismissed_version, clear dismissed to show update completed
+      // Also clear last_prompted_version if it equals old version
+      final dismissed = prefs.getString('dismissed_version') ?? '';
+      if (dismissed.isNotEmpty && dismissed != _hardcodedVersion) {
+        // Check if current hardcoded is newer than dismissed - if so, clear dismissed so banner doesn't hide
+        try {
+          // Simple version compare - if hardcoded newer, clear dismissed
+          final hardParts = _hardcodedVersion.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+          final dismissedParts = dismissed.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+          bool isHardNewer = false;
+          for (int i=0; i<3; i++) {
+            final h = i < hardParts.length ? hardParts[i] : 0;
+            final d = i < dismissedParts.length ? dismissedParts[i] : 0;
+            if (h > d) { isHardNewer = true; break; }
+            if (h < d) break;
+          }
+          if (isHardNewer) {
+            await prefs.remove('dismissed_version');
+            await prefs.remove('last_prompted_version');
+          }
+        } catch (_) {}
       }
     } catch (_) {}
     // Try 3 times with increasing timeout, fallback to hardcoded only if all fail
@@ -2421,7 +2442,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           builder: (modalContext, setModalState) {
             if (!_isCheckingUpdate && _updateInfo == null) {
               _isCheckingUpdate = true;
-              ApiService.checkAppUpdate().then((updateData) {
+              // v4.0.79 FIX: Timeout for checkAppUpdate to prevent infinite spinner when no messages
+              ApiService.checkAppUpdate().timeout(const Duration(seconds: 5), onTimeout: () => null).then((updateData) {
                 _isCheckingUpdate = false;
                 if (updateData != null && mounted) {
                   final latest = (updateData['latest_version'] ?? '').toString();
@@ -2431,9 +2453,33 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     _updateInfo = isNew ? updateData : null;
                   });
                   setModalState(() {});
+                } else {
+                  // No update or timeout - ensure UI updates
+                  if (mounted) {
+                    setState(() {
+                      _isCheckingUpdate = false;
+                    });
+                    setModalState(() {});
+                  }
                 }
               }).catchError((_) {
                 _isCheckingUpdate = false;
+                if (mounted) {
+                  setState(() {});
+                  setModalState(() {});
+                }
+              });
+              // Safety: force _isCheckingUpdate false after 3 seconds if still true (prevent infinite spinner)
+              Future.delayed(const Duration(seconds: 3), () {
+                if (_isCheckingUpdate) {
+                  _isCheckingUpdate = false;
+                  if (mounted) {
+                    try {
+                      setState(() {});
+                      setModalState(() {});
+                    } catch (_) {}
+                  }
+                }
               });
             }
 
@@ -2595,10 +2641,66 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       Expanded(
                         child: Center(
                           child: _isCheckingUpdate
-                              ? const CircularProgressIndicator(color: Color(0xFF6366F1))
-                              : const Text(
-                                  'هیچ پیام یا اطلاعیه جدیدی وجود ندارد.',
-                                  style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                              ? Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const CircularProgressIndicator(color: Color(0xFF6366F1)),
+                                    const SizedBox(height: 12),
+                                    const Text(
+                                      'در حال بررسی پیام‌ها...',
+                                      style: TextStyle(color: Color(0xFF64748B), fontSize: 11),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    TextButton(
+                                      onPressed: () {
+                                        _isCheckingUpdate = false;
+                                        setModalState(() {});
+                                        setState(() {});
+                                      },
+                                      child: const Text('لغو', style: TextStyle(color: Color(0xFF6366F1), fontSize: 11)),
+                                    ),
+                                  ],
+                                )
+                              : Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(16),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF1E293B),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(Icons.notifications_none_rounded, color: Color(0xFF64748B), size: 32),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    const Text(
+                                      'هیچ پیام یا اطلاعیه جدیدی وجود ندارد.',
+                                      style: TextStyle(color: Color(0xFF94A3B8), fontSize: 14, fontWeight: FontWeight.bold),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    const Text(
+                                      'وقتی پیامی از طرف مدیریت ارسال شود، اینجا نمایش داده میشود.',
+                                      style: TextStyle(color: Color(0xFF64748B), fontSize: 11),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF10B981).withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
+                                      ),
+                                      child: const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 14),
+                                          SizedBox(width: 6),
+                                          Text('صندوق پیام شما خالی و تمیز است', style: TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold)),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ),
                         ),
                       )
