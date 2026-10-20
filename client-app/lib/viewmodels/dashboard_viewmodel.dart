@@ -125,8 +125,11 @@ class DashboardViewModel extends ChangeNotifier {
       ServerModel best = _servers.first;
       int lowest = 99999;
 
-      for (int i = 0; i < _servers.length && i < 6; i++) {
-        final s = _servers[i];
+      // v4.0.81 QA FIX: Was only first 6, now 20 shuffled
+      final shuffled = List<ServerModel>.from(_servers)..shuffle();
+      final count = shuffled.length > 20 ? 20 : shuffled.length;
+      for (int i = 0; i < count; i++) {
+        final s = shuffled[i];
         if (s.configUri.isEmpty) continue;
         try {
           // TCP ping fallback (V2Ray ping handled in UI layer with timeout)
