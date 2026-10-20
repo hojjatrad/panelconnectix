@@ -96,11 +96,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   // v4.0.63 FOREVER FIX - Never show old version after install - PERMANENT LAW
   // LAW: currentAppVersion must be dynamic, not hardcoded const that stays old after install
   // Fix: Make it getter that returns actual installed version if available, else latest hardcoded
-  static const String _hardcodedVersion = '4.0.80'; // Fallback only, updated each release - v4.0.80 FIX version display + account info filter
-  static const int _hardcodedCode = 114;
+  static const String _hardcodedVersion = '4.0.81'; // Fallback only, updated each release - v4.0.80 FIX version display + account info filter
+  static const int _hardcodedCode = 115;
   static String get currentAppVersion => _hardcodedVersion; // v4.0.80 FIX: Always show hardcoded
-  static String _actualInstalledVersion = '4.0.80'; // Will be updated from PackageManager immediately on start - v4.0.80 FIX
-  static int _actualInstalledCode = 114;
+  static String _actualInstalledVersion = '4.0.81'; // Will be updated from PackageManager immediately on start - v4.0.80 FIX
+  static int _actualInstalledCode = 115;
 
   // v4.0.46 FOREVER CACHE FIX - PERMANENT LAW - NEVER REGRESS
   // LAW 1: Panel must NEVER serve old APK (auto-delete stale files)
