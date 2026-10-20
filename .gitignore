@@ -20,3 +20,5 @@ data/*.sqlite
 .github_token
 .env.github
 .github_token_secure
+client-app/android/.gradle/
+client-app/android/build/

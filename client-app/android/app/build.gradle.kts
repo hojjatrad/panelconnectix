@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.connectix.vpn"
-    compileSdk = 35
+    compileSdk = 34
     ndkVersion = "27.0.12077973"
 
     compileOptions {
@@ -23,9 +23,9 @@ android {
     defaultConfig {
         applicationId = "com.connectix.vpn"
         minSdk = 23
-        targetSdk = 35
-        versionCode = flutter.versionCode
-        versionName = flutter.versionName
+        targetSdk = 34
+        versionCode = flutter.versionCode()
+        versionName = flutter.versionName()
     }
 
     signingConfigs {
