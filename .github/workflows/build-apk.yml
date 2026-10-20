@@ -1,0 +1,78 @@
+name: Build APK v4.0.80+114
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'client-app/**'
+      - '.github/workflows/build-apk.yml'
+  workflow_dispatch:
+  release:
+    types: [created]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout from GitHub (always use GitHub space)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Java 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter 3.22.0
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Clean workspace
+        run: |
+          cd client-app
+          flutter clean
+          flutter pub get
+
+      - name: Build APK split per ABI (Release)
+        run: |
+          cd client-app
+          flutter build apk --split-per-abi --release --no-pub -v
+          ls -lh build/app/outputs/flutter-apk/
+
+      - name: Build Universal APK
+        run: |
+          cd client-app
+          flutter build apk --release --no-pub
+          ls -lh build/app/outputs/flutter-apk/
+
+      - name: Upload APKs to GitHub Release v4.0.80
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v4.0.80
+          name: "v4.0.80+114 ULTRA ROOT CAUSE 100% FIX"
+          body: |
+            v4.0.80+114 - 5 root causes fixed:
+            - Bell: timeout 5s + safety 3s + beautiful empty UI
+            - Privacy: 👤Hojjatrad100 blocked
+            - Full-screen: LayoutBuilder robust
+            - Version: 5 roots fixed + triple load + footer debug
+            - Built on GitHub Actions with 7GB RAM (always use GitHub space)
+          files: |
+            client-app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            client-app/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+            client-app/build/app/outputs/flutter-apk/app-release.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-v4.0.80
+          path: |
+            client-app/build/app/outputs/flutter-apk/*.apk
