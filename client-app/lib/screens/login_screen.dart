@@ -251,12 +251,17 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
       body: SafeArea(
         bottom: false,
-        child: SizedBox.expand(
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.07, vertical: screenHeight * 0.02),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: IntrinsicHeight(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.07, vertical: screenHeight * 0.02),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Container(
                   width: 72,
@@ -513,7 +518,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   style: const TextStyle(color: Color(0xFF475569), fontSize: 10),
                 ),
               ],
-            ),
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
         ),
       ),

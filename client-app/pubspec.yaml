@@ -1,7 +1,7 @@
 name: connectix_vpn
 description: Connectix Professional Multiplatform VPN Client - ULTRA Dual-Core Xray + sing-box + v4.0.64 FOREVER FIX - VERSION DISPLAY + INSTALL - MVVM + PROVIDER + DESIGN SYSTEM FULL + WIDGET TESTS + PWA SYNC + API DOCS
 publish_to: 'none'
-version: 4.0.76+110
+version: 4.0.77+111
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

@@ -96,10 +96,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   // v4.0.63 FOREVER FIX - Never show old version after install - PERMANENT LAW
   // LAW: currentAppVersion must be dynamic, not hardcoded const that stays old after install
   // Fix: Make it getter that returns actual installed version if available, else latest hardcoded
-  static const String _hardcodedVersion = '4.0.76'; // Fallback only, updated each release - v4.0.75 FIX in-app update + old version after browser
+  static const String _hardcodedVersion = '4.0.77'; // Fallback only, updated each release - v4.0.75 FIX in-app update + old version after browser
   static const int _hardcodedCode = 109;
   static String get currentAppVersion => _actualInstalledVersion.isNotEmpty && _actualInstalledVersion != '4.0.51' ? _actualInstalledVersion : _hardcodedVersion;
-  static String _actualInstalledVersion = '4.0.76'; // Will be updated from PackageManager immediately on start - v4.0.75 FIX
+  static String _actualInstalledVersion = '4.0.77'; // Will be updated from PackageManager immediately on start - v4.0.75 FIX
   static int _actualInstalledCode = 109;
 
   // v4.0.46 FOREVER CACHE FIX - PERMANENT LAW - NEVER REGRESS
@@ -3173,12 +3173,17 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         textDirection: TextDirection.rtl,
         child: SafeArea(
           bottom: false,
-          child: SizedBox.expand(
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: IntrinsicHeight(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
               // Global / Reseller Announcement Banner
               if (widget.branding.announcement.isNotEmpty)
@@ -3786,10 +3791,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               const SizedBox(height: 12),
               const Spacer(),
             ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
-            ),
         ),
-      ),
       ),
     );
   }
