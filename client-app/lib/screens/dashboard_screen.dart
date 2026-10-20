@@ -96,11 +96,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   // v4.0.63 FOREVER FIX - Never show old version after install - PERMANENT LAW
   // LAW: currentAppVersion must be dynamic, not hardcoded const that stays old after install
   // Fix: Make it getter that returns actual installed version if available, else latest hardcoded
-  static const String _hardcodedVersion = '4.0.81'; // Fallback only, updated each release - v4.0.80 FIX version display + account info filter
-  static const int _hardcodedCode = 115;
-  static String get currentAppVersion => _hardcodedVersion; // v4.0.80 FIX: Always show hardcoded
-  static String _actualInstalledVersion = '4.0.81'; // Will be updated from PackageManager immediately on start - v4.0.80 FIX
-  static int _actualInstalledCode = 115;
+  static const String _hardcodedVersion = '4.0.82'; // Fallback only, updated each release - v4.0.80 FIX version display + account info filter
+  static const int _hardcodedCode = 116;
+  static String get currentAppVersion => _actualInstalledVersion.isNotEmpty && _actualInstalledVersion != '4.0.51' ? _actualInstalledVersion : _hardcodedVersion;
+  static String _actualInstalledVersion = '4.0.82'; // Will be updated from PackageManager immediately on start - v4.0.80 FIX
+  static int _actualInstalledCode = 116;
 
   // v4.0.46 FOREVER CACHE FIX - PERMANENT LAW - NEVER REGRESS
   // LAW 1: Panel must NEVER serve old APK (auto-delete stale files)
@@ -1017,38 +1017,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         duration: const Duration(seconds: 2),
       ),
     );
-    // v4.0.81 QA FIX: Smart Connect always same server (Germany) - ROOT CAUSE
-    // Old: take(10) first in fixed order -> always Germany if Germany first in list
-    // New: Sort by previous ping if available, shuffle, take 20, avoid last server
-    // Sort clean by pingMs if available (lowest first), then shuffle same-ping groups for variety
-    clean.sort((a, b) {
-      final aPing = a.pingMs ?? 99999;
-      final bPing = b.pingMs ?? 99999;
-      if (aPing != bPing) return aPing.compareTo(bPing);
-      return 0;
-    });
-    // Shuffle to avoid always same when pings equal or null, but keep ping-sorted priority for first 5
-    final withPing = clean.where((s) => s.pingMs != null && s.pingMs! > 0).toList();
-    final withoutPing = clean.where((s) => s.pingMs == null || s.pingMs! <= 0).toList();
-    withoutPing.shuffle();
-    final shuffledClean = [...withPing, ...withoutPing];
-    // Take up to 20 candidates, not 10, for better variety
-    var candidates = shuffledClean.length > 20 ? shuffledClean.take(20).toList() : shuffledClean;
-    // Avoid last connected server if possible (round-robin)
-    String lastId = '';
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      lastId = prefs.getString('last_working_server_id') ?? '';
-    } catch (_) {}
-    if (lastId.isNotEmpty && candidates.length > 1) {
-      final filtered = candidates.where((s) => s.id != lastId).toList();
-      if (filtered.isNotEmpty) {
-        candidates = filtered;
-        print('v4.0.81 Avoiding last server $lastId, candidates now ${candidates.length}');
-      }
-    }
-    ServerModel bestServer = candidates.first;
+    ServerModel bestServer = clean.first;
     int lowestPing = 99999;
+    final candidates = clean.length > 10 ? clean.take(10).toList() : clean;
     final futures = candidates.map((s) async {
       if (s.configUri.isEmpty) return (s, -1);
       try {
@@ -1071,11 +1042,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       }
     }
     if (!found) {
-      // v4.0.81 QA FIX: Don't always pick first (Germany), pick random from clean
-      final random = (shuffledClean..shuffle()).first;
-      bestServer = random;
-      lowestPing = random.pingMs ?? 99999;
-      print('v4.0.81 No ping found, random pick: ${bestServer.name}');
+      bestServer = clean.first;
+      lowestPing = 99999;
     }
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -1110,7 +1078,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     if (_isRefreshing || _servers.isEmpty) return;
     final blacklisted = await _getBlacklistedIds();
     final excluded = await _getExcludedIds();
-    // v4.0.81 QA: realServers for pingAll should be shuffled for variety
     final realServers = _servers.where((s) {
       if (blacklisted.contains(s.id)) return false;
       if (excluded.contains(s.id)) return false;

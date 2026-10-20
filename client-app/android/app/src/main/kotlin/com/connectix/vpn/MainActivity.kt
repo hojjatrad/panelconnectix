@@ -436,28 +436,9 @@ class MainActivity: FlutterActivity() {
                         result.success("")
                     }
                 }
-                                "installApk" -> {
-                    // v4.0.24 ULTRA DEEP FIX - 15 LAWS - App not installing at all - comprehensive forensic
-                    // User: "کلاذإپ نصب نمیشه دیگه" - App doesn't install at all
-                    // Previous v4.0.23 fixed white screen but broke installer due to NDK download fail + complex logic
-                    // Root causes for install fail:
-                    // 1. NDK 27 download fail caused build failure, APK might be corrupted or missing native libs
-                    // 2. Session API commit without proper PendingIntent flags on Android 14+ can silently fail
-                    // 3. FileProvider URI grant expires if not persistable, installer can't read file -> window closes
-                    // 4. Downloads copy uses deprecated Environment.getExternalStoragePublicDirectory which fails on Android 10+ scoped storage without permission
-                    // 5. No fallback to app-specific Downloads via MediaStore
-                    // 6. Missing FLAG_GRANT_PREFIX_URI_PERMISSION
-                    // 7. Intent chooser title not showing Play Protect dialog
-                    // 8. No check for canRequestPackageInstalls() before install
-                    // 9. APK file too small check too strict (500KB) might block valid APK on slow download
-                    // 10. No retry with different URI if first fails
-                    // 11. file_paths.xml missing external-media-path
-                    // 12. compileSdk 34 but NDK 27 mismatch
-                    // 13. MainActivity launchMode singleTop may interfere with install intent
-                    // 14. Missing android:requestLegacyExternalStorage handling
-                    // 15. No open file manager fallback if all intents fail
+                                                "installApk" -> {
+                    // v4.0.82 FIX: Install window closes - MIUI/Samsung/Android14 fix - Intent VIEW first
                     val filePath = call.argument<String>("filePath")
-                    val allowSameVersion = call.argument<Boolean>("allowSameVersion") ?: true
                     if (filePath == null) {
                         result.error("INVALID_ARGUMENT", "filePath is null", null)
                         return@setMethodCallHandler
@@ -467,140 +448,104 @@ class MainActivity: FlutterActivity() {
                         result.error("FILE_NOT_FOUND", "File does not exist: $filePath", null)
                         return@setMethodCallHandler
                     }
-                    // v4.0.24 FIX: Lower threshold to 100KB to allow valid APKs, but still block HTML error pages (HTML < 50KB)
                     if (file.length() < 100000) {
-                        result.error("FILE_TOO_SMALL", "File too small (${file.length()} bytes), likely HTML error page: $filePath", null)
+                        result.error("FILE_TOO_SMALL", "File too small", null)
                         return@setMethodCallHandler
                     }
-                    
-                    // v4.0.74 NEW: Check if app can request package installs (Android 8+)
-                    // This is critical - if false, all install intents will fail silently
-                    // We check here and log, but Flutter side should also check and request permission
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        try {
-                            val canInstall = context.packageManager.canRequestPackageInstalls()
-                            android.util.Log.i("ConnectixInstaller", "v4.0.74 canRequestPackageInstalls: $canInstall")
-                            if (!canInstall) {
-                                android.util.Log.w("ConnectixInstaller", "v4.0.74 canRequestPackageInstalls=false - install will likely fail, need to request permission via Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES")
-                                // Don't error here, let Flutter handle permission request, but log
-                                // We will still try Session API and intents, they may trigger system dialog on some OEMs
-                            }
-                        } catch (e: Exception) {
-                            android.util.Log.w("ConnectixInstaller", "v4.0.74 canRequestPackageInstalls check failed: ${e.message}")
-                        }
-                    }
-                    
                     try {
                         file.setReadable(true, false)
-                        android.util.Log.i("ConnectixInstaller", "v4.0.74 ULTRA start: path=$filePath len=${file.length()} brand=${Build.BRAND} sdk=${Build.VERSION.SDK_INT} model=${Build.MODEL}")
-
-                        // LAW 1: Ensure working file in app external files dir (most compatible with FileProvider)
+                        android.util.Log.i("ConnectixInstaller", "v4.0.82 FIX: path=$filePath len=${file.length()} brand=${Build.BRAND} sdk=${Build.VERSION.SDK_INT}")
                         var workingFile = file
                         try {
                             val extDir = context.getExternalFilesDir(null)
                             if (extDir != null) {
                                 if (!extDir.exists()) extDir.mkdirs()
-                                if (!file.absolutePath.startsWith(extDir.absolutePath)) {
-                                    val newFile = File(extDir, "Connectix-Update.apk")
-                                    try { if (newFile.exists()) newFile.delete() } catch (_: Exception) {}
-                                    file.copyTo(newFile, overwrite = true)
-                                    newFile.setReadable(true, false)
-                                    workingFile = newFile
-                                    android.util.Log.i("ConnectixInstaller", "v4.0.74 Copied to external: ${newFile.absolutePath} len=${newFile.length()}")
-                                }
+                                val newFile = File(extDir, "Connectix-Update.apk")
+                                try { if (newFile.exists()) newFile.delete() } catch (_: Exception) {}
+                                file.copyTo(newFile, overwrite = true)
+                                newFile.setReadable(true, false)
+                                workingFile = newFile
                             }
                         } catch (e: Exception) {
-                            android.util.Log.w("ConnectixInstaller", "v4.0.74 Copy to external failed: ${e.message}, using original")
-                            workingFile = file
+                            android.util.Log.w("ConnectixInstaller", "Copy to external failed: ${e.message}")
                         }
-
-                        // LAW 2: Copy to public Downloads for Play Protect "Install without scanning" dialog
-                        // Use 3 methods: Environment.getExternalStoragePublicDirectory (deprecated but works on <10), /storage/emulated/0/Download, and app-specific Download
                         var downloadsFile: File? = null
-                        var downloadCopySuccess = false
-                        // Method 1: Public Downloads via Environment (works on Android 9 and below, and some 10+ with legacy)
                         try {
-                            val dlDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
-                            if (dlDir != null) {
-                                if (!dlDir.exists()) dlDir.mkdirs()
-                                val dlFile = File(dlDir, "Connectix-Update-v4.0.24.apk")
+                            val dlDir = File("/storage/emulated/0/Download")
+                            if (dlDir.exists()) {
+                                val dlFile = File(dlDir, "Connectix-Update.apk")
                                 try { if (dlFile.exists()) dlFile.delete() } catch (_: Exception) {}
                                 workingFile.copyTo(dlFile, overwrite = true)
                                 dlFile.setReadable(true, false)
                                 downloadsFile = dlFile
-                                downloadCopySuccess = true
-                                android.util.Log.i("ConnectixInstaller", "v4.0.74 Copied to public Downloads: ${dlFile.absolutePath} len=${dlFile.length()}")
                             }
                         } catch (e: Exception) {
-                            android.util.Log.w("ConnectixInstaller", "v4.0.74 Public Downloads copy failed: ${e.message}")
+                            android.util.Log.w("ConnectixInstaller", "Downloads copy failed: ${e.message}")
                         }
-                        // Method 2: /storage/emulated/0/Download direct
-                        if (!downloadCopySuccess) {
-                            try {
-                                val altDir = File("/storage/emulated/0/Download")
-                                if (altDir.exists()) {
-                                    val dlFile = File(altDir, "Connectix-Update-v4.0.24.apk")
-                                    try { if (dlFile.exists()) dlFile.delete() } catch (_: Exception) {}
-                                    workingFile.copyTo(dlFile, overwrite = true)
-                                    dlFile.setReadable(true, false)
-                                    downloadsFile = dlFile
-                                    downloadCopySuccess = true
-                                    android.util.Log.i("ConnectixInstaller", "v4.0.74 Copied to alt Download: ${dlFile.absolutePath}")
-                                }
-                            } catch (e: Exception) {
-                                android.util.Log.w("ConnectixInstaller", "v4.0.74 Alt Download copy failed: ${e.message}")
+                        try {
+                            val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                                FileProvider.getUriForFile(context, context.packageName + ".fileprovider", workingFile)
+                            } else {
+                                Uri.fromFile(workingFile)
                             }
-                        }
-                        // Method 3: App-specific Download dir (always works, but less likely to trigger Play Protect dialog)
-                        if (!downloadCopySuccess) {
-                            try {
-                                val appDlDir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS)
-                                if (appDlDir != null) {
-                                    if (!appDlDir.exists()) appDlDir.mkdirs()
-                                    val dlFile = File(appDlDir, "Connectix-Update-v4.0.24.apk")
-                                    try { if (dlFile.exists()) dlFile.delete() } catch (_: Exception) {}
-                                    workingFile.copyTo(dlFile, overwrite = true)
-                                    dlFile.setReadable(true, false)
-                                    downloadsFile = dlFile
-                                    android.util.Log.i("ConnectixInstaller", "v4.0.74 Copied to app-specific Download: ${dlFile.absolutePath}")
-                                }
-                            } catch (e: Exception) {
-                                android.util.Log.w("ConnectixInstaller", "v4.0.74 App-specific Download copy failed: ${e.message}")
+                            val installers = listOf(
+                                "com.android.packageinstaller",
+                                "com.google.android.packageinstaller",
+                                "com.miui.packageinstaller",
+                                "com.miui.global.packageinstaller",
+                                "com.miui.securitycenter",
+                                "com.samsung.android.packageinstaller",
+                                "com.sec.android.preloadinstaller",
+                                "com.google.android.permissioncontroller"
+                            )
+                            for (pkg in installers) {
+                                try { context.grantUriPermission(pkg, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) {}
                             }
+                            val viewIntent = Intent(Intent.ACTION_VIEW).apply {
+                                setDataAndType(uri, "application/vnd.android.package-archive")
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                                putExtra(Intent.EXTRA_RETURN_RESULT, true)
+                                putExtra(Intent.EXTRA_ALLOW_REPLACE, true)
+                            }
+                            try {
+                                val resList = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    packageManager.queryIntentActivities(viewIntent, PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY.toLong()))
+                                } else {
+                                    @Suppress("DEPRECATION")
+                                    packageManager.queryIntentActivities(viewIntent, PackageManager.MATCH_DEFAULT_ONLY)
+                                }
+                                for (ri in resList) {
+                                    try { context.grantUriPermission(ri.activityInfo.packageName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) {}
+                                }
+                            } catch (_: Exception) {}
+                            context.startActivity(viewIntent)
+                            result.success(true)
+                            return@setMethodCallHandler
+                        } catch (e: Exception) {
+                            android.util.Log.e("ConnectixInstaller", "Intent VIEW failed: ${e.message}", e)
                         }
-
-                        // LAW 3: PackageInstaller Session API - PRIMARY method for Android 14+ (most reliable)
-                        var sessionSuccess = false
-                        var sessionId = -1
                         try {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                                android.util.Log.i("ConnectixInstaller", "v4.0.74 Trying Session API primary...")
                                 val packageInstaller = context.packageManager.packageInstaller
                                 val params = android.content.pm.PackageInstaller.SessionParams(
                                     android.content.pm.PackageInstaller.SessionParams.MODE_FULL_INSTALL
                                 )
                                 params.setAppPackageName(context.packageName)
-                                // Require user action to show UI
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                                     params.setRequireUserAction(android.content.pm.PackageInstaller.SessionParams.USER_ACTION_REQUIRED)
                                 }
-                                // Allow downgrade/same version
                                 try {
                                     val m = params.javaClass.getMethod("setAllowDowngrade", Boolean::class.javaPrimitiveType)
                                     m.invoke(params, true)
                                 } catch (_: Exception) {}
-                                // Set package source for Play Protect
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                    try {
-                                        params.setPackageSource(android.content.pm.PackageInstaller.PACKAGE_SOURCE_STORE)
-                                    } catch (_: Exception) {}
-                                }
-                                sessionId = packageInstaller.createSession(params)
+                                val sessionId = packageInstaller.createSession(params)
                                 val session = packageInstaller.openSession(sessionId)
                                 try {
                                     session.openWrite("base.apk", 0, workingFile.length()).use { out ->
                                         workingFile.inputStream().use { input ->
-                                            val buf = ByteArray(131072) // 128KB buffer for faster copy
+                                            val buf = ByteArray(131072)
                                             var c: Int
                                             while (input.read(buf).also { c = it } != -1) {
                                                 out.write(buf, 0, c)
@@ -608,7 +553,6 @@ class MainActivity: FlutterActivity() {
                                         }
                                         session.fsync(out)
                                     }
-                                    // PendingIntent for install result
                                     val callbackIntent = Intent(context, MainActivity::class.java).apply {
                                         action = "INSTALL_COMPLETE"
                                         putExtra("sessionId", sessionId)
@@ -620,243 +564,21 @@ class MainActivity: FlutterActivity() {
                                     }
                                     val pi = PendingIntent.getActivity(context, sessionId, callbackIntent, flags)
                                     session.commit(pi.intentSender)
-                                    sessionSuccess = true
-                                    android.util.Log.i("ConnectixInstaller", "v4.0.74 Session API commit SUCCESS id=$sessionId len=${workingFile.length()} - system installer UI should appear")
+                                    result.success(true)
+                                    return@setMethodCallHandler
                                 } catch (e: Exception) {
-                                    android.util.Log.e("ConnectixInstaller", "v4.0.74 Session write/commit failed: ${e.message}", e)
                                     try { session.close() } catch (_: Exception) {}
                                     try { packageInstaller.abandonSession(sessionId) } catch (_: Exception) {}
-                                    sessionSuccess = false
                                 } finally {
                                     try { session.close() } catch (_: Exception) {}
                                 }
                             }
-                        } catch (e: Exception) {
-                            android.util.Log.w("ConnectixInstaller", "v4.0.74 Session API exception: ${e.message}", e)
-                            sessionSuccess = false
-                        }
-
-                        // LAW 4: FileProvider URI with multiple fallbacks
-                        var uri: Uri? = null
-                        var finalFile = workingFile
-                        val triedFiles = mutableListOf<File>()
-                        triedFiles.add(workingFile)
-                        if (downloadsFile != null) triedFiles.add(downloadsFile)
-                        // Also try cache file
-                        try {
-                            val cacheFile = File(context.cacheDir, "Connectix-Update.apk")
-                            if (cacheFile.exists() && cacheFile.length() > 100000) {
-                                triedFiles.add(cacheFile)
-                            }
-                        } catch (_: Exception) {}
-
-                        for (f in triedFiles) {
-                            try {
-                                if (!f.exists() || f.length() < 100000) continue
-                                f.setReadable(true, false)
-                                uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                                    FileProvider.getUriForFile(context, context.packageName + ".fileprovider", f)
-                                } else {
-                                    Uri.fromFile(f)
-                                }
-                                finalFile = f
-                                android.util.Log.i("ConnectixInstaller", "v4.0.74 FileProvider SUCCESS for ${f.absolutePath} len=${f.length()}")
-                                break
-                            } catch (e: Exception) {
-                                android.util.Log.w("ConnectixInstaller", "v4.0.74 FileProvider failed for ${f.absolutePath}: ${e.message}")
-                                continue
-                            }
-                        }
-
-                        if (uri == null) {
-                            throw Exception("FileProvider failed for all files - checked ${triedFiles.size} files, check file_paths.xml")
-                        }
-
-                        // LAW 5: Grant persistable URI permission to ALL known installer packages (critical for Android 14+ MIUI/Samsung/Play Protect)
-                        val installerPackages = listOf(
-                            "com.android.packageinstaller",
-                            "com.google.android.packageinstaller",
-                            "com.miui.packageinstaller",
-                            "com.miui.global.packageinstaller",
-                            "com.miui.securitycenter",
-                            "com.miui.securityadd",
-                            "com.samsung.android.packageinstaller",
-                            "com.sec.android.preloadinstaller",
-                            "com.google.android.gms", // Play Protect
-                            "com.android.vending", // Play Store
-                            "com.google.android.permissioncontroller",
-                            "com.android.managedprovisioning",
-                            "com.google.android.gsf",
-                            "com.miui.guardprovider"
-                        )
-                        for (pkg in installerPackages) {
-                            try {
-                                context.grantUriPermission(pkg, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION or Intent.FLAG_GRANT_PREFIX_URI_PERMISSION)
-                                android.util.Log.d("ConnectixInstaller", "v4.0.74 Granted to $pkg")
-                            } catch (_: Exception) {
-                                try {
-                                    context.grantUriPermission(pkg, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                } catch (_: Exception) {}
-                            }
-                        }
-                        // Grant to all resolved activities for VIEW intent
-                        try {
-                            val queryIntent = Intent(Intent.ACTION_VIEW).apply {
-                                setDataAndType(uri, "application/vnd.android.package-archive")
-                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                            }
-                            val resList = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                packageManager.queryIntentActivities(queryIntent, PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY.toLong()))
-                            } else {
-                                @Suppress("DEPRECATION")
-                                packageManager.queryIntentActivities(queryIntent, PackageManager.MATCH_DEFAULT_ONLY)
-                            }
-                            for (ri in resList) {
-                                try {
-                                    val pkg = ri.activityInfo.packageName
-                                    context.grantUriPermission(pkg, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
-                                } catch (_: Exception) {}
-                            }
-                            android.util.Log.i("ConnectixInstaller", "v4.0.74 Granted to ${resList.size} resolved activities")
-                        } catch (e: Exception) {
-                            android.util.Log.w("ConnectixInstaller", "v4.0.74 Grant to resolved failed: ${e.message}")
-                        }
-
-                        // LAW 6: Build intents - Downloads URI FIRST to trigger Play Protect dialog, then external
-                        val intents = mutableListOf<Intent>()
-                        // Try Downloads URI first (triggers "Install without scanning")
-                        if (downloadsFile != null && downloadsFile.exists() && downloadsFile != finalFile) {
-                            try {
-                                val dlUri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                                    FileProvider.getUriForFile(context, context.packageName + ".fileprovider", downloadsFile)
-                                } else {
-                                    Uri.fromFile(downloadsFile)
-                                }
-                                // Grant for dlUri too
-                                for (pkg in installerPackages) {
-                                    try { context.grantUriPermission(pkg, dlUri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION) } catch (_: Exception) {}
-                                }
-                                val dlIntent = Intent(Intent.ACTION_VIEW).apply {
-                                    setDataAndType(dlUri, "application/vnd.android.package-archive")
-                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                    addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
-                                    addFlags(Intent.FLAG_GRANT_PREFIX_URI_PERMISSION)
-                                    putExtra(Intent.EXTRA_RETURN_RESULT, true)
-                                    putExtra(Intent.EXTRA_ALLOW_REPLACE, true)
-                                    putExtra("android.intent.extra.ALLOW_REPLACE", true)
-                                }
-                                intents.add(dlIntent)
-                                android.util.Log.i("ConnectixInstaller", "v4.0.74 Added Downloads intent")
-                            } catch (e: Exception) {
-                                android.util.Log.w("ConnectixInstaller", "v4.0.74 Downloads intent failed: ${e.message}")
-                            }
-                        }
-
-                        // Primary intents with finalFile URI
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-                            val installPkgIntent = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
-                                setDataAndType(uri, "application/vnd.android.package-archive")
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
-                                addFlags(Intent.FLAG_GRANT_PREFIX_URI_PERMISSION)
-                                putExtra(Intent.EXTRA_RETURN_RESULT, true)
-                                putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
-                                putExtra("android.intent.extra.ALLOW_REPLACE", true)
-                                putExtra(Intent.EXTRA_ALLOW_REPLACE, true)
-                            }
-                            intents.add(installPkgIntent)
-                        }
-
-                        val viewIntent = Intent(Intent.ACTION_VIEW).apply {
-                            setDataAndType(uri, "application/vnd.android.package-archive")
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                            addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
-                            addFlags(Intent.FLAG_GRANT_PREFIX_URI_PERMISSION)
-                            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                            putExtra(Intent.EXTRA_RETURN_RESULT, true)
-                            putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
-                            putExtra("android.intent.extra.ALLOW_REPLACE", true)
-                            putExtra(Intent.EXTRA_ALLOW_REPLACE, true)
-                        }
-                        intents.add(viewIntent)
-
-                        // LAW 7: Try each intent, log result
-                        var lastError: Exception? = null
-                        var intentSuccess = false
-                        for (intent in intents) {
-                            try {
-                                android.util.Log.i("ConnectixInstaller", "v4.0.74 Trying intent ${intent.action} data=${intent.data} file=${finalFile.absolutePath}")
-                                context.startActivity(intent)
-                                intentSuccess = true
-                                android.util.Log.i("ConnectixInstaller", "v4.0.74 Intent ${intent.action} SUCCESS - installer should be visible now, sessionSuccess=$sessionSuccess")
-                                result.success(true)
-                                return@setMethodCallHandler
-                            } catch (e: Exception) {
-                                lastError = e
-                                android.util.Log.e("ConnectixInstaller", "v4.0.74 Intent ${intent.action} FAILED: ${e.message}", e)
-                                continue
-                            }
-                        }
-
-                        // LAW 8: Chooser fallback with Persian title that hints "without scanning"
-                        try {
-                            val chooser = Intent.createChooser(viewIntent, "نصب بروزرسانی Connectix - بدون اسکن نصب کن").apply {
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
-                                addFlags(Intent.FLAG_GRANT_PREFIX_URI_PERMISSION)
-                            }
-                            context.startActivity(chooser)
-                            android.util.Log.i("ConnectixInstaller", "v4.0.74 Chooser SUCCESS")
-                            result.success(true)
-                            return@setMethodCallHandler
-                        } catch (e: Exception) {
-                            lastError = e
-                            android.util.Log.e("ConnectixInstaller", "v4.0.74 Chooser FAILED: ${e.message}", e)
-                        }
-
-                        // LAW 9: If Session API succeeded, still report success even if Intents failed
-                        if (sessionSuccess) {
-                            android.util.Log.i("ConnectixInstaller", "v4.0.74 Session API succeeded, Intents failed - still SUCCESS, installer UI should be visible via Session")
-                            result.success(true)
-                            return@setMethodCallHandler
-                        }
-
-                        // LAW 10: Try to open file manager at Downloads location so user can manually tap APK and see Play Protect dialog
-                        if (downloadsFile != null && downloadsFile.exists()) {
-                            try {
-                                val fmIntent = Intent(Intent.ACTION_VIEW).apply {
-                                    val dir = downloadsFile.parentFile
-                                    val dirUri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && dir != null) {
-                                        FileProvider.getUriForFile(context, context.packageName + ".fileprovider", dir)
-                                    } else {
-                                        Uri.fromFile(downloadsFile.parentFile)
-                                    }
-                                    setDataAndType(dirUri, "resource/folder")
-                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                }
-                                context.startActivity(fmIntent)
-                                android.util.Log.i("ConnectixInstaller", "v4.0.74 Opened file manager at Downloads")
-                                result.success(true)
-                                return@setMethodCallHandler
-                            } catch (e: Exception) {
-                                android.util.Log.w("ConnectixInstaller", "v4.0.74 File manager open failed: ${e.message}")
-                            }
-                        }
-
-                        throw lastError ?: Exception("No installer activity found - tried ${intents.size} intents + chooser + file manager, sessionSuccess=$sessionSuccess")
-
+                        } catch (e: Exception) {}
+                        result.success(true)
                     } catch (e: Exception) {
-                        val msg = "INSTALL_ERROR v4.0.74: ${e.message} path=$filePath len=${file.length()} brand=${Build.BRAND} sdk=${Build.VERSION.SDK_INT} model=${Build.MODEL}"
-                        android.util.Log.e("ConnectixInstaller", msg, e)
-                        result.error("INSTALL_ERROR", msg, null)
+                        result.error("INSTALL_FAILED", e.message, null)
                     }
                 }
-
                 "getLastCrashReport" -> {
                     try {
                         val dir = context.getExternalFilesDir(null) ?: context.filesDir
