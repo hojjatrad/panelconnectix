@@ -21,7 +21,7 @@ class ApiService {
   // Layer 5: Brute-force common paths
   // Layer 6: Remote config from GitHub
   
-  // v4.0.75 FIX: Update error "ارتباط برقرار نشد" - FORENSIC
+  // v4.0.80 FIX: Update error "ارتباط برقرار نشد" - FORENSIC
   // Root cause: baseUrls contained ir.vpbotn.ir and cf.vpbotn.ir which return 404 for APKs and sometimes timeout
   // User sees "connection failed" because all 7 URLs tried with 6s timeout each = 42s wait, then fails
   // FIX: Only keep working hosts, prioritize vpbotn.ir direct, add direct.vpbotn.ir, remove ir/cf from update path
@@ -86,12 +86,12 @@ class ApiService {
       final savedApiKey = prefs.getString('saved_api_key') ?? '';
       if (savedApiKey.isNotEmpty) {
         _customApiKey = savedApiKey;
-        log('v4.0.75 initBaseUrl: loaded saved_api_key: ${savedApiKey.substring(0, savedApiKey.length > 8 ? 8 : savedApiKey.length)}...');
+        log('v4.0.80 initBaseUrl: loaded saved_api_key: ${savedApiKey.substring(0, savedApiKey.length > 8 ? 8 : savedApiKey.length)}...');
       }
       
       log('v8.0 initBaseUrl start: savedWorking=$savedWorking savedDomain=$savedDomain');
       
-      // v4.0.75: First fetch global config from web panel - central management
+      // v4.0.80: First fetch global config from web panel - central management
       try {
         await fetchGlobalAppConfig();
       } catch (_) {}
@@ -141,7 +141,7 @@ class ApiService {
     }
   }
 
-  // v4.0.75: Fetch global app config from web panel - Central management
+  // v4.0.80: Fetch global app config from web panel - Central management
   static Map<String, dynamic>? _globalAppConfig;
   static Map<String, dynamic>? get globalAppConfig => _globalAppConfig;
 
@@ -162,7 +162,7 @@ class ApiService {
               _globalAppConfig = Map<String, dynamic>.from(data['data']);
               final prefs = await SharedPreferences.getInstance();
               await prefs.setString('global_app_config', jsonEncode(_globalAppConfig));
-              log('v4.0.75 Global app config fetched from $url: ${_globalAppConfig}');
+              log('v4.0.80 Global app config fetched from $url: ${_globalAppConfig}');
               // Auto-apply panel URL and API key from global config
               final panelUrl = _globalAppConfig!['default_panel_url']?.toString() ?? _globalAppConfig!['panel_url']?.toString() ?? '';
               final apiKey = _globalAppConfig!['default_api_key']?.toString() ?? _globalAppConfig!['api_key']?.toString() ?? '';
@@ -173,12 +173,12 @@ class ApiService {
                 baseUrl = panelUrl;
                 await prefs.setString('api_base_url_working', panelUrl);
                 await prefs.setString('api_base_url', panelUrl);
-                log('v4.0.75 AUTO panel_url from global config: $panelUrl');
+                log('v4.0.80 AUTO panel_url from global config: $panelUrl');
               }
               if (apiKey.isNotEmpty) {
                 _customApiKey = apiKey;
                 await prefs.setString('saved_api_key', apiKey);
-                log('v4.0.75 AUTO api_key from global config: ${apiKey.substring(0, apiKey.length > 8 ? 8 : apiKey.length)}...');
+                log('v4.0.80 AUTO api_key from global config: ${apiKey.substring(0, apiKey.length > 8 ? 8 : apiKey.length)}...');
               }
               if (hidePanel) {
                 await prefs.setBool('hide_manual_panel_url', true);
@@ -195,7 +195,7 @@ class ApiService {
             }
           }
         } catch (e) {
-          log('v4.0.75 fetchGlobalAppConfig failed for $url: $e');
+          log('v4.0.80 fetchGlobalAppConfig failed for $url: $e');
           continue;
         }
       }
@@ -205,12 +205,12 @@ class ApiService {
       if (cached != null && cached.isNotEmpty) {
         try {
           _globalAppConfig = jsonDecode(cached) as Map<String, dynamic>;
-          log('v4.0.75 Global app config loaded from cache');
+          log('v4.0.80 Global app config loaded from cache');
           return _globalAppConfig;
         } catch (_) {}
       }
     } catch (e) {
-      log('v4.0.75 fetchGlobalAppConfig error: $e');
+      log('v4.0.80 fetchGlobalAppConfig error: $e');
     }
     return null;
   }
@@ -637,7 +637,7 @@ class ApiService {
     return [];
   }
 
-  // v4.0.75 ZERO-COST: Last Working Server Cache (ST4)
+  // v4.0.80 ZERO-COST: Last Working Server Cache (ST4)
   static Future<void> saveLastWorkingServer(ServerModel server) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -676,7 +676,7 @@ class ApiService {
     } catch (_) {}
   }
 
-  // v4.0.75 ZERO-COST: Get Best Server sorted by ping (S2)
+  // v4.0.80 ZERO-COST: Get Best Server sorted by ping (S2)
   static List<ServerModel> getBestServersSorted(List<ServerModel> servers) {
     final list = List<ServerModel>.from(servers);
     list.sort((a, b) {
@@ -692,7 +692,7 @@ class ApiService {
     return list;
   }
 
-  // v4.0.75 ZERO-COST: Multi-Domain Fallback for ANY API request (ST1)
+  // v4.0.80 ZERO-COST: Multi-Domain Fallback for ANY API request (ST1)
   static Future<http.Response> requestWithFallback(
     String path, {
     String method = 'GET',
@@ -740,7 +740,7 @@ class ApiService {
     throw lastError ?? Exception('All fallback domains failed for $path');
   }
 
-  // v4.0.75 API KEY SUPPORT: Login via API key + username/password
+  // v4.0.80 API KEY SUPPORT: Login via API key + username/password
   static String? _customApiKey;
   static void setApiKey(String? key) {
     _customApiKey = key;
@@ -924,25 +924,25 @@ class ApiService {
       await saveCachedServers(initialServers);
     }
 
-    // v4.0.75 MULTI-ACCOUNT: save to account manager
-    // v4.0.75 MANAGED MODE + API KEY + v4.0.75 AUTO API KEY FROM PANEL
+    // v4.0.80 MULTI-ACCOUNT: save to account manager
+    // v4.0.80 MANAGED MODE + API KEY + v4.0.80 AUTO API KEY FROM PANEL
     try {
-      // v4.0.75: Extract API key from server response (set by admin in web panel)
+      // v4.0.80: Extract API key from server response (set by admin in web panel)
       final serverApiKey = clientMap['api_key']?.toString() ?? brandingMap['api_key']?.toString() ?? '';
       final serverPanelUrl = brandingMap['panel_url']?.toString() ?? clientMap['panel_url']?.toString() ?? '';
       if (serverApiKey.isNotEmpty) {
         _customApiKey = serverApiKey;
         await prefs.setString('saved_api_key', serverApiKey);
-        log('v4.0.75 AUTO API KEY from panel: ${serverApiKey.substring(0, serverApiKey.length > 8 ? 8 : serverApiKey.length)}... saved to prefs');
+        log('v4.0.80 AUTO API KEY from panel: ${serverApiKey.substring(0, serverApiKey.length > 8 ? 8 : serverApiKey.length)}... saved to prefs');
       }
-      // v4.0.75: If server returns custom panel_url (set by admin), use it automatically
+      // v4.0.80: If server returns custom panel_url (set by admin), use it automatically
       if (serverPanelUrl.isNotEmpty && serverPanelUrl.startsWith('http')) {
         // Only update if different and valid
         if (serverPanelUrl != currentBase) {
           await prefs.setString('api_base_url_working', serverPanelUrl);
           await prefs.setString('api_base_url', serverPanelUrl);
           baseUrl = serverPanelUrl;
-          log('v4.0.75 AUTO PANEL URL from admin: $serverPanelUrl applied');
+          log('v4.0.80 AUTO PANEL URL from admin: $serverPanelUrl applied');
         }
       }
       // Check if branding has hide config or managed mode flags
@@ -951,12 +951,12 @@ class ApiService {
       if (hideConfig) {
         await AccountManager.setHideConfig(true);
         await prefs.setBool('hide_app_config', true);
-        log('v4.0.75 AUTO HIDE CONFIG enabled from panel');
+        log('v4.0.80 AUTO HIDE CONFIG enabled from panel');
       }
       if (managedMode) {
         await AccountManager.setManagedMode(true);
         await prefs.setBool('app_managed_mode', true);
-        log('v4.0.75 AUTO MANAGED MODE enabled from panel');
+        log('v4.0.80 AUTO MANAGED MODE enabled from panel');
       }
       
       final account = await AccountManager.addOrUpdateAccount(
@@ -987,7 +987,7 @@ class ApiService {
     };
   }
 
-  // v4.0.75 MULTI-ACCOUNT: Switch active account
+  // v4.0.80 MULTI-ACCOUNT: Switch active account
   static Future<Map<String, dynamic>?> switchToAccount(VpnAccount account) async {
     try {
       final password = await AccountManager.getPassword(account.id);
@@ -1048,7 +1048,7 @@ class ApiService {
     }
   }
 
-  // v4.0.75 MULTI-ACCOUNT: Get all servers from all accounts (unified mode)
+  // v4.0.80 MULTI-ACCOUNT: Get all servers from all accounts (unified mode)
   static Future<List<AccountServerEntry>> getAllAccountsServers() async {
     final accounts = await AccountManager.getAccounts();
     final List<AccountServerEntry> result = [];
@@ -1208,7 +1208,7 @@ class ApiService {
     }
   }
 
-  // v4.0.71 IMPROVED PING - TCP + HTTP fallback + bypass for panel domain
+  // v4.0.80 IMPROVED PING - TCP + HTTP fallback + bypass for panel domain
   static Future<int?> pingServerUri(String uriStr) async {
     try {
       String host = '';
@@ -1295,7 +1295,7 @@ class ApiService {
         return null;
       }
 
-      // v4.0.75: Try TCP connect with 3 attempts and shorter timeout for faster UI
+      // v4.0.80: Try TCP connect with 3 attempts and shorter timeout for faster UI
       for (int attempt = 0; attempt < 2; attempt++) {
         try {
           final sw = Stopwatch()..start();
@@ -1316,7 +1316,7 @@ class ApiService {
         }
       }
 
-      // v4.0.75: Fallback - try HTTP ping to host:port via HTTP client (for servers behind CDN)
+      // v4.0.80: Fallback - try HTTP ping to host:port via HTTP client (for servers behind CDN)
       try {
         final sw = Stopwatch()..start();
         final httpClient = HttpClient();
@@ -1332,16 +1332,16 @@ class ApiService {
         log('pingServerUri: HTTP fallback failed for $host:$port: $e');
       }
 
-      // v4.0.75: Last fallback - if host is IP, try to return estimated ping based on availability
+      // v4.0.80: Last fallback - if host is IP, try to return estimated ping based on availability
       // For now, return null to indicate "unknown but server exists" - UI will show "آماده"
       return null;
     } catch (e) {
       log('pingServerUri top-level error: $e');
-      return null; // v4.0.75: Return null not -1 to show "آماده" instead of "خطا"
+      return null; // v4.0.80: Return null not -1 to show "آماده" instead of "خطا"
     }
   }
 
-  // v4.0.75 FIX: Robust pingAllServers with timeouts and guaranteed progress
+  // v4.0.80 FIX: Robust pingAllServers with timeouts and guaranteed progress
   // User reported: "زمانی که تست پینگ همه سرورها را میزنم اصلا سرورها را عدد نمیندازه که بگه چندتا را داره پینگ میگیره و زده 0 از 16 سرور"
   // Root cause: getServerDelay may hang without timeout, blocking batch and progress stays 0
   // Fix: Add timeout to pingFn, ensure onProgress always called, handle errors, log
@@ -1362,7 +1362,7 @@ class ApiService {
             int? ms;
             if (pingFn != null) {
               try {
-                // v4.0.75: Add 5s timeout to pingFn (getServerDelay may hang)
+                // v4.0.80: Add 5s timeout to pingFn (getServerDelay may hang)
                 ms = await pingFn(s.configUri).timeout(const Duration(seconds: 5), onTimeout: () {
                   log('pingAllServers: pingFn timeout for ${s.name}');
                   return null;
@@ -1385,7 +1385,7 @@ class ApiService {
                 ms = null;
               }
             }
-            // v4.0.75: If still null, set to 0 = "آماده" instead of null, so UI shows ready
+            // v4.0.80: If still null, set to 0 = "آماده" instead of null, so UI shows ready
             if (ms == null || ms <= 0) {
               s.pingMs = 0; // 0 = آماده - server exists but ping not measurable
               log('pingAllServers: ${s.name} set to 0 (آماده) - ping not measurable but server exists');
@@ -1410,7 +1410,7 @@ class ApiService {
     }
     log('pingAllServers: completed for ${servers.length} servers');
     
-    // v4.0.75 ZERO-COST S2: Auto-sort by ping after measurement
+    // v4.0.80 ZERO-COST S2: Auto-sort by ping after measurement
     try {
       servers.sort((a, b) {
         int scoreA = a.pingMs == null ? 9999 : (a.pingMs == 0 ? 1 : (a.pingMs! < 0 ? 10000 : a.pingMs!));
@@ -1494,7 +1494,7 @@ class ApiService {
     return [];
   }
 
-  // v4.0.75 IMPROVED AUTO-UPDATE - Architecture detection + force/optional + auto-download
+  // v4.0.80 IMPROVED AUTO-UPDATE - Architecture detection + force/optional + auto-download
   static Future<String> getDeviceAbi() async {
     try {
       const channel = MethodChannel('com.connectix.vpn/device_info');
@@ -1511,7 +1511,7 @@ class ApiService {
   }
 
   static Map<String, dynamic> selectBestApk(Map<String, dynamic> apksData, String deviceAbi) {
-    // v4.0.75: Select best APK based on device ABI
+    // v4.0.80: Select best APK based on device ABI
     // Priority: exact match > arm64 > arm32 > universal
     if (apksData.containsKey(deviceAbi)) {
       return {
@@ -1558,7 +1558,7 @@ class ApiService {
     return {'url': '', 'size': 0, 'size_human': '', 'abi': 'unknown', 'arch': 'unknown', 'recommended': false};
   }
 
-  // v4.0.75 FIX: Update banner not showing - Forever fix
+  // v4.0.80 FIX: Update banner not showing - Forever fix
   static bool isNewerVersionStatic(String latest, String current) {
     try {
       List<int> parse(String v) => v.replaceAll(RegExp(r'[^\d.]'), '').split('.').map((e) => int.tryParse(e) ?? 0).toList();
@@ -1574,11 +1574,11 @@ class ApiService {
     return false;
   }
 
-  // v4.0.75 FIX: Update error "ارتباط برقرار نشد" - FORENSIC
+  // v4.0.80 FIX: Update error "ارتباط برقرار نشد" - FORENSIC
   // OLD BUG: 6s timeout per URL, 4 URLs = 24s wait, plus GitHub 5s = 29s total before showing error
   // User on slow Iran network sees timeout and gets "connection failed"
   // FIX: 10s timeout, only 2 primary URLs, parallel GitHub check, never show connection error for update
-  // v4.0.75 NEW ARCHITECTURE: 3-Tier Hybrid - GitHub Direct + Panel Proxy + Browser Fallback - 100% Reliable
+  // v4.0.80 NEW ARCHITECTURE: 3-Tier Hybrid - GitHub Direct + Panel Proxy + Browser Fallback - 100% Reliable
   // Tier 1: GitHub API Direct (Primary - no panel dependency, always fresh)
   // Tier 2: Panel Proxy (Secondary - for Iran where GitHub blocked)
   // Tier 3: Browser Fallback (Guaranteed - always works)
@@ -1590,12 +1590,12 @@ class ApiService {
     // ============ TIER 1: GitHub API Direct (Primary - Source of Truth) ============
     // This is the most reliable - GitHub is always up-to-date, no panel dependency
     try {
-      log('v4.0.75 TIER1: Checking GitHub API directly...');
+      log('v4.0.80 TIER1: Checking GitHub API directly...');
       final ghApiResp = await http.get(
         Uri.parse("https://api.github.com/repos/hojjatrad/panelconnectix/releases/latest"),
         headers: {
           'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'ConnectixVPN-App/4.0.75',
+          'User-Agent': 'ConnectixVPN-App/4.0.80',
           'Cache-Control': 'no-cache'
         },
       ).timeout(const Duration(seconds: 8));
@@ -1647,17 +1647,17 @@ class ApiService {
             'force_update': false,
           };
           bestVersion = ver;
-          log('v4.0.75 TIER1 SUCCESS: GitHub API returned $ver');
+          log('v4.0.80 TIER1 SUCCESS: GitHub API returned $ver');
         }
       }
     } catch (e) {
-      log('v4.0.75 TIER1 FAILED: GitHub API error: $e');
+      log('v4.0.80 TIER1 FAILED: GitHub API error: $e');
     }
     
     // ============ TIER 1B: GitHub Raw app_release.json (Secondary Primary) ============
     if (bestResult == null) {
       try {
-        log('v4.0.75 TIER1B: Checking GitHub Raw app_release.json...');
+        log('v4.0.80 TIER1B: Checking GitHub Raw app_release.json...');
         final rawResp = await http.get(
           Uri.parse("https://raw.githubusercontent.com/hojjatrad/panelconnectix/main/app_release.json?v=${DateTime.now().millisecondsSinceEpoch}"),
           headers: {'Accept': 'application/json', 'Cache-Control': 'no-cache'},
@@ -1688,11 +1688,11 @@ class ApiService {
               'force_update': rawData['force_update'] == true,
             };
             bestVersion = ver;
-            log('v4.0.75 TIER1B SUCCESS: GitHub Raw returned $ver');
+            log('v4.0.80 TIER1B SUCCESS: GitHub Raw returned $ver');
           }
         }
       } catch (e) {
-        log('v4.0.75 TIER1B FAILED: GitHub Raw error: $e');
+        log('v4.0.80 TIER1B FAILED: GitHub Raw error: $e');
       }
     }
     
@@ -1706,7 +1706,7 @@ class ApiService {
     for (final tier2Url in tier2Urls) {
       if (bestResult != null) break;
       try {
-        log('v4.0.75 TIER2: Checking $tier2Url...');
+        log('v4.0.80 TIER2: Checking $tier2Url...');
         final resp = await http.get(
           Uri.parse("$tier2Url?v=${DateTime.now().millisecondsSinceEpoch}"),
           headers: {'Accept': 'application/json', 'Cache-Control': 'no-cache'},
@@ -1736,12 +1736,12 @@ class ApiService {
               'force_update': data['force_update'] == true,
             };
             bestVersion = ver;
-            log('v4.0.75 TIER2 SUCCESS: $tier2Url returned $ver');
+            log('v4.0.80 TIER2 SUCCESS: $tier2Url returned $ver');
             break;
           }
         }
       } catch (e) {
-        log('v4.0.75 TIER2 FAILED: $tier2Url error: $e');
+        log('v4.0.80 TIER2 FAILED: $tier2Url error: $e');
       }
     }
     
@@ -1771,30 +1771,30 @@ class ApiService {
               map['source'] = 'panel_api';
               bestResult = map;
               bestVersion = ver;
-              log('v4.0.75 TIER2B SUCCESS: Panel API $currentBase returned $ver');
+              log('v4.0.80 TIER2B SUCCESS: Panel API $currentBase returned $ver');
               break;
             }
           }
         } catch (e) {
-          log('v4.0.75 TIER2B FAILED: Panel API error: $e');
+          log('v4.0.80 TIER2B FAILED: Panel API error: $e');
         }
       }
     }
     
     // ============ FINAL: Return best result (newest version) ============
     if (bestResult != null) {
-      log('v4.0.75 FINAL: Returning $bestVersion from ${bestResult['source']}');
+      log('v4.0.80 FINAL: Returning $bestVersion from ${bestResult['source']}');
       return bestResult;
     }
     
-    log('v4.0.75 FINAL: No update found from any tier');
+    log('v4.0.80 FINAL: No update found from any tier');
     return null;
   }
 
-  // v4.0.75 PROXY: Get proxies
+  // v4.0.80 PROXY: Get proxies
 
 
-  // v4.0.75 PROXY: Get proxies - FORENSIC FIX for infinite spinner
+  // v4.0.80 PROXY: Get proxies - FORENSIC FIX for infinite spinner
   // OLD BUG: 7 baseUrls * 8s = 56s worst, DNS hang not timed out, spinner infinite
   // FIX: Only 2 primary URLs, 3s timeout per URL, total max 6s, immediate return if token empty
   static Future<Map<String, dynamic>?> getProxies() async {
@@ -1806,7 +1806,7 @@ class ApiService {
         return null;
       }
 
-      // v4.0.75: Only try 2 most reliable URLs for proxy, not all 7 - to prevent 56s hang
+      // v4.0.80: Only try 2 most reliable URLs for proxy, not all 7 - to prevent 56s hang
       final orderedUrls = getOrderedBaseUrls();
       final limitedUrls = orderedUrls.take(2).toList(); // Only first 2
       
@@ -1820,7 +1820,7 @@ class ApiService {
               'X-Auth-Token': token,
               'Accept': 'application/json'
             },
-          ).timeout(const Duration(seconds: 3)); // v4.0.75: 3s not 8s
+          ).timeout(const Duration(seconds: 3)); // v4.0.80: 3s not 8s
 
           await _checkAndUpdateFromHeaders(response);
 
@@ -1912,7 +1912,7 @@ class ApiService {
     return null;
   }
 
-  // v4.0.75 FOREVER LAW - Deep verification + version check + multi-source retry + anti-jump
+  // v4.0.80 FOREVER LAW - Deep verification + version check + multi-source retry + anti-jump
   // User reported: "برنامه آپ هنگام نصب میپره و نصب نمیشه و نسخه جدیدی نمیاد"
   // Root causes:
   // 1. Panel serves old APK content even with ?v= param (mirrored file stale on host)
@@ -1929,14 +1929,14 @@ class ApiService {
   // LAW 8: Use externalFilesDir for FileProvider (best for MIUI/Samsung) + grant to 9 installers
   // LAW 9: Pure Intent (ACTION_INSTALL_PACKAGE + VIEW + Chooser) - NO PackageInstaller API
   // LAW 10: Show detailed error with file path, size, version, and browser fallback
-  // v4.0.75 FIX: Safe WakeLock with timeout + engine detached handling - prevents exit errors
+  // v4.0.80 FIX: Safe WakeLock with timeout + engine detached handling - prevents exit errors
   static Future<bool> acquireWakeLock() async {
     try {
       const channel = MethodChannel('com.connectix.vpn/updater');
       final result = await channel.invokeMethod('acquireWakeLock').timeout(const Duration(seconds: 2), onTimeout: () => false);
       return result == true;
     } catch (e) {
-      // v4.0.75: MissingPluginException after engine detach is expected, ignore
+      // v4.0.80: MissingPluginException after engine detach is expected, ignore
       if (e.toString().contains('MissingPluginException')) {
         return false;
       }
@@ -2008,7 +2008,7 @@ class ApiService {
     }
   }
 
-  // v4.0.75 FOREVER LAW: Download must NEVER stay in connecting state - Bulletproof
+  // v4.0.80 FOREVER LAW: Download must NEVER stay in connecting state - Bulletproof
   // LAW 1: Always show progress from 0% to 100% with MB, never stuck at connecting >10 sec
   // LAW 2: Try all 8 URLs with streaming, not just primary
   // LAW 3: If all streaming fail, try DownloadManager with stuck detection
@@ -2016,7 +2016,7 @@ class ApiService {
   // LAW 5: Use http.Client streaming (not http.get RAM) for progress
   // LAW 6: Timeout per URL 20 sec, total max 4 min, always call onError if fails
   // LAW 7: Test with real download, ensure progress works
-  // v4.0.75 FOREVER LAW: Download must NEVER stay in connecting state - Bulletproof
+  // v4.0.80 FOREVER LAW: Download must NEVER stay in connecting state - Bulletproof
   // LAW 1: Always show progress from 0% to 100% with MB, never stuck at connecting >10 sec
   // LAW 2: Try all 8 URLs with streaming, not just primary
   // LAW 3: If all streaming fail, try DownloadManager with stuck detection
@@ -2024,7 +2024,7 @@ class ApiService {
   // LAW 5: Use http.Client streaming (not http.get RAM) for progress
   // LAW 6: Timeout per URL 20 sec, total max 4 min, always call onError if fails
   // LAW 7: Test with real download, ensure progress works
-  // v4.0.75 ULTRA FIX: Download stuck at 10% + white screen + RTL flip + update button
+  // v4.0.80 ULTRA FIX: Download stuck at 10% + white screen + RTL flip + update button
   // LAW 1: Never stuck at connecting >5 sec - immediate progress 2% then 5%
   // LAW 2: Always show progress 0-100% with MB, even on failure
   // LAW 3: Outer try/catch to prevent white screen - always call onError
@@ -2033,11 +2033,11 @@ class ApiService {
   // LAW 6: DM fallback with stuck detection 15s
   // LAW 7: If all fail -> Persian error + browser + QR https://vpbotn.ir/qr_download.html + direct https://vpbotn.ir/Connectix-ARM64-v8a.apk
   // LAW 8: releaseWakeLock always, no white screen
-  // v4.0.75 ULTRA FORENSIC FIX - Deep expert analysis for 10% stuck + exit errors + proxy spinning
+  // v4.0.80 ULTRA FORENSIC FIX - Deep expert analysis for 10% stuck + exit errors + proxy spinning
   // ROOT CAUSE DEEP DIVE (3 bugs reported: 10% download stuck, exit errors, proxy infinite spinner):
   //
   // BUG 1: Download stuck at 10% - FORENSIC:
-  // - Old v4.0.75 used DownloadManager as PRIMARY, DM stuck at 0 bytes for 60s with progress 10% (0.1 + attempts/60*0.1)
+  // - Old v4.0.80 used DownloadManager as PRIMARY, DM stuck at 0 bytes for 60s with progress 10% (0.1 + attempts/60*0.1)
   // - Stuck detection only when bytes>0, so 0 bytes never detected as stuck -> infinite 10%
   // - File path used getCacheDir (/data/user/0/.../cache) which on MIUI/Samsung is cleared aggressively + FileProvider fails
   // - No progress timer when no data -> UI appears frozen
@@ -2053,7 +2053,7 @@ class ApiService {
   // - proxy_screen had fallback but _isLoading set only after getProxies returns, if getProxies hangs 56s, spinner 56s
   // - No immediate local fallback for offline case
   //
-  // FIX v4.0.75 ARCHITECTURE:
+  // FIX v4.0.80 ARCHITECTURE:
   // - Streaming as PRIMARY (more reliable than DM on Android 14+), DM as FALLBACK
   // - Use getExternalFilesDir (externalFilesDir) not cacheDir - best for MIUI/Samsung FileProvider + grant to 9 installers
   // - Only 2 most reliable URLs: vpbotn.ir/download_apk.php + direct.vpbotn.ir/download_apk.php both with ?start= resume + 206
@@ -2063,9 +2063,9 @@ class ApiService {
   // - Max 5 attempts with exponential backoff, then browser fallback with QR
   // - Monotonic progress never goes backwards
   // - WakeLock always released, client always closed, file integrity PK check
-  // - LAW 1-10 from v4.0.75 retained + LAW 11 (Range bypass) + LAW 12 (RTL) + LAW 13 (no stuck) + LAW 14 (externalFilesDir) + LAW 15 (exit clean)
+  // - LAW 1-10 from v4.0.80 retained + LAW 11 (Range bypass) + LAW 12 (RTL) + LAW 13 (no stuck) + LAW 14 (externalFilesDir) + LAW 15 (exit clean)
 
-  // v4.0.75 ULTRA FIX - Download APK with robust resume and no 90% loop
+  // v4.0.80 ULTRA FIX - Download APK with robust resume and no 90% loop
   // Fixes: TransactionTooLarge was fixed, now fix update 90% -> restart loop
   static Future<void> downloadAndInstallApk({
     required String downloadUrl,
@@ -2073,11 +2073,11 @@ class ApiService {
     required Function(String error) onError,
     required Function() onSuccess,
   }) async {
-    String expectedVer = '4.0.79';
+    String expectedVer = '4.0.80';
     bool wakeLockAcquired = false;
     double lastProgress = 0.0;
     int totalAttempts = 0;
-    const int maxTotalAttempts = 5; // v4.0.75: 8->5, fail faster to browser
+    const int maxTotalAttempts = 5; // v4.0.80: 8->5, fail faster to browser
     Timer? progressTimer;
     int lastReceivedForTimer = 0;
     DateTime lastChunkTime = DateTime.now();
@@ -2085,7 +2085,7 @@ class ApiService {
 
     void safeProgress(double p, int rec, int tot) {
       try {
-        // v4.0.75 FIX: Don't allow progress to go backwards except on explicit resume failure
+        // v4.0.80 FIX: Don't allow progress to go backwards except on explicit resume failure
         // But allow reset to 0 when switching URL after failure (to avoid 90%->0% confusion, we keep lastProgress for same URL only)
         if (p < lastProgress && p > 0.1) {
           // If progress goes backwards significantly (>10%), it's a new URL attempt, allow reset
@@ -2147,9 +2147,9 @@ class ApiService {
       }
 
       final ts = DateTime.now().millisecondsSinceEpoch;
-      // v4.0.75 FIX: Prioritize GitHub direct (always correct version, source of truth) over panel
-      // Root cause of browser fallback bug: panel download_apk.php had hardcoded allowlist ['4.0.51','4.0.64',...,'4.0.72'] 
-      // blocking v4.0.75, so panel served old APK (4.0.72) -> version mismatch STRICT -> all attempts fail -> browser
+      // v4.0.80 FIX: Prioritize GitHub direct (always correct version, source of truth) over panel
+      // Root cause of browser fallback bug: panel download_apk.php had hardcoded allowlist ['4.0.51','4.0.64',...,'4.0.80'] 
+      // blocking v4.0.80, so panel served old APK (4.0.80) -> version mismatch STRICT -> all attempts fail -> browser
       // Fix: GitHub first (always correct), panel second (for Iran where GitHub blocked)
       final ghUrl1 = 'https://github.com/hojjatrad/panelconnectix/releases/download/v$expectedVer/Connectix-ARM64-v8a.apk?t=$ts';
       final ghUrl2 = 'https://github.com/hojjatrad/panelconnectix/releases/download/v$expectedVer/Connectix-Android-ARM64.apk?t=$ts';
@@ -2184,8 +2184,8 @@ class ApiService {
       // Combine: GitHub first, then panel
       final List<String> allUrls = [...githubUrls, ...panelUrls];
 
-      log('v4.0.75 FIX: ${allUrls.length} URLs (${githubUrls.length} GitHub + ${panelUrls.length} panel), max $maxTotalAttempts attempts, GitHub first (source of truth)');
-      print('v4.0.75: ${allUrls.length} URLs, max $maxTotalAttempts, ver $expectedVer');
+      log('v4.0.80 FIX: ${allUrls.length} URLs (${githubUrls.length} GitHub + ${panelUrls.length} panel), max $maxTotalAttempts attempts, GitHub first (source of truth)');
+      print('v4.0.80: ${allUrls.length} URLs, max $maxTotalAttempts, ver $expectedVer');
 
       String? fileDirPath;
       try {
@@ -2215,7 +2215,7 @@ class ApiService {
 
       final file = File('${dir.path}/Connectix-Update.apk');
 
-      // v4.0.75 FIX: Remove fake progress timer that caused 90% loop
+      // v4.0.80 FIX: Remove fake progress timer that caused 90% loop
       // Old code had timer that increased progress to 0.89 when stuck 3-30s, causing fake 90%
       // Then when real download failed, it restarted from 0, causing 90%->0% loop
       // Now: only show real progress, no fake
@@ -2225,10 +2225,10 @@ class ApiService {
         http.Client? client;
 
         if (urlIndex > 0) {
-          // v4.0.75: Shorter backoff, 1-3s
+          // v4.0.80: Shorter backoff, 1-3s
           final backoffSec = (urlIndex).clamp(1, 3);
           final backoff = Duration(seconds: backoffSec);
-          log('v4.0.75 Backoff ${backoff.inSeconds}s before URL ${urlIndex+1}');
+          log('v4.0.80 Backoff ${backoff.inSeconds}s before URL ${urlIndex+1}');
           await Future.delayed(backoff);
           // Reset progress for new URL attempt (show we're trying new URL)
           lastProgress = (0.05 + (urlIndex / allUrls.length) * 0.10).clamp(0.05, 0.15);
@@ -2237,20 +2237,20 @@ class ApiService {
         for (int resumeAttempt = 0; resumeAttempt < 2 && totalAttempts < maxTotalAttempts; resumeAttempt++) {
           totalAttempts++;
           try {
-            print('v4.0.75 Attempt $totalAttempts/$maxTotalAttempts URL ${urlIndex+1}/${allUrls.length} resume $resumeAttempt: $url');
-            log('v4.0.75 Attempt $totalAttempts: $url resume $resumeAttempt');
+            print('v4.0.80 Attempt $totalAttempts/$maxTotalAttempts URL ${urlIndex+1}/${allUrls.length} resume $resumeAttempt: $url');
+            log('v4.0.80 Attempt $totalAttempts: $url resume $resumeAttempt');
 
             int existingSize = 0;
             if (await file.exists()) {
               existingSize = await file.length();
-              // v4.0.75 FIX: If existing file is valid APK and >20MB, try install immediately (don't resume)
+              // v4.0.80 FIX: If existing file is valid APK and >20MB, try install immediately (don't resume)
               if (existingSize > 20*1024*1024 && resumeAttempt == 0) {
                 try {
                   final raf = await file.open();
                   final header = await raf.read(4);
                   await raf.close();
                   if (header.length >= 2 && header[0] == 0x50 && header[1] == 0x4B) {
-                    log('v4.0.75 Found existing valid APK $existingSize bytes, trying install');
+                    log('v4.0.80 Found existing valid APK $existingSize bytes, trying install');
                     safeProgress(0.92, existingSize, existingSize);
                     try {
                       final installResult = await _updaterChannel.invokeMethod('installApk', {'filePath': file.path, 'allowSameVersion': true}).timeout(const Duration(seconds: 10));
@@ -2265,16 +2265,16 @@ class ApiService {
                   }
                 } catch (_) {}
               }
-              // v4.0.75: Only resume if file >5MB and <35MB (partial), and resumeAttempt >0
+              // v4.0.80: Only resume if file >5MB and <35MB (partial), and resumeAttempt >0
               // If resumeAttempt==0, delete file <1MB only, keep larger for resume
               if (resumeAttempt > 0 && existingSize > 0 && existingSize < 35*1024*1024) {
-                log('v4.0.75 Resume from $existingSize bytes');
+                log('v4.0.80 Resume from $existingSize bytes');
               } else if (resumeAttempt == 0 && existingSize < 1*1024*1024) {
                 try { await file.delete(); } catch (_) {}
                 existingSize = 0;
               } else if (resumeAttempt == 0 && existingSize >= 1*1024*1024) {
                 // Keep existing for potential resume on next attempt
-                log('v4.0.75 Keeping existing $existingSize for resume on next attempt');
+                log('v4.0.80 Keeping existing $existingSize for resume on next attempt');
               }
             }
 
@@ -2295,13 +2295,13 @@ class ApiService {
                   requestUrl = 'https://vpbotn.ir/download_apk.php?file=universal&v=$expectedVer&start=$existingSize&t=${DateTime.now().millisecondsSinceEpoch}';
                 }
               }
-              log('v4.0.75 Resume: Range $existingSize- + URL $requestUrl');
+              log('v4.0.80 Resume: Range $existingSize- + URL $requestUrl');
             }
 
             client = http.Client();
             final request = http.Request('GET', Uri.parse(requestUrl));
             request.headers.addAll({
-              'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Mobile) Connectix v4.0.75',
+              'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Mobile) Connectix v4.0.80',
               'Accept': '*/*',
               'Cache-Control': 'no-cache, no-store',
               'Pragma': 'no-cache',
@@ -2314,10 +2314,10 @@ class ApiService {
             final streamedResponse = await client.send(request).timeout(const Duration(seconds: 30));
 
             if (streamedResponse.statusCode >= 400 && streamedResponse.statusCode != 206) {
-              print('v4.0.75 HTTP ${streamedResponse.statusCode} for $url');
+              print('v4.0.80 HTTP ${streamedResponse.statusCode} for $url');
               try { client.close(); } catch (_) {}
               if (streamedResponse.statusCode == 416 && existingSize > 0) {
-                log('v4.0.75 416 already complete, trying install');
+                log('v4.0.80 416 already complete, trying install');
                 try {
                   final len = await file.length();
                   if (len > 20*1024*1024) {
@@ -2332,9 +2332,9 @@ class ApiService {
                   }
                 } catch (_) {}
               }
-              // v4.0.75 FIX: If GitHub returns 404, don't retry same URL, go to next
+              // v4.0.80 FIX: If GitHub returns 404, don't retry same URL, go to next
               if (streamedResponse.statusCode == 404 && url.contains('github.com')) {
-                log('v4.0.75 GitHub 404 - release asset not found, trying next URL');
+                log('v4.0.80 GitHub 404 - release asset not found, trying next URL');
                 break; // Break resume loop, go to next URL
               }
               continue;
@@ -2342,16 +2342,16 @@ class ApiService {
 
             final total = streamedResponse.contentLength ?? 0;
             final isPartial = streamedResponse.statusCode == 206;
-            // v4.0.75 FIX: If we requested Range but got 200, server doesn't support Range, overwrite not append
+            // v4.0.80 FIX: If we requested Range but got 200, server doesn't support Range, overwrite not append
             final serverSupportsRange = isPartial;
             final shouldAppend = shouldResume && serverSupportsRange;
             
             int received = shouldAppend ? existingSize : 0;
             final totalForProgress = shouldAppend ? (existingSize + total) : (total > 0 ? total : 38*1024*1024);
 
-            // v4.0.75 FIX: If server returns 200 but we requested Range, delete existing and overwrite
+            // v4.0.80 FIX: If server returns 200 but we requested Range, delete existing and overwrite
             if (shouldResume && !serverSupportsRange) {
-              log('v4.0.75 Server returned 200 not 206 for Range request - overwriting');
+              log('v4.0.80 Server returned 200 not 206 for Range request - overwriting');
               try { await file.delete(); } catch (_) {}
               received = 0;
             }
@@ -2376,16 +2376,16 @@ class ApiService {
               await sink.close();
             } catch (e) {
               try { await sink.close(); } catch (_) {}
-              print('v4.0.75 Stream error $url: $e, received $received, keeping partial if >5MB');
-              log('v4.0.75 Stream error: $e, partial $received');
+              print('v4.0.80 Stream error $url: $e, received $received, keeping partial if >5MB');
+              log('v4.0.80 Stream error: $e, partial $received');
               try { client.close(); } catch (_) {}
-              // v4.0.75 FIX: Keep partial if >5MB for resume, don't delete
+              // v4.0.80 FIX: Keep partial if >5MB for resume, don't delete
               if (received < 1*1024*1024 && existingSize == 0) {
                 try { await file.delete(); } catch (_) {}
               }
               // Only resume if we got >5MB
               if (received > 5*1024*1024) {
-                log('v4.0.75 Received $received before error, will resume');
+                log('v4.0.80 Received $received before error, will resume');
                 continue;
               }
               continue;
@@ -2399,11 +2399,11 @@ class ApiService {
             }
 
             final len = await file.length();
-            print('v4.0.75 Success $url len=$len');
+            print('v4.0.80 Success $url len=$len');
 
-            // v4.0.75 FIX: Increase min size to 20MB (APK is 36MB), and check if HTML error page
+            // v4.0.80 FIX: Increase min size to 20MB (APK is 36MB), and check if HTML error page
             if (len < 20*1024*1024) {
-              print('v4.0.75 File too small $len <20MB - likely HTML error page');
+              print('v4.0.80 File too small $len <20MB - likely HTML error page');
               // Check if it's HTML
               try {
                 final raf = await file.open();
@@ -2411,8 +2411,8 @@ class ApiService {
                 await raf.close();
                 final headerStr = String.fromCharCodes(header);
                 if (headerStr.contains('<html') || headerStr.contains('<!DOCTYPE') || headerStr.contains('404') || headerStr.contains('Not Found')) {
-                  print('v4.0.75 File is HTML error page, not APK');
-                  log('v4.0.75 File is HTML error page: ${headerStr.substring(0, 100)}');
+                  print('v4.0.80 File is HTML error page, not APK');
+                  log('v4.0.80 File is HTML error page: ${headerStr.substring(0, 100)}');
                   try { await file.delete(); } catch (_) {}
                   // If GitHub HTML 404, break to next URL
                   if (url.contains('github.com')) {
@@ -2433,7 +2433,7 @@ class ApiService {
               final header = await raf.read(4);
               await raf.close();
               if (header.length < 2 || header[0] != 0x50 || header[1] != 0x4B) {
-                print('v4.0.75 Invalid PK header - not a ZIP/APK');
+                print('v4.0.80 Invalid PK header - not a ZIP/APK');
                 try { await file.delete(); } catch (_) {}
                 continue;
               }
@@ -2442,20 +2442,20 @@ class ApiService {
               continue;
             }
 
-                        // v4.0.75 STRICT FIX - حل کامل عدم تغییر نسخه بعد از نصب
+                        // v4.0.80 STRICT FIX - حل کامل عدم تغییر نسخه بعد از نصب
             // Root cause v4.0.66/v4.0.67: ULTRA PERMISSIVE allowed ANY APK >20MB even if old version, causing "نصب میکنم ولی همون نسخه قدیمی"
-            // Fix v4.0.75: STRICT version check - if mismatch, try next URL (GitHub has correct version)
+            // Fix v4.0.80: STRICT version check - if mismatch, try next URL (GitHub has correct version)
             bool versionOk = false;
             try {
               final apkVersion = await _updaterChannel.invokeMethod<String>('getApkVersionName', {'filePath': file.path}).timeout(const Duration(seconds: 3), onTimeout: () => '');
               final apkVer = (apkVersion ?? '').trim();
-              log('v4.0.75 APK version check: expected $expectedVer, got $apkVer, len $len - SMART MODE');
-              print('v4.0.75 APK version: expected $expectedVer, got $apkVer - SMART check');
+              log('v4.0.80 APK version check: expected $expectedVer, got $apkVer, len $len - SMART MODE');
+              print('v4.0.80 APK version: expected $expectedVer, got $apkVer - SMART check');
               
               if (apkVer.isNotEmpty && expectedVer.isNotEmpty) {
-                // v4.0.75 FIX: SMART version check - allow if APK is newer than current OR exact match
-                // Previous STRICT mode rejected ANY mismatch, even if APK was newer (e.g., expected 4.0.75, got 4.0.75 but with different build)
-                // This caused browser fallback when panel served old APK (4.0.72) but expected 4.0.75
+                // v4.0.80 FIX: SMART version check - allow if APK is newer than current OR exact match
+                // Previous STRICT mode rejected ANY mismatch, even if APK was newer (e.g., expected 4.0.80, got 4.0.80 but with different build)
+                // This caused browser fallback when panel served old APK (4.0.80) but expected 4.0.80
                 // New logic: Allow if versions match OR if APK version is newer than current installed version
                 final currentInstalled = await _updaterChannel.invokeMethod<Map>('getInstalledAppVersion').timeout(const Duration(seconds: 2), onTimeout: () => {}) ?? {};
                 final currentVerName = (currentInstalled['versionName'] ?? '').toString();
@@ -2474,39 +2474,39 @@ class ApiService {
                 } catch (_) {}
                 
                 if (apkVer == expectedVer) {
-                  log('v4.0.75 APK version MATCH: $apkVer == $expectedVer - perfect, installing');
+                  log('v4.0.80 APK version MATCH: $apkVer == $expectedVer - perfect, installing');
                   versionOk = true;
                 } else if (isNewerThanCurrent) {
-                  log('v4.0.75 APK version NEWER than current: $apkVer > $currentVerName (expected $expectedVer) - ALLOWING, installing newer');
-                  print('v4.0.75 APK $apkVer is newer than current $currentVerName, allowing install even though expected $expectedVer');
+                  log('v4.0.80 APK version NEWER than current: $apkVer > $currentVerName (expected $expectedVer) - ALLOWING, installing newer');
+                  print('v4.0.80 APK $apkVer is newer than current $currentVerName, allowing install even though expected $expectedVer');
                   versionOk = true;
                 } else {
                   // Check if it's at least close (same major.minor)
                   final apkMajorMinor = apkVer.split('.').take(2).join('.');
                   final expMajorMinor = expectedVer.split('.').take(2).join('.');
                   if (apkMajorMinor == expMajorMinor) {
-                    log('v4.0.75 APK major.minor MATCH: $apkMajorMinor == $expMajorMinor, allowing despite patch mismatch $apkVer vs $expectedVer');
+                    log('v4.0.80 APK major.minor MATCH: $apkMajorMinor == $expMajorMinor, allowing despite patch mismatch $apkVer vs $expectedVer');
                     versionOk = true;
                   } else {
-                    log('v4.0.75 APK version MISMATCH: expected $expectedVer, got $apkVer, current $currentVerName - REJECTING, trying next URL');
-                    print('v4.0.75 Version mismatch - expected $expectedVer but got $apkVer (current $currentVerName), trying next URL (GitHub)');
+                    log('v4.0.80 APK version MISMATCH: expected $expectedVer, got $apkVer, current $currentVerName - REJECTING, trying next URL');
+                    print('v4.0.80 Version mismatch - expected $expectedVer but got $apkVer (current $currentVerName), trying next URL (GitHub)');
                     try { await file.delete(); } catch (_) {}
                     continue;
                   }
                 }
               } else if (apkVer.isEmpty) {
-                log('v4.0.75 APK version empty, but PK and size ok (${len}bytes) - allowing as fallback');
+                log('v4.0.80 APK version empty, but PK and size ok (${len}bytes) - allowing as fallback');
                 versionOk = true;
               } else {
                 versionOk = true;
               }
             } catch (e) {
-              log('v4.0.75 Version check error: $e - PK and size verified (${len}bytes) - allowing as fallback');
+              log('v4.0.80 Version check error: $e - PK and size verified (${len}bytes) - allowing as fallback');
               versionOk = true;
             }
             
             if (!versionOk) {
-              print('v4.0.75 Version check failed, trying next URL');
+              print('v4.0.80 Version check failed, trying next URL');
               continue;
             }
 
@@ -2514,20 +2514,20 @@ class ApiService {
 
             try {
               safeProgress(0.93, len, len);
-              // v4.0.75 NEW: Check if app can request package installs (Android 8+)
+              // v4.0.80 NEW: Check if app can request package installs (Android 8+)
               // If not, request permission first - this is critical for in-app install to work
               bool canInstall = true;
               try {
                 final canResult = await _updaterChannel.invokeMethod('canInstallPackages').timeout(const Duration(seconds: 2), onTimeout: () => true);
                 canInstall = canResult == true;
-                log('v4.0.75 canInstallPackages: $canInstall');
+                log('v4.0.80 canInstallPackages: $canInstall');
               } catch (e) {
-                log('v4.0.75 canInstallPackages check failed: $e - assuming true');
+                log('v4.0.80 canInstallPackages check failed: $e - assuming true');
                 canInstall = true;
               }
               
               if (!canInstall) {
-                log('v4.0.75 canRequestPackageInstalls=false - requesting permission');
+                log('v4.0.80 canRequestPackageInstalls=false - requesting permission');
                 safeProgress(0.94, len, len);
                 try {
                   // Show dialog to user and open settings
@@ -2561,7 +2561,7 @@ class ApiService {
                 onSuccess();
                 return;
               } else {
-                print('v4.0.75 Install not success: $installResult');
+                print('v4.0.80 Install not success: $installResult');
                 // If install returns false, try openApkFile as fallback (pure intent)
                 try {
                   final opened = await _updaterChannel.invokeMethod('openApkFile', {'filePath': file.path}).timeout(const Duration(seconds: 5));
@@ -2576,7 +2576,7 @@ class ApiService {
                 continue;
               }
             } catch (e) {
-              print('v4.0.75 Install fail: $e');
+              print('v4.0.80 Install fail: $e');
               if (e.toString().contains('INSTALL_PERMISSION_REQUIRED')) {
                 // Don't continue to next URL, show permission error
                 throw e;
@@ -2584,55 +2584,55 @@ class ApiService {
               continue;
             }
           } catch (e, stack) {
-            print('v4.0.75 URL fail $url: $e');
+            print('v4.0.80 URL fail $url: $e');
             try { client?.close(); } catch (_) {}
             continue;
           }
         }
       }
 
-      // v4.0.75 NEW ARCHITECTURE: 3-Tier Browser Fallback Guaranteed - GitHub Releases Page
+      // v4.0.80 NEW ARCHITECTURE: 3-Tier Browser Fallback Guaranteed - GitHub Releases Page
       if (!hasShownBrowserFallback) {
         hasShownBrowserFallback = true;
-        // v4.0.75: Try to open browser to GitHub releases page as ultimate fallback (100% guaranteed)
+        // v4.0.80: Try to open browser to GitHub releases page as ultimate fallback (100% guaranteed)
         try {
           final githubPage = "https://github.com/hojjatrad/panelconnectix/releases/tag/v$expectedVer";
           final latestPage = "https://github.com/hojjatrad/panelconnectix/releases/latest";
           final directUrl = "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=$expectedVer";
-          log('v4.0.75 Browser fallback: opening $githubPage and $directUrl');
+          log('v4.0.80 Browser fallback: opening $githubPage and $directUrl');
           // Don't auto-open here, let UI handle it, but log
         } catch (_) {}
         try {
           final directUrl = 'https://direct.vpbotn.ir/download_apk.php?file=arm64&v=$expectedVer&t=${DateTime.now().millisecondsSinceEpoch}';
           await _updaterChannel.invokeMethod('openBrowser', {'url': directUrl});
-          log('v4.0.75 Opened browser fallback: $directUrl');
+          log('v4.0.80 Opened browser fallback: $directUrl');
         } catch (_) {}
       }
 
-      print('v4.0.75 All $totalAttempts attempts failed, browser fallback');
-      log('v4.0.75 All failed, browser fallback');
+      print('v4.0.80 All $totalAttempts attempts failed, browser fallback');
+      log('v4.0.80 All failed, browser fallback');
       progressTimer?.cancel();
       if (wakeLockAcquired) {
         try { await releaseWakeLock(); } catch (_) {}
       }
 
-      // v4.0.75: Provide direct links that actually work
+      // v4.0.80: Provide direct links that actually work
       onError('❌ دانلود درون‌برنامه‌ای بعد از $totalAttempts تلاش ناموفق بود\n\n'
           '✅ راه حل فوری (100% کار میکنه):\n\n'
           '1️⃣ مرورگر مستقیم (پیشنهادی):\n'
           'https://direct.vpbotn.ir/download_apk.php?file=arm64&v=$expectedVer\n\n'
           '2️⃣ لینک مستقیم vpbotn.ir:\n'
           'https://vpbotn.ir/download_apk.php?file=arm64&v=$expectedVer\n\n'
-          '3️⃣ گیت‌هاب (v4.0.75):\n'
-          'https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.75/Connectix-ARM64-v8a.apk\n\n'
-          '4️⃣ آخرین نسخه دستی (v4.0.75):\n'
-          'https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.75/Connectix-ARM64-v8a.apk\n'
+          '3️⃣ گیت‌هاب (v4.0.80):\n'
+          'https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.80/Connectix-ARM64-v8a.apk\n\n'
+          '4️⃣ آخرین نسخه دستی (v4.0.80):\n'
+          'https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.80/Connectix-ARM64-v8a.apk\n'
           '(فعلا از همین لینک 4.0.68 نصب کن، بعد داخل اپ جدید آپدیت خودکار درست میشه)\n\n'
           '💡 نکته: دانلود مستقیم از مرورگر همیشه کار میکنه - بعد از دانلود، فایل را باز کن تا نصب شود');
 
     } catch (e, stack) {
-      print('v4.0.75 FATAL: $e $stack');
-      log('v4.0.75 FATAL: $e');
+      print('v4.0.80 FATAL: $e $stack');
+      log('v4.0.80 FATAL: $e');
       progressTimer?.cancel();
       try {
         if (wakeLockAcquired) {
@@ -2652,7 +2652,7 @@ class ApiService {
   }
 
 
-    // v4.0.75 NEW: Open GitHub releases page - 100% guaranteed fallback
+    // v4.0.80 NEW: Open GitHub releases page - 100% guaranteed fallback
   static Future<bool> openGitHubReleasesPage(String version) async {
     try {
       const channel = MethodChannel('com.connectix.vpn/updater');

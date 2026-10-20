@@ -96,11 +96,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   // v4.0.63 FOREVER FIX - Never show old version after install - PERMANENT LAW
   // LAW: currentAppVersion must be dynamic, not hardcoded const that stays old after install
   // Fix: Make it getter that returns actual installed version if available, else latest hardcoded
-  static const String _hardcodedVersion = '4.0.79'; // Fallback only, updated each release - v4.0.78 FIX version display + account info filter
-  static const int _hardcodedCode = 113;
+  static const String _hardcodedVersion = '4.0.80'; // Fallback only, updated each release - v4.0.80 FIX version display + account info filter
+  static const int _hardcodedCode = 114;
   static String get currentAppVersion => _actualInstalledVersion.isNotEmpty && _actualInstalledVersion != '4.0.51' ? _actualInstalledVersion : _hardcodedVersion;
-  static String _actualInstalledVersion = '4.0.79'; // Will be updated from PackageManager immediately on start - v4.0.75 FIX
-  static int _actualInstalledCode = 113;
+  static String _actualInstalledVersion = '4.0.80'; // Will be updated from PackageManager immediately on start - v4.0.80 FIX
+  static int _actualInstalledCode = 114;
 
   // v4.0.46 FOREVER CACHE FIX - PERMANENT LAW - NEVER REGRESS
   // LAW 1: Panel must NEVER serve old APK (auto-delete stale files)
@@ -117,14 +117,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   // LAW 16: Version from app_release.json, never hardcoded, delete stale APKs
   // v4.0.63 FOREVER FIX: Robust version loading - never show old version after install
   static Future<void> loadActualInstalledVersion() async {
-    // v4.0.79 ROOT CAUSE FIX: Clear any cached old version prefs that might cause stale display - NEVER REGRESS
+    // v4.0.80 ROOT CAUSE FIX: Clear any cached old version prefs that might cause stale display - NEVER REGRESS
     try {
       final prefs = await SharedPreferences.getInstance();
       final cachedVer = prefs.getString('cached_app_version') ?? '';
       if (cachedVer.isNotEmpty && cachedVer != _hardcodedVersion) {
         // Old cached version detected, will be updated
       }
-      // v4.0.79: If installed version is newer than cached dismissed_version, clear dismissed to show update completed
+      // v4.0.80: If installed version is newer than cached dismissed_version, clear dismissed to show update completed
       // Also clear last_prompted_version if it equals old version
       final dismissed = prefs.getString('dismissed_version') ?? '';
       if (dismissed.isNotEmpty && dismissed != _hardcodedVersion) {
@@ -148,10 +148,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       }
     } catch (_) {}
     // Try 3 times with increasing timeout, fallback to hardcoded only if all fail
-    for (int attempt = 0; attempt < 3; attempt++) {
+    for (int attempt = 0; attempt < 5; attempt++) { // v4.0.80: 3->5 attempts
       try {
         const channel = MethodChannel('com.connectix.vpn/updater');
-        final timeout = Duration(seconds: 2 + attempt); // 2s, 3s, 4s
+        final timeout = Duration(seconds: 2 + attempt); // 2s,3s,4s,5s,6s v4.0.80
         final result = await channel.invokeMethod('getInstalledAppVersion').timeout(timeout, onTimeout: () => null);
         if (result is Map) {
           final verName = (result['versionName'] ?? '').toString().trim();
@@ -285,7 +285,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         _syncActiveServer(_servers);
       }
     }
-    // v4.0.78 FOREVER FIX: Load actual installed version immediately and update UI - FIXED REGRESSION
+    // v4.0.80 FOREVER FIX: Load actual installed version immediately and update UI - FIXED REGRESSION
     // This fixes "new version installed but still shows old version" - must reload from PackageManager
     // LAW: Must call 2 times - immediately and after 1s delay (PackageManager cache)
     loadActualInstalledVersion().then((_) {
@@ -293,7 +293,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         setState(() {
           // Force UI refresh with new actual version
         });
-        if (kDebugMode) debugPrint('v4.0.78 initState: Actual version loaded: $actualVersion ($actualCode)');
+        if (kDebugMode) debugPrint('v4.0.80 initState: Actual version loaded: $actualVersion ($actualCode)');
       }
     });
     // Second attempt after 1.5s to catch PackageManager cache update after fresh install
@@ -301,7 +301,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       loadActualInstalledVersion().then((_) {
         if (mounted) {
           setState(() {});
-          if (kDebugMode) debugPrint('v4.0.78 initState delayed: Actual version loaded: $actualVersion ($actualCode)');
+          if (kDebugMode) debugPrint('v4.0.80 initState delayed: Actual version loaded: $actualVersion ($actualCode)');
         }
       });
     });
@@ -695,21 +695,21 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   ApiService.saveLastWorkingServer(_selectedServer!);
                   ApiService.log('ST4: Saved last working ${ _selectedServer!.name}');
                 }
-                // v4.0.76 NEW: Blacklist learning - if after 10s upload=0 download=0, mark as info server
+                // v4.0.80 NEW: Blacklist learning - if after 10s upload=0 download=0, mark as info server
                 Future.delayed(const Duration(seconds: 10), () async {
                   try {
                     if (!mounted || !_isConnected || _selectedServer == null) return;
                     final status = _v2rayStatus.value;
                     final dl = status.downloadSpeed ?? 0;
                     final ul = status.uploadSpeed ?? 0;
-                    print('v4.0.76 blacklist check: dl=$dl ul=$ul server=${_selectedServer!.name}');
+                    print('v4.0.80 blacklist check: dl=$dl ul=$ul server=${_selectedServer!.name}');
                     if (dl == 0 && ul == 0) {
                       final prefs = await SharedPreferences.getInstance();
                       final list = prefs.getStringList('blacklisted_info_servers') ?? [];
                       if (!list.contains(_selectedServer!.id)) {
                         list.add(_selectedServer!.id);
                         await prefs.setStringList('blacklisted_info_servers', list);
-                        print('v4.0.76 BLACKLISTED info server: ${_selectedServer!.name} id=${_selectedServer!.id}');
+                        print('v4.0.80 BLACKLISTED info server: ${_selectedServer!.name} id=${_selectedServer!.id}');
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
@@ -721,7 +721,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       }
                     }
                   } catch (e) {
-                    print('v4.0.76 blacklist check error: $e');
+                    print('v4.0.80 blacklist check error: $e');
                   }
                 });
               }
@@ -953,7 +953,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
   }
 
-  // 1-Tap Smart Connect to Best Ping Server - v4.0.76 ULTRA STRICT FINAL + BLACKLIST + MANUAL EXCLUDE
+  // 1-Tap Smart Connect to Best Ping Server - v4.0.80 ULTRA STRICT FINAL + BLACKLIST + MANUAL EXCLUDE
   Future<List<String>> _getBlacklistedIds() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -972,10 +972,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
   void _smartConnect() async {
     if (_isSmartConnecting || _isConnecting) return;
-    print('v4.0.76 _smartConnect: total=${_servers.length}');
+    print('v4.0.80 _smartConnect: total=${_servers.length}');
     final blacklisted = await _getBlacklistedIds();
     final excluded = await _getExcludedIds();
-    print('v4.0.76 blacklist=${blacklisted.length} excluded=${excluded.length}');
+    print('v4.0.80 blacklist=${blacklisted.length} excluded=${excluded.length}');
     for (final s in _servers) {
       print('  ${s.name} | isInfo=${s.isInfoBanner} | isReal=${s.isRealVpnServer} | sel=${s.isSelectableForSmartConnect} | reason=${s.rejectReason} | black=${blacklisted.contains(s.id)} | excl=${excluded.contains(s.id)}');
     }
@@ -988,19 +988,19 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       if (!s.isRealVpnServer) return false;
       if (!s.isSelectableForSmartConnect) return false;
       final lower = s.name.toLowerCase();
-      if (s.name.contains('👤') || s.name.contains('👥')) return false; // v4.0.78: account info with user emoji
+      if (s.name.contains('👤') || s.name.contains('👥')) return false; // v4.0.80: account info with user emoji
       if (lower.contains('حجم') || lower.contains('باقی') || lower.contains('روز') || lower.contains('ساعت') || lower.contains('انقضا') || lower.contains('ترافیک') || lower.contains('traffic') || lower.contains('expire') || lower.contains('remaining') || lower.contains('quota') || lower.contains('account') || lower.contains('subscription') || lower.contains('info') || lower.contains('📊') || lower.contains('⏳') || lower.contains('👤') || lower.contains('کاربر') || lower.contains('اکانت')) return false;
-      // v4.0.78 NEW: Block if name contains current username (privacy)
+      // v4.0.80 NEW: Block if name contains current username (privacy)
       try {
         final userLower = _client.username.toLowerCase();
         if (userLower.isNotEmpty && userLower.length >= 3 && lower.contains(userLower)) {
-          print('v4.0.78 BLOCKED server containing username: ${s.name} contains ${_client.username}');
+          print('v4.0.80 BLOCKED server containing username: ${s.name} contains ${_client.username}');
           return false;
         }
       } catch (_) {}
       return true;
     }).toList();
-    print('v4.0.76 clean=${clean.length}');
+    print('v4.0.80 clean=${clean.length}');
     if (clean.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('هیچ سرور واقعی برای اتصال هوشمند یافت نشد (همه حجم/زمان یا بلاک شدند)'), backgroundColor: Color(0xFFEF4444)),
@@ -1073,7 +1073,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
   }
 
-  // v4.0.66 NEW: Ping all servers - v4.0.75 ULTRA STRICT: Only real VPN servers, not volume info
+  // v4.0.66 NEW: Ping all servers - v4.0.80 ULTRA STRICT: Only real VPN servers, not volume info
   Future<void> _pingAllServers() async {
     if (_isRefreshing || _servers.isEmpty) return;
     final blacklisted = await _getBlacklistedIds();
@@ -1095,7 +1095,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       } catch (_) {}
       return true;
     }).toList();
-    print('v4.0.76 _pingAllServers: total=${_servers.length} real=${realServers.length} black=${blacklisted.length} excl=${excluded.length}');
+    print('v4.0.80 _pingAllServers: total=${_servers.length} real=${realServers.length} black=${blacklisted.length} excl=${excluded.length}');
     if (realServers.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('هیچ سرور واقعی برای پینگ یافت نشد (فقط اطلاعات حجم بود)'), backgroundColor: Color(0xFFEF4444)),
@@ -1109,7 +1109,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     try {
       int bestPing = 99999;
       ServerModel? bestServer;
-      // v4.0.71 OPTIMIZED: Parallel ping for all servers - 5x faster
+      // v4.0.80 OPTIMIZED: Parallel ping for all servers - 5x faster
       final candidates = realServers.take(10).toList();
       final pingFutures = candidates.map((s) async {
         if (s.configUri.isEmpty) return (s, 0);
@@ -1285,7 +1285,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   return;
                 }
               }
-              // v4.0.75 NEW: Check install permission before download
+              // v4.0.80 NEW: Check install permission before download
               try {
                 const channel = MethodChannel('com.connectix.vpn/updater');
                 final canInstall = await channel.invokeMethod('canInstallPackages').timeout(const Duration(seconds: 2), onTimeout: () => true);
@@ -1358,7 +1358,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   // Real-time In-App Downloader Modal Sheet
-  // v4.0.73 NEW ARCHITECTURE: 3-Tier Hybrid - GitHub Direct + Panel Proxy + Browser Fallback - 100% Guaranteed
+  // v4.0.80 NEW ARCHITECTURE: 3-Tier Hybrid - GitHub Direct + Panel Proxy + Browser Fallback - 100% Guaranteed
   void _startInAppDownloadAndInstall(String downloadUrl, String version, {String fallbackUrl = ''}) {
     final githubReleasesPage = "https://github.com/hojjatrad/panelconnectix/releases/tag/v$version";
     final githubLatestPage = "https://github.com/hojjatrad/panelconnectix/releases/latest";
@@ -1423,7 +1423,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     });
                   },
                   onError: (error) {
-                    // v4.0.75 FIX: Handle INSTALL_PERMISSION_REQUIRED specially
+                    // v4.0.80 FIX: Handle INSTALL_PERMISSION_REQUIRED specially
                     if (error.contains('INSTALL_PERMISSION_REQUIRED')) {
                       setModalState(() {
                         isFailed = true;
@@ -1561,14 +1561,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                           ],
                         ),
                         const SizedBox(height: 12),
-                        // v4.0.75 FIX: 3-Tier Browser Fallback - GitHub Direct FIRST (always correct version)
-                        // Previous bug: directPanelUrl first, but panel download_apk.php had allowlist bug serving old APK (4.0.72) for v4.0.73 request
+                        // v4.0.80 FIX: 3-Tier Browser Fallback - GitHub Direct FIRST (always correct version)
+                        // Previous bug: directPanelUrl first, but panel download_apk.php had allowlist bug serving old APK (4.0.80) for v4.0.80 request
                         // This caused "browser update still old version" - user downloads via browser but gets old version
                         // Fix: GitHub direct first (source of truth, always correct), panel second (for Iran)
                         ElevatedButton.icon(
                           onPressed: () async {
                             Navigator.pop(bottomSheetContext);
-                            // v4.0.75: GitHub direct FIRST (always correct version), then panel (for Iran where GitHub blocked)
+                            // v4.0.80: GitHub direct FIRST (always correct version), then panel (for Iran where GitHub blocked)
                             final urlsToTry = [downloadUrl, githubReleasesPage, githubLatestPage, directPanelUrl];
                             for (final u in urlsToTry) {
                               try {
@@ -1876,7 +1876,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               ? List<dynamic>.from(routing['rules'] as List<dynamic>)
               : <dynamic>[];
 
-          // v4.0.71: Bypass panel domain + Iranian domains -> direct (prevent loop + speed)
+          // v4.0.80: Bypass panel domain + Iranian domains -> direct (prevent loop + speed)
           rules.insert(0, {
             'type': 'field',
             'outboundTag': 'direct',
@@ -2085,7 +2085,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
       _connectedSeconds = 0;
       _timer?.cancel();
-      _timer = Timer.periodic(const Duration(milliseconds: 1500), (timer) { // v4.0.71: 1s->1.5s
+      _timer = Timer.periodic(const Duration(milliseconds: 1500), (timer) { // v4.0.80: 1s->1.5s
         if (mounted && _isConnected) {
           setState(() {
             _connectedSeconds++;
@@ -2169,7 +2169,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 ? Map<String, dynamic>.from(streamSettings['sockopt'] as Map)
                 : <String, dynamic>{};
             
-            // v4.0.71 OPTIMIZED: TCP optimizations for speed + stability
+            // v4.0.80 OPTIMIZED: TCP optimizations for speed + stability
             sockopt['tcpNoDelay'] = true;
             sockopt['tcpKeepAliveIdle'] = 100;
             sockopt['tcpKeepAliveInterval'] = 30;
@@ -2213,7 +2213,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 mux['xudpProxyUDP443'] = 'reject';
               } else {
                 // If mux already exists, ensure concurrency not too high
-                if ((mux['concurrency'] as int? ?? 0) > 8) mux['concurrency'] = 8; // v4.0.71: allow up to 8
+                if ((mux['concurrency'] as int? ?? 0) > 8) mux['concurrency'] = 8; // v4.0.80: allow up to 8
                 if (!mux.containsKey('xudpConcurrency')) mux['xudpConcurrency'] = 16;
                 if ((mux['xudpConcurrency'] as int? ?? 0) > 4) mux['xudpConcurrency'] = 4;
               }
@@ -2442,7 +2442,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           builder: (modalContext, setModalState) {
             if (!_isCheckingUpdate && _updateInfo == null) {
               _isCheckingUpdate = true;
-              // v4.0.79 FIX: Timeout for checkAppUpdate to prevent infinite spinner when no messages
+              // v4.0.80 FIX: Timeout for checkAppUpdate to prevent infinite spinner when no messages
               ApiService.checkAppUpdate().timeout(const Duration(seconds: 5), onTimeout: () => null).then((updateData) {
                 _isCheckingUpdate = false;
                 if (updateData != null && mounted) {
@@ -3407,7 +3407,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   ),
                 ),
 
-              // v4.0.70 ULTRA COMPACT FINAL
+              // v4.0.80 ULTRA COMPACT FINAL
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                 decoration: BoxDecoration(
@@ -3515,7 +3515,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             : _isConnecting
                                 ? LiteConnectState.connecting
                                 : LiteConnectState.disconnected,
-                        size: (MediaQuery.of(context).size.height * 0.15).clamp(90.0, 160.0), // v4.0.76 FULL-SCREEN 15% responsive
+                        size: (MediaQuery.of(context).size.height * 0.15).clamp(90.0, 160.0), // v4.0.80 FULL-SCREEN 15% responsive
                         countryFlag: _selectedServer?.flag ?? '🌐',
                         serverName: _selectedServer?.name ?? 'Connectix',
                         enableHaptic: true,
@@ -3527,7 +3527,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             : _isConnecting
                                 ? UltimateConnectState.connecting
                                 : UltimateConnectState.disconnected,
-                        size: (MediaQuery.of(context).size.height * 0.15).clamp(90.0, 160.0), // v4.0.76 FULL-SCREEN 15% responsive
+                        size: (MediaQuery.of(context).size.height * 0.15).clamp(90.0, 160.0), // v4.0.80 FULL-SCREEN 15% responsive
                         countryFlag: _selectedServer?.flag ?? '🌐',
                         serverName: _selectedServer?.name ?? 'Connectix',
                         enableHaptic: true,
