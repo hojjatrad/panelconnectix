@@ -158,6 +158,11 @@ class ProxyController {
             if (empty($mtprotoSecretFull)) {
                 $mtprotoSecretFull = 'ee' . substr(md5($client['uuid'] . $host), 0, 32) . '00000000000000000000000000000000';
             }
+            // v4.0.82 NEW: WEB Proxy secret (dd) for new 2026 protocol
+            $webProxySecret = $node['webproxy_secret'] ?? '';
+            if (empty($webProxySecret)) {
+                $webProxySecret = 'dd' . substr(md5($client['uuid'] . $host . 'webproxy'), 0, 32);
+            }
             $mtprotoSecret = $mtprotoSecretFull;
             $mtprotoSecretShort = substr(md5($client['uuid']), 0, 32);
             if (str_starts_with($mtprotoSecret, 'ee')) {
