@@ -7,20 +7,32 @@
     "build_number": 115,
     "release_date": "2026-10-20",
     "date": "2026-10-20",
-    "force_update": false,
-    "force_min_code": 50,
+    "force_update": true,
+    "force_min_code": 114,
     "update_type": "full",
-    "changelog": "v4.0.81+115 QA FIX Smart Connect always same server (Germany): Root causes - candidates take(10) first in fixed order always Germany, fallback clean.first Germany, no shuffling. Fixes - sort by pingMs, shuffle withoutPing, candidates 20 not 10, avoid last server round-robin, random fallback, ViewModel 6->20 shuffled. Expected: Smart Connect picks different servers based on real ping.",
-    "release_notes": "v4.0.81+115 ✅ QA FIX اتصال هوشمند همیشه یک سرور (آلمان): ریشه - take(10) اول لیست ثابت همیشه آلمان. فیکس - مرتب‌سازی بر اساس پینگ، شافل، 20 کاندید نه 10، جلوگیری از تکرار آخرین سرور، انتخاب تصادفی. الان سرورهای مختلف با پینگ بهتر انتخاب میشود.",
+    "changelog": "v4.0.81+115 CRITICAL: Smart Connect fix + Update notification fix. Force update to ensure all users get smart connect fix.",
+    "release_notes": "v4.0.81+115 ✅ دو فیکس: 1) اتصال هوشمند همیشه یک سرور آلمان - الان بر اساس پینگ بهترین سرور انتخاب میشود 2) پیام بروزرسانی نمی‌آمد - فیکس شد. لطفا آپدیت کنید.",
     "apk": {
         "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.81/Connectix-ARM64-v8a.apk",
         "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.81/Connectix-Universal.apk",
         "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.81/Connectix-ARM32-v7a.apk"
     },
     "apks": {
-        "arm64-v8a": {"url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.81/Connectix-ARM64-v8a.apk", "size": 36958336, "arch": "arm64-v8a"},
-        "armeabi-v7a": {"url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.81/Connectix-ARM32-v7a.apk", "size": 37635995, "arch": "armeabi-v7a"},
-        "universal": {"url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.81/Connectix-Universal.apk", "size": 108039564, "arch": "universal"}
+        "arm64-v8a": {
+            "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.81/Connectix-ARM64-v8a.apk",
+            "size": 36958336,
+            "arch": "arm64-v8a"
+        },
+        "armeabi-v7a": {
+            "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.81/Connectix-ARM32-v7a.apk",
+            "size": 37635995,
+            "arch": "armeabi-v7a"
+        },
+        "universal": {
+            "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.81/Connectix-Universal.apk",
+            "size": 108039564,
+            "arch": "universal"
+        }
     },
     "download_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.81/Connectix-ARM64-v8a.apk",
     "github_release": "https://github.com/hojjatrad/panelconnectix/releases/tag/v4.0.81",
