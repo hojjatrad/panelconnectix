@@ -96,10 +96,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   // v4.0.63 FOREVER FIX - Never show old version after install - PERMANENT LAW
   // LAW: currentAppVersion must be dynamic, not hardcoded const that stays old after install
   // Fix: Make it getter that returns actual installed version if available, else latest hardcoded
-  static const String _hardcodedVersion = '4.0.75'; // Fallback only, updated each release - v4.0.75 FIX in-app update + old version after browser
+  static const String _hardcodedVersion = '4.0.76'; // Fallback only, updated each release - v4.0.75 FIX in-app update + old version after browser
   static const int _hardcodedCode = 109;
   static String get currentAppVersion => _actualInstalledVersion.isNotEmpty && _actualInstalledVersion != '4.0.51' ? _actualInstalledVersion : _hardcodedVersion;
-  static String _actualInstalledVersion = '4.0.75'; // Will be updated from PackageManager immediately on start - v4.0.75 FIX
+  static String _actualInstalledVersion = '4.0.76'; // Will be updated from PackageManager immediately on start - v4.0.75 FIX
   static int _actualInstalledCode = 109;
 
   // v4.0.46 FOREVER CACHE FIX - PERMANENT LAW - NEVER REGRESS
@@ -655,6 +655,35 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   ApiService.saveLastWorkingServer(_selectedServer!);
                   ApiService.log('ST4: Saved last working ${ _selectedServer!.name}');
                 }
+                // v4.0.76 NEW: Blacklist learning - if after 10s upload=0 download=0, mark as info server
+                Future.delayed(const Duration(seconds: 10), () async {
+                  try {
+                    if (!mounted || !_isConnected || _selectedServer == null) return;
+                    final status = _v2rayStatus.value;
+                    final dl = status.downloadSpeed ?? 0;
+                    final ul = status.uploadSpeed ?? 0;
+                    print('v4.0.76 blacklist check: dl=$dl ul=$ul server=${_selectedServer!.name}');
+                    if (dl == 0 && ul == 0) {
+                      final prefs = await SharedPreferences.getInstance();
+                      final list = prefs.getStringList('blacklisted_info_servers') ?? [];
+                      if (!list.contains(_selectedServer!.id)) {
+                        list.add(_selectedServer!.id);
+                        await prefs.setStringList('blacklisted_info_servers', list);
+                        print('v4.0.76 BLACKLISTED info server: ${_selectedServer!.name} id=${_selectedServer!.id}');
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('⚠️ سرور ${_selectedServer!.name} حجم/زمان بود و بلاک شد'),
+                              backgroundColor: const Color(0xFFEF4444),
+                            ),
+                          );
+                        }
+                      }
+                    }
+                  } catch (e) {
+                    print('v4.0.76 blacklist check error: $e');
+                  }
+                });
               }
               final down = _formatSpeed(status.downloadSpeed);
               final up = _formatSpeed(status.uploadSpeed);
@@ -884,25 +913,48 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
   }
 
-  // 1-Tap Smart Connect to Best Ping Server - v4.0.75 ULTRA STRICT: Never select volume/traffic reading connections
+  // 1-Tap Smart Connect to Best Ping Server - v4.0.76 ULTRA STRICT FINAL + BLACKLIST + MANUAL EXCLUDE
+  Future<List<String>> _getBlacklistedIds() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getStringList('blacklisted_info_servers') ?? [];
+    } catch (_) {
+      return [];
+    }
+  }
+  Future<List<String>> _getExcludedIds() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getStringList('excluded_from_smart') ?? [];
+    } catch (_) {
+      return [];
+    }
+  }
   void _smartConnect() async {
     if (_isSmartConnecting || _isConnecting) return;
-    print('v4.0.75 _smartConnect: total=${_servers.length}');
+    print('v4.0.76 _smartConnect: total=${_servers.length}');
+    final blacklisted = await _getBlacklistedIds();
+    final excluded = await _getExcludedIds();
+    print('v4.0.76 blacklist=${blacklisted.length} excluded=${excluded.length}');
     for (final s in _servers) {
-      print('  ${s.name} | isInfo=${s.isInfoBanner} | isReal=${s.isRealVpnServer} | sel=${s.isSelectableForSmartConnect} | reason=${s.rejectReason}');
+      print('  ${s.name} | isInfo=${s.isInfoBanner} | isReal=${s.isRealVpnServer} | sel=${s.isSelectableForSmartConnect} | reason=${s.rejectReason} | black=${blacklisted.contains(s.id)} | excl=${excluded.contains(s.id)}');
     }
     final clean = _servers.where((s) {
+      if (blacklisted.contains(s.id)) return false;
+      if (excluded.contains(s.id)) return false;
+      if (s.isInfo) return false;
+      if (!s.isReal) return false;
       if (s.isInfoBanner) return false;
       if (!s.isRealVpnServer) return false;
       if (!s.isSelectableForSmartConnect) return false;
       final lower = s.name.toLowerCase();
-      if (lower.contains('حجم') || lower.contains('باقی') || lower.contains('روز') || lower.contains('ساعت') || lower.contains('انقضا') || lower.contains('ترافیک') || lower.contains('traffic') || lower.contains('expire') || lower.contains('remaining') || lower.contains('quota') || lower.contains('info') || lower.contains('📊') || lower.contains('⏳')) return false;
+      if (lower.contains('حجم') || lower.contains('باقی') || lower.contains('روز') || lower.contains('ساعت') || lower.contains('انقضا') || lower.contains('ترافیک') || lower.contains('traffic') || lower.contains('expire') || lower.contains('remaining') || lower.contains('quota') || lower.contains('account') || lower.contains('subscription') || lower.contains('info') || lower.contains('📊') || lower.contains('⏳')) return false;
       return true;
     }).toList();
-    print('v4.0.75 clean=${clean.length}');
+    print('v4.0.76 clean=${clean.length}');
     if (clean.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('هیچ سرور واقعی برای اتصال هوشمند یافت نشد.'), backgroundColor: Color(0xFFEF4444)),
+        const SnackBar(content: Text('هیچ سرور واقعی برای اتصال هوشمند یافت نشد (همه حجم/زمان یا بلاک شدند)'), backgroundColor: Color(0xFFEF4444)),
       );
       return;
     }
@@ -911,7 +963,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     });
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('در حال سنجش پینگ ${clean.length} سرور واقعی... (حجم/زمان رد شد)'),
+        content: Text('در حال سنجش پینگ ${clean.length} سرور واقعی... (حجم/زمان/بلاک رد شد)'),
         backgroundColor: const Color(0xFF6366F1),
         duration: const Duration(seconds: 2),
       ),
@@ -956,7 +1008,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('✅ سریع‌ترین سرور واقعی (${bestServer.name}) پینگ ${lowestPing < 99999 ? '$lowestPing ms' : 'عالی'} (حجم/زمان رد شد)'),
+          content: Text('✅ سریع‌ترین سرور واقعی (${bestServer.name}) پینگ ${lowestPing < 99999 ? '$lowestPing ms' : 'عالی'} (حجم/زمان/بلاک رد شد)'),
           backgroundColor: const Color(0xFF10B981),
         ),
       );
@@ -975,15 +1027,21 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   // v4.0.66 NEW: Ping all servers - v4.0.75 ULTRA STRICT: Only real VPN servers, not volume info
   Future<void> _pingAllServers() async {
     if (_isRefreshing || _servers.isEmpty) return;
+    final blacklisted = await _getBlacklistedIds();
+    final excluded = await _getExcludedIds();
     final realServers = _servers.where((s) {
+      if (blacklisted.contains(s.id)) return false;
+      if (excluded.contains(s.id)) return false;
+      if (s.isInfo) return false;
+      if (!s.isReal) return false;
       if (s.isInfoBanner) return false;
       if (!s.isRealVpnServer) return false;
       if (!s.isSelectableForSmartConnect) return false;
       final lower = s.name.toLowerCase();
-      if (lower.contains('حجم') || lower.contains('باقی') || lower.contains('روز') || lower.contains('ساعت') || lower.contains('انقضا') || lower.contains('ترافیک') || lower.contains('traffic') || lower.contains('expire') || lower.contains('remaining') || lower.contains('quota') || lower.contains('📊') || lower.contains('⏳')) return false;
+      if (lower.contains('حجم') || lower.contains('باقی') || lower.contains('روز') || lower.contains('ساعت') || lower.contains('انقضا') || lower.contains('ترافیک') || lower.contains('traffic') || lower.contains('expire') || lower.contains('remaining') || lower.contains('quota') || lower.contains('account') || lower.contains('📊') || lower.contains('⏳')) return false;
       return true;
     }).toList();
-    print('v4.0.75 _pingAllServers: total=${_servers.length} real=${realServers.length}');
+    print('v4.0.76 _pingAllServers: total=${_servers.length} real=${realServers.length} black=${blacklisted.length} excl=${excluded.length}');
     if (realServers.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('هیچ سرور واقعی برای پینگ یافت نشد (فقط اطلاعات حجم بود)'), backgroundColor: Color(0xFFEF4444)),
@@ -3115,11 +3173,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         textDirection: TextDirection.rtl,
         child: SafeArea(
           bottom: false,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-            child: SizedBox(
-              width: double.infinity,
+          child: SizedBox.expand(
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -3318,7 +3375,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             : _isConnecting
                                 ? LiteConnectState.connecting
                                 : LiteConnectState.disconnected,
-                        size: (MediaQuery.of(context).size.height * 0.12).clamp(80.0, 130.0), // v4.0.75 RESPONSIVE تمام صفحه
+                        size: (MediaQuery.of(context).size.height * 0.15).clamp(90.0, 160.0), // v4.0.76 FULL-SCREEN 15% responsive
                         countryFlag: _selectedServer?.flag ?? '🌐',
                         serverName: _selectedServer?.name ?? 'Connectix',
                         enableHaptic: true,
@@ -3330,7 +3387,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             : _isConnecting
                                 ? UltimateConnectState.connecting
                                 : UltimateConnectState.disconnected,
-                        size: (MediaQuery.of(context).size.height * 0.12).clamp(80.0, 130.0), // v4.0.75 RESPONSIVE تمام صفحه
+                        size: (MediaQuery.of(context).size.height * 0.15).clamp(90.0, 160.0), // v4.0.76 FULL-SCREEN 15% responsive
                         countryFlag: _selectedServer?.flag ?? '🌐',
                         serverName: _selectedServer?.name ?? 'Connectix',
                         enableHaptic: true,
@@ -3727,6 +3784,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 ),
               ),
               const SizedBox(height: 12),
+              const Spacer(),
             ],
           ),
             ),

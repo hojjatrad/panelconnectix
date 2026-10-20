@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class ServerModel {
   final String id;
   final String name;
@@ -16,7 +18,10 @@ class ServerModel {
   final String configUri;
   final bool isRecommended;
   final bool isOnline;
+  final bool isInfo; // v4.0.76 NEW: from panel flag
+  final bool isReal; // v4.0.76 NEW: from panel flag
   int? pingMs;
+  bool isPinging;
 
   ServerModel({
     required this.id,
@@ -25,87 +30,59 @@ class ServerModel {
     required this.countryCode,
     required this.flag,
     required this.protocol,
-    this.protocolLabel = '',
-    this.protocolIcon = '🌐',
-    this.protocolColor = '#6B7280',
-    this.protocolDesc = '',
-    this.bestFor = 'عمومی',
+    required this.protocolLabel,
+    required this.protocolIcon,
+    required this.protocolColor,
+    required this.protocolDesc,
+    required this.bestFor,
     required this.operatorTag,
     required this.operatorName,
     required this.pingUrl,
     required this.configUri,
     required this.isRecommended,
-    this.isOnline = true,
+    required this.isOnline,
+    this.isInfo = false,
+    this.isReal = true,
     this.pingMs,
+    this.isPinging = false,
   });
 
   factory ServerModel.fromJson(Map<String, dynamic> json) {
+    // v4.0.76: Read is_info flag from panel if present
+    bool panelIsInfo = false;
+    if (json.containsKey('is_info')) {
+      panelIsInfo = json['is_info'] == true || json['is_info'] == 1 || json['is_info'] == '1';
+    } else if (json.containsKey('is_traffic_info')) {
+      panelIsInfo = json['is_traffic_info'] == true || json['is_traffic_info'] == 1;
+    }
+    bool panelIsReal = true;
+    if (json.containsKey('is_real')) {
+      panelIsReal = json['is_real'] == true || json['is_real'] == 1;
+    } else {
+      panelIsReal = !panelIsInfo;
+    }
+
     return ServerModel(
-      id: json['id'] ?? '',
-      name: json['name'] ?? 'سرور ابری',
-      countryName: json['country_name'] ?? 'بین‌الملل',
-      countryCode: json['country_code'] ?? 'INT',
-      flag: json['flag'] ?? '🌐',
-      protocol: json['protocol'] ?? 'vless',
-      protocolLabel: json['protocol_label'] ?? (json['protocol'] ?? 'vless').toString().toUpperCase(),
-      protocolIcon: json['protocol_icon'] ?? _getProtocolIcon(json['protocol'] ?? 'vless'),
-      protocolColor: json['protocol_color'] ?? _getProtocolColor(json['protocol'] ?? 'vless'),
-      protocolDesc: json['protocol_desc'] ?? _getProtocolDesc(json['protocol'] ?? 'vless'),
-      bestFor: json['best_for'] ?? _getBestFor(json['protocol'] ?? 'vless'),
-      operatorTag: json['operator_tag'] ?? 'all',
-      operatorName: json['operator_name'] ?? 'تمام اپراتورها',
-      pingUrl: json['ping_url'] ?? 'https://www.google.com/generate_204',
-      configUri: json['config_uri'] ?? '',
-      isRecommended: json['is_recommended'] ?? false,
-      isOnline: json['is_online'] ?? true,
-      pingMs: json['ping_ms'] is int ? json['ping_ms'] : null,
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? 'Unknown',
+      countryName: json['country_name']?.toString() ?? 'Unknown',
+      countryCode: json['country_code']?.toString() ?? 'XX',
+      flag: json['flag']?.toString() ?? '🌐',
+      protocol: json['protocol']?.toString() ?? 'vless',
+      protocolLabel: json['protocol_label']?.toString() ?? 'VLESS',
+      protocolIcon: json['protocol_icon']?.toString() ?? '🔒',
+      protocolColor: json['protocol_color']?.toString() ?? '#6366F1',
+      protocolDesc: json['protocol_desc']?.toString() ?? '',
+      bestFor: json['best_for']?.toString() ?? 'عمومی',
+      operatorTag: json['operator_tag']?.toString() ?? '',
+      operatorName: json['operator_name']?.toString() ?? '',
+      pingUrl: json['ping_url']?.toString() ?? 'https://www.google.com/generate_204',
+      configUri: json['config_uri']?.toString() ?? '',
+      isRecommended: json['is_recommended'] == true,
+      isOnline: json['is_online'] == true || json['is_online'] == null,
+      isInfo: panelIsInfo,
+      isReal: panelIsReal,
     );
-  }
-  
-  // v4.0.73 NEW: Multi-protocol metadata helpers
-  static String _getProtocolIcon(String proto) {
-    switch (proto.toLowerCase()) {
-      case 'vless': return '🛡️';
-      case 'vmess': return '🔒';
-      case 'trojan': return '🐴';
-      case 'ss': case 'shadowsocks': return '👻';
-      case 'hysteria2': case 'hy2': case 'hysteria': return '⚡';
-      case 'tuic': return '🚀';
-      case 'wireguard': return '🔐';
-      default: return '🌐';
-    }
-  }
-  static String _getProtocolColor(String proto) {
-    switch (proto.toLowerCase()) {
-      case 'vless': return '#10B981';
-      case 'vmess': return '#3B82F6';
-      case 'trojan': return '#EF4444';
-      case 'ss': case 'shadowsocks': return '#8B5CF6';
-      case 'hysteria2': case 'hy2': case 'hysteria': return '#F59E0B';
-      case 'tuic': return '#8B5CF6';
-      case 'wireguard': return '#06B6D4';
-      default: return '#6B7280';
-    }
-  }
-  static String _getProtocolDesc(String proto) {
-    switch (proto.toLowerCase()) {
-      case 'vless': return 'پایدار + مقاوم در برابر فیلتر - 9.5/10';
-      case 'hysteria2': case 'hy2': return 'سریع برای اینترنت ضعیف - استریم + دانلود';
-      case 'tuic': return 'کمترین تاخیر 110-140ms - بازی + تماس صوتی';
-      case 'vmess': return 'کلاسیک + سازگار';
-      case 'trojan': return 'ساده + سریع';
-      default: return '';
-    }
-  }
-  static String _getBestFor(String proto) {
-    switch (proto.toLowerCase()) {
-      case 'vless': return 'روزمره + استقامت';
-      case 'hysteria2': case 'hy2': return 'استریم + دانلود حجیم';
-      case 'tuic': return 'بازی آنلاین + تماس صوتی + ترید';
-      case 'vmess': return 'سازگاری عمومی';
-      case 'trojan': return 'سرعت بالا';
-      default: return 'عمومی';
-    }
   }
 
   Map<String, dynamic> toJson() {
@@ -127,54 +104,100 @@ class ServerModel {
       'config_uri': configUri,
       'is_recommended': isRecommended,
       'is_online': isOnline,
-      'ping_ms': pingMs,
+      'is_info': isInfo,
+      'is_real': isReal,
     };
   }
 
-  String get pingDisplay {
-    if (pingMs == null) return '--';
-    if (pingMs! < 0) return 'خطا';
-    if (pingMs == 0) return 'آماده'; // v4.0.14: server exists but ping not measurable, show as ready
-    return '$pingMs ms';
-  }
-
+  // v4.0.76 ULTRA STRICT FINAL - هرگز حجم/زمان را به عنوان کانکشن انتخاب نکند
+  // 4-layer filter: panel flag + name keywords + URI + size heuristics
   bool get isInfoBanner {
+    // Layer 1: Panel flag (100% guarantee)
+    if (isInfo) return true;
+    if (!isReal) return true;
+
     final lower = name.toLowerCase();
     final lowerUri = configUri.toLowerCase();
+
+    // Layer 2: Emoji check
     if (name.contains('📊') || name.contains('⏳') || name.contains('📉') || name.contains('⌛') || name.contains('💾') || name.contains('📈') || name.contains('⏰') || name.contains('⌚') || name.contains('💿') || name.contains('📅')) {
       return true;
     }
-    final volumeKeywords = ['روز', 'ساعت', 'دقیقه', 'ثانیه', 'انقضا', 'اعتبار', 'حجم', 'مصرف', 'ترافیک', 'باقی', 'مانده', 'کل', 'زمان', 'مدت', 'شده', 'تاریخ', 'مهلت', 'پایان'];
+
+    // Layer 3: Persian + English keywords with numbers
+    final volumeKeywords = ['روز', 'ساعت', 'دقیقه', 'ثانیه', 'انقضا', 'اعتبار', 'حجم', 'مصرف', 'ترافیک', 'باقی', 'مانده', 'کل', 'زمان', 'مدت', 'شده', 'تاریخ', 'مهلت', 'پایان', 'شروع'];
     final hasVolumeKeyword = volumeKeywords.any((k) => lower.contains(k));
     final hasNumber = RegExp(r'\d').hasMatch(name);
     final hasGBMB = RegExp(r'(gb|mb)', caseSensitive: false).hasMatch(name);
     final hasPercent = name.contains('%');
+
     if (hasVolumeKeyword && (hasNumber || hasGBMB || hasPercent)) {
       return true;
     }
-    if (lower.contains('روز اعتبار') || lower.contains('اعتبار باقی') || lower.contains('حجم باقی') || lower.contains('حجم مصرف') || lower.contains('مصرف حجم') || lower.contains('مصرف شده') || lower.contains('حجم کل') || lower.contains('ترافیک') || lower.contains('انقضا') || lower.contains('باقی مانده') || lower.contains('زمان باقی') || lower.contains('مدت باقی') || lower.contains('traffic remaining') || lower.contains('traffic used') || lower.contains('expire') || lower.contains('remaining') || lower.contains('volume') || lower.contains('quota') || lower.contains('usage') || lower.contains('subscription info') || lower.contains('account info')) {
+
+    // Layer 3b: Direct phrases
+    if (lower.contains('روز اعتبار') ||
+        lower.contains('اعتبار باقی') ||
+        lower.contains('حجم باقی') ||
+        lower.contains('حجم مصرف') ||
+        lower.contains('مصرف حجم') ||
+        lower.contains('مصرف شده') ||
+        lower.contains('حجم کل') ||
+        lower.contains('ترافیک') ||
+        lower.contains('انقضا') ||
+        lower.contains('باقی مانده') ||
+        lower.contains('زمان باقی') ||
+        lower.contains('مدت باقی') ||
+        lower.contains('traffic remaining') ||
+        lower.contains('traffic used') ||
+        lower.contains('expire') ||
+        lower.contains('remaining') ||
+        lower.contains('used traffic') ||
+        lower.contains('total traffic') ||
+        lower.contains('time left') ||
+        lower.contains('days left') ||
+        lower.contains('volume') ||
+        lower.contains('quota') ||
+        lower.contains('usage') ||
+        lower.contains('subscription info') ||
+        lower.contains('account info') ||
+        lower.contains('account status') ||
+        lower.contains('traffic info')) {
       return true;
     }
-    if (RegExp(r'\d+(\.\d+)?\s*(gb|mb)', caseSensitive: false).hasMatch(name) && (lower.contains('روز') || lower.contains('day') || lower.contains('expire') || lower.contains('اعتبار') || lower.contains('حجم') || lower.contains('مصرف') || lower.contains('ترافیک') || lower.contains('زمان') || lower.contains('ساعت'))) {
+
+    // Layer 3c: GB/MB + volume context
+    if (RegExp(r'\d+(\.\d+)?\s*(gb|mb)', caseSensitive: false).hasMatch(name) &&
+        (lower.contains('روز') || lower.contains('day') || lower.contains('expire') || lower.contains('اعتبار') || lower.contains('حجم') || lower.contains('مصرف') || lower.contains('ترافیک') || lower.contains('زمان') || lower.contains('ساعت'))) {
       return true;
     }
-    if (lowerUri.contains('%f0%9f%93%8a') || lowerUri.contains('traffic') || lowerUri.contains('expire') || lowerUri.contains('info') || lowerUri.contains('remaining') || lowerUri.contains('quota')) {
+
+    // Layer 4: URI encoded emoji or keywords
+    if (lowerUri.contains('%f0%9f%93%8a') || lowerUri.contains('traffic') || lowerUri.contains('expire') || lowerUri.contains('info') || lowerUri.contains('remaining') || lowerUri.contains('quota') || lowerUri.contains('account')) {
       return true;
     }
+
+    // Layer 5: Invalid URI
     if (configUri.isEmpty || configUri.length < 30) {
       return true;
     }
+
+    // Layer 6: Short name + GB/MB heuristic
     if (name.length < 20 && hasNumber && hasGBMB) {
-      final hasCountry = RegExp(r'(germany|france|usa|netherlands|finland|turkey|iran|uk|gb|de|nl|fi|tr|ir|us)', caseSensitive: false).hasMatch(lower);
-      final hasVolumeWord = lower.contains('حجم') || lower.contains('مصرف') || lower.contains('ترافیک') || lower.contains('باقی') || lower.contains('روز') || lower.contains('traffic') || lower.contains('expire');
+      final hasCountry = RegExp(r'(germany|france|usa|netherlands|finland|turkey|iran|uk|gb|de|nl|fi|tr|ir|us|singapore|japan|canada)', caseSensitive: false).hasMatch(lower);
+      final hasVolumeWord = lower.contains('حجم') || lower.contains('مصرف') || lower.contains('ترافیک') || lower.contains('باقی') || lower.contains('روز') || lower.contains('traffic') || lower.contains('expire') || lower.contains('quota') || lower.contains('account');
       if (hasVolumeWord) return true;
       if (name.length < 12 && !hasCountry) return true;
     }
+
+    // Layer 7: Pure percent or pure GB/MB
     if (RegExp(r'^\s*\d+\s*%\s*$').hasMatch(name) || RegExp(r'^\s*\d+(\.\d+)?\s*(gb|mb)\s*$', caseSensitive: false).hasMatch(name)) {
       return true;
     }
+
     return false;
   }
+
   bool get isRealVpnServer {
     if (isInfoBanner) return false;
     if (configUri.isEmpty) return false;
@@ -183,133 +206,75 @@ class ServerModel {
     final hasValidProto = validProtocols.any((p) => configUri.toLowerCase().startsWith(p));
     if (!hasValidProto) return false;
     final lower = name.toLowerCase();
-    final forbidden = ['حجم', 'مصرف', 'ترافیک', 'روز', 'ساعت', 'انقضا', 'اعتبار', 'باقی', 'مانده', 'traffic', 'expire', 'remaining', 'volume', 'quota', 'account', 'subscription', 'info'];
+    final forbidden = ['حجم', 'مصرف', 'ترافیک', 'روز', 'ساعت', 'انقضا', 'اعتبار', 'باقی', 'مانده', 'traffic', 'expire', 'remaining', 'volume', 'quota', 'account', 'subscription', 'info', 'status', '📊', '⏳'];
     if (forbidden.any((k) => lower.contains(k))) return false;
     if (RegExp(r'^\s*\d+\s*%\s*$').hasMatch(name) || RegExp(r'^\s*\d+(\.\d+)?\s*(gb|mb)\s*$', caseSensitive: false).hasMatch(name)) return false;
     return true;
   }
+
   bool get isSelectableForSmartConnect {
     if (isInfoBanner) return false;
     if (!isRealVpnServer) return false;
     if (configUri.isEmpty || configUri.length < 30) return false;
     final lower = name.toLowerCase();
-    if (lower.contains('📊') || lower.contains('⏳') || lower.contains('حجم') || lower.contains('روز') || lower.contains('ساعت') || lower.contains('انقضا') || lower.contains('باقی') || lower.contains('traffic') || lower.contains('expire') || lower.contains('remaining') || lower.contains('quota')) return false;
+    if (lower.contains('📊') || lower.contains('⏳') || lower.contains('حجم') || lower.contains('روز') || lower.contains('ساعت') || lower.contains('انقضا') || lower.contains('باقی') || lower.contains('traffic') || lower.contains('expire') || lower.contains('remaining') || lower.contains('quota') || lower.contains('account') || lower.contains('subscription') || lower.contains('info')) return false;
     return true;
   }
+
   String get rejectReason {
+    if (isInfo) return 'panelFlag_is_info';
+    if (!isReal) return 'panelFlag_not_real';
     if (isInfoBanner) return 'isInfoBanner';
     if (!isRealVpnServer) return 'notReal';
     if (configUri.isEmpty || configUri.length < 30) return 'invalidUri';
     return 'ok';
   }
 
-  // v4.0.73 NEW: Protocol display helpers
-  String get displayProtocolLabel => protocolLabel.isNotEmpty ? protocolLabel : protocol.toUpperCase();
-  String get displayIcon => protocolIcon.isNotEmpty ? protocolIcon : _getProtocolIcon(protocol);
-  String get displayDesc => protocolDesc.isNotEmpty ? protocolDesc : _getProtocolDesc(protocol);
-  
-  bool get isTuic => protocol.toLowerCase() == 'tuic';
-  bool get isHysteria2 => protocol.toLowerCase() == 'hysteria2' || protocol.toLowerCase() == 'hy2' || protocol.toLowerCase() == 'hysteria';
-  bool get isVless => protocol.toLowerCase() == 'vless';
-  
-  // Color as int for Flutter
-  int get protocolColorInt {
-    try {
-      var hex = protocolColor.replaceAll('#', '');
-      if (hex.length == 6) hex = 'FF$hex';
-      return int.parse(hex, radix: 16);
-    } catch (_) {
-      return 0xFF6B7280;
-    }
-  }
-
-  factory ServerModel.fromUri(String rawUri, int index) {
-    String uri = rawUri.trim();
-    String proto = 'vless';
-    if (uri.contains('://')) {
-      proto = uri.split('://').first.toLowerCase();
-    } else if (uri.trim().startsWith('{')) {
-      proto = 'raw';
-    } else if (uri.contains('proxies:') || uri.contains('proxy-groups:')) {
-      proto = 'clash';
-    }
-
-    String name = 'سرور ابری #$index';
-    if (uri.contains('#')) {
-      try {
-        final frag = uri.split('#').last;
-        if (frag.length < 200) {
-          name = Uri.decodeComponent(frag);
-        }
-      } catch (_) {
-        try {
-          final frag = uri.split('#').last;
-          if (frag.length < 200) name = frag;
-        } catch (_) {}
-      }
-    }
-    // If raw JSON, try to extract remark/ps
-    if (name.startsWith('سرور ابری') && uri.trim().startsWith('{')) {
-      try {
-        // Attempt to parse remark from JSON comment or ps field
-        if (uri.contains('"ps"')) {
-          final m = RegExp(r'"ps"\s*:\s*"([^"]+)"').firstMatch(uri);
-          if (m != null) name = m.group(1)!;
-        }
-      } catch (_) {}
-    }
-
-    String flag = '🌐';
-    String countryName = 'بین‌الملل';
-    String countryCode = 'INT';
-    final lower = name.toLowerCase();
-
-    if (lower.contains('irancell') || lower.contains('ایرانسل') || lower.contains('germany') || lower.contains('آلمان') || lower.contains('🇩🇪')) {
-      flag = '🇩🇪'; countryName = 'آلمان'; countryCode = 'DE';
-    } else if (lower.contains('netherlands') || lower.contains('هلند') || lower.contains('🇳🇱') || lower.contains('nl')) {
-      flag = '🇳🇱'; countryName = 'هلند'; countryCode = 'NL';
-    } else if (lower.contains('fi') || lower.contains('فنلاند') || lower.contains('finland') || lower.contains('🇫🇮')) {
-      flag = '🇫🇮'; countryName = 'فنلاند'; countryCode = 'FI';
-    } else if (lower.contains('turkey') || lower.contains('ترکیه') || lower.contains('🇹🇷') || lower.contains('tr')) {
-      flag = '🇹🇷'; countryName = 'ترکیه'; countryCode = 'TR';
-    } else if (lower.contains('usa') || lower.contains('آمریکا') || lower.contains('🇺🇸') || lower.contains('us')) {
-      flag = '🇺🇸'; countryName = 'آمریکا'; countryCode = 'US';
-    } else if (lower.contains('united kingdom') || lower.contains('انگلستان') || lower.contains('uk') || lower.contains('🇬🇧') || lower.contains('gb')) {
-      flag = '🇬🇧'; countryName = 'انگلستان'; countryCode = 'GB';
-    } else if (lower.contains('france') || lower.contains('فرانسه') || lower.contains('🇫🇷') || lower.contains('fr')) {
-      flag = '🇫🇷'; countryName = 'فرانسه'; countryCode = 'FR';
-    } else if (lower.contains('dubai') || lower.contains('امارات') || lower.contains('دبی') || lower.contains('🇦🇪')) {
-      flag = '🇦🇪'; countryName = 'امارات'; countryCode = 'AE';
-    } else if (lower.contains('it') || lower.contains('ایتالیا') || lower.contains('italy') || lower.contains('🇮🇹')) {
-      flag = '🇮🇹'; countryName = 'ایتالیا'; countryCode = 'IT';
-    }
-
-    String operatorTag = 'all';
-    String operatorName = 'تمام اپراتورها';
-    if (lower.contains('irancell') || lower.contains('ایرانسل') || lower.contains('mtn')) {
-      operatorTag = 'irancell'; operatorName = 'ایرانسل';
-    } else if (lower.contains('mci') || lower.contains('همراه اول')) {
-      operatorTag = 'mci'; operatorName = 'همراه اول';
-    } else if (lower.contains('rightel') || lower.contains('رایتل')) {
-      operatorTag = 'rightel'; operatorName = 'رایتل';
-    } else if (lower.contains('wifi') || lower.contains('مخابرات') || lower.contains('شاتل') || lower.contains('وای‌فای')) {
-      operatorTag = 'wifi'; operatorName = 'اینترنت خانگی / Wi-Fi';
-    }
-
+  ServerModel copyWith({
+    String? id,
+    String? name,
+    String? countryName,
+    String? countryCode,
+    String? flag,
+    String? protocol,
+    String? protocolLabel,
+    String? protocolIcon,
+    String? protocolColor,
+    String? protocolDesc,
+    String? bestFor,
+    String? operatorTag,
+    String? operatorName,
+    String? pingUrl,
+    String? configUri,
+    bool? isRecommended,
+    bool? isOnline,
+    bool? isInfo,
+    bool? isReal,
+    int? pingMs,
+    bool? isPinging,
+  }) {
     return ServerModel(
-      id: 'conn_$index',
-      name: name,
-      countryName: countryName,
-      countryCode: countryCode,
-      flag: flag,
-      protocol: proto,
-      operatorTag: operatorTag,
-      operatorName: operatorName,
-      pingUrl: 'https://www.google.com/generate_204',
-      configUri: uri,
-      isRecommended: (index == 2 || index == 3 || index == 1),
-      isOnline: true,
-      pingMs: null,
+      id: id ?? this.id,
+      name: name ?? this.name,
+      countryName: countryName ?? this.countryName,
+      countryCode: countryCode ?? this.countryCode,
+      flag: flag ?? this.flag,
+      protocol: protocol ?? this.protocol,
+      protocolLabel: protocolLabel ?? this.protocolLabel,
+      protocolIcon: protocolIcon ?? this.protocolIcon,
+      protocolColor: protocolColor ?? this.protocolColor,
+      protocolDesc: protocolDesc ?? this.protocolDesc,
+      bestFor: bestFor ?? this.bestFor,
+      operatorTag: operatorTag ?? this.operatorTag,
+      operatorName: operatorName ?? this.operatorName,
+      pingUrl: pingUrl ?? this.pingUrl,
+      configUri: configUri ?? this.configUri,
+      isRecommended: isRecommended ?? this.isRecommended,
+      isOnline: isOnline ?? this.isOnline,
+      isInfo: isInfo ?? this.isInfo,
+      isReal: isReal ?? this.isReal,
+      pingMs: pingMs ?? this.pingMs,
+      isPinging: isPinging ?? this.isPinging,
     );
   }
 }

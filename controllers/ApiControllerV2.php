@@ -809,6 +809,37 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
             }
 
             $meta = $protoMeta[$proto] ?? ['icon' => '🌐', 'color' => '#6B7280', 'label' => strtoupper($proto), 'desc' => '', 'best_for' => 'عمومی'];
+            // v4.0.76 ULTRA STRICT: Detect traffic/volume info servers and flag them
+            $isInfo = false;
+            $lowerName = strtolower($name);
+            $lowerLink = strtolower($link);
+            // Check emoji
+            if (strpos($name, '📊') !== false || strpos($name, '⏳') !== false || strpos($name, '📉') !== false || strpos($name, '⌛') !== false || strpos($name, '💾') !== false || strpos($name, '📈') !== false || strpos($name, '⏰') !== false || strpos($name, '💿') !== false || strpos($name, '📅') !== false) {
+                $isInfo = true;
+            }
+            // Check Persian and English keywords
+            $infoKeywords = ['روز', 'ساعت', 'دقیقه', 'انقضا', 'اعتبار', 'حجم', 'مصرف', 'ترافیک', 'باقی', 'مانده', 'زمان', 'مهلت', 'پایان', 'تاریخ', 'traffic', 'expire', 'remaining', 'quota', 'account', 'subscription', 'info', 'status', 'volume', 'usage', 'days left', 'time left', 'account info', 'traffic info'];
+            foreach ($infoKeywords as $kw) {
+                if (stripos($name, $kw) !== false || stripos($link, $kw) !== false) {
+                    $isInfo = true;
+                    break;
+                }
+            }
+            // Check GB/MB + number + short name
+            if (!$isInfo && preg_match('/\d+(\.\d+)?\s*(gb|mb)/i', $name)) {
+                if (strlen($name) < 20 || preg_match('/(روز|ساعت|انقضا|باقی|traffic|expire|quota)/i', $name)) {
+                    $isInfo = true;
+                }
+            }
+            // Check only percent
+            if (!$isInfo && preg_match('/^\s*\d+\s*%\s*$/', $name)) {
+                $isInfo = true;
+            }
+            // Check link length too short
+            if (!$isInfo && strlen($link) < 30) {
+                $isInfo = true;
+            }
+            
             $serverList[] = [
                 'id' => 'conn_' . $idx,
                 'name' => $name,
@@ -826,7 +857,10 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
                 'ping_url' => 'https://www.google.com/generate_204',
                 'config_uri' => $link,
                 'is_recommended' => ($idx === 1),
-                'is_online' => true
+                'is_online' => true,
+                'is_info' => $isInfo, // v4.0.76 NEW: Flag for traffic info servers
+                'is_traffic_info' => $isInfo, // v4.0.76 NEW: Alias
+                'is_real' => !$isInfo // v4.0.76 NEW: Real VPN server
             ];
             $idx++;
         }

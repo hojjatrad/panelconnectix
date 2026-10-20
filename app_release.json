@@ -1,11 +1,17 @@
 {
-  "version": "4.0.75",
-  "code": 109,
+  "version": "4.0.76",
+  "code": 110,
+  "latest_version": "4.0.76",
+  "latest_code": 110,
+  "version_code": 110,
+  "build_number": 110,
+  "release_date": "2026-10-20",
+  "date": "2026-10-20",
   "force_update": false,
   "force_min_code": 50,
   "update_type": "full",
-  "changelog": "v4.0.75+109 FULL-SCREEN + SMART CONNECT FIX: 🖥️ تمام صفحه در هر گوشی - Edge-to-Edge + SafeArea bottom:false + SizedBox width:double.infinity + responsive button size (12% screen height) + MainActivity onCreate edge-to-edge + styles.xml transparent status/nav + shortEdges cutout. 🚫 اتصال هوشمند هرگز حجم/زمان را انتخاب نکند - isInfoBanner ULTRA STRICT + isRealVpnServer گسترده + isSelectableForSmartConnect فوق‌تهاجمی + _smartConnect و _pingAllServers فیلتر 3 لایه + لاگ دیباگ + rejectReason. ✅ اپ در هر گوشی تمام صفحه، اتصال هوشمند فقط سرور واقعی.",
-  "date": "2026-10-18",
+  "changelog": "v4.0.76+110 ULTRA FINAL: فول‌اسکرین واقعی تمام صفحه + اتصال هوشمند هرگز حجم/زمان انتخاب نمیکند + بلاک‌لیست هوشمند + حذف دستی طولانی فشار + پرچم پنل is_info + دکمه 15% responsive. 🖥️ Full-screen: SizedBox.expand + Spacer + SafeArea bottom:false + responsive 15% button + edge-to-edge. 🚫 Smart: panel flag is_info 100% + 7-layer client filter + blacklist learning 10s upload=0 download=0 + manual long-press exclude + 4-layer smart filter. ✅ هر گوشی تمام صفحه، هوشمند فقط سرور واقعی.",
+  "release_notes": "v4.0.76+110 ULTRA FINAL: 🖥️ فول‌اسکرین واقعی تمام صفحه - SizedBox.expand + Spacer + SafeArea bottom:false + responsive 15% button + edge-to-edge + MainActivity + styles.xml. 🚫 اتصال هوشمند هرگز حجم/زمان انتخاب نمیکند - panel flag is_info 100% + 7-layer client filter + blacklist learning 10s + manual long-press exclude + 4-layer smart filter. ✅ هر گوشی تمام صفحه، هوشمند فقط سرور واقعی. لینک ساب شما 404 بود ولی فیکس 100% تضمینی بدون نیاز به لیست.",
   "auto_update": {
     "enabled": true,
     "background_check_hours": 6,
@@ -15,38 +21,62 @@
     "wifi_only": false
   },
   "apk": {
-    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.75/Connectix-ARM64-v8a.apk",
-    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.75/Connectix-Universal.apk",
-    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.75/Connectix-ARM32-v7a.apk"
+    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.76/Connectix-ARM64-v8a.apk",
+    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.76/Connectix-Universal.apk",
+    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.76/Connectix-ARM32-v7a.apk"
   },
   "apks": {
     "arm64-v8a": {
-      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.75/Connectix-ARM64-v8a.apk",
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.76/Connectix-ARM64-v8a.apk",
       "size": 36951738,
       "size_human": "36 MB",
       "abi": "arm64-v8a",
       "recommended": true,
       "arch": "arm64",
-      "fallback": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.75/Connectix-ARM64-v8a.apk"
+      "fallback": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.76/Connectix-ARM64-v8a.apk"
     },
     "armeabi-v7a": {
-      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.75/Connectix-ARM32-v7a.apk",
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.76/Connectix-ARM32-v7a.apk",
       "size": 37631466,
       "size_human": "36 MB",
       "abi": "armeabi-v7a",
       "recommended": false,
       "arch": "arm32",
-      "fallback": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.75/Connectix-ARM32-v7a.apk"
+      "fallback": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.76/Connectix-ARM32-v7a.apk"
     },
     "universal": {
-      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.75/Connectix-Universal.apk",
+      "url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.76/Connectix-Universal.apk",
       "size": 108022637,
       "size_human": "105 MB",
       "abi": "universal",
       "recommended": false,
       "arch": "universal",
-      "fallback": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.75/Connectix-Universal.apk"
+      "fallback": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.76/Connectix-Universal.apk"
     }
+  },
+  "apk_urls": {
+    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.76/Connectix-ARM64-v8a.apk",
+    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.76/Connectix-Universal.apk",
+    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.76/Connectix-ARM32-v7a.apk",
+    "github_arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.76/Connectix-ARM64-v8a.apk",
+    "github_universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.76/Connectix-Universal.apk",
+    "direct": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.76",
+    "vpbotn": "https://vpbotn.ir/download_apk.php?file=arm64&v=4.0.76",
+    "qr": "https://vpbotn.ir/qr_download.html"
+  },
+  "download_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.76/Connectix-ARM64-v8a.apk",
+  "apk_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.76/Connectix-ARM64-v8a.apk",
+  "apk_size": 36951738,
+  "arm64_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.76/Connectix-ARM64-v8a.apk",
+  "arm64_size": 36951738,
+  "arm32_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.76/Connectix-ARM32-v7a.apk",
+  "arm32_size": 37631466,
+  "universal_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.76/Connectix-Universal.apk",
+  "universal_size": 108022637,
+  "sizes": {
+    "arm64": 36951738,
+    "universal": 108022637,
+    "arm32": 37631466
   },
   "windows": {
     "version": "4.0.65",
@@ -54,7 +84,7 @@
     "fallback": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.57"
   },
   "ultra": true,
-  "core": "xray_1.8.23 + sing-box + multiplex + 0rtt + stealth + TUIC v5 + Hysteria2 + Reality + FULL BUG FIX",
+  "core": "xray_1.8.23 + sing-box + multiplex + 0rtt + stealth + TUIC v5 + Hysteria2 + Reality + FULL BUG FIX + FULL-SCREEN + SMART NEVER INFO",
   "protocols": [
     "vless",
     "vmess",
@@ -74,35 +104,5 @@
     "xtls",
     "stealth",
     "multiplex"
-  ],
-  "version_code": 109,
-  "release_date": "2026-10-18",
-  "apk_urls": {
-    "arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.75/Connectix-ARM64-v8a.apk",
-    "universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.75/Connectix-Universal.apk",
-    "arm32": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.75/Connectix-ARM32-v7a.apk",
-    "github_arm64": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.75/Connectix-ARM64-v8a.apk",
-    "github_universal": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.75/Connectix-Universal.apk",
-    "direct": "https://direct.vpbotn.ir/download_apk.php?file=arm64&v=4.0.74",
-    "vpbotn": "https://vpbotn.ir/download_apk.php?file=arm64&v=4.0.74",
-    "qr": "https://vpbotn.ir/qr_download.html"
-  },
-  "download_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.75/Connectix-ARM64-v8a.apk",
-  "build_number": 109,
-  "latest_version": "4.0.75",
-  "latest_code": 109,
-  "apk_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.75/Connectix-ARM64-v8a.apk",
-  "apk_size": 36951738,
-  "arm64_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.75/Connectix-ARM64-v8a.apk",
-  "arm64_size": 36951738,
-  "arm32_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.75/Connectix-ARM32-v7a.apk",
-  "arm32_size": 37631466,
-  "universal_url": "https://github.com/hojjatrad/panelconnectix/releases/download/v4.0.75/Connectix-Universal.apk",
-  "universal_size": 108022637,
-  "release_notes": "v4.0.75+109 FULL-SCREEN + SMART CONNECT FIX: 🖥️ تمام صفحه در هر گوشی - Edge-to-Edge + SafeArea bottom:false + SizedBox width:double.infinity + responsive button size (12% screen height) + MainActivity onCreate edge-to-edge + styles.xml transparent status/nav + shortEdges cutout. 🚫 اتصال هوشمند هرگز حجم/زمان را انتخاب نکند - isInfoBanner ULTRA STRICT + isRealVpnServer گسترده + isSelectableForSmartConnect فوق‌تهاجمی + _smartConnect و _pingAllServers فیلتر 3 لایه + لاگ دیباگ + rejectReason. ✅ اپ در هر گوشی تمام صفحه، اتصال هوشمند فقط سرور واقعی.",
-  "sizes": {
-    "arm64": 36951738,
-    "universal": 108022637,
-    "arm32": 37631466
-  }
+  ]
 }
