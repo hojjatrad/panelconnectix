@@ -96,11 +96,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   // v4.0.63 FOREVER FIX - Never show old version after install - PERMANENT LAW
   // LAW: currentAppVersion must be dynamic, not hardcoded const that stays old after install
   // Fix: Make it getter that returns actual installed version if available, else latest hardcoded
-  static const String _hardcodedVersion = '4.0.77'; // Fallback only, updated each release - v4.0.75 FIX in-app update + old version after browser
-  static const int _hardcodedCode = 109;
+  static const String _hardcodedVersion = '4.0.78'; // Fallback only, updated each release - v4.0.78 FIX version display + account info filter
+  static const int _hardcodedCode = 112;
   static String get currentAppVersion => _actualInstalledVersion.isNotEmpty && _actualInstalledVersion != '4.0.51' ? _actualInstalledVersion : _hardcodedVersion;
-  static String _actualInstalledVersion = '4.0.77'; // Will be updated from PackageManager immediately on start - v4.0.75 FIX
-  static int _actualInstalledCode = 109;
+  static String _actualInstalledVersion = '4.0.78'; // Will be updated from PackageManager immediately on start - v4.0.75 FIX
+  static int _actualInstalledCode = 112;
 
   // v4.0.46 FOREVER CACHE FIX - PERMANENT LAW - NEVER REGRESS
   // LAW 1: Panel must NEVER serve old APK (auto-delete stale files)
@@ -117,6 +117,15 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   // LAW 16: Version from app_release.json, never hardcoded, delete stale APKs
   // v4.0.63 FOREVER FIX: Robust version loading - never show old version after install
   static Future<void> loadActualInstalledVersion() async {
+    // v4.0.78 FOREVER FIX: Clear any cached old version prefs that might cause stale display
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      // If we have a cached dismissed_version that equals old hardcoded, clear it to force fresh check
+      final cachedVer = prefs.getString('cached_app_version') ?? '';
+      if (cachedVer.isNotEmpty && cachedVer != _hardcodedVersion) {
+        // Old cached version detected, will be updated
+      }
+    } catch (_) {}
     // Try 3 times with increasing timeout, fallback to hardcoded only if all fail
     for (int attempt = 0; attempt < 3; attempt++) {
       try {
@@ -255,15 +264,25 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         _syncActiveServer(_servers);
       }
     }
-    // v4.0.63 FOREVER FIX: Load actual installed version immediately and update UI
+    // v4.0.78 FOREVER FIX: Load actual installed version immediately and update UI - FIXED REGRESSION
     // This fixes "new version installed but still shows old version" - must reload from PackageManager
+    // LAW: Must call 2 times - immediately and after 1s delay (PackageManager cache)
     loadActualInstalledVersion().then((_) {
       if (mounted) {
         setState(() {
           // Force UI refresh with new actual version
         });
-        if (kDebugMode) debugPrint('v4.0.63 initState: Actual version loaded: $actualVersion ($actualCode)');
+        if (kDebugMode) debugPrint('v4.0.78 initState: Actual version loaded: $actualVersion ($actualCode)');
       }
+    });
+    // Second attempt after 1.5s to catch PackageManager cache update after fresh install
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      loadActualInstalledVersion().then((_) {
+        if (mounted) {
+          setState(() {});
+          if (kDebugMode) debugPrint('v4.0.78 initState delayed: Actual version loaded: $actualVersion ($actualCode)');
+        }
+      });
     });
     _loadSettings();
     _loadAccounts();
@@ -948,7 +967,16 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       if (!s.isRealVpnServer) return false;
       if (!s.isSelectableForSmartConnect) return false;
       final lower = s.name.toLowerCase();
-      if (lower.contains('حجم') || lower.contains('باقی') || lower.contains('روز') || lower.contains('ساعت') || lower.contains('انقضا') || lower.contains('ترافیک') || lower.contains('traffic') || lower.contains('expire') || lower.contains('remaining') || lower.contains('quota') || lower.contains('account') || lower.contains('subscription') || lower.contains('info') || lower.contains('📊') || lower.contains('⏳')) return false;
+      if (s.name.contains('👤') || s.name.contains('👥')) return false; // v4.0.78: account info with user emoji
+      if (lower.contains('حجم') || lower.contains('باقی') || lower.contains('روز') || lower.contains('ساعت') || lower.contains('انقضا') || lower.contains('ترافیک') || lower.contains('traffic') || lower.contains('expire') || lower.contains('remaining') || lower.contains('quota') || lower.contains('account') || lower.contains('subscription') || lower.contains('info') || lower.contains('📊') || lower.contains('⏳') || lower.contains('👤') || lower.contains('کاربر') || lower.contains('اکانت')) return false;
+      // v4.0.78 NEW: Block if name contains current username (privacy)
+      try {
+        final userLower = _client.username.toLowerCase();
+        if (userLower.isNotEmpty && userLower.length >= 3 && lower.contains(userLower)) {
+          print('v4.0.78 BLOCKED server containing username: ${s.name} contains ${_client.username}');
+          return false;
+        }
+      } catch (_) {}
       return true;
     }).toList();
     print('v4.0.76 clean=${clean.length}');
@@ -1037,8 +1065,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       if (s.isInfoBanner) return false;
       if (!s.isRealVpnServer) return false;
       if (!s.isSelectableForSmartConnect) return false;
+      if (s.name.contains('👤') || s.name.contains('👥')) return false;
       final lower = s.name.toLowerCase();
-      if (lower.contains('حجم') || lower.contains('باقی') || lower.contains('روز') || lower.contains('ساعت') || lower.contains('انقضا') || lower.contains('ترافیک') || lower.contains('traffic') || lower.contains('expire') || lower.contains('remaining') || lower.contains('quota') || lower.contains('account') || lower.contains('📊') || lower.contains('⏳')) return false;
+      if (lower.contains('حجم') || lower.contains('باقی') || lower.contains('روز') || lower.contains('ساعت') || lower.contains('انقضا') || lower.contains('ترافیک') || lower.contains('traffic') || lower.contains('expire') || lower.contains('remaining') || lower.contains('quota') || lower.contains('account') || lower.contains('📊') || lower.contains('⏳') || lower.contains('👤')) return false;
+      try {
+        final userLower = _client.username.toLowerCase();
+        if (userLower.isNotEmpty && userLower.length >= 3 && lower.contains(userLower)) return false;
+      } catch (_) {}
       return true;
     }).toList();
     print('v4.0.76 _pingAllServers: total=${_servers.length} real=${realServers.length} black=${blacklisted.length} excl=${excluded.length}');

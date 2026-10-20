@@ -119,13 +119,13 @@ class ServerModel {
     final lower = name.toLowerCase();
     final lowerUri = configUri.toLowerCase();
 
-    // Layer 2: Emoji check
-    if (name.contains('📊') || name.contains('⏳') || name.contains('📉') || name.contains('⌛') || name.contains('💾') || name.contains('📈') || name.contains('⏰') || name.contains('⌚') || name.contains('💿') || name.contains('📅')) {
+    // Layer 2: Emoji check - including 👤 for account info
+    if (name.contains('📊') || name.contains('⏳') || name.contains('📉') || name.contains('⌛') || name.contains('💾') || name.contains('📈') || name.contains('⏰') || name.contains('⌚') || name.contains('💿') || name.contains('📅') || name.contains('👤') || name.contains('👥') || name.contains('🙍') || name.contains('🙎')) {
       return true;
     }
 
-    // Layer 3: Persian + English keywords with numbers
-    final volumeKeywords = ['روز', 'ساعت', 'دقیقه', 'ثانیه', 'انقضا', 'اعتبار', 'حجم', 'مصرف', 'ترافیک', 'باقی', 'مانده', 'کل', 'زمان', 'مدت', 'شده', 'تاریخ', 'مهلت', 'پایان', 'شروع'];
+    // Layer 3: Persian + English keywords with numbers + account info
+    final volumeKeywords = ['روز', 'ساعت', 'دقیقه', 'ثانیه', 'انقضا', 'اعتبار', 'حجم', 'مصرف', 'ترافیک', 'باقی', 'مانده', 'کل', 'زمان', 'مدت', 'شده', 'تاریخ', 'مهلت', 'پایان', 'شروع', 'کاربر', 'اکانت', 'یوزر', 'پروفایل'];
     final hasVolumeKeyword = volumeKeywords.any((k) => lower.contains(k));
     final hasNumber = RegExp(r'\d').hasMatch(name);
     final hasGBMB = RegExp(r'(gb|mb)', caseSensitive: false).hasMatch(name);
@@ -206,7 +206,7 @@ class ServerModel {
     final hasValidProto = validProtocols.any((p) => configUri.toLowerCase().startsWith(p));
     if (!hasValidProto) return false;
     final lower = name.toLowerCase();
-    final forbidden = ['حجم', 'مصرف', 'ترافیک', 'روز', 'ساعت', 'انقضا', 'اعتبار', 'باقی', 'مانده', 'traffic', 'expire', 'remaining', 'volume', 'quota', 'account', 'subscription', 'info', 'status', '📊', '⏳'];
+    final forbidden = ['حجم', 'مصرف', 'ترافیک', 'روز', 'ساعت', 'انقضا', 'اعتبار', 'باقی', 'مانده', 'traffic', 'expire', 'remaining', 'volume', 'quota', 'account', 'subscription', 'info', 'status', '📊', '⏳', '👤', 'کاربر', 'اکانت', 'یوزر'];
     if (forbidden.any((k) => lower.contains(k))) return false;
     if (RegExp(r'^\s*\d+\s*%\s*$').hasMatch(name) || RegExp(r'^\s*\d+(\.\d+)?\s*(gb|mb)\s*$', caseSensitive: false).hasMatch(name)) return false;
     return true;
@@ -217,7 +217,9 @@ class ServerModel {
     if (!isRealVpnServer) return false;
     if (configUri.isEmpty || configUri.length < 30) return false;
     final lower = name.toLowerCase();
-    if (lower.contains('📊') || lower.contains('⏳') || lower.contains('حجم') || lower.contains('روز') || lower.contains('ساعت') || lower.contains('انقضا') || lower.contains('باقی') || lower.contains('traffic') || lower.contains('expire') || lower.contains('remaining') || lower.contains('quota') || lower.contains('account') || lower.contains('subscription') || lower.contains('info')) return false;
+    if (lower.contains('📊') || lower.contains('⏳') || lower.contains('👤') || lower.contains('حجم') || lower.contains('روز') || lower.contains('ساعت') || lower.contains('انقضا') || lower.contains('باقی') || lower.contains('traffic') || lower.contains('expire') || lower.contains('remaining') || lower.contains('quota') || lower.contains('account') || lower.contains('subscription') || lower.contains('info') || lower.contains('کاربر') || lower.contains('اکانت')) return false;
+    // v4.0.78 NEW: Block servers that contain 👤 or look like account info
+    if (name.contains('👤') || name.contains('👥')) return false;
     return true;
   }
 

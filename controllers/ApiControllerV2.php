@@ -813,12 +813,12 @@ $remainBytes = max(0, $limitBytes - $usedBytes);
             $isInfo = false;
             $lowerName = strtolower($name);
             $lowerLink = strtolower($link);
-            // Check emoji
-            if (strpos($name, '📊') !== false || strpos($name, '⏳') !== false || strpos($name, '📉') !== false || strpos($name, '⌛') !== false || strpos($name, '💾') !== false || strpos($name, '📈') !== false || strpos($name, '⏰') !== false || strpos($name, '💿') !== false || strpos($name, '📅') !== false) {
+            // Check emoji - including 👤 for account info (v4.0.78)
+            if (strpos($name, '📊') !== false || strpos($name, '⏳') !== false || strpos($name, '📉') !== false || strpos($name, '⌛') !== false || strpos($name, '💾') !== false || strpos($name, '📈') !== false || strpos($name, '⏰') !== false || strpos($name, '💿') !== false || strpos($name, '📅') !== false || strpos($name, '👤') !== false || strpos($name, '👥') !== false) {
                 $isInfo = true;
             }
             // Check Persian and English keywords
-            $infoKeywords = ['روز', 'ساعت', 'دقیقه', 'انقضا', 'اعتبار', 'حجم', 'مصرف', 'ترافیک', 'باقی', 'مانده', 'زمان', 'مهلت', 'پایان', 'تاریخ', 'traffic', 'expire', 'remaining', 'quota', 'account', 'subscription', 'info', 'status', 'volume', 'usage', 'days left', 'time left', 'account info', 'traffic info'];
+            $infoKeywords = ['روز', 'ساعت', 'دقیقه', 'انقضا', 'اعتبار', 'حجم', 'مصرف', 'ترافیک', 'باقی', 'مانده', 'زمان', 'مهلت', 'پایان', 'تاریخ', 'کاربر', 'اکانت', 'یوزر', 'پروفایل', 'traffic', 'expire', 'remaining', 'quota', 'account', 'subscription', 'info', 'status', 'volume', 'usage', 'days left', 'time left', 'account info', 'traffic info', 'user info', '👤'];
             foreach ($infoKeywords as $kw) {
                 if (stripos($name, $kw) !== false || stripos($link, $kw) !== false) {
                     $isInfo = true;

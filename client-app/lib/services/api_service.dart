@@ -2073,7 +2073,7 @@ class ApiService {
     required Function(String error) onError,
     required Function() onSuccess,
   }) async {
-    String expectedVer = '4.0.75';
+    String expectedVer = '4.0.78';
     bool wakeLockAcquired = false;
     double lastProgress = 0.0;
     int totalAttempts = 0;
