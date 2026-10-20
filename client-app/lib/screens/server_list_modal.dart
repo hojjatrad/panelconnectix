@@ -4,6 +4,7 @@ import '../models/server_model.dart';
 import '../models/account_model.dart';
 import '../services/api_service.dart';
 import '../services/account_manager.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ServerListModal extends StatefulWidget {
   final List<ServerModel> servers;
@@ -33,6 +34,8 @@ class _ServerListModalState extends State<ServerListModal> {
   int _pingProgress = 0;
   bool _sortByPing = false;
   ServerModel? _bestServer;
+  Set<String> _blacklisted = {};
+  Set<String> _excluded = {};
 
   @override
   void initState() {
@@ -539,54 +542,18 @@ class _ServerListModalState extends State<ServerListModal> {
                           try { var h = hex.replaceAll('#',''); if (h.length==6) h='FF$h'; return Color(int.parse(h, radix: 16)); } catch(_){ return const Color(0xFF8B5CF6); }
                         }
 
-                        final isBlacklisted = _blacklisted.contains(s.id);
-                        final isExcluded = _excluded.contains(s.id);
                         return Container(
                           decoration: BoxDecoration(
-                            color: isBlacklisted || isExcluded ? const Color(0xFF450A0A).withOpacity(0.3) : (isSelected ? const Color(0xFF1E1B4B) : const Color(0xFF0F172A)),
+                            color: isSelected ? const Color(0xFF1E1B4B) : const Color(0xFF0F172A),
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
-                              color: isBlacklisted || isExcluded ? const Color(0xFFEF4444).withOpacity(0.5) : (isSelected ? const Color(0xFF6366F1) : (hasConfig ? const Color(0xFF1E293B) : const Color(0xFF450A0A))),
+                              color: isSelected
+                                  ? const Color(0xFF6366F1)
+                                  : (hasConfig ? const Color(0xFF1E293B) : const Color(0xFF450A0A)),
                             ),
                           ),
                           child: ListTile(
-                            onTap: () {
-                              if (isBlacklisted || isExcluded) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('${s.name} بلاک شده - برای رفع بلاک طولانی فشار دهید'), backgroundColor: const Color(0xFFEF4444)),
-                                );
-                                return;
-                              }
-                              Navigator.pop(context, s);
-                            },
-                            onLongPress: () {
-                              showDialog(
-                                context: context,
-                                builder: (ctx) => AlertDialog(
-                                  backgroundColor: const Color(0xFF0F172A),
-                                  title: Text(isExcluded ? 'رفع بلاک ${s.name}؟' : 'حذف ${s.name} از اتصال هوشمند؟', style: const TextStyle(color: Colors.white, fontSize: 14)),
-                                  content: Text(
-                                    isExcluded ? 'این سرور از لیست سیاه حذف شود و دوباره در اتصال هوشمند استفاده شود؟' : 'این سرور دیگر در اتصال هوشمند و تست پینگ استفاده نخواهد شد. آیا مطمئنید؟ (ممکن است سرور حجم/زمان باشد)',
-                                    style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
-                                  ),
-                                  actions: [
-                                    TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('انصراف')),
-                                    ElevatedButton(
-                                      style: ElevatedButton.styleFrom(backgroundColor: isExcluded ? const Color(0xFF10B981) : const Color(0xFFEF4444)),
-                                      onPressed: () async {
-                                        Navigator.pop(ctx);
-                                        if (isExcluded) {
-                                          await _unexcludeServer(s);
-                                        } else {
-                                          await _excludeServer(s);
-                                        }
-                                      },
-                                      child: Text(isExcluded ? 'رفع بلاک' : 'حذف از هوشمند'),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
+                            onTap: () => Navigator.pop(context, s),
                             leading: Container(
                               width: 44,
                               height: 44,
@@ -665,9 +632,6 @@ class _ServerListModalState extends State<ServerListModal> {
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                if (isBlacklisted) Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: const Color(0xFFEF4444).withOpacity(0.2), borderRadius: BorderRadius.circular(6)), child: const Text('حجم', style: TextStyle(color: Color(0xFFF87171), fontSize: 8, fontWeight: FontWeight.bold))),
-                                if (isExcluded) Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: const Color(0xFFEF4444).withOpacity(0.2), borderRadius: BorderRadius.circular(6)), child: const Text('بلاک', style: TextStyle(color: Color(0xFFF87171), fontSize: 8, fontWeight: FontWeight.bold))),
-                                const SizedBox(width: 4),
                                 _buildPingBadge(s),
                                 const SizedBox(width: 8),
                                 if (isSelected)
@@ -684,4 +648,26 @@ class _ServerListModalState extends State<ServerListModal> {
       ),
     );
   }
+
+  Future<void> _excludeServer(ServerModel s) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = prefs.getStringList('excluded_from_smart') ?? [];
+      if (!list.contains(s.id)) {
+        list.add(s.id);
+        await prefs.setStringList('excluded_from_smart', list);
+        setState(() { _excluded.add(s.id); });
+      }
+    } catch (_) {}
+  }
+  Future<void> _unexcludeServer(ServerModel s) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = prefs.getStringList('excluded_from_smart') ?? [];
+      list.remove(s.id);
+      await prefs.setStringList('excluded_from_smart', list);
+      setState(() { _excluded.remove(s.id); _blacklisted.remove(s.id); });
+    } catch (_) {}
+  }
+
 }

@@ -220,8 +220,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
-    final screenWidth = MediaQuery.of(context).size.width;
     return Scaffold(
       backgroundColor: const Color(0xFF090D16),
       extendBody: true,
@@ -251,17 +249,14 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
       body: SafeArea(
         bottom: false,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                child: IntrinsicHeight(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.07, vertical: screenHeight * 0.02),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 28),
+          child: SizedBox(
+            width: double.infinity,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
                   width: 72,
@@ -518,11 +513,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   style: const TextStyle(color: Color(0xFF475569), fontSize: 10),
                 ),
               ],
-                    ),
-                  ),
-                ),
-              );
-            },
+            ),
           ),
         ),
       ),
