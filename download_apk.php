@@ -91,14 +91,14 @@ if (!file_exists($filePath) || filesize($filePath) < 20*1024*1024) {
 
 // If still no local file, try GitHub proxy
 if (!file_exists($filePath) || filesize($filePath) < 20*1024*1024) {
-    $ver = $version ?: '4.0.79';
+    $ver = $version ?: '4.0.80';
     $ver = preg_replace('/[^0-9\.]/', '', $ver);
-    if (empty($ver)) $ver = '4.0.79';
+    if (empty($ver)) $ver = '4.0.80';
     
     $githubVer = $ver;
     $allowedGithubVersions = ['4.0.51', '4.0.64', '4.0.65', '4.0.66', '4.0.67', '4.0.68', '4.0.69', '4.0.70', '4.0.71', '4.0.72', '4.0.73', '4.0.74', '4.0.75', '4.0.76', '4.0.77', '4.0.78', '4.0.79', '4.0.80'];
     if (!in_array($ver, $allowedGithubVersions) && version_compare($ver, '4.0.79', '>')) {
-        $githubVer = '4.0.79';
+        $githubVer = '4.0.80';
         error_log("download_apk.php v4.0.80: Requested v$ver has no GitHub assets yet, using v$githubVer fallback");
     } elseif (version_compare($ver, '4.0.51', '>') && version_compare($ver, '4.0.75', '<')) {
         if (!in_array($ver, ['4.0.64', '4.0.65', '4.0.66', '4.0.67', '4.0.68', '4.0.69', '4.0.70', '4.0.71', '4.0.72', '4.0.73', '4.0.74', '4.0.75'])) {

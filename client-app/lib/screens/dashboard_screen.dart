@@ -98,7 +98,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   // Fix: Make it getter that returns actual installed version if available, else latest hardcoded
   static const String _hardcodedVersion = '4.0.80'; // Fallback only, updated each release - v4.0.80 FIX version display + account info filter
   static const int _hardcodedCode = 114;
-  static String get currentAppVersion => _actualInstalledVersion.isNotEmpty && _actualInstalledVersion != '4.0.51' ? _actualInstalledVersion : _hardcodedVersion;
+  static String get currentAppVersion => _hardcodedVersion; // v4.0.80 FIX: Always show hardcoded
   static String _actualInstalledVersion = '4.0.80'; // Will be updated from PackageManager immediately on start - v4.0.80 FIX
   static int _actualInstalledCode = 114;
 
@@ -3897,7 +3897,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      'نسخه ${actualVersion} (کد $actualCode)',
+                      'نسخه ${_hardcodedVersion} (کد ${_hardcodedCode}) | نصب: ${actualVersion} ($actualCode)',
                       style: const TextStyle(color: Color(0xFF475569), fontSize: 10),
                     ),
                     const SizedBox(width: 14),
